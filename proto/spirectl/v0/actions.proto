@@ -1,0 +1,533 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+import "spirectl/v0/map_drawings.proto";
+
+enum ActionFailureReasonCode {
+  ACTION_FAILURE_REASON_CODE_UNSPECIFIED = 0;
+  ACTION_FAILURE_REASON_CODE_NOT_IMPLEMENTED = 1;
+  ACTION_FAILURE_REASON_CODE_INVALID_ACTION = 2;
+  ACTION_FAILURE_REASON_CODE_BRIDGE_NOT_ATTACHED = 3;
+  ACTION_FAILURE_REASON_CODE_RUNTIME_FAILURE = 4;
+  ACTION_FAILURE_REASON_CODE_WRONG_SCREEN = 5;
+  ACTION_FAILURE_REASON_CODE_WRONG_PLAYER = 6;
+  ACTION_FAILURE_REASON_CODE_NOT_VISIBLE = 7;
+  ACTION_FAILURE_REASON_CODE_NOT_ENABLED = 8;
+  ACTION_FAILURE_REASON_CODE_MISSING_HOOK = 9;
+  ACTION_FAILURE_REASON_CODE_AMBIGUOUS_HOOK = 10;
+  ACTION_FAILURE_REASON_CODE_STALE_ID = 11;
+  ACTION_FAILURE_REASON_CODE_UNSUPPORTED_PERSPECTIVE = 12;
+  ACTION_FAILURE_REASON_CODE_DANGEROUS_MODE_REQUIRED = 13;
+}
+
+message ActionDescriptor {
+  string id = 1;
+  ActionKind kind = 2;
+  string summary = 3;
+  string cli_command_hint = 4;
+  bool provisional = 5;
+  ActionStatus status = 6;
+  repeated ActionParameter parameters = 7;
+}
+
+message ActionRequest {
+  string request_id = 1;
+  PerspectiveSelector perspective = 2;
+
+  oneof action {
+    PlayCardAction play_card = 10;
+    ChooseAction choose = 11;
+    EndTurnAction end_turn = 12;
+    ReadyAction ready = 13;
+    UnreadyAction unready = 14;
+    SelectCharacterAction select_character = 15;
+    SelectMapNodeAction select_map_node = 16;
+    MouseClickAction mouse_click = 17;
+    UsePotionAction use_potion = 18;
+    ConfirmSelectionAction confirm_selection = 19;
+    CancelSelectionAction cancel_selection = 20;
+    ClaimRewardAction claim_reward = 21;
+    SkipRewardsAction skip_rewards = 22;
+    SelectCardAction select_card = 23;
+    SkipCardSelectionAction skip_card_selection = 24;
+    SelectBundleAction select_bundle = 25;
+    BuyCardAction buy_card = 26;
+    BuyRelicAction buy_relic = 27;
+    BuyPotionAction buy_potion = 28;
+    RemoveCardAction remove_card = 29;
+    LeaveShopAction leave_shop = 30;
+    CloseShopInventoryAction close_shop_inventory = 31;
+    RestAction rest = 32;
+    SmithAction smith = 33;
+    UseRestSiteOptionAction use_rest_site_option = 34;
+    ProceedRestSiteAction proceed_rest_site = 35;
+    OpenChestAction open_chest = 36;
+    TakeRelicAction take_relic = 37;
+    ProceedTreasureRoomAction proceed_treasure_room = 38;
+    BackFromMapAction back_from_map = 39;
+    SelectEventOptionAction select_event_option = 40;
+    OpenEventShopAction open_event_shop = 41;
+    UseCrystalSphereControlAction use_crystal_sphere_control = 42;
+    ProceedEventAction proceed_event = 43;
+    JoinLobbyPlayerAction join_lobby_player = 44;
+    LeaveLobbyPlayerAction leave_lobby_player = 45;
+    ToggleMapAction toggle_map = 46;
+    ToggleDeckAction toggle_deck = 47;
+    ToggleSettingsAction toggle_settings = 48;
+    SortDeckViewAction sort_deck_view = 49;
+    ToggleDeckViewUpgradesAction toggle_deck_view_upgrades = 50;
+    OpenPotionPopupAction open_potion_popup = 51;
+    StartPotionTargetingAction start_potion_targeting = 52;
+    SelectTargetAction select_target = 53;
+    DiscardPotionAction discard_potion = 54;
+    ViewDrawPileAction view_draw_pile = 55;
+    ViewDiscardPileAction view_discard_pile = 56;
+    ViewExhaustPileAction view_exhaust_pile = 57;
+    CancelEndTurnAction cancel_end_turn = 58;
+    InspectRelicAction inspect_relic = 59;
+    CloseInspectRelicAction close_inspect_relic = 60;
+    SelectHandCardAction select_hand_card = 61;
+    DeselectHandCardAction deselect_hand_card = 62;
+    ConfirmHandSelectionAction confirm_hand_selection = 63;
+    DrawMapStrokeAction draw_map_stroke = 64;
+    ClearMapDrawingsAction clear_map_drawings = 65;
+    HealAction heal = 66;
+  }
+}
+
+message ActionDescriptorV0 {
+  string id = 1;
+  ActionKind kind = 2;
+  string summary = 3;
+  string cli_command_hint = 4;
+  bool provisional = 5;
+  ActionStatus status = 6;
+  ActionKindDescriptor kind_descriptor = 7;
+  string owner_player_id = 8;
+  ActionPerspectiveBehavior perspective_behavior = 9;
+  ActionLegalityStatus legality_status = 10;
+  repeated string checked_hook_paths = 11;
+  repeated ActionArgumentSchema argument_schema = 12;
+  repeated ActionFailureReasonCode failure_reason_codes = 13;
+  RemoteClientOrchestrationCapability remote_orchestration = 14;
+  MultiplayerRole owner_role = 15;
+}
+
+message ActionParameter {
+  string name = 1;
+  string value_type = 2;
+  bool required = 3;
+  string summary = 4;
+}
+
+message ActionKindDescriptor {
+  ActionKind kind = 1;
+  string intent_kind = 2;
+  string command_name = 3;
+  string summary = 4;
+  bool fallback = 5;
+  bool dangerous = 6;
+  repeated string modes = 7;
+  repeated string screen_types = 8;
+}
+
+message ActionArgumentSchema {
+  string name = 1;
+  ActionArgumentValueType value_type = 2;
+  bool required = 3;
+  string summary = 4;
+  repeated string allowed_values = 5;
+  bool stable_id = 6;
+}
+
+enum ActionArgumentValueType {
+  ACTION_ARGUMENT_VALUE_TYPE_UNSPECIFIED = 0;
+  ACTION_ARGUMENT_VALUE_TYPE_STRING = 1;
+  ACTION_ARGUMENT_VALUE_TYPE_STABLE_ID = 2;
+  ACTION_ARGUMENT_VALUE_TYPE_PLAYER_ID = 3;
+  ACTION_ARGUMENT_VALUE_TYPE_CARD_ID = 4;
+  ACTION_ARGUMENT_VALUE_TYPE_POTION_ID = 5;
+  ACTION_ARGUMENT_VALUE_TYPE_TARGET_ID = 6;
+  ACTION_ARGUMENT_VALUE_TYPE_CHOICE_ID = 7;
+  ACTION_ARGUMENT_VALUE_TYPE_MAP_NODE_ID = 8;
+  ACTION_ARGUMENT_VALUE_TYPE_CHARACTER_ID = 9;
+  ACTION_ARGUMENT_VALUE_TYPE_INT32 = 10;
+  ACTION_ARGUMENT_VALUE_TYPE_ENUM = 11;
+  ACTION_ARGUMENT_VALUE_TYPE_BOOL = 12;
+}
+
+enum ActionPerspectiveBehavior {
+  ACTION_PERSPECTIVE_BEHAVIOR_UNSPECIFIED = 0;
+  ACTION_PERSPECTIVE_BEHAVIOR_LOCAL_ONLY = 1;
+  ACTION_PERSPECTIVE_BEHAVIOR_OWNER_ONLY = 2;
+  ACTION_PERSPECTIVE_BEHAVIOR_OMNISCIENT_ALLOWED = 3;
+  ACTION_PERSPECTIVE_BEHAVIOR_SHARED = 4;
+  ACTION_PERSPECTIVE_BEHAVIOR_DANGEROUS_VIEWPORT = 5;
+}
+
+enum ActionLegalityStatus {
+  ACTION_LEGALITY_STATUS_UNSPECIFIED = 0;
+  ACTION_LEGALITY_STATUS_LEGAL = 1;
+  ACTION_LEGALITY_STATUS_ILLEGAL = 2;
+  ACTION_LEGALITY_STATUS_PROVISIONAL = 3;
+  ACTION_LEGALITY_STATUS_UNKNOWN = 4;
+}
+
+message PlayCardAction {
+  string card_id = 1;
+  string target_id = 2;
+}
+
+message ChooseAction {
+  string choice_id = 1;
+}
+
+message EndTurnAction {
+}
+
+message CancelEndTurnAction {
+}
+
+message ReadyAction {
+}
+
+message UnreadyAction {
+}
+
+message SelectCharacterAction {
+  string character_id = 1;
+}
+
+message SelectMapNodeAction {
+  string node_id = 1;
+}
+
+message UsePotionAction {
+  string potion_id = 1;
+  string target_id = 2;
+}
+
+message OpenPotionPopupAction {
+  string potion_id = 1;
+}
+
+message StartPotionTargetingAction {
+  string potion_id = 1;
+}
+
+message SelectTargetAction {
+  string target_id = 1;
+}
+
+message DiscardPotionAction {
+  string potion_id = 1;
+}
+
+message ConfirmSelectionAction {
+  // Optional: confirm a CLIENT-staged selection (e.g. the deck-card-removal
+  // preview). When present, the host stages these cards (by their state card id)
+  // before confirming — folding staging+confirm into one call, mirroring
+  // ConfirmHandSelectionAction. Empty preserves the original behavior (confirm
+  // whatever the host already has staged).
+  string player_id = 1;
+  repeated string card_ids = 2;
+  // Optional: the stable reward id (reward:<player-id>:visible:<index> /
+  // reward:<player-id>:<reward-set-index>) when this confirm commits a
+  // per-player undoable card-REMOVAL reward that was opened client-side (no host
+  // selection screen). The bridge engages the owning player's reward directly and
+  // removes card_ids[0] from that player's deck. Empty preserves the original
+  // live-screen staging+confirm behavior.
+  string reward_id = 3;
+}
+
+message CancelSelectionAction {
+}
+
+message ClaimRewardAction {
+  string reward_id = 1;
+  string player_id = 2;
+}
+
+message SkipRewardsAction {
+  string player_id = 1;
+}
+
+message SelectCardAction {
+  string card_id = 1;
+  string player_id = 2;
+  // Optional: the stable reward id when this select commits a per-player undoable
+  // card-CHOICE reward opened client-side (no host selection screen). The bridge
+  // engages the owning player's reward directly and adds the chosen offered card
+  // (card_id carries the synthetic card:...:<index> id) to that player's deck.
+  // Empty preserves the original live card-selection-screen behavior.
+  string reward_id = 3;
+}
+
+message SkipCardSelectionAction {
+  string player_id = 1;
+}
+
+message SelectBundleAction {
+  string bundle_id = 1;
+  string player_id = 2;
+}
+
+message BuyCardAction {
+  string shop_item_id = 1;
+  string card_id = 2;
+  string player_id = 3;
+}
+
+message BuyRelicAction {
+  string shop_item_id = 1;
+  string relic_id = 2;
+  string player_id = 3;
+}
+
+message BuyPotionAction {
+  string shop_item_id = 1;
+  string potion_id = 2;
+  string player_id = 3;
+}
+
+message RemoveCardAction {
+  string shop_item_id = 1;
+  string card_id = 2;
+  string player_id = 3;
+}
+
+message LeaveShopAction {
+  string player_id = 1;
+}
+
+message CloseShopInventoryAction {
+  string player_id = 1;
+}
+
+message RestAction {
+  string player_id = 1;
+}
+
+message SmithAction {
+  string card_id = 1;
+  string player_id = 2;
+}
+
+message UseRestSiteOptionAction {
+  string rest_option_id = 1;
+  string player_id = 2;
+}
+
+message ProceedRestSiteAction {
+  string player_id = 1;
+}
+
+message OpenChestAction {
+  string player_id = 1;
+}
+
+message TakeRelicAction {
+  string relic_id = 1;
+  string player_id = 2;
+}
+
+message ProceedTreasureRoomAction {
+  string player_id = 1;
+}
+
+message BackFromMapAction {
+  string player_id = 1;
+}
+
+message SelectEventOptionAction {
+  string event_option_id = 1;
+  string player_id = 2;
+}
+
+message OpenEventShopAction {
+  string event_option_id = 1;
+  string player_id = 2;
+}
+
+message UseCrystalSphereControlAction {
+  string control_id = 1;
+  string player_id = 2;
+  string selected_tool = 3;
+}
+
+message ProceedEventAction {
+  string player_id = 1;
+}
+
+message JoinLobbyPlayerAction {
+  string display_name = 1;
+}
+
+message LeaveLobbyPlayerAction {
+  string player_id = 1;
+}
+
+message ToggleMapAction {
+  string player_id = 1;
+}
+
+message ToggleDeckAction {
+  string player_id = 1;
+}
+
+message ToggleSettingsAction {
+  string player_id = 1;
+}
+
+message SortDeckViewAction {
+  string by = 1;
+  string player_id = 2;
+}
+
+message ToggleDeckViewUpgradesAction {
+  string player_id = 1;
+}
+
+// Open the combat draw pile viewer (the in-game NCardPileScreen). The pile
+// cards are already in run.players[].combat.drawPile; this opens the screen.
+message ViewDrawPileAction {
+  string player_id = 1;
+}
+
+// Open the combat discard pile viewer (the in-game NCardPileScreen).
+message ViewDiscardPileAction {
+  string player_id = 1;
+}
+
+// Open the combat exhaust pile viewer (the in-game NCardPileScreen).
+message ViewExhaustPileAction {
+  string player_id = 1;
+}
+
+// Open the relic-details overlay (the in-game NInspectRelicScreen) for a
+// relic-bar relic. relic_id is the stable id from
+// state.run.players[].relics[].id (a bare relic model id is also accepted).
+message InspectRelicAction {
+  string relic_id = 1;
+  string player_id = 2;
+}
+
+// Close the open relic-details overlay (the in-game NInspectRelicScreen),
+// mirroring its backdrop press.
+message CloseInspectRelicAction {
+  string player_id = 1;
+}
+
+// Stage a hand card while in-hand selection mode is active
+// (state.run.view.handSelection, e.g. Survivor's "Discard 1 card.").
+// card_id is the stable id from run.players[].combat.hand.cards[].id.
+// Selecting while already at maxSelect mirrors the game UI: the most
+// recently selected card is swapped out.
+message SelectHandCardAction {
+  string card_id = 1;
+  string player_id = 2;
+}
+
+// Unstage a previously selected hand card. Not available in upgrade-select
+// mode (the game UI swaps instead of deselecting there).
+message DeselectHandCardAction {
+  string card_id = 1;
+  string player_id = 2;
+}
+
+// Confirm the staged in-hand selection (the hand's confirm button). Legal
+// once handSelection.canConfirm is true; resolves the awaiting card effect
+// (e.g. Survivor discards the staged card).
+//
+// card_ids lets a caller stage the selection AND confirm in one call: any
+// listed card not already staged on the host is staged (as if by
+// SelectHandCardAction) before the confirm fires. This supports clients that
+// keep selection purely local (no per-click host round-trip) and only contact
+// the host at confirm time. When empty, the host confirms whatever is already
+// staged (the original behavior).
+message ConfirmHandSelectionAction {
+  string player_id = 1;
+  repeated string card_ids = 2;
+}
+
+// Draw a freeform stroke on the map (NMapDrawings) as the local player. `points` are in
+// TheMap content space (the same space the read RPC returns); the bridge inverse-
+// transforms them to NMapDrawings-local and calls the game's BeginLine /
+// UpdateCurrentLinePosition / StopLine, which broadcast to peers (no new netcode).
+// `is_eraser` draws an eraser stroke (SetDrawingModeLocal(Erasing) first). `player_id`
+// must be the local player — you cannot draw as another player; used for ownership
+// validation only (the stroke always routes through the local player's NMapDrawings).
+message DrawMapStrokeAction {
+  string player_id = 1;
+  bool is_eraser = 2;
+  repeated Point points = 3;
+}
+
+// Clear all of the local player's map drawings (NMapDrawings.ClearDrawnLinesLocal).
+message ClearMapDrawingsAction {
+  string player_id = 1;
+}
+
+// Dev-only host-side heal (`sts2 dev heal`). Directly mutates a creature's HP through
+// the game's CreatureCmd on the host — NOT a legal player move, never advertised in
+// availableActions. Healing a dead creature revives it (the game's Heal/SetCurrentHp semantics).
+// In real networked multiplayer a host-direct mutation can desync remote ENet clients; intended
+// for the couch-coop norm of one real player plus synthetic seats.
+message HealAction {
+  // Target creature id (`creature:<combatId>` — the same ids `sts2 state` shows for players,
+  // allies, and enemies). Empty = the acting seat's own player creature.
+  string target_id = 1;
+  // HP to restore (clamped to max by the game). Ignored when full=true.
+  int32 amount = 2;
+  // Set current HP to max instead of adding amount.
+  bool full = 3;
+}
+
+enum RawMouseButton {
+  RAW_MOUSE_BUTTON_UNSPECIFIED = 0;
+  RAW_MOUSE_BUTTON_LEFT = 1;
+  RAW_MOUSE_BUTTON_RIGHT = 2;
+  RAW_MOUSE_BUTTON_MIDDLE = 3;
+}
+
+message MouseClickAction {
+  int32 x = 1;
+  int32 y = 2;
+  RawMouseButton button = 3;
+}
+
+message ActionResponse {
+  string request_id = 1;
+  string action_instance_id = 2;
+  ActionKind kind = 3;
+  bool accepted = 4;
+  bool provisional = 5;
+  string message = 6;
+}
+
+message ActionResponseV0 {
+  string request_id = 1;
+  string action_instance_id = 2;
+  ActionKind kind = 3;
+  bool accepted = 4;
+  bool provisional = 5;
+  string message = 6;
+  ActionLegalityStatus legality_status = 7;
+  string owner_player_id = 8;
+  string perspective = 9;
+  repeated string checked_hook_paths = 10;
+  RemoteClientOrchestrationCapability remote_orchestration = 11;
+  MultiplayerRole owner_role = 12;
+}
+
+message ActionResult {
+  oneof result {
+    ActionResponse success = 1;
+    BridgeError error = 2;
+  }
+}

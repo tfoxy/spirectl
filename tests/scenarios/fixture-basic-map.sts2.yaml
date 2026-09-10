@@ -1,0 +1,23 @@
+name: fixture-basic-map
+description: Loads the checked-in map fixture through the live bridge and asserts the resulting map screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-map.sts2.fixture.yaml
+  - dev.assert:
+      path: run.map.view.isOpen
+      equals: true
+  - dev.assert:
+      path: run.map.points[0].id
+      equals: map-node:3:1
+  - dev.assert:
+      path: actions[args.mapNodeId=map-node:3:1].label
+      source: actions
+      equals: "Monster (3,1)"
+  - dev.assert:
+      path: actions[args.mapNodeId=map-node:3:1].kind
+      source: actions
+      equals: select-map-node
+  - dev.assert:
+      path: actions[args.mapNodeId=map-node:3:1].ownerPlayerId
+      source: actions
+      equals: p1

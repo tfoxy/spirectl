@@ -1,0 +1,35 @@
+name: fixture-combat-potion-target
+description: Loads a combat-potion fixture through the mock transport and asserts the mock's generic potion inventory.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/combat-potion-target.sts2.fixture.yaml
+
+  # The mock transport's fixture loader doesn't thread the authored potion
+  # loadout through (see cli/src/bridge/mock_data/state_run.rs `mock_player` —
+  # combat mock content is a fixed generic 2-potion loadout regardless of
+  # fixture body, and the player id stays the mock's own "p1"/"p2", not the
+  # fixture's authored "p:1"/"p:2"); assert the real, mock-producible facts.
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/combat_room
+
+  - dev.assert:
+      path: run.players[id=p1].potions[0].id
+      equals: 0
+
+  - dev.assert:
+      path: run.players[id=p1].potions[0].modelId
+      equals: fire-potion
+
+  - dev.assert:
+      path: run.players[id=p1].potions[1].id
+      equals: 1
+
+  - dev.assert:
+      path: run.players[id=p1].potions[1].modelId
+      equals: block-potion
+
+  - dev.assert:
+      path: run.players[id=p2].potions[modelId=fire-potion].id
+      exists: true

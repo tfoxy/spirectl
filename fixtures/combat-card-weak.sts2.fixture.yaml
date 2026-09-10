@@ -1,0 +1,23 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-card-weak
+description: >-
+  Two-player Ironclad QUEEN_BOSS combat where p:1 is Weakened and a Strike is
+  pre-selected. Weak is an attacker (self) power, so it reduces the card's damage
+  number while the card is in hand: the description shows the lowered value in red
+  via the generic status-aware :diff() coloring. Single-target attack case (the
+  same logic that drives multi-target cards like Whirlwind).
+run:
+  seed: fixture-combat-card-selected
+  currentActIndex: 2
+  actFloor: 51
+  players:
+    - powers:
+        - modelId: WEAK_POWER
+          amount: 1
+    - {}
+  view:
+    selectedCard:
+      cardModelId: STRIKE_IRONCLAD
+  currentRoom:
+    combat:
+      encounterId: QUEEN_BOSS

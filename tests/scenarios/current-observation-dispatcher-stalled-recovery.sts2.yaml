@@ -1,0 +1,11 @@
+name: current-observation-dispatcher-stalled-recovery
+description: Captures deterministic diagnostics artifacts for retryable dispatcher-stalled current-observation recovery consumers.
+tags: [mock, recovery, diagnostics, spec:S13]
+
+steps:
+  - dev.diagnostics:
+      bundleDir: ./recovery/dispatcher-stalled-current-observation
+
+  - dev.assert:
+      path: rootScene
+      equals: screens/main_menu

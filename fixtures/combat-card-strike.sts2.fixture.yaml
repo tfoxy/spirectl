@@ -1,0 +1,14 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-card-strike
+description: Two-player Ironclad QUEEN_BOSS combat with p:1's Strike pre-selected (selected-card styling).
+run:
+  seed: fixture-combat-card-selected
+  currentActIndex: 2
+  actFloor: 51
+  view:
+    selectedCard:
+      cardModelId: STRIKE_IRONCLAD
+  players: 2
+  currentRoom:
+    combat:
+      encounterId: QUEEN_BOSS

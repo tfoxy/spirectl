@@ -1,0 +1,35 @@
+name: fixture-rewards-all
+description: >-
+  Loads the authored rewards-all fixture through the live bridge and asserts every
+  authored reward type is present and that the granted add-reward relics actually
+  fired (AmethystAubergine adds 15 gold, etc.) on the resulting rewards screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/rewards-all.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[0].overlays[0].screenId
+      equals: Screens.NRewardsScreen
+  # Authored reward types, one of each.
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].gold
+      equals: 30
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].potion
+      equals: FIRE_POTION
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].relic
+      equals: ANCHOR
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].cardRemoval
+      equals: true
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].card.modelId
+      equals: FEED
+  # Authored "card with rare rarity": the specific-card reward includes the rare DEMON_FORM.
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].cardReward.cards[*].modelId
+      contains: DEMON_FORM
+  # Relic actually modified rewards: AmethystAubergine added a 15-gold reward in the elite room.
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].gold
+      equals: 15

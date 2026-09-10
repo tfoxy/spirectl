@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/errors.proto";
+
+message HotReloadStatusRequest {
+  string request_id = 1;
+  string project_id = 2;
+  string shell_mod_id = 3;
+}
+
+message HotReloadRequest {
+  string request_id = 1;
+  string project_id = 2;
+  string shell_mod_id = 3;
+  string logic_artifact_path = 4;
+  uint32 expected_contract_version = 5;
+  bool wait_for_completion = 6;
+  uint32 timeout_ms = 7;
+}
+
+message HotReloadProtocolInfo {
+  string id = 1;
+  uint32 version = 2;
+}
+
+message HotReloadShellStatus {
+  bool supported = 1;
+  HotReloadProtocolInfo protocol = 2;
+  string shell_mod_id = 3;
+  uint32 shell_protocol_version = 4;
+  uint32 active_generation = 5;
+  string expected_logic_artifact_path = 6;
+  uint32 contract_version = 7;
+  bool reload_in_progress = 8;
+  HotReloadReport last_reload_report = 9;
+  bool restart_required = 10;
+  repeated HotReloadNotice notices = 11;
+}
+
+message HotReloadResponse {
+  string request_id = 1;
+  bool accepted = 2;
+  HotReloadShellStatus status = 3;
+  HotReloadReport report = 4;
+  repeated HotReloadNotice notices = 5;
+}
+
+message HotReloadStatusResponse {
+  HotReloadShellStatus status = 1;
+  repeated HotReloadNotice notices = 2;
+}
+
+message HotReloadReport {
+  string status = 1;
+  uint32 generation = 2;
+  string requested_at = 3;
+  string source_assembly_path = 4;
+  string shadow_assembly_path = 5;
+  uint32 contract_version = 6;
+  string logic_assembly_name = 7;
+  string entry_type = 8;
+  uint32 previous_generation = 9;
+  bool previous_remains_active = 10;
+  bool previous_disposed = 11;
+  bool previous_unload_requested = 12;
+  bool previous_collected = 13;
+  uint64 duration_ms = 14;
+  HotReloadError error = 15;
+  repeated HotReloadWarning warnings = 16;
+}
+
+message HotReloadError {
+  string code = 1;
+  string phase = 2;
+  string message = 3;
+  string exception_type = 4;
+  string exception_message = 5;
+  bool restart_required = 6;
+}
+
+message HotReloadWarning {
+  string code = 1;
+  string phase = 2;
+  string message = 3;
+}
+
+message HotReloadNotice {
+  string code = 1;
+  string message = 2;
+}
+
+message HotReloadStatusResult {
+  oneof result {
+    HotReloadStatusResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message HotReloadResult {
+  oneof result {
+    HotReloadResponse success = 1;
+    BridgeError error = 2;
+  }
+}

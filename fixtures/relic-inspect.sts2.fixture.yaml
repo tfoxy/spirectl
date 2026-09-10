@@ -1,0 +1,21 @@
+schemaVersion: spirectl.fixture/v0
+name: relic-inspect
+description: >-
+  Single-player Ironclad combat with a three-relic relic bar (starter Burning
+  Blood plus Anchor and Girya) and the relic-details overlay (NInspectRelicScreen)
+  open on the starter relic (burning_blood) — exercises the relic-bar inspect action, the overlay
+  render (index 0 of 3: only the right arrow visible), and the backdrop close.
+run:
+  seed: fixture-relic-inspect
+  actFloor: 3
+  view:
+    inspectRelic:
+      relicModelId: BURNING_BLOOD
+  players:
+    - id: "p:1"
+      relics:
+        - modelId: ANCHOR
+        - modelId: GIRYA
+  currentRoom:
+    combat:
+      encounterId: QUEEN_BOSS

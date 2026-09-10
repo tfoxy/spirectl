@@ -1,0 +1,31 @@
+schemaVersion: spirectl.fixture/v0
+name: map-travel
+description: >-
+  Act 1 map travelled to two nodes before the boss (the deepest reached node sits two rows below the
+  boss row). The traveled path is authored to show every node kind — combat, elite, rest, shop, treasure
+  — including revealed `?` (Unknown) nodes that, once entered, display their real category. Faithful to
+  the game, only revealed combat/elite/treasure/shop get a distinct hint icon; a revealed event keeps the
+  plain `?`. The Neow start node is visited but (like the game) un-ringed.
+run:
+  seed: fixture-basic-map
+  currentRoom:
+    mapRoom:
+      # One entry per visited node from row 0 upward; the loader walks the deterministic connected path
+      # that deep and stamps each node with the authored type. "Unknown:<RoomType>" = a revealed `?`.
+      # 15 entries → rows 0..14; the current/deepest node lands at row 14, two below the boss (row 16).
+      travelPath:
+        - Ancient          # row 0  — Neow start (visited, no ring)
+        - Monster          # row 1
+        - Unknown:Event    # row 2  — revealed `?` → event (stays a plain `?`, like the game)
+        - Elite            # row 3
+        - Unknown:Treasure # row 4  — revealed `?` → treasure
+        - RestSite         # row 5
+        - Monster          # row 6
+        - Unknown:Shop     # row 7  — revealed `?` → shop
+        - Treasure         # row 8
+        - Monster          # row 9
+        - Unknown:Monster  # row 10 — revealed `?` → combat
+        - Elite            # row 11
+        - Shop             # row 12
+        - RestSite         # row 13
+        - Monster          # row 14 — current position

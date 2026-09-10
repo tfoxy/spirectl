@@ -1,0 +1,30 @@
+name: couchcoop-target-visual-diff
+description: Validates 1280x720 screenshot-diff bundles for target lobby, Neow, and nibbits-weak fixture screens.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/two-ironclad-lobby.sts2.fixture.yaml
+
+  - dev.screenshot-diff:
+      baseline: ./baselines/mock-main-menu.png
+      width: 1280
+      height: 720
+      bundleDir: ./visual-diff/lobby
+
+  - dev.load-fixture:
+      path: ../../fixtures/initial-neow.sts2.fixture.yaml
+
+  - dev.screenshot-diff:
+      baseline: ./baselines/mock-main-menu.png
+      width: 1280
+      height: 720
+      bundleDir: ./visual-diff/initial-neow
+
+  - dev.load-fixture:
+      path: ../../fixtures/two-ironclad-nibbits-weak-combat.sts2.fixture.yaml
+
+  - dev.screenshot-diff:
+      baseline: ./baselines/mock-main-menu.png
+      width: 1280
+      height: 720
+      bundleDir: ./visual-diff/nibbits-weak-combat

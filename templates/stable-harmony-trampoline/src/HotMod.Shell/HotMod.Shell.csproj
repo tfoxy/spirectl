@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Condition="'$(EnableHotModSts2References)' == 'true'">
+    <DefineConstants>$(DefineConstants);HOTMOD_STS2</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony" Version="$(HarmonyLibVersion)" />
+    <ProjectReference Include="..\HotMod.Contracts\HotMod.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableHotReloadGuardrails)' == 'true'">
+    <ProjectReference Include="..\HotMod.Guardrails\HotMod.Guardrails.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableHotModSts2References)' == 'true'">
+    <Reference Include="sts2">
+      <HintPath>$(Sts2AssembliesDir)\sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2AssembliesDir)\GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

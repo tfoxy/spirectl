@@ -1,0 +1,18 @@
+schemaVersion: spirectl.fixture/v0
+name: rest-site-remove
+description: >-
+  Rest-site (campfire) room with the base deck-card-selection (card removal) dialog
+  composed on top via a deck-card-selection overlay. Shows the player's removable
+  deck cards in the grid.
+run:
+  seed: fixture-rest-site-remove
+  actFloor: 6
+  players:
+    - id: p1
+      creature: { currentHp: 67, maxHp: 80 }
+      overlays:
+        - deckCardSelection:
+            kind: select
+            canConfirm: true
+  currentRoom:
+    restSite: {}

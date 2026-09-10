@@ -1,0 +1,90 @@
+{
+  "actions": [
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-map",
+      "kind": "toggle-map",
+      "label": "Map",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-deck",
+      "kind": "toggle-deck",
+      "label": "Deck",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-settings",
+      "kind": "toggle-settings",
+      "label": "Settings",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "by": "cost",
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:deck-view:sort:cost",
+      "kind": "sort-deck-view",
+      "label": "Sort by cost",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view.capstone.deckView.sort[0]"
+    },
+    {
+      "args": {
+        "by": "name",
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:deck-view:sort:name",
+      "kind": "sort-deck-view",
+      "label": "Sort by name",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view.capstone.deckView.sort[1]"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:deck-view:toggle-upgrades",
+      "kind": "toggle-deck-view-upgrades",
+      "label": "Show upgrades",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view.capstone.deckView.showUpgrades"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "run",
+    "scene": null
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

@@ -1,0 +1,14 @@
+name: fixture-treasure
+description: Loads the checked-in treasure-room fixture through the live bridge and asserts the resulting treasure-room screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/treasure.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.treasure
+      exists: true
+  # current's open-chest is a room-level, argument-less action (no choiceId-style
+  # argument survives — see cli/src/state_actions.rs `surface_treasure`).
+  - dev.assert:
+      path: actions[id=action:treasure-room:open-chest].kind
+      source: actions
+      equals: open-chest

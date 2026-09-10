@@ -1,0 +1,12 @@
+name: log-health-main-menu
+description: Checks the recent mock runtime log window through the first-class health-check surface.
+
+steps:
+  - game.info
+
+  - dev.log-health:
+      tail: 20
+
+  - dev.assert:
+      path: rootScene
+      equals: screens/main_menu

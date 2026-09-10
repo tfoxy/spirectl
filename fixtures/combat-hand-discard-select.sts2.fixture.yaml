@@ -1,0 +1,17 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-hand-discard-select
+description: Ironclad NIBBITS combat with the hand in Survivor-style discard selection mode (pick 1 card to discard, then confirm).
+run:
+  seed: fixture-hand-discard
+  players:
+    - id: "p:1"
+      creature: { currentHp: 67, maxHp: 80 }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL
+  view:
+    handSelection:
+      sourceModelId: SURVIVOR
+      prompt: discard
+      minSelect: 1
+      maxSelect: 1

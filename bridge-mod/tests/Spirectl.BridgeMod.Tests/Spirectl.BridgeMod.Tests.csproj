@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RollForward>LatestMajor</RollForward>
+    <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == ''">$(STS2_ASSEMBLIES_DIR)</Sts2AssembliesDir>
+    <EnableSts2LiveHost Condition="'$(RunSts2LiveHostTests)' == 'true'">true</EnableSts2LiveHost>
+    <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == ''">false</EnableSts2LiveHost>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RunSts2LiveHostTests)' == 'true'">
+    <DefineConstants>$(DefineConstants);ENABLE_STS2_LIVE_HOST</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference
+      Include="..\..\src\Spirectl.Sts2\Spirectl.Sts2.csproj"
+      AdditionalProperties="EnableSts2LiveHost=$(EnableSts2LiveHost);RunSts2LiveHostTests=$(RunSts2LiveHostTests);Sts2AssembliesDir=$(Sts2AssembliesDir)" />
+    <ProjectReference
+      Include="..\..\src\Spirectl.BridgeMod\Spirectl.BridgeMod.csproj"
+      AdditionalProperties="EnableSts2LiveHost=$(EnableSts2LiveHost);RunSts2LiveHostTests=$(RunSts2LiveHostTests);Sts2AssembliesDir=$(Sts2AssembliesDir)" />
+    <ProjectReference
+      Include="..\..\src\Spirectl.BridgeMod.Sts2Host\Spirectl.BridgeMod.Sts2Host.csproj"
+      AdditionalProperties="EnableSts2LiveHost=$(EnableSts2LiveHost);RunSts2LiveHostTests=$(RunSts2LiveHostTests);Sts2AssembliesDir=$(Sts2AssembliesDir)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(Sts2AssembliesDir)/GodotSharp.dll')">
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2AssembliesDir)/GodotSharp.dll</HintPath>
+      <Aliases>GodotLive</Aliases>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
+    <!-- Keep live dependencies copy-local for reflection tests, but do not import their
+         symbols globally because this test assembly declares full-name STS2 doubles. -->
+    <Reference Include="sts2">
+      <HintPath>$(Sts2AssembliesDir)/sts2.dll</HintPath>
+      <Aliases>Sts2Live</Aliases>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- The host-specific test partials compile only when the Host project includes its live
+       implementations. The normal bridge leg remains game-assembly-free. -->
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' != 'true'">
+    <Compile Remove="Sts2HostTests*.cs" />
+    <Compile Remove="BackgroundThrottleOptionsTests.cs" />
+  </ItemGroup>
+</Project>

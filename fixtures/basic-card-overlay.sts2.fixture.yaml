@@ -1,0 +1,26 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-card-overlay
+description: Deterministic authored card-overlay fixture for typed overlay state assertions.
+run:
+  seed: fixture-basic-card-overlay
+  actFloor: 3
+  players:
+    - id: p1
+      creature: { currentHp: 67, maxHp: 80 }
+      overlays:
+        - cardOverlay:
+            policy: blocking
+            sourceScreen: combat
+            cards:
+              - modelId: BASH
+            close:
+              id: card-overlay:close
+              label: Close
+              enabled: true
+              intent: close-overlay
+            followThrough:
+              controls:
+                - id: card-overlay:confirm
+                  label: Confirm
+                  enabled: false
+                  intent: confirm

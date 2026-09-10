@@ -1,0 +1,12 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-event-room
+description: Deterministic authored event-room fixture using typed public event state.
+run:
+  seed: fixture-basic-event-room
+  actFloor: 7
+  players:
+    - id: p1
+      creature: { currentHp: 52, maxHp: 80 }
+  currentRoom:
+    event:
+      canonicalEventModelId: DENSE_VEGETATION

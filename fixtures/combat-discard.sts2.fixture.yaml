@@ -1,0 +1,18 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-discard
+description: Silent NIBBITS combat with the hand in Survivor-style discard selection mode (played Survivor; pick 1 card to discard, then confirm).
+run:
+  seed: fixture-combat-discard
+  players:
+    - id: "p:1"
+      characterId: SILENT
+      creature: { currentHp: 67, maxHp: 80 }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL
+  view:
+    handSelection:
+      sourceModelId: SURVIVOR
+      prompt: discard
+      minSelect: 1
+      maxSelect: 1

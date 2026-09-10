@@ -1,0 +1,6 @@
+name: visual-offline-diff
+description: Compares two checked-in PNG inputs without capturing a fresh live screenshot.
+steps:
+  - dev.screenshot-diff:
+      baseline: ./baselines/mock-main-menu.png
+      actual: ./baselines/mock-main-menu.png

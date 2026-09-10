@@ -1,0 +1,33 @@
+# Live smoke for the real main-menu Start Run hook.
+# Prerequisites:
+# - the bridge is installed and the live host is reachable
+# - the game is launched and the live fixture loader can return to the real main menu
+# - this scenario is intentionally not part of the lightweight default baseline
+name: smoke-main-menu-live
+description: Explicit live validation of main-menu Start Run on an attached real main-menu session; not part of the lightweight default baseline.
+tags:
+  - liveValidation
+  - spec:S41
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-main-menu.sts2.fixture.yaml
+
+  - dev.wait-for:
+      path: rootScene
+      equals: screens/main_menu
+      timeoutMs: 10000
+
+  # Main-menu's "start run" has no native `state actions` surfacer (state
+  # dropped the generic legacy choice surface and nothing re-models the main
+  # menu; out of scope for this migration — only surface_shop/surface_map_room
+  # were added). `act choose --choice menu:start-run` remains a real, executable
+  # fallback-compatibility action regardless (see
+  # cli/src/bridge/stub_service/action_impl.rs), so drive it directly.
+  - act.fallback-choose:
+      choice: menu:start-run
+
+  - dev.wait-for:
+      path: rootScene
+      equals: screens/character_select_screen
+      timeoutMs: 10000

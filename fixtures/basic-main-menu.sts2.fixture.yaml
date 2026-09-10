@@ -1,0 +1,6 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-main-menu
+description: Deterministic authored main-menu fixture for live profile scenario isolation.
+rootScene: main-menu
+run:
+  seed: fixture-basic-main-menu

@@ -1,0 +1,12 @@
+name: debugger-event-streams
+description: Captures a bounded debugger event transcript when an observer session is already available.
+tags:
+  - spec:S91
+steps:
+  - game.info
+  - dev.debug-events:
+      session: dbg:observer
+      fromSequence: 1
+      limit: 20
+      follow: true
+      timeoutMs: 25

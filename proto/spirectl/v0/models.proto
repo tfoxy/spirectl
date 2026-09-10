@@ -1,0 +1,653 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+
+enum ModelCatalogStatus {
+  MODEL_CATALOG_STATUS_UNSPECIFIED = 0;
+  MODEL_CATALOG_STATUS_OK = 1;
+  MODEL_CATALOG_STATUS_PARTIAL = 2;
+  MODEL_CATALOG_STATUS_UNSUPPORTED_FAMILY = 3;
+  MODEL_CATALOG_STATUS_UNAVAILABLE = 4;
+}
+
+message ModelCatalogRequest {
+  string request_id = 1;
+  string family = 2;
+  repeated string ids = 3;
+  string language = 4;
+}
+
+message ModelCatalogResult {
+  oneof result {
+    ModelCatalogResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message ModelCatalogResponse {
+  string request_id = 1;
+  DataSource source = 2;
+  bool provisional = 3;
+  string family = 4;
+  ModelCatalogStatus status = 5;
+  repeated GameModel models = 6;
+  repeated string missing_ids = 7;
+  repeated ModelCatalogNotice notices = 8;
+  string language = 9;
+}
+
+message ModelCatalogNotice {
+  string code = 1;
+  string severity = 2;
+  string message = 3;
+  string path = 4;
+}
+
+message GameModel {
+  string family = 1;
+  oneof model {
+    CharacterModelInfo character = 2;
+    RelicModelInfo relic = 3;
+    CardModelInfo card = 4;
+    PotionModelInfo potion = 5;
+    EventModelInfo event = 6;
+    ActModelInfo act = 7;
+    MonsterModelInfo monster = 8;
+    EncounterModelInfo encounter = 9;
+    PowerModelInfo power = 10;
+    OrbModelInfo orb = 11;
+    AfflictionModelInfo affliction = 12;
+    EnchantmentModelInfo enchantment = 13;
+    CardPoolModelInfo card_pool = 14;
+    RelicPoolModelInfo relic_pool = 15;
+    PotionPoolModelInfo potion_pool = 16;
+    ModifierModelInfo modifier = 17;
+    AchievementModelInfo achievement = 18;
+  }
+}
+
+message ModelVector2 {
+  double x = 1;
+  double y = 2;
+}
+
+message ModelLocalizationRef {
+  string table = 1;
+  string key = 2;
+}
+
+message EncounterMonsterSlotInfo {
+  string monster_id = 1;
+  string slot = 2;
+}
+
+// A scene encounter's enemy slot position, keyed by slot name. The position is
+// EnemyContainer-local px (the encounter scene's slot Marker2D global position
+// minus the EnemyContainer center anchor), so the presentation layer can place
+// each enemy without a live combat. Populated only when has_scene.
+message EncounterSlotPositionInfo {
+  string slot = 1;
+  ModelVector2 position = 2;
+}
+
+message CharacterModelInfo {
+  reserved 11 to 16, 19 to 22;
+  reserved "visuals_path", "character_select_bg";
+
+  string id = 1;
+  string title = 2;
+  string name_color = 3;
+  int32 starting_hp = 4;
+  int32 starting_gold = 5;
+  int32 max_energy = 6;
+  string energy_label_outline_color = 7;
+  int32 base_orb_slot_count = 8;
+  bool should_always_show_star_counter = 9;
+  repeated string starting_relics = 10;
+  string character_select_title = 17;
+  string character_select_desc = 18;
+  string dialogue_color = 23;
+  string speech_bubble_color = 24;
+  string map_drawing_color = 25;
+  string visuals_asset_key = 26;
+  string icon_asset_key = 27;
+  string icon_outline_asset_key = 28;
+  string energy_counter_asset_key = 29;
+  string merchant_anim_asset_key = 30;
+  string rest_site_anim_asset_key = 31;
+  string character_select_bg_asset_key = 32;
+  string character_select_icon_asset_key = 33;
+  string character_select_locked_icon_asset_key = 34;
+  string map_marker_asset_key = 35;
+  string unlock_text = 36;
+  string icon_path = 37;
+  string icon_outline_path = 38;
+  string energy_counter_path = 39;
+  string merchant_anim_path = 40;
+  string rest_site_anim_path = 41;
+  string character_select_bg_path = 42;
+  string character_select_icon_path = 43;
+  string character_select_locked_icon_path = 44;
+  string map_marker_path = 45;
+  string character_select_bg_spine_still_asset_key = 46;
+  ModelLocalizationRef title_loc = 47;
+  ModelLocalizationRef character_select_title_loc = 48;
+  ModelLocalizationRef character_select_desc_loc = 49;
+  ModelLocalizationRef unlock_text_loc = 50;
+  // The creature's authored NCreatureVisuals/Bounds Control size (x=width,
+  // y=height, px). This is the layout box the game's combat positioner spaces
+  // creatures by (NOT the baked visual PNG, which is a trimmed first-frame render
+  // ~7-15% larger). Lets presentation size/space players without a hand-maintained
+  // table. Derived offline by the bridge from the creature scene. Absent (0,0) when
+  // the creature scene carries no measurable Bounds.
+  ModelVector2 visuals_bounds = 51;
+  // The creature scene's authored IntentPos Marker2D position (creature-local px,
+  // y negative = above the origin/feet). The game pins the combat Intents
+  // container's pivot to this marker, so intents render above the creature's
+  // visuals. Derived offline by the bridge from the creature scene; absent when
+  // the scene carries no IntentPos marker.
+  ModelVector2 intent_pos = 52;
+  // (53 reserved: was spine_animations; Spine clips are now addressed per SpineSprite node via the
+  // spine:// scheme + the producer's per-node metadata, not duplicated on the character model.)
+  reserved 53;
+}
+
+message RelicModelInfo {
+  reserved 6 to 8;
+  reserved "big_beta_icon_path";
+
+  string id = 1;
+  string title = 2;
+  string flavor = 3;
+  string description = 4;
+  string icon_path = 5;
+  string rarity = 9;
+  string icon_asset_key = 10;
+  string icon_outline_asset_key = 11;
+  string big_icon_asset_key = 12;
+  string icon_outline_path = 13;
+  string big_icon_path = 14;
+  string pool_id = 15;
+  bool is_tradable = 16;
+  bool is_allowed_in_shops = 17;
+  bool has_upon_pickup_effect = 18;
+  bool spawns_pets = 19;
+  bool adds_pet = 20;
+  bool is_stackable = 21;
+  int32 merchant_cost = 22;
+  bool show_counter = 23;
+  string flash_sfx = 24;
+  ModelLocalizationRef title_loc = 25;
+  ModelLocalizationRef flavor_loc = 26;
+  ModelLocalizationRef description_loc = 27;
+  // The relic's hover tips, mirroring RelicModel.HoverTips: the relic's own
+  // tip first (title + dynamic description, amounts substituted), then one per
+  // keyword/power the description references.
+  repeated ModelHoverTipInfo hover_tips = 28;
+  // RelicModel.DynamicVars: the values substituted into the description's
+  // `{Var}` placeholders (e.g. BURNING_BLOOD `{Heal}` -> 6).
+  map<string, int32> dynamic_vars = 29;
+}
+
+// One resolved hover tip in a model's hover-tip stack (a MegaCrit HoverTip).
+// Status/power tips are drawn with a reddish background when is_debuff is set.
+// Same shape as PotionHoverTipInfo, which predates this shared message.
+message ModelHoverTipInfo {
+  string title = 1;
+  string description = 2;
+  bool is_debuff = 3;
+  // Asset key for the tip's icon (powers/<entry>/icon), empty when the tip has
+  // no icon (e.g. the model's own tip).
+  string icon_asset_key = 4;
+}
+
+message CardModelInfo {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string type = 4;
+  string rarity = 5;
+  string target_type = 6;
+  string pool_id = 7;
+  string visual_pool_id = 8;
+  int32 energy_cost = 9;
+  bool is_energy_x_cost = 10;
+  int32 star_cost = 11;
+  bool is_star_x_cost = 12;
+  int32 replay_count = 13;
+  repeated string keywords = 14;
+  repeated string tags = 15;
+  int32 max_upgrade_level = 16;
+  bool upgradable = 17;
+  string upgrade_preview_description = 18;
+  bool can_be_generated_in_combat = 19;
+  bool can_be_generated_by_modifiers = 20;
+  string multiplayer_constraint = 21;
+  bool should_show_in_card_library = 22;
+  bool gains_block = 23;
+  string orb_evoke_type = 24;
+  bool has_built_in_overlay = 25;
+  string image_asset_key = 26;
+  string image_path = 27;
+  string beta_image_path = 28;
+  string overlay_asset_key = 29;
+  string overlay_path = 30;
+  ModelLocalizationRef title_loc = 31;
+  ModelLocalizationRef description_loc = 32;
+  ModelLocalizationRef upgrade_preview_description_loc = 33;
+  CardModelUpgradeInfo upgrade = 34;
+  map<string, int32> dynamic_vars = 35;
+}
+
+message CardModelUpgradeInfo {
+  optional int32 energy_cost = 1;
+  map<string, int32> dynamic_vars = 2;
+}
+
+message PotionModelInfo {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string selection_screen_prompt = 4;
+  string rarity = 5;
+  string usage = 6;
+  string target_type = 7;
+  string pool_id = 8;
+  bool can_be_generated_in_combat = 9;
+  bool passes_custom_usability_check = 10;
+  string icon_asset_key = 11;
+  string icon_path = 12;
+  string outline_asset_key = 13;
+  string outline_path = 14;
+  ModelLocalizationRef title_loc = 15;
+  ModelLocalizationRef description_loc = 16;
+  ModelLocalizationRef selection_screen_prompt_loc = 17;
+  // The potion's hover tips, mirroring PotionModel.HoverTips: the potion's own
+  // tip first, then one per status/power it applies. Text is fully resolved
+  // (dynamic amounts substituted) the same way the game renders it.
+  repeated PotionHoverTipInfo hover_tips = 18;
+}
+
+// One resolved hover tip in a potion's hover-tip stack (a MegaCrit HoverTip).
+// Status/power tips are drawn with a reddish background when is_debuff is set.
+message PotionHoverTipInfo {
+  string title = 1;
+  string description = 2;
+  bool is_debuff = 3;
+  // Asset key for the tip's icon (powers/<entry>/icon), empty when the tip has
+  // no icon (e.g. the potion's own tip).
+  string icon_asset_key = 4;
+}
+
+message EventModelInfo {
+  string id = 1;
+  string kind = 2;
+  string title = 3;
+  string initial_description = 4;
+  string layout_type = 5;
+  bool is_shared = 6;
+  bool is_deterministic = 7;
+  bool has_vfx = 8;
+  string canonical_encounter_id = 9;
+  repeated string game_info_options = 10;
+  string background_scene_asset_key = 11;
+  string background_scene_path = 12;
+  string initial_portrait_asset_key = 13;
+  string initial_portrait_path = 14;
+  string vfx_asset_key = 15;
+  string vfx_path = 16;
+  string epithet = 17;
+  string dialogue_color = 18;
+  string button_color = 19;
+  string ambient_bgm = 20;
+  bool has_ambient_bgm = 21;
+  repeated string any_character_dialogue_blacklist_ids = 22;
+  string map_icon_asset_key = 23;
+  string map_icon_path = 24;
+  string map_icon_outline_asset_key = 25;
+  string map_icon_outline_path = 26;
+  string run_history_icon_asset_key = 27;
+  string run_history_icon_path = 28;
+  string run_history_icon_outline_asset_key = 29;
+  string run_history_icon_outline_path = 30;
+  ModelLocalizationRef title_loc = 31;
+  ModelLocalizationRef initial_description_loc = 32;
+  ModelLocalizationRef epithet_loc = 33;
+  string background_spine_still_asset_key = 34;
+  string background_spine_still_path = 35;
+}
+
+// One discovered layer scene in an act's (or custom encounter's) background
+// layer pool. The game composes a combat background by picking one layer per
+// `bg_group_key` plus one foreground, seeded per map point — so the faithful
+// representation is the grouped pool, not a single flattened image.
+message CombatBackgroundLayerInfo {
+  string asset_key = 1;     // model://acts/<id>/backgroundLayer/<stem>
+  string res_path = 2;      // res://scenes/backgrounds/<id>/layers/<stem>.tscn
+  bool is_foreground = 3;   // filename contains "_fg_"
+  string bg_group_key = 4;  // token from "_bg_<key>_"; empty for foreground
+}
+
+message ActModelInfo {
+  string id = 1;
+  string title = 2;
+  int32 default_order = 3;
+  int32 room_count = 4;
+  int32 multiplayer_room_count = 5;
+  int32 floor_count = 6;
+  int32 multiplayer_floor_count = 7;
+  repeated string boss_encounter_ids = 8;
+  repeated string event_ids = 9;
+  repeated string ancient_event_ids = 10;
+  repeated string weak_encounter_ids = 11;
+  repeated string regular_encounter_ids = 12;
+  repeated string elite_encounter_ids = 13;
+  repeated string monster_ids = 14;
+  repeated string bg_music_options = 15;
+  repeated string music_bank_paths = 16;
+  string ambient_sfx = 17;
+  string chest_open_sfx = 18;
+  string map_traveled_color = 19;
+  string map_untraveled_color = 20;
+  string map_bg_color = 21;
+  string background_scene_asset_key = 22;
+  string background_scene_path = 23;
+  string rest_site_background_asset_key = 24;
+  string rest_site_background_path = 25;
+  string map_top_bg_asset_key = 26;
+  string map_top_bg_path = 27;
+  string map_mid_bg_asset_key = 28;
+  string map_mid_bg_path = 29;
+  string map_bot_bg_asset_key = 30;
+  string map_bot_bg_path = 31;
+  string chest_spine_asset_key = 32;
+  string chest_spine_resource_path = 33;
+  ModelLocalizationRef title_loc = 34;
+  // The act's shared combat-background layer pool. Encounters without a custom
+  // background inherit this pool.
+  repeated CombatBackgroundLayerInfo combat_background_layers = 35;
+}
+
+message MonsterModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  string title = 6;
+  int32 min_initial_hp = 7;
+  int32 max_initial_hp = 8;
+  repeated string move_names = 9;
+  repeated string asset_paths = 10;
+  string visuals_asset_key = 11;
+  string visuals_path = 12;
+  string bestiary_attack_anim_id = 13;
+  bool can_change_scale = 14;
+  bool is_health_bar_visible = 15;
+  double death_anim_length_override = 16;
+  bool has_death_anim_length_override = 17;
+  bool has_death_sfx = 18;
+  string death_sfx = 19;
+  bool has_hurt_sfx = 20;
+  string hurt_sfx = 21;
+  string take_damage_sfx = 22;
+  string take_damage_sfx_type = 23;
+  bool should_fade_after_death = 24;
+  bool should_disappear_from_doom = 25;
+  double hp_bar_size_reduction = 26;
+  ModelVector2 extra_death_vfx_padding = 27;
+  ModelLocalizationRef title_loc = 28;
+  repeated ModelLocalizationRef move_name_locs = 29;
+  // The monster's authored NCreatureVisuals/Bounds Control size (x=width,
+  // y=height, px) — the layout box the combat positioner spaces enemies by (NOT
+  // the baked visual PNG). Derived offline by the bridge from the creature scene;
+  // absent (0,0) when no measurable Bounds. Mirrors CharacterModelInfo.visuals_bounds.
+  ModelVector2 visuals_bounds = 30;
+  // The creature scene's authored IntentPos Marker2D position (creature-local px,
+  // y negative = above the origin/feet) — the pivot target the game pins the
+  // combat Intents container to. Mirrors CharacterModelInfo.intent_pos; absent
+  // when the scene carries no IntentPos marker.
+  ModelVector2 intent_pos = 31;
+}
+
+message EncounterModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  string title = 6;
+  string room_type = 7;
+  bool is_weak = 8;
+  bool is_debug_encounter = 9;
+  repeated string monster_ids = 10;
+  repeated EncounterMonsterSlotInfo monsters_with_slots = 11;
+  repeated string slots = 12;
+  repeated string tags = 13;
+  int32 min_gold_reward = 14;
+  int32 max_gold_reward = 15;
+  bool should_give_rewards = 16;
+  bool has_bgm = 17;
+  string custom_bgm = 18;
+  bool has_ambient_sfx = 19;
+  string ambient_sfx = 20;
+  bool has_scene = 21;
+  string scene_asset_key = 22;
+  string scene_path = 23;
+  string boss_node_path = 24;
+  repeated string map_node_asset_paths = 25;
+  repeated string extra_asset_paths = 26;
+  string custom_reward_description = 27;
+  bool fully_center_players = 28;
+  ModelVector2 camera_offset = 29;
+  double camera_scaling = 30;
+  ModelLocalizationRef title_loc = 31;
+  ModelLocalizationRef custom_reward_description_loc = 32;
+  // True only for the ~10 boss/event encounters that override the act
+  // background (EncounterModel.HasCustomBackground). When false, the encounter
+  // inherits its act's combat-background pool and carries no background fields.
+  bool has_custom_background = 33;
+  // Populated only when has_custom_background; the encounter's own layer pool.
+  repeated CombatBackgroundLayerInfo combat_background_layers = 34;
+  // Custom background root scene (distinct from scene_* which is the encounter
+  // setup scene). Populated only when has_custom_background.
+  string background_scene_asset_key = 35;
+  string background_scene_path = 36;
+  // Scene-encounter enemy slot positions (EnemyContainer-local px), keyed by slot
+  // name. Populated only when has_scene; lets presentation place enemies at their
+  // authored Marker2D slots with no live combat. See EncounterSlotPositionInfo.
+  repeated EncounterSlotPositionInfo slot_positions = 37;
+  // First-frame still of the custom background's foreground Spine (e.g. the Kaiser
+  // Crab body), substituted for the SpineSprite the web renderer can't run — same
+  // mechanism as EventModelInfo.background_spine_still_*. Populated only when
+  // has_custom_background AND the background scene carries a creature Spine. The
+  // still PATH is the background SCENE path (the extractor isolates the Spine).
+  string background_spine_still_asset_key = 38;
+  string background_spine_still_path = 39;
+  // Spine origin in background-root-local px (background-instance position + the
+  // setup scene's Visuals local position), so presentation can place the still
+  // without hardcoding. Populated alongside background_spine_still_*.
+  ModelVector2 background_spine_position = 40;
+}
+
+message PowerModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  string title = 6;
+  string description = 7;
+  string smart_description = 8;
+  string remote_description = 9;
+  string type = 10;
+  string stack_type = 11;
+  int32 amount = 12;
+  int32 display_amount = 13;
+  int32 amount_on_turn_start = 14;
+  bool allow_negative = 15;
+  bool is_visible = 16;
+  bool is_instanced = 17;
+  bool has_smart_description = 18;
+  bool has_remote_description = 19;
+  bool should_play_vfx = 20;
+  bool should_scale_in_multiplayer = 21;
+  string amount_label_color = 22;
+  string icon_asset_key = 23;
+  string icon_path = 24;
+  string packed_icon_path = 25;
+  string big_icon_asset_key = 26;
+  string resolved_big_icon_path = 27;
+  ModelLocalizationRef title_loc = 28;
+  ModelLocalizationRef description_loc = 29;
+  ModelLocalizationRef smart_description_loc = 30;
+  ModelLocalizationRef remote_description_loc = 31;
+}
+
+message OrbModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  string title = 6;
+  string description = 7;
+  string smart_description = 8;
+  bool has_smart_description = 9;
+  double passive_val = 10;
+  double evoke_val = 11;
+  string darkened_color = 12;
+  repeated string asset_paths = 13;
+  string icon_asset_key = 14;
+  string icon_path = 15;
+  string sprite_asset_key = 16;
+  string sprite_path = 17;
+  ModelLocalizationRef title_loc = 18;
+  ModelLocalizationRef description_loc = 19;
+  ModelLocalizationRef smart_description_loc = 20;
+}
+
+message AfflictionModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  string title = 6;
+  string description = 7;
+  string extra_card_text = 8;
+  int32 amount = 9;
+  bool is_stackable = 10;
+  bool can_afflict_unplayable_cards = 11;
+  bool has_extra_card_text = 12;
+  bool has_overlay = 13;
+  string overlay_asset_key = 14;
+  string overlay_path = 15;
+  ModelLocalizationRef title_loc = 16;
+  ModelLocalizationRef description_loc = 17;
+  ModelLocalizationRef extra_card_text_loc = 18;
+}
+
+message EnchantmentModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  string title = 6;
+  string description = 7;
+  string extra_card_text = 8;
+  int32 amount = 9;
+  int32 display_amount = 10;
+  bool show_amount = 11;
+  string status = 12;
+  bool is_stackable = 13;
+  bool has_extra_card_text = 14;
+  bool preview_outside_of_combat = 15;
+  bool should_glow_gold = 16;
+  bool should_glow_red = 17;
+  bool should_start_at_bottom_of_draw_pile = 18;
+  string icon_asset_key = 19;
+  string icon_path = 20;
+  string intended_icon_path = 21;
+  string missing_icon_path = 22;
+  ModelLocalizationRef title_loc = 23;
+  ModelLocalizationRef description_loc = 24;
+  ModelLocalizationRef extra_card_text_loc = 25;
+}
+
+message CardPoolModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  string title = 6;
+  repeated string card_ids = 7;
+  bool is_colorless = 8;
+  string energy_color_name = 9;
+  string energy_outline_color = 10;
+  string deck_entry_card_color = 11;
+  string energy_icon_asset_key = 12;
+  string energy_icon_path = 13;
+  string frame_material_asset_key = 14;
+  string frame_material_path = 15;
+  string card_frame_material_path = 16;
+  ModelLocalizationRef title_loc = 17;
+}
+
+message RelicPoolModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  repeated string relic_ids = 6;
+  string energy_color_name = 7;
+  string lab_outline_color = 8;
+}
+
+message PotionPoolModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  repeated string potion_ids = 6;
+  string energy_color_name = 7;
+  string lab_outline_color = 8;
+}
+
+message ModifierModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+  string title = 6;
+  string description = 7;
+  string neow_option_title = 8;
+  string neow_option_description = 9;
+  bool clears_player_deck = 10;
+  string polarity = 11;
+  repeated string mutually_exclusive_modifier_ids = 12;
+  string icon_asset_key = 13;
+  string icon_path = 14;
+  ModelLocalizationRef title_loc = 15;
+  ModelLocalizationRef description_loc = 16;
+  ModelLocalizationRef neow_option_title_loc = 17;
+  ModelLocalizationRef neow_option_description_loc = 18;
+}
+
+message AchievementModelInfo {
+  string id = 1;
+  string type_name = 2;
+  int32 category_sorting_id = 3;
+  int32 entry_sorting_id = 4;
+  bool should_receive_combat_hooks = 5;
+}

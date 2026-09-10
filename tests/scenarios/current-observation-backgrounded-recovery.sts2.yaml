@@ -1,0 +1,11 @@
+name: current-observation-backgrounded-recovery
+description: Captures deterministic diagnostics artifacts for retryable backgrounded current-observation recovery consumers.
+tags: [mock, recovery, diagnostics, spec:S13]
+
+steps:
+  - dev.diagnostics:
+      bundleDir: ./recovery/backgrounded-current-observation
+
+  - dev.assert:
+      path: rootScene
+      equals: screens/main_menu

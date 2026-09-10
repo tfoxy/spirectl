@@ -1,0 +1,18 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-choose-a-card
+description: Ironclad NIBBITS combat with a choose-a-card overlay on top (Attack Potion-style pick 1 of 3 attacks).
+run:
+  seed: fixture-combat-choose-a-card
+  players:
+    - id: "p:1"
+      creature: { currentHp: 67, maxHp: 80 }
+      overlays:
+        - chooseACard:
+            canSkip: true
+            cards:
+              - modelId: ANGER
+              - modelId: SWORD_BOOMERANG
+              - modelId: CONFLAGRATION
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL

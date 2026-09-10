@@ -1,0 +1,8 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-map
+description: Deterministic authored map fixture using typed map-node state and select-map-node intent assertions.
+run:
+  seed: fixture-basic-map
+  actFloor: 3
+  currentRoom:
+    mapRoom: {}

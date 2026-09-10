@@ -1,0 +1,163 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-many-cards
+description: Deterministic Ironclad combat with large authored hand, combat piles, and deck.
+run:
+  seed: fixture-combat-many-cards
+  players:
+    - id: "p:1"
+      characterId: IRONCLAD
+      creature: { currentHp: 67, maxHp: 80 }
+      deck:
+        cards:
+          - { modelId: STRIKE_IRONCLAD }
+          - { modelId: DEFEND_IRONCLAD }
+          - { modelId: BASH }
+          - { modelId: ANGER }
+          - { modelId: SWORD_BOOMERANG }
+          - { modelId: IRON_WAVE }
+          - { modelId: ARMAMENTS }
+          - { modelId: HEADBUTT }
+          - { modelId: SHRUG_IT_OFF }
+          - { modelId: THUNDERCLAP }
+          - { modelId: POMMEL_STRIKE }
+          - { modelId: TRUE_GRIT }
+          - { modelId: FLAME_BARRIER }
+          - { modelId: WHIRLWIND }
+          - { modelId: FEED }
+          - { modelId: OFFERING }
+          - { modelId: BODY_SLAM }
+          - { modelId: BATTLE_TRANCE }
+          - { modelId: IMPERVIOUS }
+          - { modelId: BLUDGEON }
+          - { modelId: STRIKE_IRONCLAD }
+          - { modelId: DEFEND_IRONCLAD }
+          - { modelId: BASH }
+          - { modelId: ANGER }
+          - { modelId: SWORD_BOOMERANG }
+          - { modelId: IRON_WAVE }
+          - { modelId: ARMAMENTS }
+          - { modelId: HEADBUTT }
+          - { modelId: SHRUG_IT_OFF }
+          - { modelId: THUNDERCLAP }
+          - { modelId: POMMEL_STRIKE }
+          - { modelId: TRUE_GRIT }
+          - { modelId: FLAME_BARRIER }
+          - { modelId: WHIRLWIND }
+          - { modelId: FEED }
+          - { modelId: OFFERING }
+          - { modelId: BODY_SLAM }
+          - { modelId: BATTLE_TRANCE }
+          - { modelId: IMPERVIOUS }
+          - { modelId: BLUDGEON }
+      combat:
+        hand:
+          cards:
+            - { modelId: NEOWS_FURY }
+            - { modelId: INFECTION }
+            - { modelId: BURN }
+            - { modelId: REGRET }
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+            - { modelId: BASH }
+            - { modelId: ANGER }
+            - { modelId: SWORD_BOOMERANG }
+            - { modelId: IRON_WAVE }
+        drawPile:
+          cards:
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+            - { modelId: BASH }
+            - { modelId: ANGER }
+            - { modelId: SWORD_BOOMERANG }
+            - { modelId: IRON_WAVE }
+            - { modelId: ARMAMENTS }
+            - { modelId: HEADBUTT }
+            - { modelId: SHRUG_IT_OFF }
+            - { modelId: THUNDERCLAP }
+            - { modelId: POMMEL_STRIKE }
+            - { modelId: TRUE_GRIT }
+            - { modelId: FLAME_BARRIER }
+            - { modelId: WHIRLWIND }
+            - { modelId: FEED }
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+            - { modelId: BASH }
+            - { modelId: ANGER }
+            - { modelId: SWORD_BOOMERANG }
+            - { modelId: IRON_WAVE }
+            - { modelId: ARMAMENTS }
+            - { modelId: HEADBUTT }
+            - { modelId: SHRUG_IT_OFF }
+            - { modelId: THUNDERCLAP }
+            - { modelId: POMMEL_STRIKE }
+            - { modelId: TRUE_GRIT }
+            - { modelId: FLAME_BARRIER }
+            - { modelId: WHIRLWIND }
+            - { modelId: FEED }
+        discardPile:
+          cards:
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+            - { modelId: BASH }
+            - { modelId: ANGER }
+            - { modelId: SWORD_BOOMERANG }
+            - { modelId: IRON_WAVE }
+            - { modelId: ARMAMENTS }
+            - { modelId: HEADBUTT }
+            - { modelId: SHRUG_IT_OFF }
+            - { modelId: THUNDERCLAP }
+            - { modelId: POMMEL_STRIKE }
+            - { modelId: TRUE_GRIT }
+            - { modelId: FLAME_BARRIER }
+            - { modelId: WHIRLWIND }
+            - { modelId: FEED }
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+            - { modelId: BASH }
+            - { modelId: ANGER }
+            - { modelId: SWORD_BOOMERANG }
+            - { modelId: IRON_WAVE }
+            - { modelId: ARMAMENTS }
+            - { modelId: HEADBUTT }
+            - { modelId: SHRUG_IT_OFF }
+            - { modelId: THUNDERCLAP }
+            - { modelId: POMMEL_STRIKE }
+            - { modelId: TRUE_GRIT }
+            - { modelId: FLAME_BARRIER }
+            - { modelId: WHIRLWIND }
+            - { modelId: FEED }
+        exhaustPile:
+          cards:
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+            - { modelId: BASH }
+            - { modelId: ANGER }
+            - { modelId: SWORD_BOOMERANG }
+            - { modelId: IRON_WAVE }
+            - { modelId: ARMAMENTS }
+            - { modelId: HEADBUTT }
+            - { modelId: SHRUG_IT_OFF }
+            - { modelId: THUNDERCLAP }
+            - { modelId: POMMEL_STRIKE }
+            - { modelId: TRUE_GRIT }
+            - { modelId: FLAME_BARRIER }
+            - { modelId: WHIRLWIND }
+            - { modelId: FEED }
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+            - { modelId: BASH }
+            - { modelId: ANGER }
+            - { modelId: SWORD_BOOMERANG }
+            - { modelId: IRON_WAVE }
+            - { modelId: ARMAMENTS }
+            - { modelId: HEADBUTT }
+            - { modelId: SHRUG_IT_OFF }
+            - { modelId: THUNDERCLAP }
+            - { modelId: POMMEL_STRIKE }
+            - { modelId: TRUE_GRIT }
+            - { modelId: FLAME_BARRIER }
+            - { modelId: WHIRLWIND }
+            - { modelId: FEED }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL

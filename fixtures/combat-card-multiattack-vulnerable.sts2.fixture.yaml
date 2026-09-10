@@ -1,0 +1,26 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-card-multiattack-vulnerable
+description: >-
+  combat-card-multiattack with Vulnerable applied to BOTH Nibbits. Whirlwind hits all
+  enemies, so each enemy's HP bar previews the boosted incoming damage (the orange
+  "will-lose" segment grows on a Vulnerable target). A low-HP encounter is used so the
+  preview segment is clearly visible. Vulnerable is a target power, so it only affects the
+  displayed damage once the attack is ready (it is excluded from the at-rest card number).
+run:
+  seed: fixture-combat-card-selected
+  currentActIndex: 2
+  actFloor: 51
+  view:
+    selectedCard:
+      cardModelId: WHIRLWIND
+  players: 2
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL
+      enemies:
+        - powers:
+            - modelId: VULNERABLE_POWER
+              amount: 2
+        - powers:
+            - modelId: VULNERABLE_POWER
+              amount: 2

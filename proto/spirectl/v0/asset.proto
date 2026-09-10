@@ -1,0 +1,342 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+
+message AssetExtractRequest {
+  string request_id = 1;
+  string source_root = 2;
+  string source_path = 3;
+  string load_path = 4;
+  string output_format = 5;
+}
+
+message AssetExtractResponse {
+  string request_id = 1;
+  DataSource source = 2;
+  bool provisional = 3;
+  string format = 4;
+  uint32 width = 5;
+  uint32 height = 6;
+  bytes contents = 7;
+  string render_mode = 8;
+  repeated string notes = 9;
+  AssetArtifactKind artifact_kind = 10;
+  uint32 duration_ms = 11;
+  uint32 frame_count = 12;
+  repeated AssetTimelineFrame frames = 13;
+  string content_type = 14;
+  AssetExtractProvenance provenance = 15;
+  repeated AssetExtractNotice notices = 16;
+  AssetExtractPlacementMetadata placement_metadata = 17;
+}
+
+enum AssetArtifactKind {
+  ASSET_ARTIFACT_KIND_UNSPECIFIED = 0;
+  ASSET_ARTIFACT_KIND_RASTER = 1;
+  ASSET_ARTIFACT_KIND_TIMELINE = 2;
+  ASSET_ARTIFACT_KIND_METADATA = 3;
+  ASSET_ARTIFACT_KIND_FONT = 4;
+}
+
+message AssetTimelineFrame {
+  uint32 index = 1;
+  string format = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  bytes contents = 5;
+  uint32 duration_ms = 6;
+  string content_type = 7;
+  // Placement of this independently-cropped frame within the clip's fixed canvas. canvas_width/height
+  // == 0 means the frame is the whole canvas (legacy full-frame timeline sources).
+  int32 offset_x = 8;
+  int32 offset_y = 9;
+  uint32 canvas_width = 10;
+  uint32 canvas_height = 11;
+}
+
+message AssetExtractProvenance {
+  string source_root = 1;
+  string source_path = 2;
+  string load_path = 3;
+  string render_mode = 4;
+  string source_kind = 5;
+}
+
+message AssetExtractNotice {
+  string code = 1;
+  string severity = 2;
+  string message = 3;
+  string path = 4;
+}
+
+message AssetExtractPlacementMetadata {
+  string source_scene_path = 1;
+  string source_node_path = 2;
+  AssetCompositionRect local_bounds = 3;
+  AssetCompositionRect global_bounds = 4;
+  uint32 output_width = 5;
+  uint32 output_height = 6;
+  string render_mode = 7;
+}
+
+message AssetExtractResult {
+  oneof result {
+    AssetExtractResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message AssetExplainRequest {
+  string request_id = 1;
+  string source_root = 2;
+  string source_path = 3;
+  string load_path = 4;
+}
+
+message AssetExplainResponse {
+  string request_id = 1;
+  DataSource source = 2;
+  bool provisional = 3;
+  AssetCompositionRootScene root_scene = 4;
+  repeated AssetCompositionPlaceholder placeholders = 5;
+  repeated AssetCompositionLayerGroup layer_groups = 6;
+  repeated AssetCompositionSelectedLayer selected_layers = 7;
+  AssetCompositionBounds bounds = 8;
+  AssetCompositionRenderPlan render = 9;
+  AssetCompositionActiveScene active_scene = 10;
+  repeated AssetCompositionWarning warnings = 11;
+  string schema_version = 12;
+  string explanation_kind = 13;
+  AssetEncounterScenePackage encounter_scene_package = 14;
+}
+
+message AssetExplainNotice {
+  string code = 1;
+  string severity = 2;
+  string path = 3;
+  string message = 4;
+  bool provisional = 5;
+}
+
+message AssetVector2 {
+  double x = 1;
+  double y = 2;
+}
+
+message AssetEncounterScenePackage {
+  string schema_version = 1;
+  string encounter_id = 2;
+  AssetEncounterViewport viewport = 3;
+  AssetEncounterCamera camera = 4;
+  AssetEncounterBackground background = 5;
+  repeated AssetEncounterLogicalActor logical_actors = 6;
+  repeated AssetEncounterVisualPart visual_parts = 7;
+  repeated AssetEncounterVisualState states = 8;
+  repeated AssetEncounterVisualTransition transitions = 9;
+  repeated AssetEncounterRenderTarget render_targets = 10;
+  repeated AssetExplainNotice notices = 11;
+  repeated AssetEncounterSelectorDiagnostic selector_diagnostics = 12;
+}
+
+message AssetEncounterViewport {
+  uint32 width = 1;
+  uint32 height = 2;
+  string coordinate_space = 3;
+}
+
+message AssetEncounterCamera {
+  double scale = 1;
+  AssetVector2 offset = 2;
+  string source = 3;
+  string provenance = 4;
+}
+
+message AssetEncounterBackground {
+  string source_scene = 1;
+  string source_query = 2;
+  string render_query = 3;
+}
+
+message AssetEncounterLogicalActor {
+  string actor_id = 1;
+  string slot_id = 2;
+  AssetCompositionRect target_rect = 3;
+  repeated string state_part_ids = 4;
+}
+
+message AssetEncounterVisualPart {
+  string part_id = 1;
+  string actor_id = 2;
+  string screen_side = 3;
+  string anatomical_side = 4;
+  int32 layer = 5;
+  AssetCompositionRect viewport_rect = 6;
+  AssetEncounterSelectorDiagnostic selector_diagnostic = 7;
+}
+
+message AssetEncounterVisualState {
+  string state_id = 1;
+  repeated string affected_part_ids = 2;
+}
+
+message AssetEncounterVisualTransition {
+  string transition_id = 1;
+  string hook = 2;
+  repeated string affected_part_ids = 3;
+  string active_state_id = 4;
+}
+
+message AssetEncounterRenderTarget {
+  string target_id = 1;
+  string kind = 2;
+  string query = 3;
+  AssetEncounterRenderTargetDecision decision = 4;
+}
+
+message AssetEncounterSelectorDiagnostic {
+  string part_id = 1;
+  string selector = 2;
+  repeated string normalized_selectors = 3;
+  repeated AssetEncounterSelectorCandidate candidates = 4;
+  AssetEncounterResolvedNode resolved_node = 5;
+  AssetCompositionRect local_bounds = 6;
+  AssetCompositionRect visible_bounds = 7;
+  string status = 8;
+  string target_state_id = 9;
+  string render_target_id = 10;
+}
+
+message AssetEncounterSelectorCandidate {
+  string path = 1;
+  string selector = 2;
+  string source = 3;
+  string status = 4;
+}
+
+message AssetEncounterResolvedNode {
+  string path = 1;
+  string name = 2;
+  string type = 3;
+}
+
+message AssetEncounterRenderTargetDecision {
+  string target_id = 1;
+  string kind = 2;
+  string state_id = 3;
+  string part_id = 4;
+  string decision = 5;
+  string reason = 6;
+  repeated string affected_part_ids = 7;
+}
+
+message AssetCompositionRootScene {
+  string background_id = 1;
+  string path = 2;
+  string load_source = 3;
+}
+
+message AssetCompositionPlaceholder {
+  string name = 1;
+  string node_path = 2;
+  uint32 order = 3;
+  bool matched = 4;
+}
+
+message AssetCompositionLayerGroup {
+  string name = 1;
+  string placeholder = 2;
+  uint32 candidate_count = 3;
+  repeated string candidates = 4;
+  string selected_path = 5;
+  string selection_source = 6;
+  uint32 order = 7;
+}
+
+message AssetCompositionSelectedLayer {
+  string placeholder = 1;
+  string path = 2;
+  uint32 order = 3;
+  string load_status = 4;
+  repeated string texture_refs = 5;
+  AssetCompositionRect local_bounds = 6;
+  AssetCompositionRect visible_bounds = 7;
+}
+
+message AssetCompositionBounds {
+  AssetCompositionRect viewport = 1;
+  AssetCompositionRect final_composed = 2;
+  AssetCompositionRect final_visible = 3;
+  double transparent_pixel_ratio = 4;
+}
+
+message AssetCompositionRenderPlan {
+  string render_mode = 1;
+  uint32 warmup_frames = 2;
+  bool trim_transparent_bounds = 3;
+  uint32 transparent_crop_padding = 4;
+  repeated string notes = 5;
+}
+
+message AssetCompositionActiveScene {
+  string status = 1;
+  bool matched_root = 2;
+  repeated string observed_layer_paths = 3;
+  repeated string differences = 4;
+}
+
+message AssetCompositionWarning {
+  string code = 1;
+  string severity = 2;
+  string message = 3;
+  map<string, string> details = 4;
+}
+
+message AssetCompositionRect {
+  double x = 1;
+  double y = 2;
+  double width = 3;
+  double height = 4;
+}
+
+message AssetExplainResult {
+  oneof result {
+    AssetExplainResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message AssetCatalogRequest {
+  string family = 1;
+}
+
+message AssetCatalogResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  string family = 3;
+  repeated AssetCatalogEntry entries = 4;
+  repeated string notes = 5;
+}
+
+message AssetCatalogEntry {
+  string key = 1;
+  string key_pattern = 2;
+  string resolution_kind = 3;
+  string model_type = 4;
+  string model_id = 5;
+  string model_property = 6;
+  string source_path = 7;
+  string render_mode = 8;
+  repeated string notes = 9;
+}
+
+message AssetCatalogResult {
+  oneof result {
+    AssetCatalogResponse success = 1;
+    BridgeError error = 2;
+  }
+}

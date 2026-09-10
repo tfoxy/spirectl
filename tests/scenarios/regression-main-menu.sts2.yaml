@@ -1,0 +1,6 @@
+name: regression-main-menu
+description: Compare the bounded main-menu snapshot baseline against the current runtime.
+steps:
+  - dev.snapshot-compare:
+      spec: ../snapshots/main-menu.sts2.snapshot.yaml
+      baseline: ../snapshots/baselines/main-menu

@@ -1,0 +1,308 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <PackageId>Spirectl.Sts2</PackageId>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/tfoxy/spirectl</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/tfoxy/spirectl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>slay-the-spire;sts2;automation</PackageTags>
+    <Description>Embeddable runtime support for Spirectl's Slay the Spire 2 bridge.</Description>
+    <Authors>Spirectl contributors</Authors>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == ''">$(STS2_ASSEMBLIES_DIR)</Sts2AssembliesDir>
+    <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == '' and '$(Sts2AssembliesDir)' != '' and Exists('$(Sts2AssembliesDir)/sts2.dll') and Exists('$(Sts2AssembliesDir)/GodotSharp.dll') and Exists('$(Sts2AssembliesDir)/0Harmony.dll')">true</EnableSts2LiveHost>
+    <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == ''">false</EnableSts2LiveHost>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
+    <DefineConstants>$(DefineConstants);ENABLE_STS2_LIVE_HOST</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+    <Compile Include="*.cs" />
+    <Compile Include="Common/**/*.cs" />
+    <Compile Include="Core/**/*.cs" />
+    <Compile Include="Embedding/**/*.cs" />
+    <Compile Include="Live/EncounterVisuals/Sts2EncounterVisualCatalog.cs" />
+    <Compile Include="Live/EncounterVisuals/Sts2EncounterVisualEventStore.cs" />
+    <Compile Include="Live/Sts2MainThreadDispatcher.cs" />
+    <Compile Include="Live/Sts2RuntimeInstrumentation.cs" />
+    <Compile Include="Live/Sts2AnimationHintInstrumentation.cs" />
+    <Compile Include="Live/Sts2LiveIntrospection.cs" />
+    <Compile Include="Live/Sts2CardStateSnapshotFactory.cs" />
+    <Compile Include="Live/Sts2SelectedCardViewState.cs" />
+    <Compile Include="Live/Sts2RewardsOverlayInspector.cs" />
+    <!-- Godot-free GodotSceneState DTOs + encoding helpers: always compiled (no Godot
+         dependency) so the asset seam's structure shape is offline-testable. The engine
+         walk (Sts2GodotSceneStateProducer.cs) stays live-host-only. -->
+    <!-- Godot-free per-entry model projection: always compiled (no Godot dependency) so the
+         "one bad entry must not sink the whole family" rule is offline-unit-testable. The family
+         builders that call it (Sts2ModelCatalogProvider.cs) stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2ModelCatalogProjection.cs" />
+    <Compile Include="Live/Sts2GodotSceneStateModels.cs" />
+    <!-- Godot-free Part C tween-endpoint tuple math: always compiled (no Godot dependency) so it's
+         offline-unit-testable, like the GodotSceneState models above. The Godot-typed
+         Sts2TweenEndpointMath stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2TweenEndpointTuples.cs" />
+    <!-- Godot-free spine-anim schedule replay: always compiled (no Godot dependency) so it's
+         offline-unit-testable. The Godot-typed Sts2SpineInspector / Sts2SpineAnimationHooks that record and
+         consume the schedule stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2SpineSchedule.cs" />
+    <!-- Reusable Godot-free Spine geometry primitives: RID candidate enumeration, stride walking, affine
+         rigidity, and atlas parsing remain with geoclip/asset behavior. Standalone probe-specific planning and
+         validation live in BridgeMod. -->
+    <!-- Godot-free core of the env-gated SPINE GEOCLIP BAKER (the arming spec parse, the frame clock, the
+         atlas page association, the src-rect derivation + uv renormalization, the rigid-vs-deforming track
+         selection and the whole geoclip/0 manifest assembly): always compiled (no Godot dependency) so the
+         artifact contract is offline-unit-testable. The Godot-typed baker
+         (Sts2SpineGeoClipBaker: bracketed mesh-RID acquisition, the RenderingServer readback, the slot-colour
+         association probe, the page PNG export) stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2SpineGeometryMath.cs" />
+    <Compile Include="Live/Sts2SpineAtlasText.cs" />
+    <Compile Include="Live/Sts2SpineGeoClipCore.cs" />
+    <Compile Include="Live/Sts2SpineGeoClipHeadlessRemint.cs" />
+    <Compile Include="Live/Sts2SpineGeoClipHeadlessMintMark.cs" />
+    <!-- Godot-free REFUSAL MEMO for the on-demand geoclip lane (the bake identity a refusal is remembered under,
+         the environment-lever fold that identity carries, and the bounded LRU itself): always compiled (no Godot
+         dependency) so the key's equality — which is what decides whether a caller is answered from memory or
+         charged seconds for a verdict already reached — is offline-unit-testable. The Godot-typed baker that
+         consults and records it (Sts2SpineGeoClipBaker.BakeOnDemand) stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2SpineGeoClipRefusalMemo.cs" />
+    <!-- P4-WS1 Godot-free SCENE-FIT FRAMING (how an off-screen bake sizes its canvas around a rig's bounds, and
+         the node-local placement rect that inverts it): always compiled (no Godot dependency) so the fit-scale
+         branch and the placement algebra are offline-unit-testable. It has TWO producers that must agree
+         numerically — the raster spine clip's `clipPlacement` and the geoclip baker's `meta.placement` — so it is
+         one implementation both call. The Godot-typed Rect2 wrapper (Sts2AssetExtractProvider.FrameFromBoundsFitted)
+         stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2SceneFitFrame.cs" />
+    <!-- Godot-free EVENT-BACKDROP FRAMING (the aspect lerp the game places event background scenes with, and the
+         mirror-centered variant an explicit-size still must use): always compiled (no Godot dependency) so both
+         compositions are offline-unit-testable and can never drift apart. The Godot-typed wrapper
+         (Sts2AssetExtractProvider.TryResolveEventBackgroundFrame) stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2EventBackgroundFrameMath.cs" />
+    <!-- Godot-free PROCESS-GLOBAL single-arm claim shared by the two env-gated one-shots above (and the tween
+         recorder): always compiled (no Godot dependency) so the arming truth table is offline-unit-testable, and
+         because the claim has to exist even in a copy built without a live host. The Godot-typed subsystems it
+         guards stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2OneShotArmClaim.cs" />
+    <!-- Godot-free spine default-animation pick / loop-flag guess / queued-chain gate (round-8 items 10+11):
+         always compiled (no Godot dependency) so the truth-tables are offline-unit-testable, like the schedule
+         replay above. The Godot-typed Sts2SpineInspector / Sts2SpineAnimationHooks that call them stay in the
+         live-host glob below. -->
+    <Compile Include="Live/Sts2SpineDefaults.cs" />
+    <!-- Godot-free spine MATERIAL discriminator (round-8 item 8): always compiled (no Godot dependency) so the
+         signature is offline-unit-testable, like the defaults above. The Godot-typed reader
+         (Sts2SpineInspector.ReadMaterialKey) that collects the shader path + uniform values stays in the
+         live-host glob below. -->
+    <Compile Include="Live/Sts2SpineMaterialKey.cs" />
+    <!-- R9 Godot-free live spine-material snapshot store (the signature → LIVE uniform-values carry that keeps the
+         bake's tint and the `&mat=` cache key from disagreeing): always compiled (no Godot dependency) so the
+         record/resolve/eviction contract is offline-unit-testable, like the discriminator above. The Godot-typed
+         face (Sts2SpineLiveMaterials) and its recorder (Sts2SpineInspector) stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2SpineLiveMaterialStore.cs" />
+    <!-- Godot-free late-static spine re-probe gate (round-8 item 13): always compiled (no Godot dependency) so
+         the budget/re-arm truth table is offline-unit-testable. The Godot-typed watcher that reads
+         skeleton_data_res and applies the decision stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2SpineReprobeGate.cs" />
+    <!-- R11 Godot-free region-emit cap decision: always compiled (no Godot dependency) so the flame frame-swap
+         pacing is offline-unit-testable. The Godot-typed watcher (Sts2RuntimeSceneWatcher) that applies it stays
+         in the live-host glob below. -->
+    <Compile Include="Live/Sts2RegionEmitCap.cs" />
+    <!-- R11 Godot-free cosmetic-emit cap decision (sustained transform-churn pacing): always compiled (no Godot
+         dependency) so it's offline-unit-testable, like Sts2RegionEmitCap above. The Godot-typed watcher that applies
+         it stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2CosmeticEmitCap.cs" />
+    <!-- R12 Godot-free decorative-animator scene-identity table (which node of which instanced scene routes to which
+         fold, plus the rel-path composer): always compiled (no Godot dependency) so the table is
+         offline-unit-testable, like the two caps above. The Godot-typed watcher that resolves each node's scene
+         identity and applies the folds stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2DecorEmitSuppress.cs" />
+    <!-- R13 Godot-free top-bar icon fold (scene→loop-token map, the icon loop's constants, and the
+         pivot-anchored rotation-undo math): always compiled (no Godot dependency) so the transform algebra is
+         offline-unit-testable, like the map-point fold below. The Godot-typed watcher that reads `IsScreenOpen` and
+         applies the pin stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2TopBarFold.cs" />
+    <!-- R13 Godot-free proceed-glow fold (the glow loop's gate + the analytic alpha pin): always compiled (no
+         Godot dependency) so the gate truth-table is offline-unit-testable. The Godot-typed watcher that reads the
+         three gate variables stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2ProceedGlow.cs" />
+    <!-- R13 Godot-free content-key registry (pooled-card identity: scene rule + per-model serial): always compiled
+         (no Godot dependency) so the key format and serial stability are offline-unit-testable. The typed
+         `NCard.Model` read that feeds it stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2ContentKey.cs" />
+    <!-- R12b Godot-free map-point pulse policy (scene identity, the pulse gate algebra, and the pivot-anchored
+         scale-undo math): always compiled (no Godot dependency) so the transform algebra is offline-unit-testable,
+         like the suppression table above. The Godot-typed watcher that reads the live gates and applies the pin
+         stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2MapPointPulse.cs" />
+    <!-- R14 Godot-free IDLE-WIRE COMBAT FOLDS (the four always-mounted combat animators that kept a visually idle
+         combat streaming ~30 msgs/s): the enemy-intent bob's position undo, the intent flip-book's frame-0
+         substitution, the energy/star orb-spin rotation undo, and the end-turn glow's scale+alpha pins with its
+         shiny-state gate. All always compiled (no Godot dependency) so the algebra, the scene tables and
+         the gate are offline-unit-testable, like the R12/R13 folds above; the Godot-typed watcher that reads the
+         live nodes and applies them stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2IntentBobFold.cs" />
+    <Compile Include="Live/Sts2IntentGlyphFold.cs" />
+    <Compile Include="Live/Sts2OrbSpinFold.cs" />
+    <Compile Include="Live/Sts2EndTurnGlowFold.cs" />
+    <!-- R15 Godot-free CREATURE SPINE-ANCHOR FOLD (the skeleton anchors that were 100% of an idle combat wire once
+         the R14 folds landed): the two-arm decision table, the emitter-parent scene table, the inert-descendant
+         class allowlist and the burst-tail policy. Always compiled (no Godot dependency) so all four are
+         offline-unit-testable, like the folds above; the Godot-typed watcher that reads the live subtree and
+         withholds the transform stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2SpineAnchorFold.cs" />
+    <!-- P2 Godot-free reparent-emit transform-omission predicate: always compiled (no Godot dependency) so the
+         truth-table is offline-unit-testable. The Godot-typed watcher that applies it stays in the live-host glob. -->
+    <Compile Include="Live/Sts2ReparentEmit.cs" />
+    <!-- Stage-A1 Godot-free explicit combat-background layer selection (the CompositionSelector
+         grammar + honored-selection validation): always compiled (no Godot dependency) so the
+         embedder-facing selector contract is offline-unit-testable. The Godot-typed composed render
+         lane (Sts2AssetExtractProvider.RenderAssets) that consumes it stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2CombatBackgroundLayerSelection.cs" />
+    <!-- WS-A Godot-free unmapped-SubViewport prune decision (the phantom top-left potion: vfx_potion_flash.tscn
+         duplicates the potion into a particle-only SubViewport the producer has no screen prefix for, so its
+         content streamed at the design origin): always compiled (no Godot dependency) so the truth-table is
+         offline-unit-testable. The Godot-typed watcher walk that applies it stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2ViewportContentPrune.cs" />
+    <!-- WS-0 embedder subtree opt-out: the `spirectl_stream_skip` metadata KEY plus the Godot-free skip decision
+         (so the truth-table is offline-unit-testable, like the prune above). The file's one Godot-typed convenience
+         overload (`HasMeta` on a live Node) sits behind #if ENABLE_STS2_LIVE_HOST, as in Sts2LiveIntrospection, so
+         this stays compilable without the game assemblies; the watcher walk that calls it stays in the live-host
+         glob below. -->
+    <Compile Include="Live/Sts2StreamSkipMeta.cs" />
+    <!-- WS-A Godot-free rich-text PER-ROLE font emit gates (font-binary suffix test, the suppress-when-same-as-the
+         node's-own-font rule, and the size/glyph-spacing omission rules that make `[b]` render bold in the mirror):
+         always compiled (no Godot dependency) so the gates are offline-unit-testable. The Godot-typed
+         GetThemeFont/GetThemeFontSize probes that feed them stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2RichRoleFontEmit.cs" />
+    <!-- WS-2 Godot-free Line2D stroke-geometry emit rules (the cheap per-tick change SIGNATURE that avoids
+         marshalling the whole point array, and the 2-dp flatten that builds the wire payload at emit time): always
+         compiled (no Godot dependency) so both are offline-unit-testable. The Godot-typed reads (GetPointCount /
+         GetPointPosition / Points / Width / DefaultColor) that feed them stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2Line2DGeometryEmit.cs" />
+    <!-- WS-NEOW Godot-free event-background composed spine-clip routing + node-local placement math: always compiled
+         (no Godot dependency) so the routing truth-table + placement round-trip are offline-unit-testable. The
+         Godot-typed lane (Sts2AssetExtractProvider.RenderAssets) that renders + consumes it stays in the live-host glob. -->
+    <Compile Include="Live/Sts2SpineEventBackgroundClip.cs" />
+    <!-- WS5 Godot-free spine-clip composite sizing (how many side-by-side render lanes fit the readback ceiling,
+         plus the truncated-readback assertion): always compiled (no Godot dependency) so the rules are
+         offline-unit-testable. The Godot-typed lane that lays the composite out stays in the live-host glob. -->
+    <Compile Include="Live/Sts2SpineClipComposite.cs" />
+    <!-- Q3 Godot-free tween-hint emitted-parent selection order: always compiled (no Godot dependency) so the
+         fallback precedence is offline-unit-testable. The watcher's EmittedParentGlobalTuple (which walks the live
+         tree and consumes this) stays in the live-host glob. -->
+    <Compile Include="Live/Sts2TweenParentResolver.cs" />
+    <!-- WS-REST Godot-free cancelled-tween opacity-resync predicate: always compiled (no Godot dependency) so the
+         truth-table is offline-unit-testable. The Godot-typed KillPostfix / CancelTweenSuppression that consume it
+         stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2CancelledTweenResync.cs" />
+    <!-- WS-3 Godot-free discard→draw shuffle card-flight algebra (the game's quadratic-bezier curve, its two-phase
+         accelerating integrator, the arc/control-point derivation and the suppression-window bound): always
+         compiled (no Godot dependency) so the whole replay contract is offline-unit-testable. The
+         Godot-typed `_Ready` hook (Sts2CardFlightHooks) and the watcher's
+         streamed-space resolve + window opening stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2CardFlightMath.cs" />
+    <!-- R13 Godot-free PARKED card-flight suppression window (the deadline + reach a not-yet-tracked node's window
+         carries until the watcher first reconciles it, and the never-shorten/never-narrow merge rule for two
+         requests landing on the same parked slot): always compiled (no Godot dependency) so the merge rule is
+         offline-unit-testable. The watcher's park/adopt/sweep plumbing stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2CardFlightWindows.cs" />
+    <!-- R14 Godot-free PARKED card-flight RESOLVE (the spawn-time scalars a resolve request holds while it waits for
+         the watcher to track its mover, the newer-payload/never-shorten merge rule, and the bounded TTL park the
+         retry drains): always compiled (no Godot dependency) so the park contract is offline-unit-testable, like the
+         parked window above. The watcher's park/drain/publish plumbing stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2CardFlightResolvePark.cs" />
+    <!-- R14 Godot-free TRAIL SELF-WINDOW policy (whether a card flight freezes its trail root's own transform
+         writes, given the feature switch, the emit mode, and the local-mode opt-in): always compiled (no Godot
+         dependency) so the whole truth table is offline-unit-testable, since its only call site is a `_Ready` hook
+         inside the live host. The window plumbing it gates stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2TrailWindowPolicy.cs" />
+    <!-- WS-4 Godot-free HAND-LAYOUT LERP algebra (the game's three per-process-frame Lerp rates and snap
+         thresholds, the DISCRETE settle-time model `k_eff = -ln(1 - k*dt)/dt` and its frame-delta clamp band, and
+         the slowest-channel/floor/cap duration rule): always compiled (no Godot dependency) so the whole duration
+         model is offline-unit-testable. The Godot-typed setter hooks
+         (Sts2HandHolderHooks) and the watcher's endpoint resolve + window opening stay in the live-host glob. -->
+    <Compile Include="Live/Sts2HandTweenMath.cs" />
+    <!-- WS-S Godot-free localized-body TEMPLATE predicate (does a body carry a named `{Token}` the caller cannot
+         source, so that formatting it would only log + capture and hand back the raw text): always compiled (no
+         Godot dependency) so the truth-table is offline-unit-testable, like the folds above. Its one caller, the
+         model catalog's card builder, stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2LocTemplateText.cs" />
+    <!-- WS-REST7 Godot-free rest-site overlay-stream predicates (prune exemption + visible-neutralization): always
+         compiled (no Godot dependency) so the truth-tables are offline-unit-testable. The Godot-typed watcher
+         (Sts2RuntimeSceneWatcher) that reads nodeType/sceneFilePath/_screenType and consumes them stays in the
+         live-host glob below. -->
+    <Compile Include="Live/Sts2RestOverlayStream.cs" />
+    <!-- Round-8 item 14 Godot-free spine BAKE BUDGET primitives: which animation time a single-frame (still /
+         degraded) bake samples, and how many frame-encode threads a bake may use while N game instances share the
+         machine. Always compiled (no Godot dependency) so both are offline-unit-testable; the Godot-typed lane
+         (Sts2AssetExtractProvider.RenderAssets) that consumes them stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2SpineStillFrame.cs" />
+    <Compile Include="Live/Sts2RenderEncodeBudget.cs" />
+    <!-- The scene-watch A/B kill-switches. Godot-free and always compiled so bridge diagnostics can record
+         which levers were effective without requiring a live host. -->
+    <Compile Include="Live/Sts2SceneWatchRuntimeSettings.cs" />
+    <Compile Include="Live/Sts2ClickableFocus.cs" />
+    <Compile Include="Live/Sts2RewardElementChoice.cs" />
+    <Compile Include="Live/Sts2RuntimeSceneWatchControls.cs" />
+    <!-- Semantic state-watch pacing levers and the process-global semantic revision the game-thread hooks bump
+         to wake an idle state subscription early. Both are reusable embedding behavior; bridge profiling is
+         supplied through the optional instrumentation seam. -->
+    <Compile Include="Live/Sts2StateWatchRuntimeSettings.cs" />
+    <Compile Include="Live/Sts2SemanticStateRevision.cs" />
+    <!-- Godot-free launcher opt-in + per-lever kill switches for the background-throttle overrides (keeping a
+         backgrounded window's instance usable as an automation target): always compiled (no Godot dependency) so
+         the default-off master switch and the default-on levers are offline-unit-testable. The Godot-typed hooks
+         that consume them (Sts2BackgroundThrottleHooks) stay in the live-host glob below. -->
+    <!-- R19 WP5 Godot-free ABSOLUTE-SCROLL primitives (the `set-scroll-offset` kill switch, the offset parse and
+         the order-agnostic window clamp): always compiled (no Godot dependency) so the clamp/parse contract is
+         offline-unit-testable. The Godot-typed handler that resolves the owning surface and writes its scroll
+         target (Sts2ActionHandler.Scroll.cs) stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2ScrollOffsetMath.cs" />
+    <!-- Godot-free ASSET-RENDER phase breakdown (which part of a background/spine render held the Godot main
+         thread and which part merely waited on frames): always compiled (no Godot dependency) so the phase
+         vocabulary, the blocking/parked fold and the take-once drain are offline-unit-testable. The Godot-typed lanes that stamp the phases
+         (Sts2AssetExtractProvider.RenderAssets) stay in the live-host glob below. -->
+    <Compile Include="Live/Sts2RenderPhaseProfile.cs" />
+    <Compile Include="Live/Sts2ImageEncodePolicy.cs" />
+    <!-- Explicit LogicalName: the loader addresses this by the literal "Spirectl.Sts2.Data.<file>" string, but the
+         DEFAULT logical name is derived from the project path — and when the project is reached through a symlinked
+         path (e.g. a .claude/worktrees/spirectl link) MSBuild drops the Data directory segment, producing
+         "Spirectl.Sts2.base-game-….json" and a resource the loader cannot find. -->
+    <EmbeddedResource Include="Data/base-game-encounter-visual-packages.json" LogicalName="Spirectl.Sts2.Data.base-game-encounter-visual-packages.json" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
+    <Reference Include="sts2">
+      <HintPath>$(Sts2AssembliesDir)/sts2.dll</HintPath>
+      <Private Condition="'$(RunSts2LiveHostTests)' == 'true'">true</Private>
+      <Private Condition="'$(RunSts2LiveHostTests)' != 'true'">false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2AssembliesDir)/GodotSharp.dll</HintPath>
+      <Private Condition="'$(RunSts2LiveHostTests)' == 'true'">true</Private>
+      <Private Condition="'$(RunSts2LiveHostTests)' != 'true'">false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(Sts2AssembliesDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Compile Include="Live/**/*.cs" Exclude="Live/Debugging/ILiveDebugRuntimeHooks.cs;Live/Sts2RuntimeSceneWatchControls.cs;Live/Sts2ModelCatalogProjection.cs;Live/Sts2SpineGeoClipRefusalMemo.cs;Live/Debugging/LiveDebugControl.cs;Live/EncounterVisuals/Sts2EncounterVisualCatalog.cs;Live/EncounterVisuals/Sts2EncounterVisualEventStore.cs;Live/Sts2MainThreadDispatcher.cs;Live/Sts2RuntimeInstrumentation.cs;Live/Sts2AnimationHintInstrumentation.cs;Live/Sts2LiveIntrospection.cs;Live/Sts2CardStateSnapshotFactory.cs;Live/Sts2SelectedCardViewState.cs;Live/Sts2RewardsOverlayInspector.cs;Live/Sts2ScenarioProvider.cs;Live/Sts2RecordedFixtureProvider.cs;Live/Sts2GodotSceneStateModels.cs;Live/Sts2TweenEndpointTuples.cs;Live/Sts2SpineSchedule.cs;Live/Sts2SpineGeometryMath.cs;Live/Sts2SpineAtlasText.cs;Live/Sts2SpineGeoClipCore.cs;Live/Sts2SpineGeoClipHeadlessRemint.cs;Live/Sts2SpineGeoClipHeadlessMintMark.cs;Live/Sts2SceneFitFrame.cs;Live/Sts2EventBackgroundFrameMath.cs;Live/Sts2OneShotArmClaim.cs;Live/Sts2SpineDefaults.cs;Live/Sts2SpineMaterialKey.cs;Live/Sts2SpineLiveMaterialStore.cs;Live/Sts2SpineReprobeGate.cs;Live/Sts2RegionEmitCap.cs;Live/Sts2CosmeticEmitCap.cs;Live/Sts2DecorEmitSuppress.cs;Live/Sts2TopBarFold.cs;Live/Sts2ProceedGlow.cs;Live/Sts2ContentKey.cs;Live/Sts2MapPointPulse.cs;Live/Sts2IntentBobFold.cs;Live/Sts2IntentGlyphFold.cs;Live/Sts2OrbSpinFold.cs;Live/Sts2EndTurnGlowFold.cs;Live/Sts2SpineAnchorFold.cs;Live/Sts2ReparentEmit.cs;Live/Sts2ViewportContentPrune.cs;Live/Sts2CombatBackgroundLayerSelection.cs;Live/Sts2StreamSkipMeta.cs;Live/Sts2RichRoleFontEmit.cs;Live/Sts2Line2DGeometryEmit.cs;Live/Sts2SpineEventBackgroundClip.cs;Live/Sts2SpineClipComposite.cs;Live/Sts2TweenParentResolver.cs;Live/Sts2CancelledTweenResync.cs;Live/Sts2CardFlightMath.cs;Live/Sts2CardFlightWindows.cs;Live/Sts2CardFlightResolvePark.cs;Live/Sts2TrailWindowPolicy.cs;Live/Sts2HandTweenMath.cs;Live/Sts2LocTemplateText.cs;Live/Sts2RestOverlayStream.cs;Live/Sts2SpineStillFrame.cs;Live/Sts2RenderEncodeBudget.cs;Live/Sts2RenderPhaseProfile.cs;Live/Sts2ImageEncodePolicy.cs;Live/Sts2SceneWatchRuntimeSettings.cs;Live/Sts2ClickableFocus.cs;Live/Sts2RewardElementChoice.cs;Live/Sts2StateWatchRuntimeSettings.cs;Live/Sts2SemanticStateRevision.cs;Live/Sts2BackgroundThrottleOptions.cs;Live/Sts2ScrollOffsetMath.cs" />
+  </ItemGroup>
+
+  <Target Name="ValidateSts2LiveHostReferences" BeforeTargets="ResolveReferences" Condition="'$(EnableSts2LiveHost)' == 'true'">
+    <Error Condition="'$(Sts2AssembliesDir)' == ''" Text="Missing Sts2AssembliesDir for EnableSts2LiveHost=true." />
+    <Error Condition="'$(Sts2AssembliesDir)' != '' and !Exists('$(Sts2AssembliesDir)/sts2.dll')" Text="Missing STS2 live-host assembly: $(Sts2AssembliesDir)/sts2.dll" />
+    <Error Condition="'$(Sts2AssembliesDir)' != '' and !Exists('$(Sts2AssembliesDir)/GodotSharp.dll')" Text="Missing STS2 live-host assembly: $(Sts2AssembliesDir)/GodotSharp.dll" />
+    <Error Condition="'$(Sts2AssembliesDir)' != '' and !Exists('$(Sts2AssembliesDir)/0Harmony.dll')" Text="Missing STS2 live-host assembly: $(Sts2AssembliesDir)/0Harmony.dll" />
+  </Target>
+</Project>

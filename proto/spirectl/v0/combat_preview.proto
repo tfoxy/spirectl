@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+
+// Combat damage/block PREVIEW oracle: the game's OWN computed numbers for each
+// playable hand card against each candidate target, used to VALIDATE the client's
+// status-modifier formula (it is not consumed by the renderer / state). The bridge
+// computes these by calling the game's damage/block funnel (Hook.ModifyDamage /
+// Hook.ModifyBlock) directly, so every power, relic, and enchantment is reflected
+// exactly as in-game. Numbers only for now; the funnel's per-modifier breakdown can be
+// added additively later.
+message CombatPreviewRequest {
+  string request_id = 1;
+  // Optional: the perspective player whose hand to preview. Empty = local player.
+  string player_id = 2;
+}
+
+message CombatPreviewResult {
+  oneof result {
+    CombatPreviewResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message CombatPreviewResponse {
+  string request_id = 1;
+  DataSource source = 2;
+  bool provisional = 3;
+  // False when not in a live combat play phase (cards map is then empty).
+  bool combat_active = 4;
+  // Keyed by the SAME stable card id state advertises (Sts2CombatIds.CardId).
+  map<string, CardPreview> cards = 5;
+}
+
+// The game-computed preview numbers for a single hand card. All values are the final
+// post-modifier integers the game would display.
+message CardPreview {
+  // Block this card grants its owner (Dexterity/Frail/relics applied); 0 if not a block card.
+  int32 block = 1;
+  // Damage with NO creature target (self-power modifiers only) — the in-hand number; 0
+  // if the card has no damage var.
+  int32 self_damage = 2;
+  // Damage against each candidate target, keyed by the stable creature id
+  // (Sts2CombatIds.CreatureId) — target Vulnerable etc. applied per creature.
+  map<string, int32> damage_by_target = 3;
+}

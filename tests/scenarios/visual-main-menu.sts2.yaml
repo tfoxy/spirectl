@@ -1,0 +1,6 @@
+name: visual-main-menu
+description: Compares the explicit mock main-menu screenshot against the checked-in baseline bundle input.
+steps:
+  - dev.screenshot-diff:
+      baseline: ./baselines/mock-main-menu.png
+      bundleDir: ./visual-main-menu

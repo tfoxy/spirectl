@@ -1,0 +1,108 @@
+name: fixture-restore-expansion
+description: Exercises expanded deterministic fixture recipes against the mock bridge with typed state and intent assertions.
+tags: [fixture, mock, typed-state, spec:S89]
+# The mock transport's fixture loader only threads screen/player identity through
+# from an authored fixture (see cli/src/bridge/stub_service/fixture_asset_impl.rs
+# `load_fixture`); it does not simulate a specific fixture's authored room/overlay
+# content (currentRoom.event/treasure/restSite/shop all stay null regardless of
+# what was authored — see cli/src/bridge/mock_data/state_run.rs
+# `mock_current_room`). Each block below asserts the real, mock-producible scene
+# identity; where the mock's own generic canned overlay content is real (map
+# points, bundle/choose-a-card overlays) the block also proves a real resolved
+# `state actions` choice.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-map.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/map_room
+  - dev.assert:
+      path: run.map.points[0].id
+      equals: map-node:3:1
+  - dev.assert:
+      path: actions[args.mapNodeId=map-node:3:1].kind
+      source: actions
+      equals: select-map-node
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-event-room-options.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/event_room
+
+  - dev.load-fixture:
+      path: ../../fixtures/treasure.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/treasure_room
+
+  - dev.load-fixture:
+      path: ../../fixtures/rest-site.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/rest_site_room
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-shop-inventory.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/shop_room
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-rewards.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].screenType
+      equals: Rewards
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-card-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].screenType
+      equals: CardSelection
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-simple-card-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].screenType
+      equals: CardSelection
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-deck-card-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].screenType
+      equals: CardSelection
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-bundle-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].bundleSelection.bundles[0].id
+      equals: card-selection:bundle:offensive-pack:0
+  - dev.assert:
+      path: actions[args.bundleId=card-selection:bundle:offensive-pack:0].kind
+      source: actions
+      equals: select-bundle
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-card-overlay.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].chooseACard
+      exists: true
+  - dev.assert:
+      path: actions[kind=select-card].kind
+      source: actions
+      equals: select-card
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-passive-card-overlay.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].chooseACard
+      exists: true
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-lobby.sts2.fixture.yaml
+  - dev.assert:
+      path: rootScene
+      equals: screens/character_select_screen
+  - dev.assert:
+      path: characterSelect.lobby.players
+      exists: true

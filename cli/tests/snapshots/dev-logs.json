@@ -1,0 +1,25 @@
+{
+  "entries": [
+    {
+      "cursor": 1,
+      "level": "info",
+      "message": "Stub bridge runtime created.",
+      "target": "bridge.bootstrap"
+    },
+    {
+      "cursor": 2,
+      "level": "info",
+      "message": "Typed mock bridge transport is active.",
+      "target": "bridge.transport"
+    },
+    {
+      "cursor": 3,
+      "level": "debug",
+      "message": "Returning scaffolded runtime state through the protobuf contract.",
+      "target": "bridge.state"
+    }
+  ],
+  "nextCursor": 3,
+  "provisional": true,
+  "source": "stub"
+}

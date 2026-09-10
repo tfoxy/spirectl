@@ -1,0 +1,15 @@
+name: fixture-basic-card-selection
+description: Loads the checked-in card-selection fixture through the live bridge and asserts the resulting card-selection screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-card-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].chooseACard
+      exists: true
+  - dev.assert:
+      path: actions[args.cardId=card-selection:card:bash:0].kind
+      source: actions
+      equals: select-card
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].chooseACard.cards[0].modelId
+      equals: BASH

@@ -1,0 +1,22 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-shop-inventory
+description: Deterministic authored shop fixture with explicit inventory, card-removal, and buy intent controls.
+run:
+  seed: fixture-basic-shop-inventory
+  actFloor: 5
+  players:
+    - id: p1
+      creature: { currentHp: 61, maxHp: 80 }
+      gold: 175
+  currentRoom:
+    shop:
+      inventory:
+        characterCardEntries:
+          - card: { modelId: BASH }
+          - card: { modelId: BASH }
+        relicEntries:
+          - modelId: ANCHOR
+        potionEntries:
+          - modelId: FIRE_POTION
+        cardRemovalEntry:
+          used: false

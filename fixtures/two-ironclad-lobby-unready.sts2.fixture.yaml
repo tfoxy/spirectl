@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: two-ironclad-lobby-unready
+description: Deterministic two-Ironclad multiplayer lobby with explicit host-local ownership.
+characterSelect:
+  lobby:
+    seed: fixture-two-ironclad-lobby
+    hostPlayerId: "p:1"
+    players:
+      - id: "p:1"
+        characterId: IRONCLAD
+        isReady: false
+      - id: "p:2"
+        characterId: IRONCLAD
+        isHostLocalSeat: true
+        isReady: false

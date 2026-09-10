@@ -1,0 +1,165 @@
+schemaVersion: spirectl.scenario/v0
+name: mock-shop
+description: Sparse mock shop scenario for runner load-scenario coverage.
+createdAt: "2026-04-24T00:00:00Z"
+source:
+  gameVersion: mock-game/0
+  bridgeVersion: spirectl-bridge/0.0.0
+  spirectlVersion: 0.0.0
+  screen:
+    id: Screens.Shops.NMerchantInventory
+    title: Shop
+    instanceId: screen:shop:1
+  perspective:
+    scope: local
+    playerId: p1
+restore:
+  mode: sparse
+  quality: partial
+  fallbackPolicy: fall-back-to-sparse-with-degraded-quality
+  fieldReports:
+    # state has no top-level `choices` document to restore-validate against
+    # (the mock transport's `dev.load-scenario` path doesn't populate
+    # `run.currentRoom.shop` either — see cli/src/scenario_checkpoint/
+    # validation.rs `extract_restore_path`'s "choices[].id" arm, which reads a
+    # legacy-only key). `run.seed` is real on both sides (mock always answers
+    # "mock-seed") and exercises the same forced-comparison field-report
+    # mechanism this fixture is here to prove.
+    - path: run.seed
+      capture: exact
+      restore: inferred
+      validationKey: true
+      reasonCode: shop-seed
+      message: Run seed is captured from the live run and restored through fixture recipes.
+  compatibilityNotes:
+    - code: runtime-queues-omitted
+      message: Hidden runtime queues were not captured.
+      field: ""
+run:
+  seed: mock-seed
+  act: 1
+  floor: 5
+  players:
+    - id: p1
+      character: ironclad
+      isLocal: true
+      isHost: true
+      isRemote: false
+screenState:
+  shop:
+    gold: 123
+    choiceIds:
+      - shop:p1:card:strike:0
+      - shop:p1:relic:anchor:0
+      - shop:p1:potion:fire-potion:0
+      - shop:p1:card-removal:0
+      - shop:leave
+    availableActionKinds:
+      - choose
+  choices:
+    - id: shop:p1:card:strike:0
+      choiceKind: shop
+      intentKind: choose
+      label: Strike
+      description: Buy Strike.
+      ownerPlayerId: p1
+      perspective:
+        scope: local
+        playerId: p1
+      arguments:
+        choiceId: shop:p1:card:strike:0
+      enabled: true
+      disabledReason:
+      preferredAction:
+        kind: choose
+        arguments:
+          choiceId: shop:p1:card:strike:0
+    - id: shop:p1:relic:anchor:0
+      choiceKind: shop
+      intentKind: choose
+      label: Anchor
+      description: Buy Anchor.
+      ownerPlayerId: p1
+      perspective:
+        scope: local
+        playerId: p1
+      arguments:
+        choiceId: shop:p1:relic:anchor:0
+      enabled: true
+      disabledReason:
+      preferredAction:
+        kind: choose
+        arguments:
+          choiceId: shop:p1:relic:anchor:0
+    - id: shop:p1:potion:fire-potion:0
+      choiceKind: shop
+      intentKind: choose
+      label: Fire Potion
+      description: Buy Fire Potion.
+      ownerPlayerId: p1
+      perspective:
+        scope: local
+        playerId: p1
+      arguments:
+        choiceId: shop:p1:potion:fire-potion:0
+      enabled: true
+      disabledReason:
+      preferredAction:
+        kind: choose
+        arguments:
+          choiceId: shop:p1:potion:fire-potion:0
+    - id: shop:p1:card-removal:0
+      choiceKind: shop
+      intentKind: choose
+      label: Remove
+      description: Remove a card.
+      ownerPlayerId: p1
+      perspective:
+        scope: local
+        playerId: p1
+      arguments:
+        choiceId: shop:p1:card-removal:0
+      enabled: true
+      disabledReason:
+      preferredAction:
+        kind: choose
+        arguments:
+          choiceId: shop:p1:card-removal:0
+    - id: shop:leave
+      choiceKind: shop
+      intentKind: choose
+      label: Leave Shop
+      description: Leave the shop.
+      ownerPlayerId: p1
+      perspective:
+        scope: local
+        playerId: p1
+      arguments:
+        choiceId: shop:leave
+      enabled: true
+      disabledReason:
+      preferredAction:
+        kind: choose
+        arguments:
+          choiceId: shop:leave
+  availableActions:
+    - id: action:shop:choose:shop:p1:relic:anchor:0
+      kind: choose
+      intentKind: choose
+      label: Buy Anchor.
+      ownerPlayerId: p1
+      perspective:
+        scope: local
+        playerId: p1
+      legalityStatus: legal
+      arguments:
+        choiceId: shop:p1:relic:anchor:0
+      preferredAction: choose
+      preferredActionRef:
+        kind: choose
+        arguments:
+          choiceId: shop:p1:relic:anchor:0
+notices:
+  - code: sparse-export
+    message: Static model defaults are referenced by stable id and not repeated.
+    provisional: false

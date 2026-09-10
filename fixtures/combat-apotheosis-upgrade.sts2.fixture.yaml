@@ -1,0 +1,26 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-apotheosis-upgrade
+description: >-
+  Producer-test fixture for the combat card-upgrade event: p:1 holds APOTHEOSIS
+  (upgrades every card on play, TargetType.Self, no target needed). Playing it in
+  this live combat fires CardModel.UpgradeInternal for each card, which the
+  Sts2CardUpgradeEventHooks postfix streams as COMBAT_EVENT_TYPE_CARD_UPGRADE over
+  WatchCombatEvents — verify with `sts2 events --watch`.
+run:
+  seed: fixture-combat-apotheosis-upgrade
+  players:
+    - id: "p:1"
+      characterId: IRONCLAD
+      creature: { currentHp: 72, maxHp: 80 }
+      combat:
+        hand:
+          cards:
+            - { modelId: APOTHEOSIS }
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+        drawPile:
+          cards:
+            - { modelId: ANGER }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

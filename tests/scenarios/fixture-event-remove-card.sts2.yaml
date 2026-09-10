@@ -1,0 +1,41 @@
+name: fixture-event-remove-card
+description: >-
+  Loads the Precarious Shears card-removal fixture through the live bridge and asserts
+  the relic-driven state: PRECARIOUS_SHEARS is in the relic bar and its upon-pickup effect
+  has opened the deck-card-removal dialog (kind: remove) over the Neow ancient event, with
+  HP still full (the relic's self-damage only lands after the removals are confirmed).
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/event-remove-card.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[0].relics[modelId=PRECARIOUS_SHEARS].modelId
+      equals: PRECARIOUS_SHEARS
+  - dev.assert:
+      path: run.players[0].overlays[0].deckCardSelection.kind
+      equals: remove
+  - dev.assert:
+      path: run.players[0].overlays[0].screenId
+      equals: Screens.CardSelection.NDeckCardSelectScreen
+  - dev.assert:
+      path: run.players[0].overlays[0].deckCardSelection.cards[0].modelId
+      exists: true
+  # Selection sizing + prompt the renderer drives the dialog chrome from: an exact-2
+  # removal (min == max) shows no confirm button and is not cancelable (no back button).
+  - dev.assert:
+      path: run.players[0].overlays[0].deckCardSelection.minSelect
+      equals: 2
+  - dev.assert:
+      path: run.players[0].overlays[0].deckCardSelection.maxSelect
+      equals: 2
+  - dev.assert:
+      path: run.players[0].overlays[0].deckCardSelection.canCancel
+      equals: false
+  - dev.assert:
+      path: run.players[0].overlays[0].deckCardSelection.promptText
+      exists: true
+  - dev.assert:
+      path: run.players[0].creature.currentHp
+      equals: 80
+  - dev.assert:
+      path: run.currentRoom.event.canonicalEventModelId
+      equals: NEOW

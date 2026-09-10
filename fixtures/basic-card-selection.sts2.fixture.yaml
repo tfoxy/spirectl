@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-card-selection
+description: Deterministic authored card-selection fixture using typed selection state and select-card/skip intent assertions.
+run:
+  seed: fixture-basic-card-selection
+  actFloor: 6
+  players:
+    - id: p1
+      creature: { currentHp: 54, maxHp: 80 }
+      overlays:
+        - chooseACard:
+            canSkip: true
+            cards:
+              - modelId: BASH
+              - modelId: ANGER

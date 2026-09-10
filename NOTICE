@@ -1,0 +1,29 @@
+spirectl
+Copyright 2026 spirectl contributors
+
+This product is licensed under the Apache License, Version 2.0.
+
+Acknowledgement:
+Early exploration for spirectl was informed by sts2-modding-mcp
+(https://github.com/elliotttate/sts2-modding-mcp), which helped demonstrate
+the value of AI-assisted Slay the Spire 2 modding workflows. This
+acknowledgement is for inspiration and does not indicate that spirectl vendors
+or derives from that project.
+
+Non-Affiliation:
+spirectl is not affiliated with, endorsed by, or sponsored by Mega Crit. Slay
+the Spire and Slay the Spire 2 are trademarks of Mega Crit. Godot, Spine
+(Esoteric Software LLC), and FMOD (Firelight Technologies Pty Ltd) are named
+in this project for identification purposes only, to describe interoperability
+with the engine, animation runtime, and audio engine that Slay the Spire 2
+uses; spirectl ships none of their code or assets, and operates on the user's
+own local, legitimately-obtained game installation.
+
+Third-Party Attribution:
+This product bundles ICSharpCode.Decompiler (ILSpy) via NuGet, licensed under
+the MIT License. See https://github.com/icsharpcode/ILSpy for source and
+license text.
+
+This product includes a small performance patch to @marcbachmann/cel-js,
+licensed under the MIT License, applied under presentation/web/patches/. The
+patch retains portions of the MIT-licensed original.

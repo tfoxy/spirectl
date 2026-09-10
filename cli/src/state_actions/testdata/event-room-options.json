@@ -1,0 +1,78 @@
+{
+  "actions": [
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-map",
+      "kind": "toggle-map",
+      "label": "Map",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-deck",
+      "kind": "toggle-deck",
+      "label": "Deck",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-settings",
+      "kind": "toggle-settings",
+      "label": "Settings",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "eventOptionId": "o1",
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:event-room:select-event-option:o1",
+      "kind": "select-event-option",
+      "label": "Investigate",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.event.playerStates[0].options[0]"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:event-room:proceed:p1",
+      "kind": "proceed-event",
+      "label": "Leave",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.event.playerStates[0].options[1]"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "run",
+    "scene": "rooms/event_room"
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

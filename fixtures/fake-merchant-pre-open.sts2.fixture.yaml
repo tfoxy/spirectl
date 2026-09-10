@@ -1,0 +1,9 @@
+schemaVersion: spirectl.fixture/v0
+name: fake-merchant-pre-open
+description: Deterministic authored Fake Merchant event-room fixture for live semantic-action validation.
+run:
+  seed: fixture-fake-merchant-pre-open
+  actFloor: 7
+  currentRoom:
+    event:
+      canonicalEventModelId: FAKE_MERCHANT

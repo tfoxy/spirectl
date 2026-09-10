@@ -1,0 +1,31 @@
+{
+  "actions": [
+    {
+      "args": {},
+      "enabled": true,
+      "id": "action:lobby:unready",
+      "kind": "unready",
+      "label": "Unready",
+      "ownerPlayerId": "p1",
+      "sourcePath": "characterSelect.lobby"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "screens/character_select_screen",
+    "scene": null
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

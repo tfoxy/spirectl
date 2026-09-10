@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/actions.proto";
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+
+message HandshakeRequest {
+  string cli_version = 1;
+  string requested_schema_version = 2;
+  string mode = 3;
+  TransportKind transport_kind = 4;
+}
+
+message HandshakeResponse {
+  string schema_version = 1;
+  string game_version = 2;
+  string bridge_version = 3;
+  TransportKind transport_kind = 4;
+  AttachmentState attachment_state = 5;
+  DataSource source = 6;
+  bool provisional = 7;
+  PerspectiveInfo default_perspective = 8;
+  repeated Capability capabilities = 9;
+  repeated ActionDescriptor supported_actions = 10;
+  BridgeBuildIdentity build_identity = 11;
+}
+
+message BridgeBuildIdentity {
+  string bridge_semver = 1;
+  string bridge_version = 2;
+  string assembly_informational_version = 3;
+  string built_at_utc = 4;
+}
+
+message HandshakeResult {
+  oneof result {
+    HandshakeResponse success = 1;
+    BridgeError error = 2;
+  }
+}

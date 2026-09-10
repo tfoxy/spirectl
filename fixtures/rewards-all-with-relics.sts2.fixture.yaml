@@ -1,0 +1,78 @@
+schemaVersion: spirectl.fixture/v0
+name: rewards-all-with-relics
+description: >-
+  Authored rewards screen listing one of every reward type item by item, granted
+  alongside every reward-modifying relic (all ~17) so their reward hooks fire on
+  load. Superset of rewards-all that also includes the card-modifier relics.
+#
+# The rewards overlay enters a synthetic Boss combat room (rewards.roomType). Boss
+# is used (not Elite) because the game caps card-reward alternatives at 2: DRIFTWOOD
+# adds Reroll and PAELS_WING adds Sacrifice, so the card rewards here are authored
+# non-skippable (canSkip: false) to free the Skip slot. A Boss room also avoids any
+# relic-added *skippable* card reward (WHITE_STAR/PRAYER_WHEEL are Elite/Monster) that
+# would re-trip the cap.
+#
+# Firing matrix on the Boss rewards screen:
+#   Add-reward (TryModifyRewards):
+#     - AMETHYST_AUBERGINE   FIRES: adds a bonus gold reward (non-final-act boss).
+#     - LAVA_ROCK            FIRES: adds bonus relic rewards (first Act 0 Boss).
+#     - DRIFTWOOD            FIRES: makes every card reward rerollable.
+#     - BLACK_STAR / WHITE_STAR  dormant (Elite room only).
+#     - PRAYER_WHEEL         dormant (Monster room only).
+#     - WONGOS_MYSTERY_TICKET dormant (needs 5 completed combats).
+#   Card-reward option modifiers (TryModifyCardRewardOptions[Late]) — applied to
+#   the cards inside every card reward, including the authored specific-card one:
+#     - PAELS_WING           FIRES: adds a "SACRIFICE" alternative action.
+#     - MOLTEN_EGG           FIRES: upgrades Attack cards in card rewards.
+#     - FROZEN_EGG           FIRES: upgrades Power cards in card rewards.
+#     - TOXIC_EGG            FIRES: upgrades Skill cards in card rewards.
+#     - SILVER_CRUCIBLE      FIRES: upgrades cards in card rewards (limited uses).
+#     - FRESNEL_LENS         FIRES: enchants card-reward cards with Nimble.
+#     - GLITTER              FIRES: enchants card-reward cards with Glam.
+#     - WING_CHARM           FIRES: enchants one random card-reward card with Swift.
+#     - LAVA_LAMP            conditional (only when no unblockable damage this combat).
+#     - LASTING_CANDY        dormant (only every 2nd combat; counter state).
+run:
+  seed: fixture-rewards-all-with-relics
+  actFloor: 8
+  players:
+    - id: p1
+      creature: { currentHp: 58, maxHp: 80 }
+      relics:
+        # Add-action / add-reward relics
+        - modelId: PAELS_WING
+        - modelId: PRAYER_WHEEL
+        - modelId: WHITE_STAR
+        - modelId: BLACK_STAR
+        - modelId: LAVA_ROCK
+        - modelId: WONGOS_MYSTERY_TICKET
+        - modelId: AMETHYST_AUBERGINE
+        - modelId: LASTING_CANDY
+        # Card-reward modifiers
+        - modelId: DRIFTWOOD
+        - modelId: SILVER_CRUCIBLE
+        - modelId: MOLTEN_EGG
+        - modelId: FROZEN_EGG
+        - modelId: TOXIC_EGG
+        - modelId: FRESNEL_LENS
+        - modelId: LAVA_LAMP
+        - modelId: GLITTER
+        - modelId: WING_CHARM
+      overlays:
+        - rewards:
+            roomType: boss
+            items:
+              - gold: 30
+              # Card rewards are non-skippable so Reroll (Driftwood) + Sacrifice
+              # (Pael's Wing) fit under the screen's 2-alternative cap.
+              - card: { modelIds: [BASH, ANGER, DEMON_FORM], canSkip: false }   # specific cards (DEMON_FORM = rare)
+              - card: { roomType: boss, count: 3, canSkip: false }              # pooled card choice
+              - specialCard: { modelId: FEED }                  # single specific rare card
+              - potion: { modelId: FIRE_POTION }
+              - relic: { modelId: ANCHOR }                      # specific relic
+              - relic: { rarity: rare }                         # random rare relic
+              - cardRemoval: true
+              - linked:
+                  items:
+                    - gold: 10
+                    - relic: {}                                 # random relic

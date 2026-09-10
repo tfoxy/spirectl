@@ -1,0 +1,14 @@
+schemaVersion: spirectl.fixture/v0
+name: map-act-2
+description: >-
+  Act 2 map room, entered after clearing the act-1 boss. currentActIndex 1 generates the act-2 map and
+  resolves the act-2 boss (its own boss art renders on the boss node). Start-parked on the act-2 starting
+  (ancient) node. NOTE: act-specific map colors (MapTraveledColor / MapBgColor) are not yet projected to
+  state, so the parchment and boss tints still render act 1's Overgrowth colors — a known follow-up.
+run:
+  seed: fixture-basic-map
+  currentActIndex: 1
+  actFloor: 1
+  currentRoom:
+    mapRoom:
+      firstNode: ancient

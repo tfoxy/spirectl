@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <AssemblyName>spirectlbridge</AssemblyName>
+    <RootNamespace>Spirectl.BridgeMod.Sts2Host.Loader</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == ''">$(STS2_ASSEMBLIES_DIR)</Sts2AssembliesDir>
+    <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == '' and Exists('$(Sts2AssembliesDir)/sts2.dll') and Exists('$(Sts2AssembliesDir)/GodotSharp.dll')">true</EnableSts2LiveHost>
+    <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == ''">false</EnableSts2LiveHost>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
+    <Reference Include="sts2">
+      <HintPath>$(Sts2AssembliesDir)/sts2.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2AssembliesDir)/GodotSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

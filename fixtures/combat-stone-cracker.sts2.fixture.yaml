@@ -1,0 +1,41 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-stone-cracker
+description: >-
+  Combat start with STONE_CRACKER: two draw-pile cards have just been upgraded and are
+  previewed as a horizontal row in the center of the screen. Modeled as
+  combatState.transientEffects of kind
+  cardUpgrade, authored directly so the renderer's cardUpgrade branch is validatable
+  statically — no live transient to catch. The relic is granted for context (its bar
+  entry); it does not fire on load, so the previewed upgrade comes from the authored
+  transient effects.
+run:
+  seed: fixture-combat-stone-cracker
+  players:
+    - id: "p:1"
+      characterId: IRONCLAD
+      creature: { currentHp: 72, maxHp: 80 }
+      relics:
+        - modelId: STONE_CRACKER
+      combat:
+        hand:
+          cards:
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+        drawPile:
+          cards:
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK
+      transientEffects:
+        - id: "fx:upgrade:1"
+          kind: cardUpgrade
+          cardModelId: STRIKE_IRONCLAD
+          sourceRelicModelId: STONE_CRACKER
+          spawnedAtMs: 0
+        - id: "fx:upgrade:2"
+          kind: cardUpgrade
+          cardModelId: DEFEND_IRONCLAD
+          sourceRelicModelId: STONE_CRACKER
+          spawnedAtMs: 0

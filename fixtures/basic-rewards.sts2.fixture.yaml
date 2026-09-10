@@ -1,0 +1,10 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-rewards
+description: Deterministic authored rewards fixture using typed reward state and claim/skip intent assertions.
+run:
+  seed: fixture-basic-rewards
+  actFloor: 3
+  players:
+    - creature: { currentHp: 67, maxHp: 80 }
+      overlays:
+        - rewards: {}

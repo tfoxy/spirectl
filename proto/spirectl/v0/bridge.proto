@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/actions.proto";
+import "spirectl/v0/asset.proto";
+import "spirectl/v0/combat_preview.proto";
+import "spirectl/v0/console.proto";
+import "spirectl/v0/debug.proto";
+import "spirectl/v0/fixture.proto";
+import "spirectl/v0/handshake.proto";
+import "spirectl/v0/hot_reload.proto";
+import "spirectl/v0/lifecycle.proto";
+import "spirectl/v0/logs.proto";
+import "spirectl/v0/mods.proto";
+import "spirectl/v0/models.proto";
+import "spirectl/v0/reference.proto";
+import "spirectl/v0/runtime.proto";
+import "spirectl/v0/runtime_scene.proto";
+import "spirectl/v0/scenario.proto";
+import "spirectl/v0/screenshot.proto";
+
+service BridgeService {
+  rpc Handshake(HandshakeRequest) returns (HandshakeResult);
+  rpc GetState(StateRequest) returns (StateResult);
+  rpc WatchState(StateWatchRequest) returns (stream StateWatchEvent);
+  rpc WatchCombatEvents(WatchCombatEventsRequest) returns (stream CombatEvent);
+  rpc ExecuteAction(ActionRequest) returns (ActionResult);
+  rpc LoadFixture(FixtureLoadRequest) returns (FixtureLoadResult);
+  rpc RecordFixture(RecordedFixtureRequest) returns (RecordedFixtureResult);
+  rpc GetLogs(LogsRequest) returns (LogsResult);
+  rpc ExecuteConsoleCommand(ConsoleCommandRequest) returns (ConsoleCommandResult);
+  rpc GetDebugStatus(DebugStatusRequest) returns (DebugStatusResult);
+  rpc StartDebugSession(DebugSessionStartRequest) returns (DebugSessionStartResult);
+  rpc GetDebugSessionStatus(DebugSessionStatusRequest) returns (DebugSessionStatusResult);
+  rpc EndDebugSession(DebugSessionEndRequest) returns (DebugSessionEndResult);
+  rpc PauseDebug(DebugPauseRequest) returns (DebugPauseResult);
+  rpc ResumeDebug(DebugResumeRequest) returns (DebugResumeResult);
+  rpc StepDebug(DebugStepRequest) returns (DebugStepResult);
+  rpc WaitDebug(DebugWaitRequest) returns (DebugWaitResult);
+  rpc ListBreakpoints(DebugBreakpointListRequest) returns (DebugBreakpointListResult);
+  rpc AddBreakpoint(DebugBreakpointAddRequest) returns (DebugBreakpointAddResult);
+  rpc RemoveBreakpoint(DebugBreakpointRemoveRequest) returns (DebugBreakpointRemoveResult);
+  rpc GetDebugEvents(DebugEventStreamRequest) returns (DebugEventStreamResult);
+  rpc GetRuntimeSceneTree(RuntimeSceneTreeRequest) returns (RuntimeSceneTreeResult);
+  rpc GetRuntimeSceneNode(RuntimeSceneNodeRequest) returns (RuntimeSceneNodeResult);
+  rpc SetRuntimeSceneNodeVisible(RuntimeSceneSetVisibleRequest) returns (RuntimeSceneSetVisibleResult);
+  rpc HoverRuntimeSceneControl(RuntimeSceneControlHoverRequest) returns (RuntimeSceneControlHoverResult);
+  rpc UnhoverRuntimeSceneControl(RuntimeSceneControlUnhoverRequest) returns (RuntimeSceneControlUnhoverResult);
+  rpc GetRuntimeTransitionStatus(RuntimeTransitionStatusRequest) returns (RuntimeTransitionStatusResult);
+  rpc InspectPresentationResourceScenes(PresentationResourceSceneRequest) returns (PresentationResourceSceneResult);
+  rpc InspectPresentationLocalization(PresentationLocalizationRequest) returns (PresentationLocalizationResult);
+  rpc GetScreenshot(ScreenshotRequest) returns (ScreenshotResult);
+  rpc GetAssetCatalog(AssetCatalogRequest) returns (AssetCatalogResult);
+  rpc ExtractAsset(AssetExtractRequest) returns (AssetExtractResult);
+  rpc ExplainAsset(AssetExplainRequest) returns (AssetExplainResult);
+  rpc CloseGame(GameCloseRequest) returns (GameCloseResult);
+  rpc GetMods(ModListRequest) returns (ModListResult);
+  rpc GetModels(ModelCatalogRequest) returns (ModelCatalogResult);
+  rpc GetCombatPreview(CombatPreviewRequest) returns (CombatPreviewResult);
+  rpc GetReference(ReferenceRequest) returns (ReferenceResult);
+  rpc CaptureScenario(ScenarioCaptureRequest) returns (ScenarioCaptureResult);
+  rpc RestoreScenario(ScenarioRestoreRequest) returns (ScenarioRestoreResult);
+  rpc CaptureCheckpoint(CheckpointCaptureRequest) returns (CheckpointCaptureResult);
+  rpc RestoreCheckpoint(CheckpointRestoreRequest) returns (CheckpointRestoreResult);
+  rpc ListCheckpoints(CheckpointListRequest) returns (CheckpointListResult);
+  rpc DeleteCheckpoint(CheckpointDeleteRequest) returns (CheckpointDeleteResult);
+  rpc GetHotReloadStatus(HotReloadStatusRequest) returns (HotReloadStatusResult);
+  rpc RequestHotReload(HotReloadRequest) returns (HotReloadResult);
+}

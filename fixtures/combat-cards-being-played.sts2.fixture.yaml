@@ -1,0 +1,33 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-cards-being-played
+description: >-
+  Combat with cards resolving in the center play pile. The local player (p:1) has
+  several cards mid-resolution including a status card (BURN) to prove status-card
+  coverage; a second player (p:2) has a card in their play pile to exercise the
+  multiplayer "other players' played cards" render.
+run:
+  seed: fixture-combat-cards-being-played
+  players:
+    - id: "p:1"
+      characterId: IRONCLAD
+      creature: { currentHp: 67, maxHp: 80 }
+      combat:
+        hand:
+          cards:
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+        playPile:
+          cards:
+            - { modelId: BASH }
+            - { modelId: IRON_WAVE }
+            - { modelId: BURN }
+    - id: "p:2"
+      characterId: IRONCLAD
+      creature: { currentHp: 70, maxHp: 80 }
+      combat:
+        playPile:
+          cards:
+            - { modelId: ANGER }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

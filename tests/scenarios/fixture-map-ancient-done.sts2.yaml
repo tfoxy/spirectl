@@ -1,0 +1,17 @@
+name: fixture-map-ancient-done
+description: Loads the post-Neow map fixture and asserts the visited Neow/ancient starting node.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/map-ancient-done.sts2.fixture.yaml
+  - dev.assert:
+      path: rootScene
+      equals: run
+  - dev.assert:
+      path: run.currentRoom.mapRoom
+      exists: true
+  - dev.assert:
+      path: run.map.points[0].pointType
+      equals: Ancient
+  - dev.assert:
+      path: run.map.points[0].visited
+      equals: true

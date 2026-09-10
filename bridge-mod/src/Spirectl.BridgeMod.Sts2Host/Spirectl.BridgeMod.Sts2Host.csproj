@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <LangVersion>latest</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == ''">$(STS2_ASSEMBLIES_DIR)</Sts2AssembliesDir>
+    <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == '' and '$(Sts2AssembliesDir)' != '' and Exists('$(Sts2AssembliesDir)/sts2.dll') and Exists('$(Sts2AssembliesDir)/GodotSharp.dll') and Exists('$(Sts2AssembliesDir)/0Harmony.dll')">true</EnableSts2LiveHost>
+    <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == ''">false</EnableSts2LiveHost>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
+    <DefineConstants>$(DefineConstants);ENABLE_STS2_LIVE_HOST</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference
+      Include="..\Spirectl.BridgeMod\Spirectl.BridgeMod.csproj"
+      AdditionalProperties="EnableSts2LiveHost=$(EnableSts2LiveHost);RunSts2LiveHostTests=$(RunSts2LiveHostTests);Sts2AssembliesDir=$(Sts2AssembliesDir)" />
+    <ProjectReference
+      Include="..\Spirectl.Sts2\Spirectl.Sts2.csproj"
+      AdditionalProperties="EnableSts2LiveHost=$(EnableSts2LiveHost);RunSts2LiveHostTests=$(RunSts2LiveHostTests);Sts2AssembliesDir=$(Sts2AssembliesDir)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="Common/**/*.cs" />
+    <Compile Include="Live/HostedBridgeServerFactory.cs" />
+    <Compile Include="Live/UnixSocketBridgeServer.cs" />
+    <Compile Include="Live/TcpBridgeServer.cs" />
+    <Compile Include="Live/NamedPipeBridgeServer.cs" />
+    <Compile Include="Live/StandaloneBridgeRpcDiagnostics.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
+    <Compile Include="Live/Sts2BridgeRuntimeFactory.cs" />
+    <Compile Include="Live/BridgeOnly/**/*.cs" />
+    <Reference Include="sts2">
+      <HintPath>$(Sts2AssembliesDir)/sts2.dll</HintPath>
+      <Private Condition="'$(RunSts2LiveHostTests)' == 'true'">true</Private>
+      <Private Condition="'$(RunSts2LiveHostTests)' != 'true'">false</Private>
+    </Reference>
+    <Reference Include="GodotSharp">
+      <HintPath>$(Sts2AssembliesDir)/GodotSharp.dll</HintPath>
+      <Private Condition="'$(RunSts2LiveHostTests)' == 'true'">true</Private>
+      <Private Condition="'$(RunSts2LiveHostTests)' != 'true'">false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(Sts2AssembliesDir)/0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Compile Include="Live/ModEntry.cs" />
+  </ItemGroup>
+
+  <Target Name="ValidateSts2LiveHostReferences" BeforeTargets="ResolveReferences" Condition="'$(EnableSts2LiveHost)' == 'true'">
+    <Error Condition="'$(Sts2AssembliesDir)' == ''" Text="Missing Sts2AssembliesDir for EnableSts2LiveHost=true." />
+    <Error Condition="'$(Sts2AssembliesDir)' != '' and !Exists('$(Sts2AssembliesDir)/sts2.dll')" Text="Missing STS2 live-host assembly: $(Sts2AssembliesDir)/sts2.dll" />
+    <Error Condition="'$(Sts2AssembliesDir)' != '' and !Exists('$(Sts2AssembliesDir)/GodotSharp.dll')" Text="Missing STS2 live-host assembly: $(Sts2AssembliesDir)/GodotSharp.dll" />
+    <Error Condition="'$(Sts2AssembliesDir)' != '' and !Exists('$(Sts2AssembliesDir)/0Harmony.dll')" Text="Missing STS2 live-host assembly: $(Sts2AssembliesDir)/0Harmony.dll" />
+  </Target>
+</Project>

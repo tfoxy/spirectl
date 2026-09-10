@@ -1,0 +1,48 @@
+name: multiplayer-ownership
+description: S87 deterministic multiplayer lobby membership coverage.
+
+# The mock transport's fixture loader only threads player ids through from the
+# authored fixture (see cli/src/bridge/stub_service/fixture_asset_impl.rs
+# `load_fixture` / mock_data `mock_character_select`) — it does not simulate
+# per-player role/ownership metadata (host/remote/host-local-seat), and the
+# state native `state actions` schema has no ownerRole/remoteOrchestration on
+# action items either (`emit_action` in cli/src/state_actions.rs carries only
+# id/kind/label/args/ownerPlayerId/sourcePath). `surface_character_select` also
+# only surfaces actions for the single machine-local `characterSelect.view.
+# playerId` seat — it does not model driving a second host-local-seat player's
+# own ready/ownership actions. Assert the real, mock-producible facts instead:
+# lobby membership and host/local identity.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/multiplayer-ownership-host-owned.sts2.fixture.yaml
+  - dev.assert:
+      path: rootScene
+      equals: screens/character_select_screen
+  - dev.assert:
+      path: characterSelect.lobby.hostPlayerId
+      equals: "p:100"
+  - dev.assert:
+      path: characterSelect.lobby.localPlayerId
+      equals: "p:100"
+  - dev.assert:
+      path: characterSelect.lobby.players[id=p:200].id
+      equals: "p:200"
+  - dev.assert:
+      path: actions[kind=ready].ownerPlayerId
+      source: actions
+      equals: "p:100"
+
+  - dev.load-fixture:
+      path: ../../fixtures/multiplayer-ownership-host-local-seat.sts2.fixture.yaml
+  - dev.assert:
+      path: rootScene
+      equals: screens/character_select_screen
+  - dev.assert:
+      path: characterSelect.lobby.hostPlayerId
+      equals: "p:100"
+  - dev.assert:
+      path: characterSelect.lobby.players[id=p:200].id
+      equals: "p:200"
+  - dev.assert:
+      path: characterSelect.lobby.players[id=p:300].id
+      equals: "p:300"

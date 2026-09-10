@@ -1,0 +1,75 @@
+{
+  "actions": [
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-map",
+      "kind": "toggle-map",
+      "label": "Map",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-deck",
+      "kind": "toggle-deck",
+      "label": "Deck",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-settings",
+      "kind": "toggle-settings",
+      "label": "Settings",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {},
+      "enabled": true,
+      "id": "action:treasure-room:open-chest",
+      "kind": "open-chest",
+      "label": "Open Chest",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.treasure"
+    },
+    {
+      "args": {
+        "relicId": "r1"
+      },
+      "enabled": true,
+      "id": "action:treasure-room:take-relic:r1",
+      "kind": "take-relic",
+      "label": "relic-a",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.treasure.currentRelics[0]"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "run",
+    "scene": "rooms/treasure_room"
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

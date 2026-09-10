@@ -1,0 +1,8 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-shop
+description: Deterministic authored shop fixture using typed shop state.
+run:
+  seed: fixture-basic-shop
+  actFloor: 5
+  currentRoom:
+    shop: {}

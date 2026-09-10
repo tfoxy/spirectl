@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-passive-card-overlay
+description: Deterministic authored passive-card-overlay fixture for typed overlay state assertions.
+run:
+  seed: fixture-basic-passive-card-overlay
+  actFloor: 5
+  players:
+    - id: p1
+      creature: { currentHp: 61, maxHp: 80 }
+      overlays:
+        - cardOverlay:
+            policy: passive
+            sourceScreen: shop
+            cards:
+              - modelId: ZAP

@@ -1,0 +1,4 @@
+[gd_resource type="StatusConfig" format=3 uid="uid://statusconfigfixture"]
+
+[resource]
+display_name = "Status Config"

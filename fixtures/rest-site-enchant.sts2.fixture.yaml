@@ -1,0 +1,20 @@
+schemaVersion: spirectl.fixture/v0
+name: rest-site-enchant
+description: >-
+  Rest-site (campfire) room with the deck enchant-selection dialog composed on top.
+  Shows the player's deck cards in the grid with the Swift enchantment available to
+  apply in the preview.
+run:
+  seed: fixture-rest-site-enchant
+  actFloor: 6
+  players:
+    - id: p1
+      creature: { currentHp: 67, maxHp: 80 }
+      overlays:
+        - deckCardSelection:
+            kind: enchant
+            enchantmentId: SWIFT
+            enchantAmount: 1
+            canConfirm: true
+  currentRoom:
+    restSite: {}

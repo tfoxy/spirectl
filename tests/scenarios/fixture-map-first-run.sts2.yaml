@@ -1,0 +1,17 @@
+name: fixture-map-first-run
+description: Loads the first-run map fixture and asserts a combat (Monster) starting node — a profile's first run seats an enemy first node, not Neow.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/map-first-run.sts2.fixture.yaml
+  - dev.assert:
+      path: rootScene
+      equals: run
+  - dev.assert:
+      path: run.currentRoom.mapRoom
+      exists: true
+  - dev.assert:
+      path: run.map.points[0].pointType
+      equals: Monster
+  - dev.assert:
+      path: run.map.points[0].visited
+      equals: true

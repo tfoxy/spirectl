@@ -1,0 +1,10 @@
+name: diagnostics-main-menu
+description: Captures a diagnostics payload and evidence bundle from the explicit mock main-menu runner flow.
+
+steps:
+  - dev.diagnostics:
+      bundleDir: ./diagnostics-main-menu-evidence
+
+  - dev.assert:
+      path: rootScene
+      equals: screens/main_menu

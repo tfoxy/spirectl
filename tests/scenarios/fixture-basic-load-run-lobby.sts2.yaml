@@ -1,0 +1,43 @@
+name: fixture-basic-load-run-lobby
+description: Loads the checked-in load-run lobby fixture through the live bridge and asserts the resulting screen-aware state envelope (the load-run lobby projects into characterSelect, including the saved-run summary that drives the InfoPanel hp/gold/act/floor labels).
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-load-run-lobby.sts2.fixture.yaml
+  - dev.assert:
+      path: rootScene
+      equals: screens/multiplayer_load_game_screen
+  - dev.assert:
+      path: characterSelect.lobby.netGameType
+      equals: host
+  - dev.assert:
+      path: characterSelect.lobby.seed
+      equals: fixture-basic-load-run-lobby
+  - dev.assert:
+      path: characterSelect.lobby.hostPlayerId
+      equals: p:1
+  - dev.assert:
+      path: characterSelect.lobby.players[id=p:1].characterId
+      equals: IRONCLAD
+  - dev.assert:
+      path: characterSelect.lobby.players[id=p:2].characterId
+      equals: SILENT
+  - dev.assert:
+      path: characterSelect.view.playerId
+      equals: p:1
+  # Saved-run summary mirrored from the resumed SerializableRun (act/floor + per-player hp/gold).
+  # A freshly generated save sits at act 1 (index 0), floor 0, with the character's starting stats.
+  - dev.assert:
+      path: characterSelect.lobby.savedRun.currentActIndex
+      equals: 0
+  - dev.assert:
+      path: characterSelect.lobby.savedRun.actFloor
+      equals: 0
+  - dev.assert:
+      path: characterSelect.lobby.savedRun.players[id=p:1].currentHp
+      equals: 80
+  - dev.assert:
+      path: characterSelect.lobby.savedRun.players[id=p:1].maxHp
+      equals: 80
+  - dev.assert:
+      path: characterSelect.lobby.savedRun.players[id=p:1].gold
+      equals: 99

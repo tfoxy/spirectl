@@ -1,0 +1,17 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-simple-grid-select
+description: Ironclad NIBBITS combat with a simple card-grid overlay on top (Headbutt-style "place a card from your discard on top of your draw pile", 2+ candidates so the screen opens).
+run:
+  seed: fixture-combat-simple-grid
+  players:
+    - id: "p:1"
+      creature: { currentHp: 67, maxHp: 80 }
+      overlays:
+        - simpleCardSelection:
+            cards:
+              - modelId: STRIKE_IRONCLAD
+              - modelId: DEFEND_IRONCLAD
+              - modelId: BASH
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL

@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+mapfile -t staged_rs < <(git diff --cached --name-only --diff-filter=ACMR -- '*.rs')
+if (( ${#staged_rs[@]} == 0 )); then
+  exit 0
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "pre-commit: cargo is required to format Rust files but was not found in PATH." >&2
+  echo "pre-commit: install Rust/Cargo or skip this hook temporarily to proceed." >&2
+  exit 1
+fi
+
+declare -A before_dirty=()
+while IFS= read -r path; do
+  before_dirty["$path"]=1
+done < <(git diff --name-only -- '*.rs')
+
+declare -A staged_before_hash=()
+for path in "${staged_rs[@]}"; do
+  if [[ -f "$path" ]]; then
+    staged_before_hash["$path"]="$(git hash-object "$path")"
+  else
+    staged_before_hash["$path"]=""
+  fi
+done
+
+cargo fmt
+
+need_restage=false
+while IFS= read -r path; do
+  if [[ -n "${staged_before_hash["$path"]+set}" ]]; then
+    if [[ ! -f "$path" ]]; then
+      need_restage=true
+      continue
+    fi
+    if [[ "${staged_before_hash["$path"]}" != "$(git hash-object "$path")" ]]; then
+      need_restage=true
+      continue
+    fi
+  fi
+done < <(printf '%s\n' "${staged_rs[@]}")
+
+if ! $need_restage; then
+  while IFS= read -r path; do
+    if [[ -z "${before_dirty["$path"]+set}" ]]; then
+      need_restage=true
+      break
+    fi
+  done < <(git diff --name-only -- '*.rs')
+fi
+
+if $need_restage; then
+  echo "pre-commit: cargo fmt changed Rust files. Stage formatting output and retry." >&2
+  echo "pre-commit: files with Rust formatting changes:" >&2
+  git diff --name-only -- '*.rs' >&2
+  exit 1
+fi
+

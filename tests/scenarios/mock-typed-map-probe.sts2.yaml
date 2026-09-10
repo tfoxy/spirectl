@@ -1,0 +1,22 @@
+name: mock-typed-map-probe
+description: Asserts the typed map state surface against the deterministic mock map transport.
+tags: [mock, typed-state, map]
+steps:
+  - dev.assert:
+      path: run.map.view.isOpen
+      equals: true
+  - dev.assert:
+      path: run.map.points[0].id
+      equals: map-node:3:1
+  - dev.assert:
+      path: actions[args.mapNodeId=map-node:3:1].label
+      source: actions
+      equals: "Monster (3,1)"
+  - dev.assert:
+      path: actions[args.mapNodeId=map-node:3:1].kind
+      source: actions
+      equals: select-map-node
+  - dev.assert:
+      path: actions[args.mapNodeId=map-node:3:1].ownerPlayerId
+      source: actions
+      equals: p1

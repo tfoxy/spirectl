@@ -1,0 +1,17 @@
+name: fixture-initial-neow
+description: Loads the checked-in initial Neow fixture through the generic event-room path and asserts the resulting event-room screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/initial-neow.sts2.fixture.yaml
+  # The mock transport's fixture loader only threads screen/player identity
+  # through from the authored fixture (see
+  # cli/src/bridge/stub_service/fixture_asset_impl.rs `load_fixture`) — it does
+  # not simulate a specific event's real ancient-dialogue/option content, so
+  # `run.currentRoom.event` stays null here regardless of which event fixture was
+  # loaded. Assert the real, mock-producible room-scene identity instead.
+  - dev.assert:
+      path: rootScene
+      equals: run
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/event_room

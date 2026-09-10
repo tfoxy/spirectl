@@ -1,0 +1,12 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-combat
+description: Deterministic authored combat-entry fixture using public run/player recipe fields.
+run:
+  seed: fixture-basic-combat
+  ascensionLevel: 3
+  players:
+    - id: "p:1"
+      creature: { currentHp: 67, maxHp: 80 }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL

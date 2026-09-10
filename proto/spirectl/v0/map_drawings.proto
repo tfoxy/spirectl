@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+
+// A 2D point in "TheMap content space" — the same coordinate space the map NODES use
+// (what the presentation renderer consumes). The bridge does the transform from the
+// game's net-normalized stroke coordinates, so clients never see the SubViewport /
+// 0.5x runtime scale / NMapDrawings-size details. SHARED by the read RPC below and the
+// DrawMapStrokeAction write (actions.proto).
+message Point {
+  double x = 1;
+  double y = 2;
+}
+
+// Read-only snapshot of the player map drawings (NMapDrawings) currently on the map
+// screen. Drawings are deliberately NOT part of state: a run can accumulate
+// unbounded strokes, so they get a separate on-demand surface (mirrors screenshot /
+// presentation captures). The presentation pipeline captures this into raw/drawings.json.
+message MapDrawingsRequest {
+  string request_id = 1;
+  // Reserved for parity with other RPCs; drawings are returned for all players
+  // regardless. Empty = local player.
+  string player_id = 2;
+}
+
+message MapDrawingsResult {
+  oneof result {
+    MapDrawingsResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message MapDrawingsResponse {
+  string request_id = 1;
+  DataSource source = 2;
+  // False when the map screen is not open (strokes is then empty).
+  bool map_active = 3;
+  repeated MapDrawingStroke strokes = 4;
+}
+
+// One drawn stroke (a SerializableMapDrawingLine), already transformed into TheMap
+// content space. color is the owner character's MapDrawingColor (recomputed game-side,
+// never serialized in the run save); is_eraser marks an eraser stroke.
+message MapDrawingStroke {
+  string id = 1;
+  string owner_player_id = 2;
+  string color = 3; // "#RRGGBB"
+  bool is_eraser = 4;
+  repeated Point points = 5;
+}

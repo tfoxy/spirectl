@@ -1,0 +1,35 @@
+name: fixture-fake-merchant
+description: Loads the checked-in Fake Merchant fixture and verifies open/close semantic actions against the live bridge.
+tags:
+  - liveValidation
+  - spec:S74
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/fake-merchant-pre-open.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.event
+      exists: true
+  # `open-event-shop`/`close-shop-inventory` (room-transition actions, like
+  # leave-shop/proceed-treasure-room/back-from-map) have no native
+  # `state actions` surfacer yet — out of scope for this migration. Drive the
+  # transition directly via the real act command instead of discovering it
+  # through `state actions` first.
+  - act.open-event-shop:
+      eventOption: event-room:fake-merchant:open-shop
+  - dev.wait-for:
+      path: run.currentRoom.scene
+      equals: rooms/shop_room
+      timeoutMs: 5000
+  - dev.assert:
+      path: run.currentRoom.shop
+      exists: true
+  - dev.delay:
+      ms: 1500
+  - act.close-shop-inventory: {}
+  - dev.wait-for:
+      path: run.currentRoom.scene
+      equals: rooms/event_room
+      timeoutMs: 5000
+  - dev.assert:
+      path: run.currentRoom.event
+      exists: true

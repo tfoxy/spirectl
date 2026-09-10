@@ -1,0 +1,11 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-power-debuff
+description: Applies Weakness 1 in red text
+run:
+  seed: combat-power-debuff
+  players:
+    - relics:
+        - modelId: RED_MASK
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

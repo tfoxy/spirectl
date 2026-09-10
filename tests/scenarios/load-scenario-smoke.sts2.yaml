@@ -1,0 +1,8 @@
+name: load-scenario-smoke
+description: Starts from a checked-in sparse shop scenario artifact and verifies the restored screen.
+steps:
+  - dev.load-scenario:
+      path: ./repros/mock-shop.sts2.scenario.yaml
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/shop_room

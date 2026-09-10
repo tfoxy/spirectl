@@ -1,0 +1,20 @@
+name: fixture-basic-card-overlay
+description: Loads the checked-in card-overlay fixture and asserts the resulting choose-a-card overlay actions.
+tags: [fixture, overlay, typed-state]
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-card-overlay.sts2.fixture.yaml
+  # state has no `cardOverlay` wire concept (policy/breadcrumbs/notices); the
+  # game's card-overlay screen projects to the real `chooseACard` overlay, native
+  # `state actions` surfacer (see cli/src/state_actions.rs `surface_choose_a_card`).
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].chooseACard
+      exists: true
+  - dev.assert:
+      path: actions[kind=select-card].kind
+      source: actions
+      equals: select-card
+  - dev.assert:
+      path: actions[kind=skip-card-selection].kind
+      source: actions
+      equals: skip-card-selection

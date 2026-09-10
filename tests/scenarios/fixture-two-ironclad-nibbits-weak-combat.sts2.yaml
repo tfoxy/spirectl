@@ -1,0 +1,35 @@
+name: fixture-two-ironclad-nibbits-weak-combat
+description: Loads the two-Ironclad nibbits-weak combat fixture and asserts the resulting mock combat encounter.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/two-ironclad-nibbits-weak-combat.sts2.fixture.yaml
+
+  # The mock transport's combat fixture loading doesn't thread the authored
+  # encounterId or player roster through (see cli/src/bridge/mock_data/
+  # state_run.rs `mock_current_room`/`mock_run` — combat mock content is a fixed
+  # canned encounter regardless of fixture body), and host-local-seat/
+  # remoteOrchestration ownership metadata has no state schema representation
+  # either. Assert the real, mock-producible facts instead.
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/combat_room
+
+  - dev.assert:
+      path: run.currentRoom.combat.encounterId
+      equals: JAW_WORM_WEAK
+
+  - dev.assert:
+      path: actions[kind=play-card].args.cardId
+      source: actions
+      equals: c_1
+
+  - dev.assert:
+      path: actions[kind=play-card].ownerPlayerId
+      source: actions
+      equals: p1
+
+  - dev.assert:
+      path: actions[kind=end-turn].args.playerId
+      source: actions
+      equals: p1

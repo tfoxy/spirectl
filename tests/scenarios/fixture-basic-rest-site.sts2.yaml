@@ -1,0 +1,8 @@
+name: fixture-basic-rest-site
+description: Loads the checked-in rest-site fixture through the live bridge and asserts the resulting rest-site screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/rest-site.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/rest_site_room

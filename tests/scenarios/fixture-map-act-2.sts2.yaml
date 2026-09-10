@@ -1,0 +1,14 @@
+name: fixture-map-act-2
+description: Loads the act-2 map fixture and asserts the act-2 boss encounter (the act model advances even though the run index stays at the loader's non-boss placeholder).
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/map-act-2.sts2.fixture.yaml
+  - dev.assert:
+      path: rootScene
+      equals: run
+  - dev.assert:
+      path: run.currentRoom.mapRoom
+      exists: true
+  - dev.assert:
+      path: run.bossEncounterId
+      equals: KAISER_CRAB_BOSS

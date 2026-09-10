@@ -1,0 +1,14 @@
+schemaVersion: spirectl.fixture/v0
+name: rest-site-smith
+description: Rest-site (campfire) room with the SMITH upgrade dialog composed on top via a deck-card-selection overlay.
+run:
+  seed: fixture-rest-site-smith
+  actFloor: 6
+  players:
+    - id: p1
+      overlays:
+        - deckCardSelection:
+            kind: upgrade
+            canConfirm: true
+  currentRoom:
+    restSite: {}

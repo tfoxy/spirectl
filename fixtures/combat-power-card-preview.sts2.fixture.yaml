@@ -1,0 +1,18 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-power-card-preview
+description: >-
+  NIBBITS_WEAK enemy with PAINFUL_STABS_POWER applied. PainfulStabsPower's
+  ExtraHoverTips include a CardHoverTip(Wound), so the bridge resolves the power
+  instance's previewedCard and the presentation shows a floating Wound card
+  preview beside the power tip when the power icon is focused. Validates the
+  powers card-preview cross-stack (proto previewedCard + bridge CardHoverTip
+  extraction + combat/power onFocus.appends).
+run:
+  seed: fixture-power-card-preview
+  players: 1
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK
+      enemies:
+        - powers:
+            - { modelId: PAINFUL_STABS_POWER, amount: 1 }

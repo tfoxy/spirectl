@@ -1,0 +1,90 @@
+{
+  "actions": [
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-map",
+      "kind": "toggle-map",
+      "label": "Map",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-deck",
+      "kind": "toggle-deck",
+      "label": "Deck",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-settings",
+      "kind": "toggle-settings",
+      "label": "Settings",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1",
+        "rewardId": "rw1"
+      },
+      "enabled": true,
+      "id": "action:rewards:claim:rw1",
+      "kind": "claim-reward",
+      "label": "25 Gold",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.players[id=p1].overlays[id=ov1].rewards.items[0]"
+    },
+    {
+      "args": {
+        "playerId": "p1",
+        "rewardId": "rw2"
+      },
+      "enabled": true,
+      "id": "action:rewards:claim:rw2",
+      "kind": "claim-reward",
+      "label": "burning-blood",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.players[id=p1].overlays[id=ov1].rewards.items[1]"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:rewards:flow:ov1",
+      "kind": "skip-rewards",
+      "label": "Proceed",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.players[id=p1].overlays[id=ov1].rewards.flow"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "run",
+    "scene": null
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

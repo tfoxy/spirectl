@@ -1,0 +1,12 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-defeat
+description: Deterministic combat defeat — a finished run with a combat-death history, shown on the game-over (defeat) screen pushed over the overlay stack.
+run:
+  seed: fixture-combat-defeat
+  actFloor: 3
+  players:
+    - id: "p:1"
+      creature: { currentHp: 0, maxHp: 80 }
+  gameOver:
+    win: false
+    killedByEncounter: NIBBITS_NORMAL
