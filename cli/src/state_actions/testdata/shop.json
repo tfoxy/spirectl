@@ -1,0 +1,99 @@
+{
+  "actions": [
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-map",
+      "kind": "toggle-map",
+      "label": "Map",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-deck",
+      "kind": "toggle-deck",
+      "label": "Deck",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-settings",
+      "kind": "toggle-settings",
+      "label": "Settings",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "shopItemId": "shop:card:0"
+      },
+      "enabled": true,
+      "id": "action:shop:buy-card:shop:card:0",
+      "kind": "buy-card",
+      "label": "buy-card",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.shop.inventory.characterCardEntries[0]"
+    },
+    {
+      "args": {
+        "shopItemId": "shop:relic:0"
+      },
+      "enabled": true,
+      "id": "action:shop:buy-relic:shop:relic:0",
+      "kind": "buy-relic",
+      "label": "relic-a",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.shop.inventory.relicEntries[0]"
+    },
+    {
+      "args": {
+        "shopItemId": "shop:potion:0"
+      },
+      "enabled": true,
+      "id": "action:shop:buy-potion:shop:potion:0",
+      "kind": "buy-potion",
+      "label": "fire-potion",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.shop.inventory.potionEntries[0]"
+    },
+    {
+      "args": {
+        "shopItemId": "shop:remove:0"
+      },
+      "enabled": true,
+      "id": "action:shop:remove-card:shop:remove:0",
+      "kind": "remove-card",
+      "label": "Remove Card",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.shop.inventory.cardRemovalEntry"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "run",
+    "scene": "rooms/shop_room"
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

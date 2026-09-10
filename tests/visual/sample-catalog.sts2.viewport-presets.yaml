@@ -1,0 +1,6 @@
+schemaVersion: spirectl.viewport-presets/v0
+presets:
+  - name: repo-tablet
+    width: 1536
+    height: 2048
+    description: Repo-authored portrait viewport for repeatable docs and CI captures.

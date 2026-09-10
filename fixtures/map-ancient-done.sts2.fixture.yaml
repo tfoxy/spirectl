@@ -1,0 +1,13 @@
+schemaVersion: spirectl.fixture/v0
+name: map-ancient-done
+description: >-
+  Act 1 map opened just after the Neow decision: the starting (row-0) node is the Neow/ancient node,
+  marked visited (the current position), with the first regular row travelable. As in game, the visited
+  Neow node shows NO circular "visited" ring — only the standee marker and the highlighted next row
+  mark it.
+run:
+  seed: fixture-basic-map
+  actFloor: 1
+  currentRoom:
+    mapRoom:
+      firstNode: ancient

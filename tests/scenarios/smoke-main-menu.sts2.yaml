@@ -1,0 +1,23 @@
+name: smoke-main-menu
+description: Lightweight baseline smoke scenario for explicit mock main-menu transport rather than a live bridge session.
+
+steps:
+  - game.info
+
+  # Canonical state (`spirectl.state/v0`): the menu is identified by `rootScene`; the current top-level
+  # `screen` section no longer exists.
+  - dev.assert:
+      path: rootScene
+      equals: screens/main_menu
+
+  - dev.logs:
+      limit: 1
+      level: info
+      target: transport
+
+  - act.fallback-choose:
+      choice: menu:start-run
+
+  - dev.assert:
+      path: combat.enemies[0].hp
+      notExists: true

@@ -1,0 +1,19 @@
+schemaVersion: spirectl.fixture/v0
+name: multiplayer-ownership-host-local-seat
+description: Host-owned multiplayer lobby slice with one extra host-local seat and one true remote player.
+characterSelect:
+  kind: load-run
+  lobby:
+    seed: fixture-multiplayer-ownership-host-local-seat
+    hostPlayerId: "p:100"
+    players:
+      - id: "p:100"
+        characterId: IRONCLAD
+        isReady: false
+      - id: "p:200"
+        characterId: SILENT
+        isHostLocalSeat: true
+        isReady: true
+      - id: "p:300"
+        characterId: DEFECT
+        isReady: true

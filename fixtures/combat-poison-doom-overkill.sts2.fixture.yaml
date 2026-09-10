@@ -1,0 +1,16 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-poison-doom-overkill
+description: >-
+  NIBBITS_WEAK Nibbit at 8/42 HP with 12 Poison and 28 Doom applied (one default
+  player) — validates the enemy poison + doom status visuals on a damaged HP bar.
+run:
+  seed: fixture-combat-poison-doom-overkill
+  players: 1
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK
+      enemies:
+        - currentHp: 8
+          powers:
+            - { modelId: POISON_POWER, amount: 12 }
+            - { modelId: DOOM_POWER, amount: 28 }

@@ -1,0 +1,26 @@
+name: fixture-basic-shop
+description: Loads the checked-in shop fixture through the live bridge and asserts the resulting shop screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-shop.sts2.fixture.yaml
+  - dev.wait-for:
+      path: run.currentRoom.scene
+      equals: rooms/shop_room
+      timeoutMs: 5000
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/shop_room
+  - dev.assert:
+      path: run.currentRoom.shop
+      exists: true
+  # `leave-shop` (a room-exit action, like proceed-treasure-room/back-from-map) has
+  # no native `state actions` surfacer yet — out of scope for this migration
+  # (only surface_shop's purchasable-item actions were added). Assert a real
+  # generated purchasable item instead of the old fallback `choose` id.
+  - dev.assert:
+      path: run.currentRoom.shop.inventory.characterCardEntries[id~=^shop:].id
+      exists: true
+  - dev.assert:
+      path: actions[args.shopItemId~=^shop:].kind
+      source: actions
+      exists: true

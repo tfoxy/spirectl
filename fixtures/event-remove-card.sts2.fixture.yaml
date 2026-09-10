@@ -1,0 +1,23 @@
+schemaVersion: spirectl.fixture/v0
+name: event-remove-card
+description: >-
+  Neow ancient event after choosing the Precarious Shears relic option. The relic
+  (Ancient) is in the bar and its upon-pickup effect has opened the "remove two
+  cards" deck-card-selection dialog (CardSelectCmd.FromDeckForRemoval, exactly 2
+  cards from the live starter deck). The relic's 16 self-damage only lands after
+  the two removals are confirmed, so HP is still full while the dialog is open.
+run:
+  seed: fixture-event-remove-card
+  players:
+    - id: p:1
+      creature: { currentHp: 80, maxHp: 80 }
+      relics:
+        - modelId: PRECARIOUS_SHEARS
+  currentRoom:
+    event:
+      canonicalEventModelId: NEOW
+      playerStates:
+        - ancient:
+            view:
+              visibleDialogue:
+                dialogueId: NEOW.talk.ANY.4

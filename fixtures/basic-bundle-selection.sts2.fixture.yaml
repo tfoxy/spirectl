@@ -1,0 +1,21 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-bundle-selection
+description: Deterministic authored bundle-selection fixture using typed selection state and select-bundle intent assertions.
+run:
+  seed: fixture-basic-bundle-selection
+  actFloor: 6
+  players:
+    - id: p1
+      creature: { currentHp: 54, maxHp: 80 }
+      overlays:
+        - bundleSelection:
+            canConfirm: true
+            bundles:
+              - id: offensive-pack
+                cardIds:
+                  - BASH
+                  - ANGER
+              - id: defensive-pack
+                cardIds:
+                  - BASH
+                  - SHRUG_IT_OFF

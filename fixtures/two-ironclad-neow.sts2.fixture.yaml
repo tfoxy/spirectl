@@ -1,0 +1,14 @@
+schemaVersion: spirectl.fixture/v0
+name: two-ironclad-neow
+description: Deterministic two-player Ironclad host-local Neow ancient event.
+run:
+  seed: fixture-two-ironclad-neow-ancient-event
+  players: 2
+  currentRoom:
+    event:
+      canonicalEventModelId: NEOW
+      playerStates:
+        - ancient:
+            view:
+              visibleDialogue:
+                dialogueId: NEOW.talk.ANY.4

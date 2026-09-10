@@ -1,0 +1,11 @@
+schemaVersion: spirectl.fixture/v0
+name: rest-site
+description: Deterministic authored rest-site fixture using typed rest controls.
+run:
+  seed: fixture-basic-rest-site
+  actFloor: 3
+  players:
+    - id: p1
+      creature: { currentHp: 67, maxHp: 80 }
+  currentRoom:
+    restSite: {}

@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": false,
+    "strictNullChecks": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": false,
+    "paths": {
+      "@godot-scene-web/core": ["../../../godot-scene-web/packages/core/src/index.ts"],
+      "@godot-scene-web/tscn-parser": ["../../../godot-scene-web/packages/tscn-parser/src/index.ts"],
+      "@godot-scene-web/layout": ["../../../godot-scene-web/packages/layout/src/index.ts"],
+      "@godot-scene-web/layout/anchors": ["../../../godot-scene-web/packages/layout/src/anchor-grammar.ts"],
+      "@godot-scene-web/scene-graph": ["../../../godot-scene-web/packages/scene-graph/src/index.ts"],
+      "@godot-scene-web/canvas": ["../../../godot-scene-web/packages/canvas/src/index.ts"],
+      "@godot-scene-web/canvas-effects/webgl": ["../../../godot-scene-web/packages/canvas-effects/src/webgl.ts"],
+      "@godot-scene-web/canvas-effects/webgpu": ["../../../godot-scene-web/packages/canvas-effects/src/webgpu.ts"],
+      "@godot-scene-web/effects": ["../../../godot-scene-web/packages/effects/src/index.ts"],
+      "@godot-scene-web/effects/*": ["../../../godot-scene-web/packages/effects/src/*/index.ts"],
+      "@godot-scene-web/html": ["../../../godot-scene-web/packages/html/src/index.ts"],
+      "@godot-scene-web/html/runtime": ["../../../godot-scene-web/packages/html/src/runtime.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}

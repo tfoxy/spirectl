@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+
+message LogsRequest {
+  uint32 limit = 1;
+  LogLevel minimum_level = 2;
+  string target_filter = 3;
+  uint64 after_cursor = 4;
+}
+
+message LogEntry {
+  LogLevel level = 1;
+  string target = 2;
+  string message = 3;
+  uint64 cursor = 4;
+}
+
+message LogsResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  repeated LogEntry entries = 3;
+  uint64 next_cursor = 4;
+}
+
+message LogsResult {
+  oneof result {
+    LogsResponse success = 1;
+    BridgeError error = 2;
+  }
+}

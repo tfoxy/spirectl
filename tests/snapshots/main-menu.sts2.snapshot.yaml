@@ -1,0 +1,18 @@
+schemaVersion: spirectl.snapshot/v0
+name: main-menu
+state:
+  # state has no per-item "choices" array (the legacy generic-choice surface was
+  # retired); rootScene/language are the closest stable main-menu selectors left.
+  selectors:
+    - rootScene
+    - language
+actions:
+  includeAvailableActionIds: true
+logHealth:
+  tail: 10
+diagnostics:
+  tail: 10
+screenshot:
+  preset: desktop-1080p
+  maxDiffPixels: 0
+  maxDiffRatio: 0

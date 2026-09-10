@@ -1,0 +1,10 @@
+{
+  "availableActionIds": [
+    "action:menu:start-run"
+  ],
+  "versions": {
+    "bridgeVersion": null,
+    "gameVersion": null,
+    "schemaVersion": null
+  }
+}

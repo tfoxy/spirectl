@@ -1,0 +1,82 @@
+name: fixture-combat-afflictions
+description: Loads the combat-afflictions fixture and asserts one applied affliction per hand card.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/combat-afflictions.sts2.fixture.yaml
+
+  - dev.assert:
+      path: rootScene
+      equals: run
+
+  - dev.assert:
+      path: run.currentRoom.combat.encounterId
+      equals: NIBBITS_NORMAL
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[5]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[6]
+      notExists: true
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[0].modelId
+      equals: BASH
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[0].afflictionModelId
+      equals: BOUND
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[0].afflictionAmount
+      equals: 1
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[1].modelId
+      equals: ANGER
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[1].afflictionModelId
+      equals: ENTANGLED
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[1].afflictionAmount
+      equals: 1
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[2].modelId
+      equals: INFLAME
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[2].afflictionModelId
+      equals: GALVANIZED
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[2].afflictionAmount
+      equals: 1
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[3].modelId
+      equals: STRIKE_IRONCLAD
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[3].afflictionModelId
+      equals: HEXED
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[3].afflictionAmount
+      equals: 1
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[4].modelId
+      equals: SWORD_BOOMERANG
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[4].afflictionModelId
+      equals: RINGING
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[4].afflictionAmount
+      equals: 1
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[5].modelId
+      equals: DEFEND_IRONCLAD
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[5].afflictionModelId
+      equals: SMOG
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[5].afflictionAmount
+      equals: 1

@@ -1,0 +1,306 @@
+{
+  "source": "command-catalog",
+  "topics": [
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code locate type CombatScreen --assemblies-dir ./assemblies",
+        "sts2 code hooks OnDeckChanged --assemblies-dir ./assemblies --resources-dir ./game-project",
+        "sts2 code hook-info method:Game:Namespace.Type::Method(System.String) --assemblies-dir ./assemblies",
+        "sts2 code refs method method:Game:Namespace.Type::Method(System.String) --assemblies-dir ./assemblies"
+      ],
+      "id": "managed-hook-discovery",
+      "limits": [
+        "Static metadata only; this does not prove runtime patch safety or load order behavior.",
+        "Use exact ids or signatures from code hooks before decompile or downstream notes."
+      ],
+      "relatedCommands": [
+        "code locate",
+        "code hooks",
+        "code hook-info",
+        "code describe",
+        "code refs",
+        "code decompile"
+      ],
+      "summary": "Start from managed metadata to find likely hookable gameplay methods, then resolve one exact method signature before deeper navigation."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code scene-search CombatScreen --resources-dir ./game-project --assemblies-dir ./assemblies",
+        "sts2 code scene-node res://ui/CombatScreen.tscn /CombatScreen --resources-dir ./game-project --assemblies-dir ./assemblies",
+        "sts2 code hooks _Ready --assemblies-dir ./assemblies --resources-dir ./game-project"
+      ],
+      "id": "scene-script-to-hook-flow",
+      "limits": [
+        "Scene hints stay static and filesystem-oriented; live runtime trees remain under the dev surface.",
+        "Attached script ids require script metadata in the indexed assemblies."
+      ],
+      "relatedCommands": [
+        "code scene-search",
+        "code scene-tree",
+        "code scene-node",
+        "code hooks",
+        "code hook-info"
+      ],
+      "summary": "Move from a scene or node into the attached managed script type, then pivot into managed hook discovery for callback methods."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 assets extract hand_icon --resources-dir ./game-project",
+        "sts2 code scene-search hand_icon --resources-dir ./game-project --assemblies-dir ./assemblies",
+        "sts2 code hooks HandPanel --assemblies-dir ./assemblies --resources-dir ./game-project"
+      ],
+      "id": "asset-to-script-trace",
+      "limits": [
+        "Assets extract artifacts; scene/resource inspection keeps structured metadata. Treat them as separate surfaces.",
+        "Not every asset resolves to one owning script; confirm broader references before patching."
+      ],
+      "relatedCommands": [
+        "assets extract",
+        "code scene-search",
+        "code scene-node",
+        "code hooks"
+      ],
+      "summary": "Use asset extraction and static scene/resource inspection together to trace a visual asset back to the script or scene that likely controls it."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code hook-info method:Game:Namespace.Type::Method(System.String) --assemblies-dir ./assemblies",
+        "sts2 dev diagnostics --bundle-dir ./.sts2/artifacts/modding",
+        "sts2 dev scene node /root/CombatScreen/HandPanel",
+        "sts2 dev screenshot --output ./.sts2/artifacts/modding/hand-panel.png"
+      ],
+      "id": "runtime-evidence-loop",
+      "limits": [
+        "M32 does not add live hook probing or runtime patch verification.",
+        "Use runtime/dev commands as confirmatory evidence, not as a replacement for static signature resolution."
+      ],
+      "relatedCommands": [
+        "code hook-info",
+        "dev diagnostics",
+        "dev scene tree",
+        "dev scene node",
+        "dev scene children",
+        "dev screenshot",
+        "assets extract"
+      ],
+      "summary": "Confirm static hook research with existing live diagnostics, runtime scene inspection, screenshots, or extracted artifacts without adding a new hook-probing surface."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code locate type DamageCmd --assemblies-dir ./assemblies",
+        "sts2 code locate type CombatState --assemblies-dir ./assemblies",
+        "sts2 code refs symbol ActionQueue --assemblies-dir ./assemblies",
+        "sts2 --json dev fixture load --path fixtures/basic-combat.sts2.fixture.yaml",
+        "sts2 --json state"
+      ],
+      "id": "combat-system-deep-dive",
+      "limits": [
+        "This is authoring guidance over the installed game API; exact type and method names must be confirmed with code locate, refs, describe, or decompile.",
+        "Runtime validation should use fixtures, state, diagnostics, logs, screenshots, or test scenarios rather than hidden combat-state mutation."
+      ],
+      "relatedCommands": [
+        "code locate",
+        "code refs",
+        "code describe",
+        "code decompile",
+        "dev fixture load",
+        "state",
+        "test run"
+      ],
+      "summary": "Research combat intents, command APIs, combat state, card piles, and the action queue before writing combat-affecting mod logic."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code locate type CardModel --assemblies-dir ./assemblies",
+        "sts2 code derived type CardModel --assemblies-dir ./assemblies",
+        "sts2 code locate symbol ModelDb --assemblies-dir ./assemblies",
+        "sts2 code decompile type MegaCrit.Sts2.Cards.Bash --assemblies-dir ./assemblies --full"
+      ],
+      "id": "entity-model-authoring",
+      "limits": [
+        "This topic does not generate source files or prescribe one project layout.",
+        "Community libraries may change registration details; inspect the target mod dependencies before assuming BaseLib or raw-game patterns."
+      ],
+      "relatedCommands": [
+        "code locate",
+        "code refs",
+        "code derived",
+        "code decompile",
+        "assets extract",
+        "dev logs"
+      ],
+      "summary": "Understand STS2 entity models, stable IDs, pools, localization, and examples before adding cards, relics, powers, potions, monsters, encounters, events, or modifiers."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code locate type CustomCardModel --include-mods --assemblies-dir ./assemblies",
+        "sts2 code locate symbol PoolAttribute --include-mods --assemblies-dir ./assemblies",
+        "sts2 code refs symbol CustomEnum --include-mods --assemblies-dir ./assemblies",
+        "sts2 --json dev logs --tail 100"
+      ],
+      "id": "baselib-authoring",
+      "limits": [
+        "spirectl does not depend on BaseLib and does not guarantee BaseLib availability in a target mod.",
+        "Confirm package versions, namespaces, attributes, and pool registration in the target project or installed mod assemblies before editing code."
+      ],
+      "relatedCommands": [
+        "code locate",
+        "code refs",
+        "code decompile",
+        "dev logs",
+        "game deploy"
+      ],
+      "summary": "Use BaseLib references as optional community-library guidance for custom models, pools, dynamic variables, config, custom enums, and common namespace pitfalls."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code hooks \"modify damage\" --assemblies-dir ./assemblies --resources-dir ./game-project",
+        "sts2 code hook-info method:Game:Namespace.Type::Method(System.Int32) --assemblies-dir ./assemblies",
+        "sts2 code refs method method:Game:Namespace.Type::Method(System.Int32) --assemblies-dir ./assemblies",
+        "sts2 code decompile method method:Game:Namespace.Type::Method(System.Int32) --assemblies-dir ./assemblies --full"
+      ],
+      "id": "hook-vs-harmony-decision",
+      "limits": [
+        "Hook and patch suitability is advisory until exact signatures and call sites are resolved against the installed game assemblies.",
+        "Transpilers and private reflection are brittle and should be last-resort choices with explicit validation."
+      ],
+      "relatedCommands": [
+        "code hooks",
+        "code hook-info",
+        "code refs",
+        "code describe",
+        "code decompile",
+        "dev diagnostics"
+      ],
+      "summary": "Choose between native hooks, BaseLib hooks, Harmony prefix/postfix patches, transpilers, reflection, or no patch before changing game behavior."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 assets extract res://ui/shared/HandPanel.tscn --resources-dir ./game-project",
+        "sts2 code scene-search HandPanel --resources-dir ./game-project --assemblies-dir ./assemblies",
+        "sts2 code scene-node res://ui/shared/HandPanel.tscn /HandPanel --resources-dir ./game-project --assemblies-dir ./assemblies",
+        "sts2 dev screenshot --output ./.sts2/artifacts/modding/ui-check.png"
+      ],
+      "id": "resource-loading-and-godot-ui",
+      "limits": [
+        "This is reference-only; spirectl does not add PCK packaging or source-writing helpers in this topic.",
+        "dotnet build only builds a PCK when the mod project has explicit MSBuild targets or scripts for that behavior."
+      ],
+      "relatedCommands": [
+        "assets extract",
+        "assets explain",
+        "code scene-search",
+        "code scene-tree",
+        "code scene-node",
+        "dev scene node",
+        "dev scene children",
+        "dev screenshot"
+      ],
+      "summary": "Research res:// assets, embedded resources, localization files, optional PCK wiring, Godot scene script registration, and programmatic UI before adding visual or UI mod code."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code locate type RunRngSet --assemblies-dir ./assemblies",
+        "sts2 code locate symbol INetMessage --assemblies-dir ./assemblies",
+        "sts2 --json state --perspective local",
+        "sts2 --json inspect actions",
+        "sts2 --json dev fixture load --path fixtures/multiplayer-ownership-local-only-degraded.sts2.fixture.yaml"
+      ],
+      "id": "multiplayer-and-determinism",
+      "limits": [
+        "Single-player behavior is not enough proof for multiplayer-safe mod logic.",
+        "A local bridge perspective can validate observable state and ownership metadata, but it does not create independent remote clients."
+      ],
+      "relatedCommands": [
+        "code locate",
+        "code refs",
+        "code decompile",
+        "state",
+        "inspect actions",
+        "dev fixture load",
+        "test run"
+      ],
+      "summary": "Keep mod behavior deterministic and multiplayer-aware by researching game RNG streams, save/load effects, authority, message shapes, and ownership boundaries."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 game deploy ./mods/MyMod --build --restart --verify",
+        "sts2 --json dev logs --tail 200",
+        "sts2 --json dev log-health",
+        "sts2 --json dev diagnostics --bundle-dir ./.sts2/artifacts/modding/failure",
+        "sts2 code hook-info AfterCardPlayed --assemblies-dir ./assemblies"
+      ],
+      "id": "mod-troubleshooting-playbook",
+      "limits": [
+        "Troubleshooting entries are starting points; always inspect the first real compiler error, game log exception, or bridge diagnostic notice before editing.",
+        "This topic does not add automatic repair or source mutation helpers."
+      ],
+      "relatedCommands": [
+        "game deploy",
+        "dev logs",
+        "dev log-health",
+        "dev diagnostics",
+        "code locate",
+        "code hook-info",
+        "code scene-search"
+      ],
+      "summary": "Map common mod build, load, registration, localization, asset, hook, and runtime failures to likely causes and the next spirectl inspection command."
+    },
+    {
+      "docPath": "docs/testing.md",
+      "exampleSequence": [
+        "sts2 --json dev fixture load --path fixtures/basic-shop-inventory.sts2.fixture.yaml",
+        "sts2 --json dev fixture load --path fixtures/multiplayer-ownership-local-only-degraded.sts2.fixture.yaml",
+        "sts2 --json inspect ai-tools"
+      ],
+      "id": "fixture-restore-recipes",
+      "limits": [
+        "Fixtures are recipe-backed setup, not hidden runtime restore; they do not patch combat queues, RNG continuation, animation state, enemy AI history, or transient UI internals.",
+        "Shareable dev.load-scenario sparse artifacts and exact native sidecars are separate restore surfaces.",
+        "Local-only degraded multiplayer fixtures model the local bridge perspective and omitted remote clients; they do not create fake remote clients."
+      ],
+      "relatedCommands": [
+        "dev fixture load",
+        "dev scenario load",
+        "inspect ai-tools",
+        "test run"
+      ],
+      "summary": "Use authored .sts2.fixture.yaml recipes for deterministic screen-entry setup and read recipeReport diagnostics for applied, inferred, omitted, unsupported, degraded multiplayer, and bridge-validation fields."
+    },
+    {
+      "docPath": "docs/modding-reference.md",
+      "exampleSequence": [
+        "sts2 code hooks \"combat turn\" --assemblies-dir ./assemblies --resources-dir ./game-project",
+        "sts2 code hook-info method:Game:Namespace.Type::Method() --assemblies-dir ./assemblies",
+        "dotnet build templates/stable-harmony-trampoline/src/HotMod.Shell/HotMod.Shell.csproj",
+        "sts2 game deploy templates/stable-harmony-trampoline/src/HotMod.Shell --build --restart --verify",
+        "dotnet build templates/stable-harmony-trampoline/src/HotMod.Logic/HotMod.Logic.csproj",
+        "touch <deployed-mod>/hot-reload/reload.marker"
+      ],
+      "id": "stable-harmony-trampoline",
+      "limits": [
+        "Native STS2 mod loading remains startup-bound; shell or patch signature changes still require restart.",
+        "M57 exposes the template and reference workflow only; CLI reload automation is deferred to M61."
+      ],
+      "relatedCommands": [
+        "code hooks",
+        "code hook-info",
+        "code decompile",
+        "game deploy",
+        "dev logs"
+      ],
+      "summary": "Build a stable Harmony shell that owns patch methods and reloads developer-owned logic through a collectible contract-bound assembly."
+    }
+  ]
+}

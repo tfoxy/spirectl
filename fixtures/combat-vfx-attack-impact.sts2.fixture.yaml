@@ -1,0 +1,31 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-vfx-attack-impact
+description: >-
+  The native VFX backbone, attack-impact mechanism. A hit-spark VFX is authored as a
+  combatState.transientEffects entry of kind "vfx" naming the game scene it instances
+  (vfx/hit_spark_vfx), anchored to the enemy creature. The renderer mounts that captured
+  scene generically via the CombatVfxContainer repeat (scene = item.scenePath) and its
+  GPUParticles2D animate natively — no per-effect catalog binding. This is the authored
+  (renderer-truth) reproduction of what the live AddChildSafely VFX hook streams over
+  WatchCombatEvents. NOTE: rendering live requires the vfx/hit_spark_vfx scene to be
+  pre-captured into the fixture payload (capture only bundles live-tree scenes today).
+run:
+  seed: fixture-combat-vfx-attack-impact
+  players:
+    - id: "p:1"
+      characterId: IRONCLAD
+      creature: { currentHp: 72, maxHp: 80 }
+      combat:
+        hand:
+          cards:
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK
+      transientEffects:
+        - id: "fx:vfx:1"
+          kind: vfx
+          scenePath: vfx/hit_spark_vfx
+          anchorCreatureId: "creature:1"
+          spawnedAtMs: 0

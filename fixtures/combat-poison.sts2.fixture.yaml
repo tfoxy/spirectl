@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-poison
+description: >-
+  NIBBITS_WEAK Nibbit at 10/42 HP with 20 Poison applied (one default player) —
+  validates the enemy poison status visual.
+run:
+  seed: fixture-combat-poison
+  players: 1
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK
+      enemies:
+        - currentHp: 10
+          powers:
+            - { modelId: POISON_POWER, amount: 20 }

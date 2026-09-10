@@ -1,0 +1,19 @@
+name: fixture-basic-event-room
+description: Loads the checked-in event-room fixture through the live bridge and asserts the resulting event-room screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-event-room.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.event
+      exists: true
+  - dev.assert:
+      path: actions[args.eventOptionId=event-room:gain-gold:0].kind
+      source: actions
+      equals: select-event-option
+  - dev.assert:
+      path: actions[args.eventOptionId=event-room:gain-gold:0].label
+      source: actions
+      equals: Take 75 Gold
+  - dev.assert:
+      path: run.currentRoom.event.playerStates[0].options[0].id
+      equals: event-room:gain-gold:0

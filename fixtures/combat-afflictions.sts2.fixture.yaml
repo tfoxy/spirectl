@@ -1,0 +1,21 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-afflictions
+description: Deterministic Ironclad combat with one hand card for each applied affliction.
+run:
+  seed: fixture-combat-afflictions
+  players:
+    - id: "p:1"
+      characterId: IRONCLAD
+      creature: { currentHp: 67, maxHp: 80 }
+      combat:
+        hand:
+          cards:
+            - { modelId: BASH, afflictionId: bound }
+            - { modelId: ANGER, afflictionId: entangled }
+            - { modelId: INFLAME, afflictionId: galvanized }
+            - { modelId: STRIKE_IRONCLAD, afflictionId: hexed }
+            - { modelId: SWORD_BOOMERANG, afflictionId: ringing }
+            - { modelId: DEFEND_IRONCLAD, afflictionId: smog }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL

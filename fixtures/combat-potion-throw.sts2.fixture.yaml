@@ -1,0 +1,17 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-potion-throw
+description: Deterministic two-player Ironclad combat with Fire Potion targeting active.
+run:
+  seed: fixture-combat-potion-throw
+  view:
+    selectedPotion:
+      slotIndex: 0
+      mode: targeting
+  players:
+    - id: "p:1"
+      potions:
+        - modelId: FIRE_POTION
+    - id: "p:2"
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

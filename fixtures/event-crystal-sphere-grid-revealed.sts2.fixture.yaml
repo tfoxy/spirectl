@@ -1,0 +1,45 @@
+schemaVersion: spirectl.fixture/v0
+name: event-crystal-sphere-grid-revealed
+run:
+  seed: event-crystal-sphere-grid
+  currentRoom:
+    event:
+      canonicalEventModelId: CRYSTAL_SPHERE
+      playerStates:
+        - options:
+            - textKey: CRYSTAL_SPHERE.pages.INITIAL.options.UNCOVER_FUTURE
+              wasChosen: false
+            - textKey: CRYSTAL_SPHERE.pages.INITIAL.options.PAYMENT_PLAN
+              wasChosen: true
+          crystalSphere:
+            selectedTool: big
+            divinationsRemaining: 2
+            cells:
+              - { id: crystal-sphere:cell:3:2, x: 3, y: 2, isHidden: false }
+              - { id: crystal-sphere:cell:4:2, x: 4, y: 2, isHidden: false }
+              - { id: crystal-sphere:cell:5:2, x: 5, y: 2, isHidden: false }
+              - { id: crystal-sphere:cell:3:3, x: 3, y: 3, isHidden: false }
+              - { id: crystal-sphere:cell:4:3, x: 4, y: 3, isHidden: false }
+              - { id: crystal-sphere:cell:5:3, x: 5, y: 3, isHidden: false }
+              - { id: crystal-sphere:cell:7:3, x: 7, y: 3, isHidden: false }
+              - { id: crystal-sphere:cell:8:3, x: 8, y: 3, isHidden: false }
+              - { id: crystal-sphere:cell:9:3, x: 9, y: 3, isHidden: false }
+              - { id: crystal-sphere:cell:3:4, x: 3, y: 4, isHidden: false }
+              - { id: crystal-sphere:cell:4:4, x: 4, y: 4, isHidden: false }
+              - { id: crystal-sphere:cell:5:4, x: 5, y: 4, isHidden: false }
+              - { id: crystal-sphere:cell:7:4, x: 7, y: 4, isHidden: false }
+              - { id: crystal-sphere:cell:8:4, x: 8, y: 4, isHidden: false }
+              - { id: crystal-sphere:cell:9:4, x: 9, y: 4, isHidden: false }
+              - { id: crystal-sphere:cell:2:5, x: 2, y: 5, isHidden: false }
+              - { id: crystal-sphere:cell:3:5, x: 3, y: 5, isHidden: false }
+              - { id: crystal-sphere:cell:4:5, x: 4, y: 5, isHidden: false }
+              - { id: crystal-sphere:cell:7:5, x: 7, y: 5, isHidden: false }
+              - { id: crystal-sphere:cell:8:5, x: 8, y: 5, isHidden: false }
+              - { id: crystal-sphere:cell:9:5, x: 9, y: 5, isHidden: false }
+              - { id: crystal-sphere:cell:2:6, x: 2, y: 6, isHidden: false }
+              - { id: crystal-sphere:cell:3:6, x: 3, y: 6, isHidden: false }
+              - { id: crystal-sphere:cell:4:6, x: 4, y: 6, isHidden: false }
+              - { id: crystal-sphere:cell:6:6, x: 6, y: 6, isHidden: false }
+              - { id: crystal-sphere:cell:2:7, x: 2, y: 7, isHidden: false }
+              - { id: crystal-sphere:cell:3:7, x: 3, y: 7, isHidden: false }
+              - { id: crystal-sphere:cell:4:7, x: 4, y: 7, isHidden: false }

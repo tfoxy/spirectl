@@ -1,0 +1,9 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-card-debuff-intent
+description: Combat with "card debuff" intent
+run:
+  currentActIndex: 2
+  actFloor: 51
+  currentRoom:
+    combat:
+      encounterId: QUEEN_BOSS

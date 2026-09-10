@@ -1,0 +1,18 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-event-room-options
+description: Deterministic authored event-room fixture with explicit visible option controls.
+run:
+  seed: fixture-basic-event-room-options
+  actFloor: 7
+  players:
+    - id: p1
+      creature: { currentHp: 52, maxHp: 80 }
+  currentRoom:
+    event:
+      canonicalEventModelId: GOLDEN_IDOL
+      playerStates:
+        - options:
+            - id: gain-gold
+              titleText: Take 75 Gold
+            - id: leave
+              titleText: Leave

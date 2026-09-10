@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://handpanelfixture"]
+
+[ext_resource type="Script" path="res://scripts/HandPanelController.cs" id="1_hand_script"]
+[ext_resource type="StatusConfig" path="res://resources/StatusConfig.tres" id="2_status_config"]
+[ext_resource type="Resource" path="res://assets/hand_icon.tres" id="3_hand_icon"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel_style"]
+
+[node name="HandPanel" type="VBoxContainer" unique_id=2001]
+script = ExtResource("1_hand_script")
+status_config = ExtResource("2_status_config")
+panel_style = SubResource("StyleBoxFlat_panel_style")
+
+[node name="EnergyLabel" type="Label" parent="." unique_id=2002]
+text = "3"
+
+[node name="ConfirmButton" type="Button" parent="." unique_id=2003]
+focus_neighbor_left = NodePath("../EnergyLabel")
+
+[node name="Icon" type="TextureRect" parent="." unique_id=2004]
+texture = ExtResource("3_hand_icon")

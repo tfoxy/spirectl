@@ -1,0 +1,17 @@
+# Deterministic mock transport config for checked-in runner scenarios.
+# Normal `sts2` usage defaults to the live local IPC bridge.
+
+transport:
+  kind: mock
+  mockScenario: main-menu
+
+test:
+  profiles:
+    presentation-combat:
+      description: Presentation-grade combat state assertions against the combat mock.
+      config:
+        transport:
+          kind: mock
+          mockScenario: combat
+      paths:
+        - tests/scenarios/presentation-combat.sts2.yaml

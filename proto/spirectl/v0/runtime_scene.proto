@@ -1,0 +1,527 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+
+message RuntimeSceneTreeRequest {
+  string node_path = 1;
+  bool include_properties = 2;
+  bool include_computed_transform = 3;
+}
+
+message RuntimeSceneNodeRequest {
+  string node_path = 1;
+  bool include_properties = 2;
+  bool include_computed_transform = 3;
+}
+
+message RuntimeSceneSetVisibleRequest {
+  string node_path = 1;
+  bool visible = 2;
+  bool include_computed_transform = 3;
+}
+
+message RuntimeSceneControlHoverRequest {
+  string node_path = 1;
+  string presentation_element_id = 2;
+  bool include_hover_tip = 3;
+  uint32 settle_ms = 4;
+}
+
+// Reverts a prior hover: moves the pointer to a neutral point (clearing any
+// active hover/tooltip) and, when a target is supplied, invokes the control's
+// unfocus hook. Both target fields are optional; empty means a global clear.
+message RuntimeSceneControlUnhoverRequest {
+  string node_path = 1;
+  string presentation_element_id = 2;
+}
+
+message RuntimeTransitionStatusRequest {
+  string request_id = 1;
+}
+
+message RuntimeSceneVector2 {
+  double x = 1;
+  double y = 2;
+}
+
+message RuntimeSceneColor {
+  double r = 1;
+  double g = 2;
+  double b = 3;
+  double a = 4;
+  string html = 5;
+}
+
+message RuntimeSceneTransform2D {
+  RuntimeSceneVector2 x_axis = 1;
+  RuntimeSceneVector2 y_axis = 2;
+  RuntimeSceneVector2 origin = 3;
+}
+
+message RuntimeSceneRect2 {
+  RuntimeSceneVector2 position = 1;
+  RuntimeSceneVector2 size = 2;
+}
+
+message RuntimeSceneAnchors {
+  optional double left = 1;
+  optional double top = 2;
+  optional double right = 3;
+  optional double bottom = 4;
+}
+
+message RuntimeSceneOffsets {
+  optional double left = 1;
+  optional double top = 2;
+  optional double right = 3;
+  optional double bottom = 4;
+}
+
+message RuntimeSceneResourceRef {
+  string field = 1;
+  string resource_path = 2;
+  string resource_type = 3;
+  string resource_name = 4;
+}
+
+message RuntimeScenePropertyNotice {
+  string code = 1;
+  string field = 2;
+  string message = 3;
+}
+
+message RuntimeSceneTextProperties {
+  optional string text = 1;
+  optional string raw_text = 2;
+  optional bool rich_text_enabled = 3;
+  string source = 4;
+  string diagnostic_surface = 5;
+  repeated RuntimeScenePropertyNotice notices = 6;
+  RuntimeSceneResourceRef font = 7;
+  optional double font_size = 8;
+  optional double line_height = 9;
+  RuntimeSceneColor text_color = 10;
+  RuntimeSceneColor outline_color = 11;
+  optional double outline_size = 12;
+  repeated RuntimeSceneRichTextSpan rich_text_spans = 13;
+  RuntimeSceneTextShadow shadow = 14;
+  optional double letter_spacing = 15;
+  optional string font_weight = 16;
+  optional string font_style = 17;
+  RuntimeSceneTextLayout layout = 18;
+  RuntimeSceneTextRecipe recipe = 19;
+  string font_size_source = 20;
+  optional double applied_font_size = 21;
+  optional double theme_font_size = 22;
+  optional double configured_min_font_size = 23;
+  optional double configured_max_font_size = 24;
+  RuntimeSceneTextRenderedMetrics rendered_metrics = 25;
+}
+
+message RuntimeSceneTextRecipe {
+  string source = 1;
+  optional bool auto_size_enabled = 2;
+  optional double min_font_size_px = 3;
+  optional double max_font_size_px = 4;
+  optional double nominal_font_size_px = 5;
+  optional bool rich_text_enabled = 6;
+  optional string wrap_mode = 7;
+  optional string break_flags = 8;
+  optional string justification_flags = 9;
+  optional string text_overrun_behavior = 10;
+  optional bool horizontally_bound = 11;
+  optional bool vertically_bound = 12;
+}
+
+message RuntimeSceneTextRenderedMetrics {
+  string metric_source = 1;
+  optional double font_ascent_px = 2;
+  optional double font_descent_px = 3;
+  optional double font_height_px = 4;
+  optional double paragraph_size_width_px = 5;
+  optional double paragraph_size_height_px = 6;
+  repeated RuntimeSceneTextRenderedLineMetrics lines = 7;
+}
+
+message RuntimeSceneTextRenderedLineMetrics {
+  uint32 index = 1;
+  optional double paragraph_ascent_px = 2;
+  optional double paragraph_descent_px = 3;
+  optional double paragraph_line_size_width_px = 4;
+  optional double paragraph_line_size_height_px = 5;
+  optional double paragraph_line_width_px = 6;
+}
+
+message RuntimeSceneTextLayout {
+  optional string horizontal_alignment = 1;
+  optional string vertical_alignment = 2;
+  optional double baseline_offset = 3;
+  optional double ascent = 4;
+  optional double descent = 5;
+  optional double line_height = 6;
+  optional double content_width = 7;
+  optional double content_height = 8;
+  optional bool clip_contents = 9;
+  repeated RuntimeSceneTextLine lines = 10;
+}
+
+message RuntimeSceneTextLine {
+  uint32 index = 1;
+  optional string text = 2;
+  optional double x = 3;
+  optional double y = 4;
+  optional double baseline_y = 5;
+  optional double width = 6;
+  optional double height = 7;
+  optional int32 start = 8;
+  optional int32 end = 9;
+}
+
+message RuntimeSceneTextShadow {
+  RuntimeSceneColor color = 1;
+  RuntimeSceneVector2 offset = 2;
+  optional double size = 3;
+  optional double outline_size = 4;
+  string source = 5;
+  repeated RuntimeSceneStackedTextShadow stacked_shadows = 6;
+}
+
+message RuntimeSceneStackedTextShadow {
+  uint32 index = 1;
+  RuntimeSceneColor color = 2;
+  RuntimeSceneVector2 offset = 3;
+  optional double outline_size = 4;
+  string source = 5;
+}
+
+message RuntimeSceneRichTextSpan {
+  string tag = 1;
+  string text = 2;
+  RuntimeSceneColor color = 3;
+}
+
+message RuntimeScenePatchMargins {
+  double left = 1;
+  double top = 2;
+  double right = 3;
+  double bottom = 4;
+}
+
+message RuntimeSceneNinePatchProperties {
+  RuntimeSceneResourceRef texture = 1;
+  bool draw_center = 2;
+  RuntimeScenePatchMargins patch_margins = 3;
+  string axis_stretch_horizontal = 4;
+  string axis_stretch_vertical = 5;
+  RuntimeSceneColor effective_modulate = 6;
+}
+
+message RuntimeSceneTextureRectProperties {
+  string stretch_mode = 1;
+  string expand_mode = 2;
+  bool flip_h = 3;
+  bool flip_v = 4;
+}
+
+message RuntimeSceneShaderParameter {
+  string name = 1;
+  string value_kind = 2;
+  string string_value = 3;
+  optional double number_value = 4;
+  optional bool bool_value = 5;
+  RuntimeSceneColor color_value = 6;
+  RuntimeSceneVector2 vector2_value = 7;
+  RuntimeSceneResourceRef resource_value = 8;
+}
+
+message RuntimeSceneMaterialProperties {
+  RuntimeSceneResourceRef material = 1;
+  optional bool use_parent_material = 2;
+  RuntimeSceneResourceRef shader = 3;
+  repeated RuntimeSceneShaderParameter shader_parameters = 4;
+  string blend_mode = 5;
+}
+
+message RuntimeSceneThemeConstant {
+  string name = 1;
+  optional double value = 2;
+}
+
+message RuntimeSceneLayoutProperties {
+  RuntimeSceneVector2 minimum_size = 1;
+  RuntimeSceneVector2 combined_minimum_size = 2;
+  RuntimeSceneVector2 custom_minimum_size = 3;
+  optional int32 size_flags_horizontal = 4;
+  optional int32 size_flags_vertical = 5;
+  optional double size_flags_stretch_ratio = 6;
+  string layout_direction = 7;
+  string theme_type_variation = 8;
+  repeated RuntimeSceneThemeConstant theme_constants = 9;
+  optional int32 container_alignment = 10;
+  optional bool flow_vertical = 11;
+}
+
+message RuntimeSceneNodeProperties {
+  optional bool visible = 1;
+  optional bool effective_visible = 2;
+  RuntimeSceneVector2 position = 3;
+  RuntimeSceneVector2 global_position = 4;
+  RuntimeSceneVector2 scale = 5;
+  optional double rotation_radians = 6;
+  RuntimeSceneVector2 size = 7;
+  RuntimeSceneVector2 pivot_offset = 8;
+  RuntimeSceneAnchors anchors = 9;
+  RuntimeSceneOffsets offsets = 10;
+  optional int32 z_index = 11;
+  RuntimeSceneColor modulate = 12;
+  RuntimeSceneColor self_modulate = 13;
+  repeated RuntimeSceneResourceRef textures = 14;
+  repeated RuntimeScenePropertyNotice notices = 15;
+  RuntimeSceneTextProperties text = 16;
+  RuntimeSceneNinePatchProperties nine_patch = 17;
+  RuntimeSceneColor effective_modulate = 18;
+  optional bool clip_contents = 19;
+  RuntimeSceneTextureRectProperties texture_rect = 20;
+  RuntimeSceneMaterialProperties material = 21;
+  RuntimeSceneLayoutProperties layout = 22;
+  optional bool show_behind_parent = 23;
+  optional bool z_as_relative = 24;
+  optional int32 clip_children_mode = 25;
+  // Control-only pointer/focus policy. Unset for a node that is not a Control, which is
+  // distinct from a Control that reports the enum's zero value.
+  optional int32 mouse_filter = 26;
+  optional int32 focus_mode = 27;
+  optional int32 mouse_default_cursor_shape = 28;
+}
+
+message RuntimeSceneComputedTransform {
+  RuntimeSceneTransform2D local_transform = 1;
+  RuntimeSceneTransform2D global_transform = 2;
+  RuntimeSceneRect2 global_rect = 3;
+  RuntimeSceneRect2 viewport_clipped_rect = 4;
+  repeated RuntimeScenePropertyNotice notices = 5;
+}
+
+message RuntimeSceneNodeInfo {
+  string node_id = 1;
+  string node_path = 2;
+  string name = 3;
+  string node_type = 4;
+  string parent_node_path = 5;
+  string owner_path = 6;
+  string scene_file_path = 7;
+  string attached_script_path = 8;
+  string attached_script_type = 9;
+  uint32 child_count = 10;
+  repeated string notes = 11;
+  RuntimeSceneNodeProperties properties = 12;
+  RuntimeSceneComputedTransform computed_transform = 13;
+  string native_node_type = 14;
+}
+
+message RuntimeSceneTreeResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  ScreenInfo screen = 3;
+  string root_node_path = 4;
+  repeated RuntimeSceneNodeInfo nodes = 5;
+  repeated string notes = 6;
+}
+
+message RuntimeSceneNodeResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  ScreenInfo screen = 3;
+  RuntimeSceneNodeInfo node = 4;
+  repeated RuntimeSceneNodeInfo children = 5;
+  repeated string notes = 6;
+}
+
+message RuntimeSceneSetVisibleResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  ScreenInfo screen = 3;
+  RuntimeSceneNodeInfo node = 4;
+  bool previous_visible = 5;
+  bool requested_visible = 6;
+  bool changed = 7;
+  repeated string notes = 8;
+}
+
+message RuntimeSceneHoverLabel {
+  string node_path = 1;
+  string name = 2;
+  string text = 3;
+}
+
+message RuntimeSceneHoverTip {
+  bool visible = 1;
+  string node_path = 2;
+  optional string title = 3;
+  optional string text = 4;
+  repeated RuntimeSceneHoverLabel labels = 5;
+  repeated string notes = 6;
+}
+
+message RuntimeSceneControlHoverResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  ScreenInfo screen = 3;
+  RuntimeSceneNodeInfo node = 4;
+  string resolved_node_path = 5;
+  string presentation_element_id = 6;
+  bool hovered = 7;
+  RuntimeSceneVector2 hover_position = 8;
+  RuntimeSceneHoverTip hover_tip = 9;
+  repeated string notes = 10;
+}
+
+message RuntimeSceneControlUnhoverResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  ScreenInfo screen = 3;
+  RuntimeSceneNodeInfo node = 4;
+  string resolved_node_path = 5;
+  string presentation_element_id = 6;
+  bool hovered = 7;
+  RuntimeSceneVector2 pointer_position = 8;
+  repeated string notes = 9;
+}
+
+message RuntimeTransitionBlocker {
+  string kind = 1;
+  string node_path = 2;
+  string node_type = 3;
+  string name = 4;
+  string status = 5;
+  string reason = 6;
+  optional string animation_name = 7;
+  optional int32 loops_left = 8;
+  optional bool running = 9;
+  optional bool infinite = 10;
+}
+
+message RuntimeTransitionStatusResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  ScreenInfo screen = 3;
+  bool quiescent = 4;
+  uint32 blocking_count = 5;
+  uint32 ignored_infinite_count = 6;
+  repeated RuntimeTransitionBlocker blockers = 7;
+  repeated string notes = 8;
+}
+
+message PresentationResourceSceneRequest {
+  string request_id = 1;
+  repeated string scene_ids = 2;
+  double viewport_width = 3;
+  double viewport_height = 4;
+  repeated string synthetic_probe_ids = 5;
+  bool include_computed_transform = 6;
+}
+
+message PresentationResourceScene {
+  string scene_id = 1;
+  string resource_path = 2;
+  bool loaded = 3;
+  repeated RuntimeSceneNodeInfo nodes = 4;
+  repeated string notes = 5;
+  string unavailable_reason = 6;
+}
+
+message PresentationResourceSceneResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  repeated PresentationResourceScene scenes = 3;
+  repeated string notes = 4;
+}
+
+message PresentationLocalizationRequest {
+  string request_id = 1;
+  repeated string table_names = 2;
+  string language = 3;
+}
+
+message PresentationLocalizationTable {
+  string name = 1;
+  map<string, string> entries = 2;
+}
+
+message PresentationLocalizationDiagnostic {
+  string code = 1;
+  string severity = 2;
+  string table_name = 3;
+  string path = 4;
+  string message = 5;
+}
+
+message PresentationLocalizationResponse {
+  DataSource source = 1;
+  bool provisional = 2;
+  string language = 3;
+  repeated PresentationLocalizationTable tables = 4;
+  repeated PresentationLocalizationDiagnostic diagnostics = 5;
+  repeated string notes = 6;
+}
+
+message RuntimeSceneTreeResult {
+  oneof result {
+    RuntimeSceneTreeResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message RuntimeSceneNodeResult {
+  oneof result {
+    RuntimeSceneNodeResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message RuntimeSceneSetVisibleResult {
+  oneof result {
+    RuntimeSceneSetVisibleResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message RuntimeSceneControlHoverResult {
+  oneof result {
+    RuntimeSceneControlHoverResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message RuntimeSceneControlUnhoverResult {
+  oneof result {
+    RuntimeSceneControlUnhoverResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message RuntimeTransitionStatusResult {
+  oneof result {
+    RuntimeTransitionStatusResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message PresentationResourceSceneResult {
+  oneof result {
+    PresentationResourceSceneResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message PresentationLocalizationResult {
+  oneof result {
+    PresentationLocalizationResponse success = 1;
+    BridgeError error = 2;
+  }
+}

@@ -1,0 +1,16 @@
+schemaVersion: spirectl.fixture/v0
+name: multiplayer-ownership-local-non-host
+description: Local non-host multiplayer lobby slice using stable player ids.
+characterSelect:
+  kind: load-run
+  lobby:
+    seed: fixture-multiplayer-ownership-local-non-host
+    localPlayerId: "p:200"
+    hostPlayerId: "p:100"
+    players:
+      - id: "p:100"
+        characterId: IRONCLAD
+        isReady: true
+      - id: "p:200"
+        characterId: SILENT
+        isReady: false

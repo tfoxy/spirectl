@@ -1,0 +1,29 @@
+{
+  "actions": [],
+  "diagnostics": [
+    {
+      "code": "presentation_action_surface_unmatched",
+      "message": "No presentation actions surface matched the current state screen.",
+      "rootScene": "main_menu",
+      "scene": null,
+      "severity": "info"
+    }
+  ],
+  "perspective": {
+    "playerId": null,
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 0,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "main_menu",
+    "scene": null
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

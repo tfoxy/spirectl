@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+import "spirectl/v0/models.proto";
+
+// Game "reference data": values that are constant at runtime but are not game
+// models (cards, relics, …). Examples: the StsColors palette and the game
+// version / modding metadata shown in the in-game DebugInfo node.
+//
+// The surface is topic-addressed and extensible: each topic adds a new arm to
+// ReferenceResponse.payload. Adding a topic never reuses field numbers.
+enum ReferenceStatus {
+  REFERENCE_STATUS_UNSPECIFIED = 0;
+  REFERENCE_STATUS_OK = 1;
+  REFERENCE_STATUS_PARTIAL = 2;
+  REFERENCE_STATUS_UNSUPPORTED_TOPIC = 3;
+  REFERENCE_STATUS_UNAVAILABLE = 4;
+}
+
+message ReferenceRequest {
+  string request_id = 1;
+  string topic = 2;
+  // Optional per-topic filter (e.g. specific color names for the "colors"
+  // topic). Empty means "return everything for the topic".
+  repeated string keys = 3;
+}
+
+message ReferenceResult {
+  oneof result {
+    ReferenceResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message ReferenceResponse {
+  string request_id = 1;
+  DataSource source = 2;
+  bool provisional = 3;
+  string topic = 4;
+  ReferenceStatus status = 5;
+  // Requested keys that were not found (e.g. unknown color names).
+  repeated string missing_keys = 6;
+  repeated ReferenceNotice notices = 7;
+  // One arm per topic. Extend additively; never reuse field numbers.
+  oneof payload {
+    GameColors colors = 8;
+    GameVersionInfo version = 9;
+    // The synthetic "Random Character" lobby entry (not a real game model — excluded from
+    // ModelDb.AllCharacters). Reuses CharacterModelInfo so hosts seed it into the same
+    // character model cache as the "characters" model-catalog family.
+    CharacterModelInfo random_character = 10;
+  }
+}
+
+message ReferenceNotice {
+  string code = 1;
+  string severity = 2;
+  string message = 3;
+  string path = 4;
+}
+
+// --- topic: colors ---
+
+message GameColors {
+  repeated GameColor colors = 1;
+}
+
+message GameColor {
+  string name = 1;  // StsColors field name, e.g. "aqua", "screenBackdrop"
+  // Lowercase hex, no leading '#'. 8 hex digits when alpha != 1 (alpha
+  // preserved), otherwise 6. The r/g/b/a floats below are the lossless source.
+  string hex = 2;
+  // Lossless 0..1 components (the authoritative representation).
+  float r = 3;
+  float g = 4;
+  float b = 5;
+  float a = 6;
+}
+
+// --- topic: version ---
+
+message GameVersionInfo {
+  string version = 1;       // e.g. "v0.103.2"
+  string version_date = 2;  // e.g. "2026.04.16" (ReleaseInfo.Date, yyyy.MM.dd)
+  string commit = 3;
+  string branch = 4;
+  int32 main_assembly_hash = 5;
+  ModdingSummary modding = 6;
+}
+
+message ModdingSummary {
+  bool is_running_modded = 1;
+  int32 loaded_mod_count = 2;
+  int32 total_mod_count = 3;
+}

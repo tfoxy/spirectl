@@ -1,0 +1,24 @@
+name: couchcoop-target-screenshots
+description: Captures 1280x720 screenshot baselines for the CouchCoop target lobby, Neow, and nibbits-weak screens.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/two-ironclad-lobby.sts2.fixture.yaml
+
+  - dev.screenshot:
+      width: 1280
+      height: 720
+
+  - dev.load-fixture:
+      path: ../../fixtures/initial-neow.sts2.fixture.yaml
+
+  - dev.screenshot:
+      width: 1280
+      height: 720
+
+  - dev.load-fixture:
+      path: ../../fixtures/two-ironclad-nibbits-weak-combat.sts2.fixture.yaml
+
+  - dev.screenshot:
+      width: 1280
+      height: 720

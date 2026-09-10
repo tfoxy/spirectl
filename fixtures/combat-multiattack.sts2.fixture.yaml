@@ -1,0 +1,10 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-multiattack
+description: Combat with multi attack intent
+run:
+  seed: combat-multihit
+  currentActIndex: 1
+  actFloor: 20
+  currentRoom:
+    combat:
+      encounterId: ENTOMANCER_ELITE

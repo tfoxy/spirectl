@@ -1,0 +1,7 @@
+schemaVersion: spirectl.fixture/v0
+name: event-crystal-sphere
+run:
+  seed: event-crystal-sphere
+  currentRoom:
+    event:
+      canonicalEventModelId: CRYSTAL_SPHERE

@@ -1,0 +1,6 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-lobby
+description: Deterministic authored multiplayer lobby fixture using stable local player ids.
+characterSelect:
+  lobby:
+    seed: fixture-basic-lobby

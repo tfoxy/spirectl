@@ -1,0 +1,37 @@
+name: fixture-rewards-all-with-relics
+description: >-
+  Loads the authored rewards-all-with-relics fixture (all ~17 reward-modifying
+  relics) through the live bridge and asserts the authored reward types plus that
+  the card-modifier relics actually fired: Driftwood makes card rewards rerollable
+  and the egg/crucible relics upgrade the card-reward cards.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/rewards-all-with-relics.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[0].overlays[0].screenId
+      equals: Screens.NRewardsScreen
+  # Authored reward types.
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].gold
+      equals: 30
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].potion
+      equals: FIRE_POTION
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].relic
+      equals: ANCHOR
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].cardRemoval
+      equals: true
+  # Card rewards are authored non-skippable (frees the Skip slot for Reroll + Sacrifice).
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].cardReward.canSkip
+      equals: false
+  # Driftwood actually fired: card rewards are rerollable.
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].cardReward.canReroll
+      equals: true
+  # Egg / Silver Crucible relics actually fired: card-reward cards are upgraded.
+  - dev.assert:
+      path: run.players[0].overlays[0].rewards.items[*].cardReward.cards[*].upgradeLevel
+      equals: 1

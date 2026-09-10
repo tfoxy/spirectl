@@ -1,0 +1,105 @@
+{
+  "actions": [
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-map",
+      "kind": "toggle-map",
+      "label": "Map",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-deck",
+      "kind": "toggle-deck",
+      "label": "Deck",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-settings",
+      "kind": "toggle-settings",
+      "label": "Settings",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "cardId": "card:1",
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:select-hand-card:card:1",
+      "kind": "select-hand-card",
+      "label": "strike",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view.handSelection.selectableCardIds"
+    },
+    {
+      "args": {
+        "cardId": "card:3",
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:select-hand-card:card:3",
+      "kind": "select-hand-card",
+      "label": "strike",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view.handSelection.selectableCardIds"
+    },
+    {
+      "args": {
+        "cardId": "card:2",
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:deselect-hand-card:card:2",
+      "kind": "deselect-hand-card",
+      "label": "strike",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view.handSelection.selectedCardIds"
+    },
+    {
+      "args": {
+        "cardIds": [
+          "card:2"
+        ],
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:confirm-hand-selection",
+      "kind": "confirm-hand-selection",
+      "label": "Confirm: Choose a card to [gold]discard[/gold].",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view.handSelection"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "run",
+    "scene": "rooms/combat_room"
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

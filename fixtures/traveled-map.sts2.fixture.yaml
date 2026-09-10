@@ -1,0 +1,13 @@
+schemaVersion: spirectl.fixture/v0
+name: traveled-map
+description: >-
+  Progressed map fixture: the loader auto-walks a connected path several rows up from the start, so
+  run.visitedMapCoords covers a real walked route. Exercises the traveled-path edge coloring (the
+  walked connections render in the act traveled color, scaled up) plus the current marker and
+  scroll-centering at a non-zero row. Same seed/act as basic-map.
+run:
+  seed: fixture-basic-map
+  actFloor: 5
+  currentRoom:
+    mapRoom:
+      travelToRow: 5

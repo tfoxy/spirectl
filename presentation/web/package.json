@@ -1,0 +1,31 @@
+{
+  "name": "@spirectl/presentation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "STS2 render vocabulary for mirror hosts: animation bindings, BBCode tags, play-zone predicate",
+  "exports": {
+    "./spine": {
+      "types": "./src/spine/index.ts",
+      "import": "./src/spine/index.ts"
+    },
+    "./render": {
+      "types": "./src/render/index.ts",
+      "import": "./src/render/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@godot-scene-web/html": "*"
+  },
+  "devDependencies": {
+    "@godot-scene-web/html": "link:../../../godot-scene-web/packages/html",
+    "@types/node": "^22.10.0",
+    "happy-dom": "^20.10.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.11",
+    "vitest": "^4.1.5"
+  }
+}

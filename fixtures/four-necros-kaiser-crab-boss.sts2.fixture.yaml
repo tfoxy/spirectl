@@ -1,0 +1,19 @@
+schemaVersion: spirectl.fixture/v0
+name: four-necros-kaiser-crab-boss
+description: Four players as Necrobinders with pets (Osty) in Kaiser Crab boss encounter.
+run:
+  currentActIndex: 1
+  actFloor: 32
+  ascensionLevel: 0
+  players:
+    - characterId: NECROBINDER
+      creature: { currentHp: 80, maxHp: 80 }
+    - characterId: NECROBINDER
+      creature: { currentHp: 80, maxHp: 80 }
+    - characterId: NECROBINDER
+      creature: { currentHp: 80, maxHp: 80 }
+    - characterId: NECROBINDER
+      creature: { currentHp: 80, maxHp: 80 }
+  currentRoom:
+    combat:
+      encounterId: KAISER_CRAB_BOSS

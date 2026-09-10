@@ -1,0 +1,17 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-potion-target
+description: Deterministic two-player Ironclad combat with p:1 target-oriented potion cases.
+run:
+  seed: fixture-combat-potion-target
+  players:
+    - id: "p:1"
+      potions:
+        - modelId: FIRE_POTION
+        - modelId: POTION_OF_BINDING
+        - modelId: LUCKY_TONIC
+        - modelId: FAIRY_IN_A_BOTTLE
+        - modelId: FOUL_POTION
+    - id: "p:2"
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

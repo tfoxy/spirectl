@@ -1,0 +1,21 @@
+name: fixture-basic-deck-card-selection
+description: Loads the checked-in deck-card-selection fixture through the live bridge and asserts the resulting screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-deck-card-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].deckCardSelection.kind
+      equals: select
+  # No native `state actions` surfacer models deckCardSelection's own pick action
+  # yet (out of scope for this migration — only surface_shop/surface_map_room were
+  # added); assert the real per-card content on the state doc directly instead of
+  # a synthesized select-card/confirm/cancel action.
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].deckCardSelection.cards[0].modelId
+      equals: BASH
+  - act.fallback-choose:
+      choice: card-selection:card:bash:0
+  - act.cancel-selection: {}
+  - act.fallback-choose:
+      choice: card-selection:card:bash:0
+  - act.confirm-selection: {}

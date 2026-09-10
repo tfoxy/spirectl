@@ -1,0 +1,30 @@
+name: fixture-basic-simple-card-selection
+description: Loads the checked-in simple-card-selection fixture through the live bridge and asserts the resulting screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-simple-card-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].simpleGridCardSelection
+      exists: true
+  - dev.assert:
+      path: actions[args.cardId=card-selection:card:bash:0].kind
+      source: actions
+      equals: select-card
+  - act.fallback-choose:
+      choice: card-selection:card:bash:0
+  - dev.assert:
+      path: actions[kind=confirm-selection].kind
+      source: actions
+      equals: confirm-selection
+  - dev.assert:
+      path: actions[kind=cancel-selection].kind
+      source: actions
+      equals: cancel-selection
+  - act.cancel-selection: {}
+  - dev.assert:
+      path: actions[args.cardId=card-selection:card:bash:0].kind
+      source: actions
+      equals: select-card
+  - act.fallback-choose:
+      choice: card-selection:card:bash:0
+  - act.confirm-selection: {}

@@ -1,0 +1,59 @@
+{
+  "captures": {
+    "actions": {
+      "availableActionIds": [
+        "action:menu:start-run"
+      ],
+      "path": "tests/snapshots/baselines/main-menu/inspect-actions.json"
+    },
+    "diagnostics": {
+      "path": "tests/snapshots/baselines/main-menu/diagnostics.json",
+      "status": "partial"
+    },
+    "logHealth": {
+      "path": "tests/snapshots/baselines/main-menu/log-health.json",
+      "status": "healthy"
+    },
+    "screenshot": {
+      "appliedViewport": {
+        "height": 1080,
+        "width": 1920
+      },
+      "maxDiffPixels": 0,
+      "maxDiffRatio": 0.0,
+      "path": "tests/snapshots/baselines/main-menu/runtime.png",
+      "preset": "desktop-1080p",
+      "requestedViewport": {
+        "height": 1080,
+        "width": 1920
+      }
+    },
+    "state": {
+      "path": "tests/snapshots/baselines/main-menu/state.json",
+      "selectors": [
+        {
+          "path": "screen.id",
+          "resolution": null,
+          "value": "main-menu"
+        },
+        {
+          "path": "screen.title",
+          "resolution": null,
+          "value": "Main Menu"
+        },
+        {
+          "path": "choices[0].id",
+          "resolution": null,
+          "value": "menu:start-run"
+        }
+      ]
+    }
+  },
+  "compareVersions": false,
+  "description": null,
+  "name": "main-menu",
+  "outputDir": "tests/snapshots/baselines/main-menu",
+  "schemaVersion": "spirectl.snapshot/v0",
+  "specPath": "tests/snapshots/main-menu.sts2.snapshot.yaml",
+  "status": "exported"
+}

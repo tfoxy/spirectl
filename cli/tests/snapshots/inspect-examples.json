@@ -1,0 +1,1665 @@
+{
+  "examples": [
+    {
+      "command": "state",
+      "example": "sts2 state",
+      "summary": "Runtime-only presentation state envelope (spirectl.state/v0); state actions returns the native semantic action list."
+    },
+    {
+      "command": "state",
+      "example": "sts2 --json state",
+      "summary": "Runtime-only presentation state envelope (spirectl.state/v0); state actions returns the native semantic action list."
+    },
+    {
+      "command": "state",
+      "example": "sts2 --json state actions",
+      "summary": "Runtime-only presentation state envelope (spirectl.state/v0); state actions returns the native semantic action list."
+    },
+    {
+      "command": "state",
+      "example": "sts2 --json state --watch --max-events 1",
+      "summary": "Runtime-only presentation state envelope (spirectl.state/v0); state actions returns the native semantic action list."
+    },
+    {
+      "command": "state",
+      "example": "sts2 --json state --perspective omniscient --player-id p2",
+      "summary": "Runtime-only presentation state envelope (spirectl.state/v0); state actions returns the native semantic action list."
+    },
+    {
+      "command": "state watch",
+      "example": "sts2 --json state --watch --max-events 1",
+      "summary": "Read-only NDJSON stream over the state envelope; uses reactive live bridge watch when available and polling fallback otherwise."
+    },
+    {
+      "command": "state watch",
+      "example": "sts2 --json state --watch --watch-mode poll --timeout-ms 10000 --poll-interval-ms 250 --rpc-timeout-ms 1000",
+      "summary": "Read-only NDJSON stream over the state envelope; uses reactive live bridge watch when available and polling fallback otherwise."
+    },
+    {
+      "command": "state watch",
+      "example": "sts2 --json state --watch --fail-fast --max-events 1",
+      "summary": "Read-only NDJSON stream over the state envelope; uses reactive live bridge watch when available and polling fallback otherwise."
+    },
+    {
+      "command": "act play-card",
+      "example": "sts2 act play-card --card c_17 --target e_2",
+      "summary": "Semantic card play routed through the bridge contract."
+    },
+    {
+      "command": "act play-card",
+      "example": "sts2 act play-card --card c_17 --target e_2 --player-id p2",
+      "summary": "Semantic card play routed through the bridge contract."
+    },
+    {
+      "command": "act use-potion",
+      "example": "sts2 act use-potion --potion potion:p:100:0:fire-potion --target e_1",
+      "summary": "Use an executable combat potion by stable potion id, with an optional target id when required."
+    },
+    {
+      "command": "act choose",
+      "example": "sts2 act choose --choice reward:p1:0",
+      "summary": "Fallback-only compatibility choice execution for generic, modded, or unmodeled visible choices when no modeled intent action exists."
+    },
+    {
+      "command": "act choose",
+      "example": "sts2 act choose --choice reward:p2:0 --player-id p2",
+      "summary": "Fallback-only compatibility choice execution for generic, modded, or unmodeled visible choices when no modeled intent action exists."
+    },
+    {
+      "command": "act choose",
+      "example": "sts2 act choose --choice event-room:fake-merchant:open-shop",
+      "summary": "Fallback-only compatibility choice execution for generic, modded, or unmodeled visible choices when no modeled intent action exists."
+    },
+    {
+      "command": "act choose",
+      "example": "sts2 act choose --choice shop:close-inventory",
+      "summary": "Fallback-only compatibility choice execution for generic, modded, or unmodeled visible choices when no modeled intent action exists."
+    },
+    {
+      "command": "act choose",
+      "example": "sts2 act choose --choice map:back",
+      "summary": "Fallback-only compatibility choice execution for generic, modded, or unmodeled visible choices when no modeled intent action exists."
+    },
+    {
+      "command": "act choose",
+      "example": "sts2 act choose --choice crystal-sphere:tool:big",
+      "summary": "Fallback-only compatibility choice execution for generic, modded, or unmodeled visible choices when no modeled intent action exists."
+    },
+    {
+      "command": "act choose",
+      "example": "sts2 act choose --choice crystal-sphere:cell:0:0",
+      "summary": "Fallback-only compatibility choice execution for generic, modded, or unmodeled visible choices when no modeled intent action exists."
+    },
+    {
+      "command": "act confirm-selection",
+      "example": "sts2 act confirm-selection",
+      "summary": "Confirm the currently staged selection on a supported selection overlay."
+    },
+    {
+      "command": "act cancel-selection",
+      "example": "sts2 act cancel-selection",
+      "summary": "Cancel the currently staged selection on a supported selection overlay."
+    },
+    {
+      "command": "act mouse click",
+      "example": "sts2 --mode dangerous act mouse click --x 100 --y 200",
+      "summary": "Dangerous raw viewport mouse click fallback routed through the bridge contract."
+    },
+    {
+      "command": "act select-map-node",
+      "example": "sts2 act select-map-node --node map-node:3:1",
+      "summary": "Select an executable map node by stable node id."
+    },
+    {
+      "command": "act end-turn",
+      "example": "sts2 act end-turn",
+      "summary": "Semantic end-turn execution routed through the bridge contract."
+    },
+    {
+      "command": "act end-turn",
+      "example": "sts2 act end-turn --player-id p2",
+      "summary": "Semantic end-turn execution routed through the bridge contract."
+    },
+    {
+      "command": "act ready",
+      "example": "sts2 act ready",
+      "summary": "Mark the local multiplayer lobby player ready when the live lobby allows it."
+    },
+    {
+      "command": "act unready",
+      "example": "sts2 act unready",
+      "summary": "Clear the local multiplayer lobby ready state when the live lobby allows it."
+    },
+    {
+      "command": "act select-character",
+      "example": "sts2 act select-character --character silent",
+      "summary": "Select an executable multiplayer lobby character by stable character id in start-run or load-run lobbies."
+    },
+    {
+      "command": "act select-character",
+      "example": "sts2 act select-character --character silent --player-id p:200",
+      "summary": "Select an executable multiplayer lobby character by stable character id in start-run or load-run lobbies."
+    },
+    {
+      "command": "act claim-reward",
+      "example": "sts2 act claim-reward --reward reward:p1:0",
+      "summary": "Claim a visible reward by stable reward id."
+    },
+    {
+      "command": "act skip-rewards",
+      "example": "sts2 act skip-rewards",
+      "summary": "Skip a visible rewards flow when legal."
+    },
+    {
+      "command": "act select-card",
+      "example": "sts2 act select-card --card card-selection:card:bash:0",
+      "summary": "Select a visible card in a supported card-selection flow."
+    },
+    {
+      "command": "act skip-card-selection",
+      "example": "sts2 act skip-card-selection",
+      "summary": "Skip a skippable card-selection flow."
+    },
+    {
+      "command": "act select-bundle",
+      "example": "sts2 act select-bundle --bundle card-selection:bundle:offensive-pack:0",
+      "summary": "Select a visible bundle by stable bundle id."
+    },
+    {
+      "command": "act buy-card",
+      "example": "sts2 act buy-card --shop-item shop:p1:card:strike:0",
+      "summary": "Buy a visible shop card by stable shop item id."
+    },
+    {
+      "command": "act buy-relic",
+      "example": "sts2 act buy-relic --shop-item shop:p1:relic:anchor:0",
+      "summary": "Buy a visible shop relic by stable shop item id."
+    },
+    {
+      "command": "act buy-potion",
+      "example": "sts2 act buy-potion --shop-item shop:p1:potion:fire-potion:0",
+      "summary": "Buy a visible shop potion by stable shop item id."
+    },
+    {
+      "command": "act remove-card",
+      "example": "sts2 act remove-card --shop-item shop:p1:card-removal:0",
+      "summary": "Use a visible shop card-removal service by stable shop item id."
+    },
+    {
+      "command": "act leave-shop",
+      "example": "sts2 act leave-shop",
+      "summary": "Leave a visible shop when legal."
+    },
+    {
+      "command": "act close-shop-inventory",
+      "example": "sts2 act close-shop-inventory",
+      "summary": "Close a visible Fake Merchant shop inventory."
+    },
+    {
+      "command": "act rest",
+      "example": "sts2 act rest",
+      "summary": "Use the visible rest option at a rest site."
+    },
+    {
+      "command": "act smith",
+      "example": "sts2 act smith --card c_1",
+      "summary": "Use the visible smith option at a rest site."
+    },
+    {
+      "command": "act use-rest-site-option",
+      "example": "sts2 act use-rest-site-option --rest-option heal",
+      "summary": "Use another visible rest-site option by stable option id."
+    },
+    {
+      "command": "act proceed-rest-site",
+      "example": "sts2 act proceed-rest-site",
+      "summary": "Proceed from a rest site when visible."
+    },
+    {
+      "command": "act open-chest",
+      "example": "sts2 act open-chest",
+      "summary": "Open a visible treasure-room chest."
+    },
+    {
+      "command": "act take-relic",
+      "example": "sts2 act take-relic --relic anchor",
+      "summary": "Take a visible relic by stable relic id."
+    },
+    {
+      "command": "act proceed-treasure-room",
+      "example": "sts2 act proceed-treasure-room",
+      "summary": "Proceed from a treasure room when visible."
+    },
+    {
+      "command": "act back-from-map",
+      "example": "sts2 act back-from-map",
+      "summary": "Go back from the map when visible."
+    },
+    {
+      "command": "act select-event-option",
+      "example": "sts2 act select-event-option --event-option event-room:gain-gold:0",
+      "summary": "Select a visible first-party event option by stable option id."
+    },
+    {
+      "command": "act open-event-shop",
+      "example": "sts2 act open-event-shop --event-option event-room:fake-merchant:open-shop",
+      "summary": "Open a visible event shop entry point such as Fake Merchant."
+    },
+    {
+      "command": "act use-crystal-sphere-control",
+      "example": "sts2 act use-crystal-sphere-control --control crystal-sphere:tool:big",
+      "summary": "Use a visible Crystal Sphere control by stable control id."
+    },
+    {
+      "command": "act use-crystal-sphere-control",
+      "example": "sts2 act use-crystal-sphere-control --control crystal-sphere:cell:5:5 --selected-tool small",
+      "summary": "Use a visible Crystal Sphere control by stable control id."
+    },
+    {
+      "command": "act proceed-event",
+      "example": "sts2 act proceed-event",
+      "summary": "Proceed from an event when visible."
+    },
+    {
+      "command": "act toggle-map",
+      "example": "sts2 act toggle-map",
+      "summary": "Toggle the run top-bar map."
+    },
+    {
+      "command": "act toggle-deck",
+      "example": "sts2 act toggle-deck",
+      "summary": "Toggle the run top-bar deck view."
+    },
+    {
+      "command": "act inspect-relic",
+      "example": "sts2 act inspect-relic --relic relic:p:1:0:BURNING_BLOOD",
+      "summary": "Open the relic-details overlay for a relic-bar relic."
+    },
+    {
+      "command": "act close-inspect-relic",
+      "example": "sts2 act close-inspect-relic",
+      "summary": "Close the open relic-details overlay."
+    },
+    {
+      "command": "act select-hand-card",
+      "example": "sts2 act select-hand-card --card 12",
+      "summary": "Stage a hand card while in-hand selection mode is active (state.run.view.handSelection)."
+    },
+    {
+      "command": "act deselect-hand-card",
+      "example": "sts2 act deselect-hand-card --card 12",
+      "summary": "Unstage a previously selected hand card from the active in-hand selection."
+    },
+    {
+      "command": "act confirm-hand-selection",
+      "example": "sts2 act confirm-hand-selection",
+      "summary": "Confirm the staged in-hand selection; resolves the awaiting card effect (e.g. Survivor's discard)."
+    },
+    {
+      "command": "act toggle-settings",
+      "example": "sts2 act toggle-settings",
+      "summary": "Toggle the run top-bar settings menu."
+    },
+    {
+      "command": "act sort-deck-view",
+      "example": "sts2 act sort-deck-view --by type",
+      "summary": "Sort the current run deck view."
+    },
+    {
+      "command": "act toggle-deck-view-upgrades",
+      "example": "sts2 act toggle-deck-view-upgrades",
+      "summary": "Toggle deck view upgrade previews."
+    },
+    {
+      "command": "dev logs",
+      "example": "sts2 dev logs",
+      "summary": "Read recent structured bridge logs, tail a recent window, or follow new entries through the typed transport client."
+    },
+    {
+      "command": "dev logs",
+      "example": "sts2 --json dev logs --limit 20 --level warn --target bridge.action",
+      "summary": "Read recent structured bridge logs, tail a recent window, or follow new entries through the typed transport client."
+    },
+    {
+      "command": "dev logs",
+      "example": "sts2 --json dev logs --after-cursor 120",
+      "summary": "Read recent structured bridge logs, tail a recent window, or follow new entries through the typed transport client."
+    },
+    {
+      "command": "dev logs",
+      "example": "sts2 dev logs --follow --tail 20",
+      "summary": "Read recent structured bridge logs, tail a recent window, or follow new entries through the typed transport client."
+    },
+    {
+      "command": "dev console",
+      "example": "sts2 --json dev console help",
+      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+    },
+    {
+      "command": "dev console",
+      "example": "sts2 --json dev console draw 3",
+      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+    },
+    {
+      "command": "dev console",
+      "example": "sts2 --json dev console help draw",
+      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+    },
+    {
+      "command": "dev console",
+      "example": "sts2 --json dev console die",
+      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+    },
+    {
+      "command": "dev console",
+      "example": "sts2 --mode dangerous --json dev console achievement",
+      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+    },
+    {
+      "command": "dev console",
+      "example": "sts2 --mode dangerous --json dev console cloud",
+      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+    },
+    {
+      "command": "dev console",
+      "example": "sts2 --mode dangerous --json dev console unlock",
+      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+    },
+    {
+      "command": "dev heal",
+      "example": "sts2 --json dev heal --amount 10",
+      "summary": "Instantly heal (or revive) any creature host-side through the game's heal command — a devtool rescue, not a legal player action. Host-direct mutation can desync real remote network clients; fine for couch co-op's single real player."
+    },
+    {
+      "command": "dev heal",
+      "example": "sts2 --json dev heal --target creature:2 --amount 5",
+      "summary": "Instantly heal (or revive) any creature host-side through the game's heal command — a devtool rescue, not a legal player action. Host-direct mutation can desync real remote network clients; fine for couch co-op's single real player."
+    },
+    {
+      "command": "dev heal",
+      "example": "sts2 --json dev heal --full",
+      "summary": "Instantly heal (or revive) any creature host-side through the game's heal command — a devtool rescue, not a legal player action. Host-direct mutation can desync real remote network clients; fine for couch co-op's single real player."
+    },
+    {
+      "command": "dev log-health",
+      "example": "sts2 --json dev log-health --tail 100",
+      "summary": "Fail when the recent runtime log window contains unhealthy error or exception-shaped entries after optional exclusions."
+    },
+    {
+      "command": "dev log-health",
+      "example": "sts2 --json dev log-health --tail 100 --exclude-target bridge.exception",
+      "summary": "Fail when the recent runtime log window contains unhealthy error or exception-shaped entries after optional exclusions."
+    },
+    {
+      "command": "dev log-health",
+      "example": "sts2 --json dev log-health --tail 100 --exclude-message-regex '(?i)known flaky warning'",
+      "summary": "Fail when the recent runtime log window contains unhealthy error or exception-shaped entries after optional exclusions."
+    },
+    {
+      "command": "dev diagnostics",
+      "example": "sts2 --json dev diagnostics",
+      "summary": "Collect one stable runtime diagnostics payload and optionally write a predictable evidence bundle."
+    },
+    {
+      "command": "dev diagnostics",
+      "example": "sts2 --json dev diagnostics --bundle-dir ./.sts2/artifacts/evidence",
+      "summary": "Collect one stable runtime diagnostics payload and optionally write a predictable evidence bundle."
+    },
+    {
+      "command": "dev diagnostics",
+      "example": "sts2 --json dev diagnostics --tail 100 --exclude-target bridge.exception",
+      "summary": "Collect one stable runtime diagnostics payload and optionally write a predictable evidence bundle."
+    },
+    {
+      "command": "dev mod-reload",
+      "example": "sts2 --json dev mod-reload --project ./mods/MyHotMod --build --wait",
+      "summary": "Build and request reload for an M57/M60 shell-supported hot-reload project through the live bridge."
+    },
+    {
+      "command": "dev mod-reload",
+      "example": "sts2 --json dev mod-reload --project . --wait",
+      "summary": "Build and request reload for an M57/M60 shell-supported hot-reload project through the live bridge."
+    },
+    {
+      "command": "dev mod-reload status",
+      "example": "sts2 --json dev mod-reload status --project ./mods/MyHotMod",
+      "summary": "Report active shell protocol, generation, last reload report, and restart-required state for a hot-reload project."
+    },
+    {
+      "command": "dev mod-reload status",
+      "example": "sts2 --json dev mod-reload status --project .",
+      "summary": "Report active shell protocol, generation, last reload report, and restart-required state for a hot-reload project."
+    },
+    {
+      "command": "dev http",
+      "example": "sts2 --json dev http --url http://127.0.0.1:3000/health --expect-status 200",
+      "summary": "Run one bounded HTTP probe with optional status, header, and JSON/text query assertions."
+    },
+    {
+      "command": "dev http",
+      "example": "sts2 --json dev http --url http://127.0.0.1:3000/health --query json.status --equals ok",
+      "summary": "Run one bounded HTTP probe with optional status, header, and JSON/text query assertions."
+    },
+    {
+      "command": "dev http-wait",
+      "example": "sts2 --json dev http-wait --url http://127.0.0.1:3000/health --expect-status 200 --timeout-ms 10000",
+      "summary": "Poll one HTTP endpoint until the requested status, header, or JSON/text query assertions match."
+    },
+    {
+      "command": "dev http-wait",
+      "example": "sts2 --json dev http-wait --url http://127.0.0.1:3000/health --query json.status --equals ok --interval-ms 250",
+      "summary": "Poll one HTTP endpoint until the requested status, header, or JSON/text query assertions match."
+    },
+    {
+      "command": "dev fetch",
+      "example": "sts2 --json dev fetch --source ./fixtures/health.json",
+      "summary": "Fetch one local or HTTP artifact, optionally write it to disk, and assert over parsed JSON/text content."
+    },
+    {
+      "command": "dev fetch",
+      "example": "sts2 --json dev fetch --source http://127.0.0.1:3000/build.json --output ./.sts2/artifacts/build.json --query json.status --equals ok",
+      "summary": "Fetch one local or HTTP artifact, optionally write it to disk, and assert over parsed JSON/text content."
+    },
+    {
+      "command": "dev websocket",
+      "example": "sts2 --json dev websocket --url ws://127.0.0.1:3001/events --expect-text ready",
+      "summary": "Open one bounded websocket validation session with optional text sends and expected text frames."
+    },
+    {
+      "command": "dev websocket",
+      "example": "sts2 --json dev websocket --url ws://127.0.0.1:3001/events --send-text ping --expect-text pong",
+      "summary": "Open one bounded websocket validation session with optional text sends and expected text frames."
+    },
+    {
+      "command": "dev wait-for",
+      "example": "sts2 dev wait-for run.currentRoom.scene --equals rooms/combat_room",
+      "summary": "Poll bridge-backed state until a simple path assertion succeeds. `--source actions` polls the resolved `state actions` document instead of the plain state snapshot."
+    },
+    {
+      "command": "dev wait-for",
+      "example": "sts2 --json dev wait-for run.players[combat.energy>=3].id --timeout-ms 5000 --exists",
+      "summary": "Poll bridge-backed state until a simple path assertion succeeds. `--source actions` polls the resolved `state actions` document instead of the plain state snapshot."
+    },
+    {
+      "command": "dev wait-for",
+      "example": "sts2 --json dev wait-for run.currentRoom.combat.combatState.enemies[*].id --equals e_1 --timeout-ms 5000",
+      "summary": "Poll bridge-backed state until a simple path assertion succeeds. `--source actions` polls the resolved `state actions` document instead of the plain state snapshot."
+    },
+    {
+      "command": "dev wait-for",
+      "example": "sts2 --json dev wait-for actions[kind=select-event-option].id --source actions --exists --timeout-ms 5000",
+      "summary": "Poll bridge-backed state until a simple path assertion succeeds. `--source actions` polls the resolved `state actions` document instead of the plain state snapshot."
+    },
+    {
+      "command": "dev wait-for",
+      "example": "sts2 --json dev wait-for actions[args.eventOptionId=event-room:gain-gold:0].kind --source actions --equals select-event-option --timeout-ms 5000",
+      "summary": "Poll bridge-backed state until a simple path assertion succeeds. `--source actions` polls the resolved `state actions` document instead of the plain state snapshot."
+    },
+    {
+      "command": "dev wait-for-transitions",
+      "example": "sts2 dev wait-for-transitions",
+      "summary": "Poll live runtime transition diagnostics until finite transitions and animations settle."
+    },
+    {
+      "command": "dev wait-for-transitions",
+      "example": "sts2 --json dev wait-for-transitions --timeout-ms 5000 --interval-ms 50 --stable-samples 3",
+      "summary": "Poll live runtime transition diagnostics until finite transitions and animations settle."
+    },
+    {
+      "command": "dev assert",
+      "example": "sts2 dev assert run.currentRoom.scene --equals rooms/combat_room",
+      "summary": "Assert a simple path against the current bridge-backed state. `--source actions` queries the resolved `state actions` document (`spirectl.state-actions/v0`) instead of the plain state snapshot."
+    },
+    {
+      "command": "dev assert",
+      "example": "sts2 --json dev assert run.players[id=p1].combat.energy --gte 1",
+      "summary": "Assert a simple path against the current bridge-backed state. `--source actions` queries the resolved `state actions` document (`spirectl.state-actions/v0`) instead of the plain state snapshot."
+    },
+    {
+      "command": "dev assert",
+      "example": "sts2 --json dev assert run.currentRoom.combat.combatState.enemies[*].id --equals e_1",
+      "summary": "Assert a simple path against the current bridge-backed state. `--source actions` queries the resolved `state actions` document (`spirectl.state-actions/v0`) instead of the plain state snapshot."
+    },
+    {
+      "command": "dev assert",
+      "example": "sts2 --json dev assert actions[label*=Turn].id --source actions --equals action:combat-room:end-turn",
+      "summary": "Assert a simple path against the current bridge-backed state. `--source actions` queries the resolved `state actions` document (`spirectl.state-actions/v0`) instead of the plain state snapshot."
+    },
+    {
+      "command": "dev assert",
+      "example": "sts2 --json dev assert actions[args.eventOptionId=event-room:gain-gold:0].kind --source actions --equals select-event-option",
+      "summary": "Assert a simple path against the current bridge-backed state. `--source actions` queries the resolved `state actions` document (`spirectl.state-actions/v0`) instead of the plain state snapshot."
+    },
+    {
+      "command": "dev assert",
+      "example": "sts2 --json dev assert actions[=action:combat-room:end-turn].kind --source actions --equals end-turn",
+      "summary": "Assert a simple path against the current bridge-backed state. `--source actions` queries the resolved `state actions` document (`spirectl.state-actions/v0`) instead of the plain state snapshot."
+    },
+    {
+      "command": "dev fixture record",
+      "example": "sts2 dev fixture record",
+      "summary": "Record the current screen-entry fixture recipe into ignored local .sts2/fixtures/current-screen storage without claiming exact mid-screen replay."
+    },
+    {
+      "command": "dev fixture resume",
+      "example": "sts2 dev fixture resume",
+      "summary": "Resume the ignored local recorded screen-entry fixture through recipe-backed fixture loading, optionally restarting first."
+    },
+    {
+      "command": "dev fixture resume",
+      "example": "sts2 dev fixture resume --restart",
+      "summary": "Resume the ignored local recorded screen-entry fixture through recipe-backed fixture loading, optionally restarting first."
+    },
+    {
+      "command": "dev fixture status",
+      "example": "sts2 dev fixture status",
+      "summary": "Show whether an ignored local recorded screen fixture exists and what screen it targets."
+    },
+    {
+      "command": "dev fixture clear",
+      "example": "sts2 dev fixture clear",
+      "summary": "Clear the ignored local recorded screen fixture."
+    },
+    {
+      "command": "dev fixture load",
+      "example": "sts2 dev fixture load fixtures/basic-combat.sts2.fixture.yaml",
+      "summary": "Load an authored sparse recipe fixture into the attached live bridge and report recipeReport/bridgeValidation diagnostics."
+    },
+    {
+      "command": "dev fixture load",
+      "example": "sts2 dev fixture load fixtures/basic-shop-inventory.sts2.fixture.yaml",
+      "summary": "Load an authored sparse recipe fixture into the attached live bridge and report recipeReport/bridgeValidation diagnostics."
+    },
+    {
+      "command": "dev fixture load",
+      "example": "sts2 dev fixture load fixtures/basic-load-run-lobby.sts2.fixture.yaml",
+      "summary": "Load an authored sparse recipe fixture into the attached live bridge and report recipeReport/bridgeValidation diagnostics."
+    },
+    {
+      "command": "dev fixture load",
+      "example": "sts2 --json dev fixture load --path fixtures/multiplayer-ownership-local-only-degraded.sts2.fixture.yaml",
+      "summary": "Load an authored sparse recipe fixture into the attached live bridge and report recipeReport/bridgeValidation diagnostics."
+    },
+    {
+      "command": "dev fixture load-latest",
+      "example": "sts2 dev fixture load-latest",
+      "summary": "Reload the fixture last loaded in this worktree (recorded under .sts2/fixtures/last-loaded.json), optionally restarting first; designed for per-worktree foreach replays."
+    },
+    {
+      "command": "dev fixture load-latest",
+      "example": "sts2 dev fixture load-latest --restart",
+      "summary": "Reload the fixture last loaded in this worktree (recorded under .sts2/fixtures/last-loaded.json), optionally restarting first; designed for per-worktree foreach replays."
+    },
+    {
+      "command": "dev scenario export",
+      "example": "sts2 dev scenario export --output ./scenarios/combat.sts2.scenario.yaml",
+      "summary": "Export the attached state as a shareable sparse spirectl.scenario/v0 YAML artifact with field-level restoreSupport and optional exact sidecar metadata."
+    },
+    {
+      "command": "dev scenario export",
+      "example": "sts2 dev scenario export --output ./scenarios/combat.sts2.scenario.yaml --include-exact",
+      "summary": "Export the attached state as a shareable sparse spirectl.scenario/v0 YAML artifact with field-level restoreSupport and optional exact sidecar metadata."
+    },
+    {
+      "command": "dev scenario load",
+      "example": "sts2 dev scenario load ./scenarios/combat.sts2.scenario.yaml",
+      "summary": "Load a shareable spirectl.scenario/v0 YAML artifact through the live bridge, with field-level restore validation and degraded multiplayer reporting."
+    },
+    {
+      "command": "dev scenario load",
+      "example": "sts2 dev scenario load ./scenarios/combat.sts2.scenario.yaml --restart",
+      "summary": "Load a shareable spirectl.scenario/v0 YAML artifact through the live bridge, with field-level restore validation and degraded multiplayer reporting."
+    },
+    {
+      "command": "dev scenario load",
+      "example": "sts2 dev scenario load --path ./scenarios/combat.sts2.scenario.yaml --allow-degraded-local-multiplayer",
+      "summary": "Load a shareable spirectl.scenario/v0 YAML artifact through the live bridge, with field-level restore validation and degraded multiplayer reporting."
+    },
+    {
+      "command": "dev debug status",
+      "example": "sts2 --json dev debug status",
+      "summary": "Inspect explicit dev-only debug status, leased-session ownership, breakpoint registry, and hook support."
+    },
+    {
+      "command": "dev debug status",
+      "example": "sts2 --json dev debug status --session dbg:1",
+      "summary": "Inspect explicit dev-only debug status, leased-session ownership, breakpoint registry, and hook support."
+    },
+    {
+      "command": "dev debug session start",
+      "example": "sts2 --json dev debug session start --name smoke-investigation --pause",
+      "summary": "Start an explicit debugger session as the controller lease owner or as a passive observer."
+    },
+    {
+      "command": "dev debug session start",
+      "example": "sts2 --json dev debug session start --role observer --name transcript-watcher",
+      "summary": "Start an explicit debugger session as the controller lease owner or as a passive observer."
+    },
+    {
+      "command": "dev debug session status",
+      "example": "sts2 --json dev debug session status --id dbg:1",
+      "summary": "Inspect one leased debugger session by stable id."
+    },
+    {
+      "command": "dev debug session end",
+      "example": "sts2 --json dev debug session end --id dbg:1 --resume",
+      "summary": "Release a leased debugger session and optionally resume the runtime."
+    },
+    {
+      "command": "dev debug pause",
+      "example": "sts2 --json dev debug pause --session dbg:1",
+      "summary": "Request a manual pause through the bridge-owned debug control surface."
+    },
+    {
+      "command": "dev debug resume",
+      "example": "sts2 --json dev debug resume --session dbg:1",
+      "summary": "Request a resume through the bridge-owned debug control surface."
+    },
+    {
+      "command": "dev debug step",
+      "example": "sts2 --json dev debug step --session dbg:1 --kind action --count 1",
+      "summary": "Request a bounded frame/action step through the explicit debug surface."
+    },
+    {
+      "command": "dev debug events",
+      "example": "sts2 --json dev debug events --session dbg:1 --from-sequence 42 --limit 50",
+      "summary": "Replay bounded debugger events by sequence cursor, with optional bounded follow polling."
+    },
+    {
+      "command": "dev debug events",
+      "example": "sts2 --json dev debug events --session dbg:observer --follow --timeout-ms 1000",
+      "summary": "Replay bounded debugger events by sequence cursor, with optional bounded follow polling."
+    },
+    {
+      "command": "dev debug wait",
+      "example": "sts2 --json dev debug wait --session dbg:1 --timeout-ms 5000",
+      "summary": "Resume under a leased debugger session until a breakpoint hits or a timeout elapses."
+    },
+    {
+      "command": "dev breakpoint list",
+      "example": "sts2 --json dev breakpoint list --session dbg:1",
+      "summary": "List registered debug breakpoints and the current live debug status."
+    },
+    {
+      "command": "dev breakpoint add",
+      "example": "sts2 --json dev breakpoint add --path screen.id --equals '\"main-menu\"' --name menu-break",
+      "summary": "Register a live debug breakpoint with match/change kinds and the shared predicate grammar."
+    },
+    {
+      "command": "dev breakpoint add",
+      "example": "sts2 --json dev breakpoint add --session dbg:1 --path combat.players[0].energy --kind change --min-hit-count 2 --auto-remove-on-hit",
+      "summary": "Register a live debug breakpoint with match/change kinds and the shared predicate grammar."
+    },
+    {
+      "command": "dev breakpoint remove",
+      "example": "sts2 --json dev breakpoint remove --session dbg:1 --id bp:1",
+      "summary": "Remove a previously registered debug breakpoint by stable id."
+    },
+    {
+      "command": "dev screenshot",
+      "example": "sts2 dev screenshot --output ./.sts2/artifacts/combat.png",
+      "summary": "Capture a bridge-backed PNG screenshot to a file."
+    },
+    {
+      "command": "dev screenshot",
+      "example": "sts2 dev screenshot --width 1280 --height 720 --output ./.sts2/artifacts/combat-720p.png",
+      "summary": "Capture a bridge-backed PNG screenshot to a file."
+    },
+    {
+      "command": "dev screenshot",
+      "example": "sts2 dev screenshot --preset desktop-1080p --rpc-timeout-ms 5000 --output ./.sts2/artifacts/combat-1080p.png",
+      "summary": "Capture a bridge-backed PNG screenshot to a file."
+    },
+    {
+      "command": "dev screenshot-diff",
+      "example": "sts2 --json dev screenshot-diff --baseline ./baselines/main-menu.png",
+      "summary": "Compare a baseline PNG against either a live screenshot or an explicit actual PNG and optionally write a diff bundle."
+    },
+    {
+      "command": "dev screenshot-diff",
+      "example": "sts2 --json dev screenshot-diff --baseline ./baselines/main-menu.png --width 1280 --height 720 --rpc-timeout-ms 5000 --bundle-dir ./.sts2/artifacts/visual/main-menu-720p",
+      "summary": "Compare a baseline PNG against either a live screenshot or an explicit actual PNG and optionally write a diff bundle."
+    },
+    {
+      "command": "dev screenshot-diff",
+      "example": "sts2 --json dev screenshot-diff --baseline ./baselines/main-menu.png --preset desktop-1080p --bundle-dir ./.sts2/artifacts/visual/main-menu",
+      "summary": "Compare a baseline PNG against either a live screenshot or an explicit actual PNG and optionally write a diff bundle."
+    },
+    {
+      "command": "dev screenshot-diff",
+      "example": "sts2 --json dev screenshot-diff --baseline ./baselines/main-menu.png --actual ./captures/current-main-menu.png",
+      "summary": "Compare a baseline PNG against either a live screenshot or an explicit actual PNG and optionally write a diff bundle."
+    },
+    {
+      "command": "dev snapshot export",
+      "example": "sts2 --json dev snapshot export --spec tests/snapshots/main-menu.sts2.snapshot.yaml --output ./.sts2/artifacts/snapshots/main-menu",
+      "summary": "Capture one bounded snapshot-regression baseline bundle from the current runtime."
+    },
+    {
+      "command": "dev snapshot compare",
+      "example": "sts2 --json dev snapshot compare --spec tests/snapshots/main-menu.sts2.snapshot.yaml --baseline tests/snapshots/baselines/main-menu",
+      "summary": "Compare a bounded snapshot spec against an exported baseline bundle and optionally write current evidence."
+    },
+    {
+      "command": "dev snapshot compare",
+      "example": "sts2 --json dev snapshot compare --spec tests/snapshots/main-menu.sts2.snapshot.yaml --baseline tests/snapshots/baselines/main-menu --bundle-dir ./.sts2/artifacts/snapshots/main-menu",
+      "summary": "Compare a bounded snapshot spec against an exported baseline bundle and optionally write current evidence."
+    },
+    {
+      "command": "dev visual-preflight",
+      "example": "sts2 --json dev visual-preflight --encounter kaiser_crab_boss --print-only",
+      "summary": "Run a bounded live visual preflight report with catalog explain, manifest-ready batch extraction, and artifact validation guidance."
+    },
+    {
+      "command": "dev visual-preflight",
+      "example": "sts2 --json dev visual-preflight --encounter ovicopter_normal --print-only",
+      "summary": "Run a bounded live visual preflight report with catalog explain, manifest-ready batch extraction, and artifact validation guidance."
+    },
+    {
+      "command": "dev visual-preflight",
+      "example": "sts2 --json dev visual-preflight --repair-stale-endpoint --attach",
+      "summary": "Run a bounded live visual preflight report with catalog explain, manifest-ready batch extraction, and artifact validation guidance."
+    },
+    {
+      "command": "dev visual-preflight",
+      "example": "sts2 --json dev visual-preflight --launch --timeout-ms 30000 --interval-ms 250",
+      "summary": "Run a bounded live visual preflight report with catalog explain, manifest-ready batch extraction, and artifact validation guidance."
+    },
+    {
+      "command": "dev scene tree",
+      "example": "sts2 dev scene tree",
+      "summary": "Inspect the recursive live Godot runtime scene tree under an optional normalized /root path, with optional layout/render properties for calibration."
+    },
+    {
+      "command": "dev scene tree",
+      "example": "sts2 --json dev scene tree /root/CombatScreen",
+      "summary": "Inspect the recursive live Godot runtime scene tree under an optional normalized /root path, with optional layout/render properties for calibration."
+    },
+    {
+      "command": "dev scene tree",
+      "example": "sts2 --json dev scene tree /root --properties --computed-transform",
+      "summary": "Inspect the recursive live Godot runtime scene tree under an optional normalized /root path, with optional layout/render properties for calibration."
+    },
+    {
+      "command": "dev scene node",
+      "example": "sts2 dev scene node /root",
+      "summary": "Describe one exact live Godot runtime scene node and its direct children by normalized /root path, with opt-in developer properties including text-bearing label diagnostics."
+    },
+    {
+      "command": "dev scene node",
+      "example": "sts2 --json dev scene node /root/CombatScreen/HandPanel",
+      "summary": "Describe one exact live Godot runtime scene node and its direct children by normalized /root path, with opt-in developer properties including text-bearing label diagnostics."
+    },
+    {
+      "command": "dev scene node",
+      "example": "sts2 --json dev scene node /root/CombatScreen/BgContainer --properties --computed-transform",
+      "summary": "Describe one exact live Godot runtime scene node and its direct children by normalized /root path, with opt-in developer properties including text-bearing label diagnostics."
+    },
+    {
+      "command": "dev scene node",
+      "example": "sts2 --json dev scene node /root/EventRoom/MegaRichTextLabel --properties",
+      "summary": "Describe one exact live Godot runtime scene node and its direct children by normalized /root path, with opt-in developer properties including text-bearing label diagnostics."
+    },
+    {
+      "command": "dev scene children",
+      "example": "sts2 dev scene children /root/CombatScreen",
+      "summary": "Inspect the direct children of one exact live Godot runtime scene node by normalized /root path."
+    },
+    {
+      "command": "dev scene children",
+      "example": "sts2 --json dev scene children /root/CombatScreen --properties",
+      "summary": "Inspect the direct children of one exact live Godot runtime scene node by normalized /root path."
+    },
+    {
+      "command": "dev scene hover",
+      "example": "sts2 --json dev scene hover --path /root/CharacterSelect/DEFECT_button --hover-tip",
+      "summary": "Hover one live Godot Control by normalized /root path or current presentation element id and optionally return visible HoverTip text."
+    },
+    {
+      "command": "dev scene hover",
+      "example": "sts2 --json dev scene hover --element-id character:defect:tile --hover-tip --settle-ms 100",
+      "summary": "Hover one live Godot Control by normalized /root path or current presentation element id and optionally return visible HoverTip text."
+    },
+    {
+      "command": "dev scene unhover",
+      "example": "sts2 --json dev scene unhover",
+      "summary": "Revert a prior dev scene hover: move the pointer to a neutral point to clear any active hover/tooltip and, when a target is given, invoke that live Godot Control's unfocus hook. Target is optional (omit for a global clear)."
+    },
+    {
+      "command": "dev scene unhover",
+      "example": "sts2 --json dev scene unhover --path /root/CharacterSelect/DEFECT_button",
+      "summary": "Revert a prior dev scene hover: move the pointer to a neutral point to clear any active hover/tooltip and, when a target is given, invoke that live Godot Control's unfocus hook. Target is optional (omit for a global clear)."
+    },
+    {
+      "command": "dev scene set-visible",
+      "example": "sts2 dev scene set-visible /root/Game/RootSceneContainer/Run/GlobalUi/DebugInfo --hidden",
+      "summary": "Set transient runtime visibility for one live Godot CanvasItem scene node by normalized /root path, with optional post-mutation stability verification."
+    },
+    {
+      "command": "dev scene set-visible",
+      "example": "sts2 --json dev scene set-visible /root/Game/RootSceneContainer/Run/GlobalUi/DebugInfo --visible --verify-after-ms 300",
+      "summary": "Set transient runtime visibility for one live Godot CanvasItem scene node by normalized /root path, with optional post-mutation stability verification."
+    },
+    {
+      "command": "game detect",
+      "example": "sts2 game detect",
+      "summary": "Report configured or detected game path status."
+    },
+    {
+      "command": "game detect",
+      "example": "sts2 --json game detect",
+      "summary": "Report configured or detected game path status."
+    },
+    {
+      "command": "game info",
+      "example": "sts2 game info",
+      "summary": "Describe the configured transport and bridge handshake state."
+    },
+    {
+      "command": "game info",
+      "example": "sts2 --json game info",
+      "summary": "Describe the configured transport and bridge handshake state."
+    },
+    {
+      "command": "game bridge-health",
+      "example": "sts2 game bridge-health",
+      "summary": "Diagnose live bridge readiness without mutating game files or processes."
+    },
+    {
+      "command": "game bridge-health",
+      "example": "sts2 --json game bridge-health --rpc-timeout-ms 1000",
+      "summary": "Diagnose live bridge readiness without mutating game files or processes."
+    },
+    {
+      "command": "game bridge-health",
+      "example": "sts2 --json game bridge-health --verbose",
+      "summary": "Diagnose live bridge readiness without mutating game files or processes."
+    },
+    {
+      "command": "game install-bridge",
+      "example": "sts2 game install-bridge",
+      "summary": "Build and install only the bridge payload into the configured mods directory."
+    },
+    {
+      "command": "game install-bridge",
+      "example": "sts2 --json game install-bridge",
+      "summary": "Build and install only the bridge payload into the configured mods directory."
+    },
+    {
+      "command": "game launch",
+      "example": "sts2 game launch",
+      "summary": "Close any existing configured game process, then launch a fresh one."
+    },
+    {
+      "command": "game launch",
+      "example": "sts2 game launch --timeout-ms 30000 --interval-ms 250",
+      "summary": "Close any existing configured game process, then launch a fresh one."
+    },
+    {
+      "command": "game launch",
+      "example": "sts2 game launch --verify-stable-ms 2000",
+      "summary": "Close any existing configured game process, then launch a fresh one."
+    },
+    {
+      "command": "game launch",
+      "example": "sts2 game launch --no-detach-session",
+      "summary": "Close any existing configured game process, then launch a fresh one."
+    },
+    {
+      "command": "game launch",
+      "example": "sts2 game launch -- --headless -fastmp host_standard",
+      "summary": "Close any existing configured game process, then launch a fresh one."
+    },
+    {
+      "command": "game mods settings",
+      "example": "sts2 --json game mods settings",
+      "summary": "Read enabled and disabled mod ids from the saved STS2 mod settings file."
+    },
+    {
+      "command": "game mods settings",
+      "example": "sts2 --json game mods settings --settings-file ~/.local/share/SlayTheSpire2/steam/76561198072573591/settings.save",
+      "summary": "Read enabled and disabled mod ids from the saved STS2 mod settings file."
+    },
+    {
+      "command": "game mods active",
+      "example": "sts2 --json game mods active",
+      "summary": "List mods reported by the live game through the bridge."
+    },
+    {
+      "command": "game mods active",
+      "example": "sts2 game mods active",
+      "summary": "List mods reported by the live game through the bridge."
+    },
+    {
+      "command": "game instances",
+      "example": "sts2 game instances",
+      "summary": "List or prune named game instances (per-instance bridge socket + Godot user-dir; active instance may come from --instance, SPIRECTL_INSTANCE, or instances.default)."
+    },
+    {
+      "command": "game instances",
+      "example": "sts2 --json game instances list",
+      "summary": "List or prune named game instances (per-instance bridge socket + Godot user-dir; active instance may come from --instance, SPIRECTL_INSTANCE, or instances.default)."
+    },
+    {
+      "command": "game instances",
+      "example": "sts2 game instances prune",
+      "summary": "List or prune named game instances (per-instance bridge socket + Godot user-dir; active instance may come from --instance, SPIRECTL_INSTANCE, or instances.default)."
+    },
+    {
+      "command": "game instances",
+      "example": "sts2 --instance alpha game launch",
+      "summary": "List or prune named game instances (per-instance bridge socket + Godot user-dir; active instance may come from --instance, SPIRECTL_INSTANCE, or instances.default)."
+    },
+    {
+      "command": "game instances",
+      "example": "sts2 --instance alpha game state",
+      "summary": "List or prune named game instances (per-instance bridge socket + Godot user-dir; active instance may come from --instance, SPIRECTL_INSTANCE, or instances.default)."
+    },
+    {
+      "command": "game instances",
+      "example": "sts2 --instance dev --isolated-build game launch",
+      "summary": "List or prune named game instances (per-instance bridge socket + Godot user-dir; active instance may come from --instance, SPIRECTL_INSTANCE, or instances.default)."
+    },
+    {
+      "command": "game instances",
+      "example": "sts2 game launch",
+      "summary": "List or prune named game instances (per-instance bridge socket + Godot user-dir; active instance may come from --instance, SPIRECTL_INSTANCE, or instances.default)."
+    },
+    {
+      "command": "game attach",
+      "example": "sts2 game attach",
+      "summary": "Poll the configured Unix-socket bridge until live IPC attachment succeeds."
+    },
+    {
+      "command": "game attach",
+      "example": "sts2 game attach --timeout-ms 30000 --interval-ms 250",
+      "summary": "Poll the configured Unix-socket bridge until live IPC attachment succeeds."
+    },
+    {
+      "command": "game close",
+      "example": "sts2 game close",
+      "summary": "Gracefully stop the local game process through bridge, configured stop command, or exact platform process matching."
+    },
+    {
+      "command": "game close",
+      "example": "sts2 game close --timeout-ms 30000 --interval-ms 250",
+      "summary": "Gracefully stop the local game process through bridge, configured stop command, or exact platform process matching."
+    },
+    {
+      "command": "game close",
+      "example": "sts2 --json game close",
+      "summary": "Gracefully stop the local game process through bridge, configured stop command, or exact platform process matching."
+    },
+    {
+      "command": "game kill",
+      "example": "sts2 game kill",
+      "summary": "Force terminate exact local game process matches."
+    },
+    {
+      "command": "game kill",
+      "example": "sts2 --json game kill",
+      "summary": "Force terminate exact local game process matches."
+    },
+    {
+      "command": "game deploy",
+      "example": "sts2 game deploy ./mods/MyMod --build --restart --verify",
+      "summary": "Deploy the bridge plus a mod project, with optional build, restart, and verify."
+    },
+    {
+      "command": "game deploy",
+      "example": "sts2 game deploy ./mods/MyMod --build --timeout-ms 30000 --interval-ms 250",
+      "summary": "Deploy the bridge plus a mod project, with optional build, restart, and verify."
+    },
+    {
+      "command": "game deploy",
+      "example": "sts2 game deploy ./mods/MyMod --restart --verify --verify-stable-ms 2000",
+      "summary": "Deploy the bridge plus a mod project, with optional build, restart, and verify."
+    },
+    {
+      "command": "service serve",
+      "example": "sts2 --json service serve",
+      "summary": "Run the CLI-owned HTTP/JSON automation service for remote metadata and bounded automation access."
+    },
+    {
+      "command": "service serve",
+      "example": "sts2 --json service serve --listen 127.0.0.1:4317 --auth-token local-dev-token",
+      "summary": "Run the CLI-owned HTTP/JSON automation service for remote metadata and bounded automation access."
+    },
+    {
+      "command": "service serve",
+      "example": "sts2 --json service serve --mcp-mode network --mcp-listen 127.0.0.1:4318 --mcp-auth-token local-mcp-token",
+      "summary": "Run the CLI-owned HTTP/JSON automation service for remote metadata and bounded automation access."
+    },
+    {
+      "command": "service serve",
+      "example": "sts2 --json service serve --job-store durable",
+      "summary": "Run the CLI-owned HTTP/JSON automation service for remote metadata and bounded automation access."
+    },
+    {
+      "command": "service serve",
+      "example": "sts2 --json service serve --job-store durable --job-store-dir remote-jobs",
+      "summary": "Run the CLI-owned HTTP/JSON automation service for remote metadata and bounded automation access."
+    },
+    {
+      "command": "config resolve",
+      "example": "sts2 --json config resolve",
+      "summary": "Resolve config into absolute install paths (gamePath, assembliesDir, resourcesDir, modsDir, instancesDir, artifactsDir) with the source of each value, so scripts never re-parse sts2.local.yaml."
+    },
+    {
+      "command": "config resolve",
+      "example": "sts2 --json config resolve modsDir",
+      "summary": "Resolve config into absolute install paths (gamePath, assembliesDir, resourcesDir, modsDir, instancesDir, artifactsDir) with the source of each value, so scripts never re-parse sts2.local.yaml."
+    },
+    {
+      "command": "config resolve",
+      "example": "sts2 --json config resolve gamePath assembliesDir",
+      "summary": "Resolve config into absolute install paths (gamePath, assembliesDir, resourcesDir, modsDir, instancesDir, artifactsDir) with the source of each value, so scripts never re-parse sts2.local.yaml."
+    },
+    {
+      "command": "toolchain info",
+      "example": "sts2 toolchain info",
+      "summary": "Report managed toolchain roots, config provenance, and offline helper availability."
+    },
+    {
+      "command": "toolchain info",
+      "example": "sts2 --json toolchain info",
+      "summary": "Report managed toolchain roots, config provenance, and offline helper availability."
+    },
+    {
+      "command": "project recover",
+      "example": "sts2 project recover --kind decompile",
+      "summary": "Own stable repo-local offline recovery outputs and manifests under the managed toolchain root."
+    },
+    {
+      "command": "project recover",
+      "example": "sts2 --json project recover --kind all",
+      "summary": "Own stable repo-local offline recovery outputs and manifests under the managed toolchain root."
+    },
+    {
+      "command": "project scaffold stable-harmony-trampoline",
+      "example": "sts2 project scaffold stable-harmony-trampoline --output ./mods/MyHotMod --mod-id my-hot-mod --name \"My Hot Mod\" --namespace MyHotMod",
+      "summary": "Create a downstream stable Harmony trampoline hot-reload project with generated local profiles."
+    },
+    {
+      "command": "project scaffold stable-harmony-trampoline",
+      "example": "sts2 project scaffold stable-harmony-trampoline --output ./mods/MyHotMod --mod-id my-hot-mod --name \"My Hot Mod\" --namespace MyHotMod --enable-guardrails",
+      "summary": "Create a downstream stable Harmony trampoline hot-reload project with generated local profiles."
+    },
+    {
+      "command": "project scaffold stable-harmony-trampoline",
+      "example": "sts2 --json project scaffold stable-harmony-trampoline --output ./mods/MyHotMod --mod-id my-hot-mod --name \"My Hot Mod\" --namespace MyHotMod --force-empty",
+      "summary": "Create a downstream stable Harmony trampoline hot-reload project with generated local profiles."
+    },
+    {
+      "command": "project scaffold stable-harmony-trampoline",
+      "example": "sts2 project profile run my-hot-mod-shell-deploy-restart",
+      "summary": "Create a downstream stable Harmony trampoline hot-reload project with generated local profiles."
+    },
+    {
+      "command": "project scaffold stable-harmony-trampoline",
+      "example": "sts2 project profile run my-hot-mod-logic-build",
+      "summary": "Create a downstream stable Harmony trampoline hot-reload project with generated local profiles."
+    },
+    {
+      "command": "project profile list",
+      "example": "sts2 project profile list",
+      "summary": "List checked-in profiles that may compose lifecycle and repo-local command steps."
+    },
+    {
+      "command": "project profile list",
+      "example": "sts2 --json project profile list",
+      "summary": "List checked-in profiles that may compose lifecycle and repo-local command steps."
+    },
+    {
+      "command": "project profile show",
+      "example": "sts2 project profile show install-launch-and-attach",
+      "summary": "Show one resolved checked-in profile with lifecycle and repo-local command steps."
+    },
+    {
+      "command": "project profile show",
+      "example": "sts2 --json project profile show install-launch-and-attach",
+      "summary": "Show one resolved checked-in profile with lifecycle and repo-local command steps."
+    },
+    {
+      "command": "project profile run",
+      "example": "sts2 project profile run install-bridge",
+      "summary": "Run one checked-in profile by composing lifecycle commands and repo-local command steps."
+    },
+    {
+      "command": "project profile run",
+      "example": "sts2 --json project profile run install-launch-and-attach",
+      "summary": "Run one checked-in profile by composing lifecycle commands and repo-local command steps."
+    },
+    {
+      "command": "project hook list",
+      "example": "sts2 project hook list",
+      "summary": "List registered repo-local validation hooks from the checked-in hooks file."
+    },
+    {
+      "command": "project hook list",
+      "example": "sts2 --json project hook list",
+      "summary": "List registered repo-local validation hooks from the checked-in hooks file."
+    },
+    {
+      "command": "project hook show",
+      "example": "sts2 project hook show repo-check",
+      "summary": "Show one registered repo-local validation hook with resolved command and cwd paths."
+    },
+    {
+      "command": "project hook show",
+      "example": "sts2 --json project hook show repo-check",
+      "summary": "Show one registered repo-local validation hook with resolved command and cwd paths."
+    },
+    {
+      "command": "project hook run",
+      "example": "sts2 project hook run repo-check",
+      "summary": "Run one registered repo-local validation hook through the JSON stdin/stdout contract."
+    },
+    {
+      "command": "project hook run",
+      "example": "sts2 --json project hook run repo-check --input '{\"kind\":\"smoke\"}'",
+      "summary": "Run one registered repo-local validation hook through the JSON stdin/stdout contract."
+    },
+    {
+      "command": "code locate",
+      "example": "sts2 code locate type CombatScreen",
+      "summary": "Locate types and methods in installed game or mod assemblies."
+    },
+    {
+      "command": "code locate",
+      "example": "sts2 --json code locate method DrawCard --include-mods --include-dependencies",
+      "summary": "Locate types and methods in installed game or mod assemblies."
+    },
+    {
+      "command": "code describe",
+      "example": "sts2 code describe type MegaCrit.Sts2.CardState",
+      "summary": "Describe an exact type or method with structured metadata."
+    },
+    {
+      "command": "code describe",
+      "example": "sts2 --json code describe method \"MegaCrit.Sts2.CardState::CanPlay()\"",
+      "summary": "Describe an exact type or method with structured metadata."
+    },
+    {
+      "command": "code decompile",
+      "example": "sts2 code decompile type MegaCrit.Sts2.CardState",
+      "summary": "Show metadata-derived text by default, or ILSpy-backed output with --full."
+    },
+    {
+      "command": "code decompile",
+      "example": "sts2 --json code decompile method \"MegaCrit.Sts2.CardState::CanPlay()\" --full",
+      "summary": "Show metadata-derived text by default, or ILSpy-backed output with --full."
+    },
+    {
+      "command": "code refs",
+      "example": "sts2 code refs type MegaCrit.Sts2.CardState",
+      "summary": "Find static references to an exact type or method, or do name-based fallback reference search."
+    },
+    {
+      "command": "code refs",
+      "example": "sts2 --json code refs symbol CanPlay --include-mods --include-dependencies",
+      "summary": "Find static references to an exact type or method, or do name-based fallback reference search."
+    },
+    {
+      "command": "code derived",
+      "example": "sts2 code derived type MegaCrit.Sts2.CardState",
+      "summary": "Find direct derived classes, implementers, and interface inheritance relationships for a type."
+    },
+    {
+      "command": "code derived",
+      "example": "sts2 --json code derived type MegaCrit.Sts2.BaseCard",
+      "summary": "Find direct derived classes, implementers, and interface inheritance relationships for a type."
+    },
+    {
+      "command": "code hooks",
+      "example": "sts2 code hooks --assemblies-dir ./assemblies",
+      "summary": "List static managed hook candidates with pagination, filters, script hints, and staged follow-up ids."
+    },
+    {
+      "command": "code hooks",
+      "example": "sts2 --json code hooks _Ready --assemblies-dir ./assemblies --resources-dir ./game-project --limit 50 --has-script",
+      "summary": "List static managed hook candidates with pagination, filters, script hints, and staged follow-up ids."
+    },
+    {
+      "command": "code hook-info",
+      "example": "sts2 code hook-info method:Game:Namespace.Type::Method(System.String) --assemblies-dir ./assemblies",
+      "summary": "Resolve one exact managed hook candidate into a hook-ready method signature projection."
+    },
+    {
+      "command": "code hook-info",
+      "example": "sts2 --json code hook-info \"Namespace.Type::Method(System.String)\" --assemblies-dir ./assemblies",
+      "summary": "Resolve one exact managed hook candidate into a hook-ready method signature projection."
+    },
+    {
+      "command": "code scene-search",
+      "example": "sts2 code scene-search HandPanel --resources-dir ./game-project",
+      "summary": "Search static Godot text, binary, and packed scenes, nodes, and resources without using the runtime bridge."
+    },
+    {
+      "command": "code scene-search",
+      "example": "sts2 --json code scene-search StatusConfig --resources-dir ./game-project --assemblies-dir ./assemblies",
+      "summary": "Search static Godot text, binary, and packed scenes, nodes, and resources without using the runtime bridge."
+    },
+    {
+      "command": "code scene-tree",
+      "example": "sts2 code scene-tree res://ui/CombatScreen.tscn --resources-dir ./game-project",
+      "summary": "Show one exact static Godot scene tree from supported text, binary, or packed scene assets."
+    },
+    {
+      "command": "code scene-tree",
+      "example": "sts2 --json code scene-tree scene:game:res://ui/CombatScreen.tscn --resources-dir ./game-project",
+      "summary": "Show one exact static Godot scene tree from supported text, binary, or packed scene assets."
+    },
+    {
+      "command": "code scene-node",
+      "example": "sts2 code scene-node res://ui/shared/HandPanel.tscn /HandPanel/ConfirmButton --resources-dir ./game-project",
+      "summary": "Describe one exact static Godot scene node from supported text, binary, or packed scene assets, including NodePath and resource references."
+    },
+    {
+      "command": "code scene-node",
+      "example": "sts2 --json code scene-node res://ui/shared/HandPanel.tscn /HandPanel --resources-dir ./game-project --assemblies-dir ./assemblies",
+      "summary": "Describe one exact static Godot scene node from supported text, binary, or packed scene assets, including NodePath and resource references."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 assets extract hand --resources-dir ./game-project",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract title_font --execution offline --resources-dir ./game-project",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract packed_icon --execution offline --resources-dir ./game-project",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract anim --execution live --format png --resources-dir ./game-project --game-path ~/games/sts2",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract model://characters/ironclad/visuals --execution live",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract model://characters/ironclad/iconOutline --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract model://characters/ironclad/characterSelectIcon --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract model://relics/burning-blood/bigIcon --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract res://scenes/vfx/block_spark_vfx.tscn --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract composed://combat-background/hive/image --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract composed://encounters/kaiser_crab_boss/background/image --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract composed://encounters/kaiser_crab_boss/visual-state/rocket-charge-up/overlay/image --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract composed://encounters/kaiser_crab_boss/visual-part/rocket/state/rocket-charge-up/image --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets extract",
+      "example": "sts2 --json assets extract composed://encounters/knowledge_demon_boss/visual-part/burn-fire/state/heavy-attack-burnt/image --execution live --format png",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "command": "assets catalog",
+      "example": "sts2 --json assets catalog --execution live",
+      "summary": "List supported typed semantic asset key families and their model/composed provenance."
+    },
+    {
+      "command": "assets catalog",
+      "example": "sts2 --json assets catalog --family model",
+      "summary": "List supported typed semantic asset key families and their model/composed provenance."
+    },
+    {
+      "command": "assets catalog",
+      "example": "sts2 --json assets catalog --family model:characters",
+      "summary": "List supported typed semantic asset key families and their model/composed provenance."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models characters",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models --language esp characters",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models --language auto characters",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models cards strike-ironclad",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models characters ironclad silent",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models relics burning-blood",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models events room-full-of-cheese",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models ancients neow",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models acts overgrowth",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models monsters jaw-worm",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models encounters jaw-worm-weak",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models powers strength",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "models",
+      "example": "sts2 --json models enchantments innate",
+      "summary": "Export immutable live game model metadata for a model family; localized text is returned as loc refs by default, or resolved with --language <code|auto>."
+    },
+    {
+      "command": "reference",
+      "example": "sts2 --json reference colors",
+      "summary": "Export live game reference data that is constant at runtime but is not a game model. Built-in topics: colors (the StsColors palette) and version (game version, date, and modding summary). Topics are server-defined and extensible."
+    },
+    {
+      "command": "reference",
+      "example": "sts2 --json reference colors aqua gold screenBackdrop",
+      "summary": "Export live game reference data that is constant at runtime but is not a game model. Built-in topics: colors (the StsColors palette) and version (game version, date, and modding summary). Topics are server-defined and extensible."
+    },
+    {
+      "command": "reference",
+      "example": "sts2 --json reference version",
+      "summary": "Export live game reference data that is constant at runtime but is not a game model. Built-in topics: colors (the StsColors palette) and version (game version, date, and modding summary). Topics are server-defined and extensible."
+    },
+    {
+      "command": "assets resolve",
+      "example": "sts2 --json assets resolve model://characters/defect/characterSelectIcon --execution live",
+      "summary": "Resolve one typed semantic asset key to its model/composed provider provenance."
+    },
+    {
+      "command": "assets resolve",
+      "example": "sts2 --json assets resolve composed://combat-background/hive/image --execution live",
+      "summary": "Resolve one typed semantic asset key to its model/composed provider provenance."
+    },
+    {
+      "command": "assets explain",
+      "example": "sts2 --json assets explain composed://combat-background/overgrowth/image --execution live",
+      "summary": "Explain composed live asset decisions, expanded encounter package metadata, selector diagnostics, render diagnostics, isolation evidence, bounds, notices, and warnings without writing artifacts."
+    },
+    {
+      "command": "assets explain",
+      "example": "sts2 --json assets explain composed://encounters/kaiser_crab_boss/scene-package --execution live",
+      "summary": "Explain composed live asset decisions, expanded encounter package metadata, selector diagnostics, render diagnostics, isolation evidence, bounds, notices, and warnings without writing artifacts."
+    },
+    {
+      "command": "assets explain",
+      "example": "sts2 --json assets explain composed://encounters/knowledge_demon_boss/scene-package --execution live",
+      "summary": "Explain composed live asset decisions, expanded encounter package metadata, selector diagnostics, render diagnostics, isolation evidence, bounds, notices, and warnings without writing artifacts."
+    },
+    {
+      "command": "assets extract-batch",
+      "example": "sts2 --json assets extract-batch --manifest ./asset-manifest.json --output ./.sts2/artifacts/mock-assets --format png",
+      "summary": "Extract many filesystem, packed, or virtual model-backed assets from a generic JSON manifest while preserving per-request combat catalog notes, notices, provenance, failures, render diagnostics, and artifact-check diagnostics."
+    },
+    {
+      "command": "assets extract-batch",
+      "example": "sts2 --json assets extract-batch --manifest ./asset-manifest.json --execution offline --resources-dir ./game-project",
+      "summary": "Extract many filesystem, packed, or virtual model-backed assets from a generic JSON manifest while preserving per-request combat catalog notes, notices, provenance, failures, render diagnostics, and artifact-check diagnostics."
+    },
+    {
+      "command": "assets extract-batch",
+      "example": "sts2 --json assets extract-batch --manifest ./encounter-asset-manifest.json --output ./.sts2/artifacts/encounters --execution live --format png",
+      "summary": "Extract many filesystem, packed, or virtual model-backed assets from a generic JSON manifest while preserving per-request combat catalog notes, notices, provenance, failures, render diagnostics, and artifact-check diagnostics."
+    },
+    {
+      "command": "assets extract-batch",
+      "example": "scripts/validate.sh m78-live-encounter-artifacts --encounter kaiser_crab_boss --json",
+      "summary": "Extract many filesystem, packed, or virtual model-backed assets from a generic JSON manifest while preserving per-request combat catalog notes, notices, provenance, failures, render diagnostics, and artifact-check diagnostics."
+    },
+    {
+      "command": "skill install",
+      "example": "sts2 skill install",
+      "summary": "Install the checked-in spirectl skill pack into a project-local .agents/skills directory or an explicit root path."
+    },
+    {
+      "command": "skill install",
+      "example": "sts2 skill install ./vendor/skills",
+      "summary": "Install the checked-in spirectl skill pack into a project-local .agents/skills directory or an explicit root path."
+    },
+    {
+      "command": "skill install",
+      "example": "sts2 --json skill install",
+      "summary": "Install the checked-in spirectl skill pack into a project-local .agents/skills directory or an explicit root path."
+    },
+    {
+      "command": "skill install",
+      "example": "sts2 --json skill install --path ./vendor/skills",
+      "summary": "Install the checked-in spirectl skill pack into a project-local .agents/skills directory or an explicit root path."
+    },
+    {
+      "command": "completion",
+      "example": "sts2 completion",
+      "summary": "Generate shell completion text from the authoritative clap command tree."
+    },
+    {
+      "command": "completion",
+      "example": "sts2 completion bash",
+      "summary": "Generate shell completion text from the authoritative clap command tree."
+    },
+    {
+      "command": "completion",
+      "example": "sts2 --json completion fish",
+      "summary": "Generate shell completion text from the authoritative clap command tree."
+    },
+    {
+      "command": "completion install",
+      "example": "sts2 completion install",
+      "summary": "Install shell completion text into a spirectl-managed per-user path or an explicit file path and print activation metadata."
+    },
+    {
+      "command": "completion install",
+      "example": "sts2 completion install zsh",
+      "summary": "Install shell completion text into a spirectl-managed per-user path or an explicit file path and print activation metadata."
+    },
+    {
+      "command": "completion install",
+      "example": "sts2 --json completion install --path ~/.config/spirectl/completions/sts2.bash",
+      "summary": "Install shell completion text into a spirectl-managed per-user path or an explicit file path and print activation metadata."
+    },
+    {
+      "command": "inspect commands",
+      "example": "sts2 inspect commands",
+      "summary": "List self-describing command metadata."
+    },
+    {
+      "command": "inspect commands",
+      "example": "sts2 --json inspect commands",
+      "summary": "List self-describing command metadata."
+    },
+    {
+      "command": "inspect examples",
+      "example": "sts2 inspect examples",
+      "summary": "List example invocations from the command catalog."
+    },
+    {
+      "command": "inspect examples",
+      "example": "sts2 inspect examples --command \"code locate\"",
+      "summary": "List example invocations from the command catalog."
+    },
+    {
+      "command": "inspect actions",
+      "example": "sts2 inspect actions",
+      "summary": "Describe bridge-supported actions and current availability, with explicit --offline/mock paths for static metadata rendering without a live host."
+    },
+    {
+      "command": "inspect actions",
+      "example": "sts2 --json inspect actions",
+      "summary": "Describe bridge-supported actions and current availability, with explicit --offline/mock paths for static metadata rendering without a live host."
+    },
+    {
+      "command": "inspect actions",
+      "example": "sts2 --json inspect actions --offline",
+      "summary": "Describe bridge-supported actions and current availability, with explicit --offline/mock paths for static metadata rendering without a live host."
+    },
+    {
+      "command": "inspect actions",
+      "example": "sts2 --config tests/sts2.mock.yaml --json inspect actions",
+      "summary": "Describe bridge-supported actions and current availability, with explicit --offline/mock paths for static metadata rendering without a live host."
+    },
+    {
+      "command": "inspect state-schema",
+      "example": "sts2 inspect state-schema",
+      "summary": "Describe the compact agent-first state schema, legacy migration path, and stable join rules."
+    },
+    {
+      "command": "inspect state-schema",
+      "example": "sts2 --json inspect state-schema",
+      "summary": "Describe the compact agent-first state schema, legacy migration path, and stable join rules."
+    },
+    {
+      "command": "inspect reference-topics",
+      "example": "sts2 inspect reference-topics",
+      "summary": "List checked-in modding discovery and hot-reload workflow references, limits, and staged command sequences."
+    },
+    {
+      "command": "inspect reference-topics",
+      "example": "sts2 --json inspect reference-topics",
+      "summary": "List checked-in modding discovery and hot-reload workflow references, limits, and staged command sequences."
+    },
+    {
+      "command": "inspect viewport-presets",
+      "example": "sts2 inspect viewport-presets",
+      "summary": "List the effective viewport preset catalog available to visual capture commands."
+    },
+    {
+      "command": "inspect viewport-presets",
+      "example": "sts2 --json inspect viewport-presets",
+      "summary": "List the effective viewport preset catalog available to visual capture commands."
+    },
+    {
+      "command": "inspect viewport-presets",
+      "example": "sts2 --json inspect viewport-presets --preset-catalog ./tests/visual/sample-catalog.sts2.viewport-presets.yaml",
+      "summary": "List the effective viewport preset catalog available to visual capture commands."
+    },
+    {
+      "command": "inspect ai-tools",
+      "example": "sts2 inspect ai-tools",
+      "summary": "Describe the thin AI adapter tool catalog mapped onto the CLI surface."
+    },
+    {
+      "command": "inspect ai-tools",
+      "example": "sts2 --json inspect ai-tools",
+      "summary": "Describe the thin AI adapter tool catalog mapped onto the CLI surface."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --json test run --profile mock",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --json test run --profile live --tag spec:S74",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --config tests/sts2.mock.yaml test run tests/scenarios/smoke-main-menu.sts2.yaml",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --config tests/sts2.mock.yaml --json test run tests/scenarios/smoke-main-menu.sts2.yaml",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --json test run tests/scenarios/smoke-main-menu-live.sts2.yaml",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --json test run ./tmp/smoke-main-menu.sts2.json",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --json test run --inline '{name: smoke-inline, steps: [game.info]}'",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --config tests/sts2.mock.yaml --json test run --artifacts-dir ./tmp/sts2-artifacts tests/scenarios/smoke-main-menu.sts2.yaml",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test run",
+      "example": "sts2 --config tests/sts2.mock.yaml --json test run --failure-artifacts never tests/scenarios/smoke-main-menu.sts2.yaml",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "command": "test stress",
+      "example": "sts2 --config tests/sts2.mock.yaml --json test stress --iterations 10 tests/scenarios/regression-main-menu.sts2.yaml",
+      "summary": "Repeat an existing scenario path under bounded iteration or duration controls and persist aggregate summaries."
+    },
+    {
+      "command": "test stress",
+      "example": "sts2 --config tests/sts2.mock.yaml --json test stress --duration-ms 60000 --max-failures 2 --cooldown-ms 500 tests/scenarios/regression-main-menu.sts2.yaml",
+      "summary": "Repeat an existing scenario path under bounded iteration or duration controls and persist aggregate summaries."
+    }
+  ],
+  "source": "command-catalog"
+}

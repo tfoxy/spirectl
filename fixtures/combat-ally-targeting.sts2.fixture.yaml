@@ -1,0 +1,22 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-ally-targeting
+description: Two-player Ironclad combat with p:1's Believe in You (AnyAlly card) pre-selected and an Energy Potion (AnyPlayer) in the belt, to exercise ally / player-container targeting onto the co-op roster (MultiplayerPlayerContainer).
+run:
+  seed: fixture-combat-ally-targeting
+  view:
+    selectedCard:
+      cardModelId: BELIEVE_IN_YOU
+  players:
+    - id: "p:1"
+      potions:
+        - modelId: ENERGY_POTION
+      combat:
+        hand:
+          cards:
+            - { modelId: BELIEVE_IN_YOU }
+            - { modelId: STRIKE_IRONCLAD }
+            - { modelId: DEFEND_IRONCLAD }
+    - id: "p:2"
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

@@ -1,0 +1,101 @@
+{
+  "actions": [
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-map",
+      "kind": "toggle-map",
+      "label": "Map",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-deck",
+      "kind": "toggle-deck",
+      "label": "Deck",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-settings",
+      "kind": "toggle-settings",
+      "label": "Settings",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:rest-site:rest:HEAL",
+      "kind": "rest",
+      "label": "rest",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.restSite.playerStates[0].options[0]"
+    },
+    {
+      "args": {
+        "playerId": "p1",
+        "restOptionId": "LIFT"
+      },
+      "enabled": true,
+      "id": "action:rest-site:use-rest-site-option:LIFT",
+      "kind": "use-rest-site-option",
+      "label": "use-rest-site-option",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.restSite.playerStates[0].options[2]"
+    },
+    {
+      "args": {
+        "playerId": "p1",
+        "restOptionId": "DIG"
+      },
+      "enabled": true,
+      "id": "action:rest-site:use-rest-site-option:DIG",
+      "kind": "use-rest-site-option",
+      "label": "use-rest-site-option",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.restSite.playerStates[0].options[3]"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:rest-site:proceed-rest-site",
+      "kind": "proceed-rest-site",
+      "label": "Proceed",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.restSite.view"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "run",
+    "scene": "rooms/rest_site_room"
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

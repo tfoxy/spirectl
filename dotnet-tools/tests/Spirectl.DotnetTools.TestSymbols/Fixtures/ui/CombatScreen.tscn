@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://combatscreenfixture"]
+
+[ext_resource type="Script" path="res://scripts/CombatScreen.cs" id="1_screen_script"]
+[ext_resource type="PackedScene" path="res://ui/shared/HandPanel.tscn" id="2_hand_panel_scene"]
+[ext_resource type="StatusConfig" path="res://resources/StatusConfig.tres" id="3_status_config"]
+
+[node name="CombatScreen" type="Control" unique_id=1001]
+script = ExtResource("1_screen_script")
+status_config = ExtResource("3_status_config")
+
+[node name="HandPanel" parent="." instance=ExtResource("2_hand_panel_scene") unique_id=1002]
+
+[node name="StatusBadge" type="StatusBadge" parent="." unique_id=1003]
+status_target = NodePath("../HandPanel")

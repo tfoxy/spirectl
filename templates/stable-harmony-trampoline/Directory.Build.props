@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <HotModTemplateRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</HotModTemplateRoot>
+    <HarmonyLibVersion>2.4.2</HarmonyLibVersion>
+    <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == ''">$(STS2_ASSEMBLIES_DIR)</Sts2AssembliesDir>
+    <EnableHotModSts2References Condition="'$(EnableHotModSts2References)' == '' and Exists('$(Sts2AssembliesDir)/sts2.dll') and Exists('$(Sts2AssembliesDir)/GodotSharp.dll')">true</EnableHotModSts2References>
+    <EnableHotModSts2References Condition="'$(EnableHotModSts2References)' == ''">false</EnableHotModSts2References>
+    <EnableHotReloadGuardrails Condition="'$(EnableHotReloadGuardrails)' == ''">false</EnableHotReloadGuardrails>
+  </PropertyGroup>
+</Project>

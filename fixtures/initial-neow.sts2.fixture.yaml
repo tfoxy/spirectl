@@ -1,0 +1,16 @@
+schemaVersion: spirectl.fixture/v0
+name: initial-neow
+description: Deterministic authored event-room fixture for the initial Neow ancient event.
+run:
+  seed: fixture-initial-neow
+  players:
+    - id: p1
+      creature: { currentHp: 80, maxHp: 80 }
+  currentRoom:
+    event:
+      canonicalEventModelId: NEOW
+      playerStates:
+        - ancient:
+            view:
+              visibleDialogue:
+                dialogueId: NEOW.talk.ANY.4

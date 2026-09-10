@@ -1,0 +1,10 @@
+schemaVersion: spirectl.fixture/v0
+name: treasure-opened
+description: Deterministic authored opened treasure-room fixture with typed proceed control.
+run:
+  seed: fixture-basic-treasure-room-opened
+  actFloor: 9
+  currentRoom:
+    treasure:
+      currentRelicsActive: true
+      canProceed: true

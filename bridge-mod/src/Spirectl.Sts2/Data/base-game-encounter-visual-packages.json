@@ -1,0 +1,566 @@
+{
+  "schemaVersion": "0",
+  "packages": [
+    {
+      "encounterId": "kaiser_crab_boss",
+      "packageId": "composed://encounters/kaiser_crab_boss/scene-package",
+      "background": {
+        "sourceScene": "res://scenes/backgrounds/kaiser_crab_boss/kaiser_crab_boss_background.tscn",
+        "sourceQuery": "composed://combat-background/kaiser_crab_boss/image",
+        "renderQuery": "composed://encounters/kaiser_crab_boss/background/image"
+      },
+      "specialVisual": {
+        "sourceScene": "res://scenes/creature_visuals/kaiser_crab_boss_setup.tscn",
+        "rootType": "NKaiserCrabBossBackground"
+      },
+      "logicalActors": [
+        {
+          "actorId": "crusher",
+          "slotId": "crusher",
+          "statePartIds": [
+            "crusher"
+          ],
+          "targetRect": {
+            "x": 316,
+            "y": 336,
+            "width": 360,
+            "height": 440
+          }
+        },
+        {
+          "actorId": "rocket",
+          "slotId": "rocket",
+          "statePartIds": [
+            "rocket"
+          ],
+          "targetRect": {
+            "x": 1236,
+            "y": 336,
+            "width": 360,
+            "height": 440
+          }
+        }
+      ],
+      "visualParts": [
+        {
+          "partId": "crusher",
+          "actorId": "crusher",
+          "screenSide": "left",
+          "anatomicalSide": "left",
+          "layer": 10,
+          "selector": "%ArmBoneL",
+          "viewportRect": {
+            "x": 250,
+            "y": 150,
+            "width": 520,
+            "height": 690
+          }
+        },
+        {
+          "partId": "rocket",
+          "actorId": "rocket",
+          "screenSide": "right",
+          "anatomicalSide": "right",
+          "layer": 20,
+          "selector": "%ArmBoneR",
+          "viewportRect": {
+            "x": 1135,
+            "y": 150,
+            "width": 535,
+            "height": 690
+          }
+        },
+        {
+          "partId": "body",
+          "actorId": "",
+          "screenSide": "center",
+          "anatomicalSide": "body",
+          "layer": 30,
+          "selector": "%Visuals",
+          "viewportRect": {
+            "x": 680,
+            "y": 90,
+            "width": 560,
+            "height": 760
+          }
+        }
+      ],
+      "states": [
+        {
+          "stateId": "default",
+          "affectedPartIds": [
+            "crusher",
+            "rocket",
+            "body"
+          ],
+          "hook": ""
+        },
+        {
+          "stateId": "hurt-left",
+          "affectedPartIds": [
+            "crusher"
+          ],
+          "hook": "PlayHurtAnim(left)"
+        },
+        {
+          "stateId": "hurt-right",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "hook": "PlayHurtAnim(right)"
+        },
+        {
+          "stateId": "arm-death-left",
+          "affectedPartIds": [
+            "crusher"
+          ],
+          "hook": "PlayArmDeathAnim(left)"
+        },
+        {
+          "stateId": "arm-death-right",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "hook": "PlayArmDeathAnim(right)"
+        },
+        {
+          "stateId": "rocket-charge-up",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "hook": "PlayRightSideChargeUpAnim"
+        },
+        {
+          "stateId": "rocket-heavy",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "hook": "PlayRightSideHeavy"
+        },
+        {
+          "stateId": "rocket-recharge",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "hook": "PlayRightRecharge"
+        },
+        {
+          "stateId": "body-death",
+          "affectedPartIds": [
+            "body"
+          ],
+          "hook": "PlayBodyDeathAnim"
+        }
+      ],
+      "transitions": [
+        {
+          "transitionId": "hurt-left",
+          "hook": "PlayHurtAnim(left)",
+          "affectedPartIds": [
+            "crusher"
+          ],
+          "activeStateId": "hurt-left"
+        },
+        {
+          "transitionId": "hurt-right",
+          "hook": "PlayHurtAnim(right)",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "activeStateId": "hurt-right"
+        },
+        {
+          "transitionId": "arm-death-left",
+          "hook": "PlayArmDeathAnim(left)",
+          "affectedPartIds": [
+            "crusher"
+          ],
+          "activeStateId": "arm-death-left"
+        },
+        {
+          "transitionId": "arm-death-right",
+          "hook": "PlayArmDeathAnim(right)",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "activeStateId": "arm-death-right"
+        },
+        {
+          "transitionId": "rocket-charge-up",
+          "hook": "PlayRightSideChargeUpAnim",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "activeStateId": "rocket-charge-up"
+        },
+        {
+          "transitionId": "rocket-heavy",
+          "hook": "PlayRightSideHeavy",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "activeStateId": "rocket-heavy"
+        },
+        {
+          "transitionId": "rocket-recharge",
+          "hook": "PlayRightRecharge",
+          "affectedPartIds": [
+            "rocket"
+          ],
+          "activeStateId": "rocket-recharge"
+        },
+        {
+          "transitionId": "body-death",
+          "hook": "PlayBodyDeathAnim",
+          "affectedPartIds": [
+            "body"
+          ],
+          "activeStateId": "body-death"
+        }
+      ],
+      "renderTargets": [
+        {
+          "targetId": "background",
+          "kind": "background",
+          "query": "composed://encounters/kaiser_crab_boss/background/image"
+        },
+        {
+          "targetId": "default-overlay",
+          "kind": "overlay",
+          "query": "composed://encounters/kaiser_crab_boss/visual-state/default/overlay/image"
+        },
+        {
+          "targetId": "rocket-charge-up-overlay",
+          "kind": "overlay",
+          "query": "composed://encounters/kaiser_crab_boss/visual-state/rocket-charge-up/overlay/image"
+        },
+        {
+          "targetId": "rocket-charge-up-part",
+          "kind": "part",
+          "query": "composed://encounters/kaiser_crab_boss/visual-part/rocket/state/rocket-charge-up/image"
+        }
+      ],
+      "notices": [
+        {
+          "code": "base-game-catalog-v0",
+          "severity": "info",
+          "path": "encounterVisuals",
+          "message": "Kaiser Crab is the first checked-in base-game encounter visual package.",
+          "provisional": true
+        }
+      ]
+    },
+    {
+      "encounterId": "ovicopter_normal",
+      "packageId": "composed://encounters/ovicopter_normal/scene-package",
+      "background": {
+        "sourceScene": "res://scenes/backgrounds/hive/hive_background.tscn",
+        "sourceQuery": "composed://combat-background/hive/image",
+        "renderQuery": "composed://encounters/ovicopter_normal/background/image"
+      },
+      "specialVisual": {
+        "sourceScene": "res://scenes/creature_visuals/ovicopter.tscn",
+        "rootType": "NCreatureVisuals"
+      },
+      "logicalActors": [
+        {
+          "actorId": "ovicopter",
+          "slotId": "ovicopter",
+          "statePartIds": [
+            "body"
+          ],
+          "targetRect": {
+            "x": 1769,
+            "y": 223,
+            "width": 403,
+            "height": 476
+          }
+        }
+      ],
+      "visualParts": [
+        {
+          "partId": "body",
+          "actorId": "ovicopter",
+          "screenSide": "right",
+          "anatomicalSide": "body",
+          "layer": 10,
+          "selector": "%Visuals",
+          "viewportRect": {
+            "x": 1700,
+            "y": 150,
+            "width": 560,
+            "height": 610
+          }
+        }
+      ],
+      "states": [
+        {
+          "stateId": "default",
+          "affectedPartIds": [
+            "body"
+          ],
+          "hook": ""
+        },
+        {
+          "stateId": "lay-eggs",
+          "affectedPartIds": [
+            "body"
+          ],
+          "hook": "layTrigger"
+        },
+        {
+          "stateId": "buff",
+          "affectedPartIds": [
+            "body"
+          ],
+          "hook": "buffTrigger"
+        },
+        {
+          "stateId": "attack",
+          "affectedPartIds": [
+            "body"
+          ],
+          "hook": "Attack"
+        }
+      ],
+      "transitions": [
+        {
+          "transitionId": "lay-eggs",
+          "hook": "layTrigger",
+          "affectedPartIds": [
+            "body"
+          ],
+          "activeStateId": "lay-eggs"
+        },
+        {
+          "transitionId": "buff",
+          "hook": "buffTrigger",
+          "affectedPartIds": [
+            "body"
+          ],
+          "activeStateId": "buff"
+        },
+        {
+          "transitionId": "attack",
+          "hook": "Attack",
+          "affectedPartIds": [
+            "body"
+          ],
+          "activeStateId": "attack"
+        }
+      ],
+      "renderTargets": [
+        {
+          "targetId": "background",
+          "kind": "background",
+          "query": "composed://encounters/ovicopter_normal/background/image"
+        },
+        {
+          "targetId": "default-overlay",
+          "kind": "overlay",
+          "query": "composed://encounters/ovicopter_normal/visual-state/default/overlay/image"
+        },
+        {
+          "targetId": "lay-eggs-overlay",
+          "kind": "overlay",
+          "query": "composed://encounters/ovicopter_normal/visual-state/lay-eggs/overlay/image"
+        },
+        {
+          "targetId": "lay-eggs-body-part",
+          "kind": "part",
+          "query": "composed://encounters/ovicopter_normal/visual-part/body/state/lay-eggs/image"
+        }
+      ],
+      "notices": [
+        {
+          "code": "base-game-catalog-priority-set-s90",
+          "severity": "info",
+          "path": "encounterVisuals.ovicopter_normal",
+          "message": "Ovicopter metadata is seeded from reviewed static encounter, monster, and recovered scene metadata; broad animation-fidelity coverage remains out of scope.",
+          "provisional": true
+        },
+        {
+          "code": "encounter-visual-dynamic-minions-unsupported",
+          "severity": "warning",
+          "path": "encounterVisuals.ovicopter_normal.logicalActors",
+          "message": "Ovicopter egg minions are spawned dynamically during the encounter and are not represented as catalog visual parts in this package.",
+          "provisional": true
+        }
+      ]
+    },
+    {
+      "encounterId": "knowledge_demon_boss",
+      "packageId": "composed://encounters/knowledge_demon_boss/scene-package",
+      "background": {
+        "sourceScene": "res://scenes/backgrounds/knowledge_demon_boss/knowledge_demon_boss_background.tscn",
+        "sourceQuery": "composed://combat-background/knowledge_demon_boss/image",
+        "renderQuery": "composed://encounters/knowledge_demon_boss/background/image"
+      },
+      "specialVisual": {
+        "sourceScene": "res://scenes/creature_visuals/knowledge_demon.tscn",
+        "rootType": "NCreatureVisuals"
+      },
+      "logicalActors": [
+        {
+          "actorId": "knowledge-demon",
+          "slotId": "knowledge-demon",
+          "statePartIds": [
+            "body",
+            "burn-fire"
+          ],
+          "targetRect": {
+            "x": 1335,
+            "y": 228,
+            "width": 520,
+            "height": 595
+          }
+        }
+      ],
+      "visualParts": [
+        {
+          "partId": "body",
+          "actorId": "knowledge-demon",
+          "screenSide": "right",
+          "anatomicalSide": "body",
+          "layer": 10,
+          "selector": "%Visuals",
+          "viewportRect": {
+            "x": 1270,
+            "y": 150,
+            "width": 650,
+            "height": 760
+          }
+        },
+        {
+          "partId": "burn-fire",
+          "actorId": "knowledge-demon",
+          "screenSide": "right",
+          "anatomicalSide": "overlay",
+          "layer": 20,
+          "selector": "%Visuals/NKnowledgeDemonVfx",
+          "viewportRect": {
+            "x": 1250,
+            "y": 110,
+            "width": 700,
+            "height": 820
+          }
+        }
+      ],
+      "states": [
+        {
+          "stateId": "default",
+          "affectedPartIds": [
+            "body"
+          ],
+          "hook": ""
+        },
+        {
+          "stateId": "mind-rot",
+          "affectedPartIds": [
+            "body",
+            "burn-fire"
+          ],
+          "hook": "MindRotTrigger"
+        },
+        {
+          "stateId": "medium-attack",
+          "affectedPartIds": [
+            "body"
+          ],
+          "hook": "MediumAttackTrigger"
+        },
+        {
+          "stateId": "heavy-attack-burnt",
+          "affectedPartIds": [
+            "body",
+            "burn-fire"
+          ],
+          "hook": "HeavyAttackTrigger"
+        },
+        {
+          "stateId": "heal",
+          "affectedPartIds": [
+            "body",
+            "burn-fire"
+          ],
+          "hook": "HealTrigger"
+        }
+      ],
+      "transitions": [
+        {
+          "transitionId": "mind-rot",
+          "hook": "MindRotTrigger",
+          "affectedPartIds": [
+            "body",
+            "burn-fire"
+          ],
+          "activeStateId": "mind-rot"
+        },
+        {
+          "transitionId": "medium-attack",
+          "hook": "MediumAttackTrigger",
+          "affectedPartIds": [
+            "body"
+          ],
+          "activeStateId": "medium-attack"
+        },
+        {
+          "transitionId": "heavy-attack-burnt",
+          "hook": "HeavyAttackTrigger",
+          "affectedPartIds": [
+            "body",
+            "burn-fire"
+          ],
+          "activeStateId": "heavy-attack-burnt"
+        },
+        {
+          "transitionId": "heal",
+          "hook": "HealTrigger",
+          "affectedPartIds": [
+            "body",
+            "burn-fire"
+          ],
+          "activeStateId": "heal"
+        }
+      ],
+      "renderTargets": [
+        {
+          "targetId": "background",
+          "kind": "background",
+          "query": "composed://encounters/knowledge_demon_boss/background/image"
+        },
+        {
+          "targetId": "default-overlay",
+          "kind": "overlay",
+          "query": "composed://encounters/knowledge_demon_boss/visual-state/default/overlay/image"
+        },
+        {
+          "targetId": "heavy-attack-burnt-overlay",
+          "kind": "overlay",
+          "query": "composed://encounters/knowledge_demon_boss/visual-state/heavy-attack-burnt/overlay/image"
+        },
+        {
+          "targetId": "burn-fire-part",
+          "kind": "part",
+          "query": "composed://encounters/knowledge_demon_boss/visual-part/burn-fire/state/heavy-attack-burnt/image"
+        }
+      ],
+      "notices": [
+        {
+          "code": "base-game-catalog-broader-s107",
+          "severity": "info",
+          "path": "encounterVisuals.knowledge_demon_boss",
+          "message": "Knowledge Demon Boss metadata is seeded from recovered scene assets and the game's EncounterModel/MonsterModel hook behavior.",
+          "provisional": true
+        },
+        {
+          "code": "encounter-visual-vfx-live-only",
+          "severity": "warning",
+          "path": "encounterVisuals.knowledge_demon_boss.visualParts.burn-fire",
+          "message": "Knowledge Demon burn fire combines shader, Spine slot, and particle effects under NKnowledgeDemonVfx; offline catalog metadata exposes a render target, but isolation must be proven with live artifact diagnostics.",
+          "provisional": true
+        }
+      ]
+    }
+  ]
+}

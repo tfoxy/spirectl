@@ -1,0 +1,53 @@
+schemaVersion: spirectl.fixture/v0
+name: rewards-all
+description: >-
+  Authored rewards screen listing one of every reward type item by item (gold,
+  pooled card, card with rare rarity, single specific card, potion, specific
+  relic, rare relic, card removal, linked reward set), granted alongside the
+  add-action / add-reward relics so their reward hooks fire on load.
+#
+# The rewards overlay enters a synthetic Elite combat room (rewards.roomType)
+# so the granted relics' TryModifyRewards hooks run against the authored rewards.
+#
+# Reward-modifying relics granted here and what each does on the rewards screen:
+#   - AMETHYST_AUBERGINE   FIRES (elite): adds a bonus gold reward.
+#   - BLACK_STAR           FIRES (elite): adds a bonus relic reward.
+#   - WHITE_STAR           FIRES (elite, acts 0-2): adds a boss-rarity card reward.
+#   - PAELS_WING           FIRES: adds a "SACRIFICE" alternative action to each card
+#                          reward (visible after opening the card reward screen).
+#   - PRAYER_WHEEL         dormant under elite (only fires in a Monster room).
+#   - LAVA_ROCK            dormant (only the first Act 0 Boss reward).
+#   - WONGOS_MYSTERY_TICKET dormant (needs 5 completed combats; counter state).
+#   - LASTING_CANDY        dormant (only every 2nd combat; counter state).
+# Set rewards.roomType: monster to instead demonstrate PRAYER_WHEEL.
+run:
+  seed: fixture-rewards-all
+  actFloor: 8
+  players:
+    - id: p1
+      creature: { currentHp: 58, maxHp: 80 }
+      relics:
+        - modelId: PAELS_WING
+        - modelId: PRAYER_WHEEL
+        - modelId: WHITE_STAR
+        - modelId: BLACK_STAR
+        - modelId: LAVA_ROCK
+        - modelId: WONGOS_MYSTERY_TICKET
+        - modelId: AMETHYST_AUBERGINE
+        - modelId: LASTING_CANDY
+      overlays:
+        - rewards:
+            roomType: elite
+            items:
+              - gold: 30
+              - card: { modelIds: [BASH, ANGER, DEMON_FORM] }   # specific cards (DEMON_FORM = rare)
+              - card: { roomType: elite, count: 3 }             # pooled card choice
+              - specialCard: { modelId: FEED }                  # single specific rare card
+              - potion: { modelId: FIRE_POTION }
+              - relic: { modelId: ANCHOR }                      # specific relic
+              - relic: { rarity: rare }                         # random rare relic
+              - cardRemoval: true
+              - linked:
+                  items:
+                    - gold: 10
+                    - relic: {}                                 # random relic

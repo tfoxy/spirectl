@@ -1,0 +1,32 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <InformationalVersion>0.1.0</InformationalVersion>
+    <SpirectlBridgeBuiltAtUtc Condition="'$(SpirectlBridgeBuiltAtUtc)' == ''">$([System.DateTime]::UtcNow.ToString("O"))</SpirectlBridgeBuiltAtUtc>
+
+    <SpirectlRepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</SpirectlRepoRoot>
+    <SpirectlLocalConfigPath>$([System.IO.Path]::Combine('$(SpirectlRepoRoot)', 'sts2.local.yaml'))</SpirectlLocalConfigPath>
+    <SpirectlRepoConfigPath>$([System.IO.Path]::Combine('$(SpirectlRepoRoot)', 'sts2.config.yaml'))</SpirectlRepoConfigPath>
+
+    <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == '' and '$(STS2_ASSEMBLIES_DIR)' != ''">$(STS2_ASSEMBLIES_DIR)</Sts2AssembliesDir>
+    <SpirectlAssembliesConfigPath Condition="'$(SpirectlAssembliesConfigPath)' == '' and Exists('$(SpirectlLocalConfigPath)')">$(SpirectlLocalConfigPath)</SpirectlAssembliesConfigPath>
+    <SpirectlAssembliesConfigPath Condition="'$(SpirectlAssembliesConfigPath)' == '' and Exists('$(SpirectlRepoConfigPath)')">$(SpirectlRepoConfigPath)</SpirectlAssembliesConfigPath>
+    <SpirectlAssembliesConfigText Condition="'$(SpirectlAssembliesConfigPath)' != ''">$([System.IO.File]::ReadAllText('$(SpirectlAssembliesConfigPath)'))</SpirectlAssembliesConfigText>
+
+    <SpirectlConfiguredAssembliesDir Condition="'$(SpirectlAssembliesConfigText)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(SpirectlAssembliesConfigText)', '(?m)^[ \t]*assembliesDir:[ \t]*([^#\r\n]+?)?[ \t]*$').Groups[1].Value)</SpirectlConfiguredAssembliesDir>
+    <SpirectlConfiguredGamePath Condition="'$(SpirectlAssembliesConfigText)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(SpirectlAssembliesConfigText)', '(?m)^[ \t]*path:[ \t]*([^#\r\n]+?)?[ \t]*$').Groups[1].Value)</SpirectlConfiguredGamePath>
+
+    <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == '' and '$(SpirectlConfiguredAssembliesDir)' != ''">$(SpirectlConfiguredAssembliesDir)</Sts2AssembliesDir>
+    <SpirectlDetectedGodotSharpCount Condition="'$(Sts2AssembliesDir)' == '' and '$(SpirectlConfiguredGamePath)' != '' and '$(SpirectlConfiguredGamePath)' != 'auto' and Exists('$(SpirectlConfiguredGamePath)')">$([System.IO.Directory]::GetFiles('$(SpirectlConfiguredGamePath)', 'GodotSharp.dll', System.IO.SearchOption.AllDirectories).Length)</SpirectlDetectedGodotSharpCount>
+    <SpirectlDetectedGodotSharpPath Condition="'$(SpirectlDetectedGodotSharpCount)' != '' and $(SpirectlDetectedGodotSharpCount) &gt; 0">$([System.IO.Directory]::GetFiles('$(SpirectlConfiguredGamePath)', 'GodotSharp.dll', System.IO.SearchOption.AllDirectories)[0])</SpirectlDetectedGodotSharpPath>
+    <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == '' and '$(SpirectlDetectedGodotSharpPath)' != ''">$([System.IO.Path]::GetDirectoryName('$(SpirectlDetectedGodotSharpPath)'))</Sts2AssembliesDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>SpirectlBridgeBuiltAtUtc</_Parameter1>
+      <_Parameter2>$(SpirectlBridgeBuiltAtUtc)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

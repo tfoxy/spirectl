@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-doom
+description: >-
+  NIBBITS_WEAK Nibbit at 10/42 HP with 20 Doom applied (one default player) —
+  validates the enemy doom status visual.
+run:
+  seed: fixture-combat-doom
+  players: 1
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK
+      enemies:
+        - currentHp: 10
+          powers:
+            - { modelId: DOOM_POWER, amount: 20 }

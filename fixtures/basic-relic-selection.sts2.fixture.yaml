@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-relic-selection
+description: Deterministic authored relic-selection fixture using typed relic choices.
+run:
+  seed: fixture-basic-relic-selection
+  currentActIndex: 1
+  actFloor: 9
+  players:
+    - creature: { currentHp: 49, maxHp: 80 }
+  currentRoom:
+    treasure:
+      relicSelectionOpen: true
+      currentRelics:
+        - modelId: ANCHOR
+        - modelId: BAG_OF_MARBLES

@@ -1,0 +1,449 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/errors.proto";
+
+enum DebugExecutionState {
+  DEBUG_EXECUTION_STATE_UNSPECIFIED = 0;
+  DEBUG_EXECUTION_STATE_RUNNING = 1;
+  DEBUG_EXECUTION_STATE_PAUSED = 2;
+  DEBUG_EXECUTION_STATE_UNSUPPORTED = 3;
+}
+
+enum DebugPauseReason {
+  DEBUG_PAUSE_REASON_UNSPECIFIED = 0;
+  DEBUG_PAUSE_REASON_NONE = 1;
+  DEBUG_PAUSE_REASON_MANUAL = 2;
+  DEBUG_PAUSE_REASON_BREAKPOINT = 3;
+  DEBUG_PAUSE_REASON_STEP_COMPLETE = 4;
+  DEBUG_PAUSE_REASON_UNSUPPORTED = 5;
+  DEBUG_PAUSE_REASON_BRIDGE_ERROR = 6;
+}
+
+enum DebugStepKind {
+  DEBUG_STEP_KIND_UNSPECIFIED = 0;
+  DEBUG_STEP_KIND_FRAME = 1;
+  DEBUG_STEP_KIND_ACTION = 2;
+}
+
+enum DebugPredicateOperator {
+  DEBUG_PREDICATE_OPERATOR_UNSPECIFIED = 0;
+  DEBUG_PREDICATE_OPERATOR_EQUALS = 1;
+  DEBUG_PREDICATE_OPERATOR_CONTAINS = 2;
+  DEBUG_PREDICATE_OPERATOR_REGEX = 3;
+  DEBUG_PREDICATE_OPERATOR_GT = 4;
+  DEBUG_PREDICATE_OPERATOR_GTE = 5;
+  DEBUG_PREDICATE_OPERATOR_LT = 6;
+  DEBUG_PREDICATE_OPERATOR_LTE = 7;
+  DEBUG_PREDICATE_OPERATOR_EXISTS = 8;
+  DEBUG_PREDICATE_OPERATOR_NOT_EXISTS = 9;
+}
+
+enum DebugBreakpointKind {
+  DEBUG_BREAKPOINT_KIND_UNSPECIFIED = 0;
+  DEBUG_BREAKPOINT_KIND_MATCH = 1;
+  DEBUG_BREAKPOINT_KIND_CHANGE = 2;
+}
+
+enum DebugSessionOwnership {
+  DEBUG_SESSION_OWNERSHIP_UNSPECIFIED = 0;
+  DEBUG_SESSION_OWNERSHIP_UNOWNED = 1;
+  DEBUG_SESSION_OWNERSHIP_OWNED_BY_CALLER = 2;
+  DEBUG_SESSION_OWNERSHIP_LEASED_ELSEWHERE = 3;
+}
+
+enum DebugSessionRole {
+  DEBUG_SESSION_ROLE_UNSPECIFIED = 0;
+  DEBUG_SESSION_ROLE_CONTROLLER = 1;
+  DEBUG_SESSION_ROLE_OBSERVER = 2;
+}
+
+enum DebugEventKind {
+  DEBUG_EVENT_KIND_UNSPECIFIED = 0;
+  DEBUG_EVENT_KIND_STATUS_CHANGED = 1;
+  DEBUG_EVENT_KIND_BREAKPOINT_HIT = 2;
+  DEBUG_EVENT_KIND_PAUSED = 3;
+  DEBUG_EVENT_KIND_RESUMED = 4;
+  DEBUG_EVENT_KIND_STEPPED = 5;
+  DEBUG_EVENT_KIND_LEASE_CHANGED = 6;
+  DEBUG_EVENT_KIND_OBSERVER_ATTACHED = 7;
+  DEBUG_EVENT_KIND_OBSERVER_DETACHED = 8;
+  DEBUG_EVENT_KIND_DISCONNECTED = 9;
+  DEBUG_EVENT_KIND_CLIENT_DROPPED = 10;
+  DEBUG_EVENT_KIND_STATE_CHANGED = 11;
+}
+
+message DebugNotice {
+  string code = 1;
+  string message = 2;
+}
+
+message DebugPredicate {
+  DebugPredicateOperator operator = 1;
+  string expected_json = 2;
+}
+
+message DebugSessionInfo {
+  string id = 1;
+  string name = 2;
+  uint32 lease_timeout_ms = 3;
+  int64 lease_expires_at_unix_ms = 4;
+  DebugSessionRole role = 5;
+}
+
+message DebugBreakpoint {
+  string id = 1;
+  string name = 2;
+  string query_path = 3;
+  DebugPredicate predicate = 4;
+  bool enabled = 5;
+  bool provisional = 6;
+  DebugBreakpointKind kind = 7;
+  uint32 min_hit_count = 8;
+  uint32 hit_count = 9;
+  bool auto_remove_on_hit = 10;
+  string last_observed_json = 11;
+}
+
+message DebugBreakpointHit {
+  string breakpoint_id = 1;
+  string breakpoint_name = 2;
+  string query_path = 3;
+  DebugPredicate predicate = 4;
+  string actual_json = 5;
+  string screen_type = 6;
+  string screen_instance_id = 7;
+  DebugBreakpointKind kind = 8;
+  uint32 hit_count = 9;
+}
+
+message DebugStatusRequest {
+  string session_id = 1;
+}
+
+message DebugStatusResponse {
+  bool supported = 1;
+  DebugExecutionState execution_state = 2;
+  DebugPauseReason pause_reason = 3;
+  string pause_reason_detail = 4;
+  bool can_pause = 5;
+  bool can_resume = 6;
+  repeated DebugStepKind supported_step_kinds = 7;
+  repeated DebugBreakpoint breakpoints = 8;
+  DebugBreakpointHit last_breakpoint_hit = 9;
+  repeated DebugNotice notices = 10;
+  bool breakpoint_management_supported = 11;
+  bool breakpoint_evaluation_supported = 12;
+  DebugSessionOwnership session_ownership = 13;
+  DebugSessionInfo active_session = 14;
+  DebugSessionRole caller_role = 15;
+  repeated DebugSessionInfo observer_sessions = 16;
+}
+
+message DebugStatusResult {
+  oneof result {
+    DebugStatusResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugSessionStartRequest {
+  string name = 1;
+  bool pause_on_start = 2;
+  uint32 lease_timeout_ms = 3;
+  DebugSessionRole role = 4;
+}
+
+message DebugSessionStartResponse {
+  bool started = 1;
+  DebugSessionInfo session = 2;
+  DebugStatusResponse status = 3;
+  repeated DebugNotice notices = 4;
+}
+
+message DebugSessionStartResult {
+  oneof result {
+    DebugSessionStartResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugSessionStatusRequest {
+  string id = 1;
+}
+
+message DebugSessionStatusResponse {
+  bool found = 1;
+  DebugSessionInfo session = 2;
+  DebugStatusResponse status = 3;
+  repeated DebugNotice notices = 4;
+}
+
+message DebugSessionStatusResult {
+  oneof result {
+    DebugSessionStatusResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugSessionEndRequest {
+  string id = 1;
+  bool resume_runtime = 2;
+}
+
+message DebugSessionEndResponse {
+  bool ended = 1;
+  string id = 2;
+  DebugStatusResponse status = 3;
+  repeated DebugNotice notices = 4;
+}
+
+message DebugSessionEndResult {
+  oneof result {
+    DebugSessionEndResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugPauseRequest {
+  string session_id = 1;
+}
+
+message DebugPauseResponse {
+  bool applied = 1;
+  DebugStatusResponse status = 2;
+  repeated DebugNotice notices = 3;
+}
+
+message DebugPauseResult {
+  oneof result {
+    DebugPauseResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugResumeRequest {
+  string session_id = 1;
+}
+
+message DebugResumeResponse {
+  bool applied = 1;
+  DebugStatusResponse status = 2;
+  repeated DebugNotice notices = 3;
+}
+
+message DebugResumeResult {
+  oneof result {
+    DebugResumeResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugStepRequest {
+  DebugStepKind kind = 1;
+  uint32 count = 2;
+  string session_id = 3;
+}
+
+message DebugStepResponse {
+  bool applied = 1;
+  DebugStatusResponse status = 2;
+  repeated DebugNotice notices = 3;
+}
+
+message DebugStepResult {
+  oneof result {
+    DebugStepResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugWaitRequest {
+  string session_id = 1;
+  uint32 timeout_ms = 2;
+}
+
+message DebugWaitResponse {
+  bool completed = 1;
+  bool timed_out = 2;
+  DebugStatusResponse status = 3;
+  repeated DebugNotice notices = 4;
+}
+
+message DebugWaitResult {
+  oneof result {
+    DebugWaitResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugBreakpointListRequest {
+  string session_id = 1;
+}
+
+message DebugBreakpointListResponse {
+  repeated DebugBreakpoint breakpoints = 1;
+  DebugStatusResponse status = 2;
+  repeated DebugNotice notices = 3;
+}
+
+message DebugBreakpointListResult {
+  oneof result {
+    DebugBreakpointListResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugBreakpointAddRequest {
+  string query_path = 1;
+  DebugPredicate predicate = 2;
+  string name = 3;
+  string session_id = 4;
+  DebugBreakpointKind kind = 5;
+  uint32 min_hit_count = 6;
+  bool auto_remove_on_hit = 7;
+}
+
+message DebugBreakpointAddResponse {
+  bool added = 1;
+  DebugBreakpoint breakpoint = 2;
+  DebugStatusResponse status = 3;
+  repeated DebugNotice notices = 4;
+}
+
+message DebugBreakpointAddResult {
+  oneof result {
+    DebugBreakpointAddResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugBreakpointRemoveRequest {
+  string id = 1;
+  string session_id = 2;
+}
+
+message DebugBreakpointRemoveResponse {
+  bool removed = 1;
+  string id = 2;
+  DebugStatusResponse status = 3;
+  repeated DebugNotice notices = 4;
+}
+
+message DebugBreakpointRemoveResult {
+  oneof result {
+    DebugBreakpointRemoveResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message DebugLeaseConflict {
+  DebugSessionInfo active_controller = 1;
+  string requested_name = 2;
+  uint32 requested_lease_timeout_ms = 3;
+  repeated DebugNotice notices = 4;
+}
+
+message DebugEventStatusChanged {
+  DebugExecutionState previous_execution_state = 1;
+  DebugExecutionState execution_state = 2;
+  DebugPauseReason pause_reason = 3;
+  string pause_reason_detail = 4;
+}
+
+message DebugEventBreakpointHit {
+  DebugBreakpointHit hit = 1;
+}
+
+message DebugEventPause {
+  DebugPauseReason reason = 1;
+  string detail = 2;
+}
+
+message DebugEventResume {
+  string detail = 1;
+}
+
+message DebugEventStep {
+  DebugStepKind kind = 1;
+  uint32 count = 2;
+  string detail = 3;
+}
+
+message DebugEventLeaseChanged {
+  DebugSessionInfo previous_controller = 1;
+  DebugSessionInfo controller = 2;
+  DebugLeaseConflict conflict = 3;
+}
+
+message DebugEventObserverChanged {
+  DebugSessionInfo observer = 1;
+}
+
+message DebugEventDisconnect {
+  DebugSessionInfo session = 1;
+  string reason = 2;
+}
+
+message DebugEventClientDropped {
+  DebugSessionInfo session = 1;
+  string reason = 2;
+  uint64 dropped_event_count = 3;
+}
+
+message DebugEventStateChanged {
+  string screen_type = 1;
+  string screen_instance_id = 2;
+  repeated string changed_paths = 3;
+  string selected_state_json = 4;
+}
+
+message DebugEvent {
+  uint64 sequence = 1;
+  int64 unix_time_ms = 2;
+  DebugEventKind kind = 3;
+  string session_id = 4;
+  DebugSessionRole session_role = 5;
+  repeated DebugNotice notices = 6;
+  oneof detail {
+    DebugEventStatusChanged status_changed = 10;
+    DebugEventBreakpointHit breakpoint_hit = 11;
+    DebugEventPause paused = 12;
+    DebugEventResume resumed = 13;
+    DebugEventStep stepped = 14;
+    DebugEventLeaseChanged lease_changed = 15;
+    DebugEventObserverChanged observer_attached = 16;
+    DebugEventObserverChanged observer_detached = 17;
+    DebugEventDisconnect disconnected = 18;
+    DebugEventClientDropped client_dropped = 19;
+    DebugEventStateChanged state_changed = 20;
+  }
+}
+
+message DebugEventStreamRequest {
+  string session_id = 1;
+  uint64 from_sequence = 2;
+  uint32 limit = 3;
+}
+
+message DebugEventStreamResponse {
+  repeated DebugEvent events = 1;
+  uint64 from_sequence = 2;
+  uint64 next_sequence = 3;
+  uint64 oldest_retained_sequence = 4;
+  uint64 newest_sequence = 5;
+  uint32 retention_limit = 6;
+  bool expired = 7;
+  bool overflow = 8;
+  repeated DebugNotice notices = 9;
+}
+
+message DebugEventStreamResult {
+  oneof result {
+    DebugEventStreamResponse success = 1;
+    BridgeError error = 2;
+  }
+}

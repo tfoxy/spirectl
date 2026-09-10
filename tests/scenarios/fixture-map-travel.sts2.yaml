@@ -1,0 +1,26 @@
+name: fixture-map-travel
+description: Loads the travelled map fixture (two nodes before the boss) and asserts the authored traveled path — a Neow start plus revealed `?` (Unknown) nodes carrying their resolved room type.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/map-travel.sts2.fixture.yaml
+  - dev.assert:
+      path: rootScene
+      equals: run
+  - dev.assert:
+      path: run.currentRoom.mapRoom
+      exists: true
+  # Neow start node, visited (row 0 = the first point in the sorted points array).
+  - dev.assert:
+      path: run.map.points[0].pointType
+      equals: Ancient
+  # A revealed `?` node: still pointType Unknown, but its travelled room type is surfaced
+  # (the deterministic walk over the fixed seed keeps these indices stable).
+  - dev.assert:
+      path: run.map.points[12].pointType
+      equals: Unknown
+  - dev.assert:
+      path: run.map.points[12].revealedRoomType
+      equals: Treasure
+  - dev.assert:
+      path: run.map.points[5].revealedRoomType
+      equals: Event

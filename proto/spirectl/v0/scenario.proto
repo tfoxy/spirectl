@@ -1,0 +1,341 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+import "spirectl/v0/runtime.proto";
+
+enum RestoreMode {
+  RESTORE_MODE_UNSPECIFIED = 0;
+  RESTORE_MODE_SPARSE = 1;
+  RESTORE_MODE_EXACT = 2;
+  RESTORE_MODE_HYBRID = 3;
+}
+
+enum RestoreQuality {
+  RESTORE_QUALITY_UNSPECIFIED = 0;
+  RESTORE_QUALITY_EXACT = 1;
+  RESTORE_QUALITY_PARTIAL = 2;
+  RESTORE_QUALITY_UNSUPPORTED = 3;
+  RESTORE_QUALITY_DEGRADED = 4;
+}
+
+message RestoreCompatibilityNote {
+  string code = 1;
+  string message = 2;
+  string field = 3;
+}
+
+enum RestoreFieldFidelity {
+  RESTORE_FIELD_FIDELITY_UNSPECIFIED = 0;
+  RESTORE_FIELD_FIDELITY_EXACT = 1;
+  RESTORE_FIELD_FIDELITY_PARTIAL = 2;
+  RESTORE_FIELD_FIDELITY_INFERRED = 3;
+  RESTORE_FIELD_FIDELITY_OMITTED = 4;
+  RESTORE_FIELD_FIDELITY_UNSUPPORTED = 5;
+  RESTORE_FIELD_FIDELITY_DEGRADED_LOCAL_MULTIPLAYER = 6;
+}
+
+enum RestoreVerificationStatus {
+  RESTORE_VERIFICATION_STATUS_UNSPECIFIED = 0;
+  RESTORE_VERIFICATION_STATUS_PASSED = 1;
+  RESTORE_VERIFICATION_STATUS_PARTIAL = 2;
+  RESTORE_VERIFICATION_STATUS_DEGRADED = 3;
+  RESTORE_VERIFICATION_STATUS_FAILED = 4;
+}
+
+message RestoreFieldReport {
+  string path = 1;
+  RestoreFieldFidelity capture = 2;
+  RestoreFieldFidelity restore = 3;
+  bool validation_key = 4;
+  string reason_code = 5;
+  string message = 6;
+}
+
+message RestoreMismatch {
+  string path = 1;
+  string expected_json = 2;
+  string observed_json = 3;
+  string severity = 4;
+  string support_class = 5;
+  string reason_code = 6;
+  string suggested_next_step = 7;
+}
+
+message RestoreVerification {
+  RestoreVerificationStatus status = 1;
+  RestoreQuality quality = 2;
+  repeated string checked_fields = 3;
+  repeated RestoreMismatch mismatches = 4;
+  string expected_summary_json = 5;
+  string observed_summary_json = 6;
+}
+
+enum MultiplayerRestoreMode {
+  MULTIPLAYER_RESTORE_MODE_UNSPECIFIED = 0;
+  MULTIPLAYER_RESTORE_MODE_LOBBY_ONLY = 1;
+  MULTIPLAYER_RESTORE_MODE_HOST_LOCAL_ACTIVE_RUN = 2;
+  MULTIPLAYER_RESTORE_MODE_REMOTE_PLAYER_PLACEHOLDER = 3;
+  MULTIPLAYER_RESTORE_MODE_FULL_ACTIVE_MULTIPLAYER = 4;
+  MULTIPLAYER_RESTORE_MODE_UNSUPPORTED_REMOTE_CLIENT_REQUIRED = 5;
+  MULTIPLAYER_RESTORE_MODE_DEGRADED_LOCAL_ONLY = 6;
+  MULTIPLAYER_RESTORE_MODE_ACTIVE_MULTIPLAYER_UNSUPPORTED = 7;
+}
+
+message MultiplayerPlayerState {
+  string id = 1;
+  string net_id = 2;
+  int32 slot_id = 3;
+  string display_name = 4;
+  string selected_character_id = 5;
+  bool is_ready = 6;
+  bool is_local = 7;
+  bool is_host = 8;
+  bool is_remote = 9;
+  string character = 10;
+}
+
+message MultiplayerLobbySnapshot {
+  string lobby_id = 1;
+  string phase = 2;
+  repeated LobbyCharacter available_characters = 3;
+}
+
+message MultiplayerRestoreMetadata {
+  bool is_multiplayer = 1;
+  MultiplayerRestoreMode restore_mode = 2;
+  string local_player_id = 3;
+  string host_player_id = 4;
+  string local_player_role = 5;
+  repeated MultiplayerPlayerState players = 6;
+  MultiplayerLobbySnapshot lobby = 7;
+  bool requires_remote_clients = 8;
+  bool degraded_local_only_available = 9;
+  repeated RestoreCompatibilityNote limitations = 10;
+}
+
+message MultiplayerRestoreResult {
+  MultiplayerRestoreMode mode = 1;
+  string remote_player_mode = 2;
+  string local_player_id = 3;
+  string host_player_id = 4;
+  repeated string restored_player_ids = 5;
+  repeated string omitted_remote_player_ids = 6;
+  bool requires_remote_clients = 7;
+}
+
+message ScenarioSourceMetadata {
+  string game_version = 1;
+  string bridge_version = 2;
+  string spirectl_version = 3;
+  ScreenInfo screen = 4;
+  PerspectiveInfo perspective = 5;
+}
+
+message ExactBundleMetadata {
+  string path = 1;
+  string format_version = 2;
+  string sha256 = 3;
+  uint64 size_bytes = 4;
+  bool version_sensitive = 5;
+  string content_type = 6;
+}
+
+message ExactBundlePayload {
+  string path = 1;
+  string format_version = 2;
+  string content_type = 3;
+  bytes data = 4;
+}
+
+message RestoreMetadata {
+  RestoreMode mode = 1;
+  RestoreQuality quality = 2;
+  ExactBundleMetadata exact_bundle = 3;
+  repeated RestoreCompatibilityNote compatibility_notes = 4;
+  repeated RestoreFieldReport field_reports = 5;
+}
+
+message ScenarioRunState {
+  string seed = 1;
+  int32 act = 2;
+  int32 floor = 3;
+  int32 ascension = 4;
+  repeated ScenarioPlayerState players = 5;
+}
+
+message ScenarioPlayerState {
+  string id = 1;
+  string character = 2;
+  bool is_local = 3;
+  bool is_host = 4;
+  bool is_remote = 5;
+}
+
+message ScenarioDocument {
+  string schema_version = 1;
+  string name = 2;
+  string description = 3;
+  string created_at = 4;
+  ScenarioSourceMetadata source = 5;
+  RestoreMetadata restore = 6;
+  ScenarioRunState run = 7;
+  string screen_state_json = 8;
+  repeated StateNotice notices = 9;
+  MultiplayerRestoreMetadata multiplayer = 10;
+}
+
+message CheckpointManifest {
+  string schema_version = 1;
+  string name = 2;
+  string created_at = 3;
+  ScenarioSourceMetadata source = 4;
+  string summary_json = 5;
+  ExactBundleMetadata exact_bundle = 6;
+  RestoreQuality restore_quality = 7;
+  repeated RestoreCompatibilityNote known_omissions = 8;
+  string fallback_policy = 9;
+  repeated RestoreFieldReport field_reports = 10;
+  MultiplayerRestoreMetadata multiplayer = 11;
+}
+
+message ScenarioCaptureRequest {
+  string request_id = 1;
+  string schema_version = 2;
+  bool include_exact = 3;
+  PerspectiveSelector perspective = 4;
+}
+
+message ScenarioCaptureResponse {
+  string request_id = 1;
+  ScenarioDocument scenario = 2;
+  DataSource source = 3;
+  bool provisional = 4;
+  ExactBundlePayload exact_bundle_payload = 5;
+}
+
+message ScenarioCaptureResult {
+  oneof result {
+    ScenarioCaptureResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message ScenarioRestoreRequest {
+  string request_id = 1;
+  string schema_version = 2;
+  ScenarioDocument scenario = 3;
+  bool restart_requested = 4;
+  ExactBundlePayload exact_bundle_payload = 5;
+  bool allow_sparse_fallback = 6;
+  bool allow_degraded_local_multiplayer = 7;
+}
+
+message ScenarioRestoreResponse {
+  string request_id = 1;
+  RestoreQuality quality = 2;
+  ScreenInfo screen = 3;
+  PerspectiveInfo resolved_perspective = 4;
+  repeated StateNotice notices = 5;
+  bool exact_bundle_used = 6;
+  bool sparse_fallback_used = 7;
+  repeated RestoreCompatibilityNote compatibility_notes = 8;
+  RestoreVerification verification = 9;
+  MultiplayerRestoreResult multiplayer_restore = 10;
+}
+
+message ScenarioRestoreResult {
+  oneof result {
+    ScenarioRestoreResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message CheckpointCaptureRequest {
+  string request_id = 1;
+  string name = 2;
+  PerspectiveSelector perspective = 3;
+}
+
+message CheckpointCaptureResponse {
+  string request_id = 1;
+  CheckpointManifest manifest = 2;
+  DataSource source = 3;
+  bool provisional = 4;
+  ExactBundlePayload exact_bundle_payload = 5;
+}
+
+message CheckpointCaptureResult {
+  oneof result {
+    CheckpointCaptureResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message CheckpointRestoreRequest {
+  string request_id = 1;
+  string name = 2;
+  CheckpointManifest manifest = 3;
+  bool restart_requested = 4;
+  ExactBundlePayload exact_bundle_payload = 5;
+  bool allow_sparse_fallback = 6;
+  bool allow_degraded_local_multiplayer = 7;
+}
+
+message CheckpointRestoreResponse {
+  string request_id = 1;
+  RestoreQuality quality = 2;
+  ScreenInfo screen = 3;
+  PerspectiveInfo resolved_perspective = 4;
+  repeated StateNotice notices = 5;
+  bool exact_bundle_used = 6;
+  bool sparse_fallback_used = 7;
+  repeated RestoreCompatibilityNote compatibility_notes = 8;
+  RestoreVerification verification = 9;
+  MultiplayerRestoreResult multiplayer_restore = 10;
+}
+
+message CheckpointRestoreResult {
+  oneof result {
+    CheckpointRestoreResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message CheckpointListRequest {
+  string request_id = 1;
+}
+
+message CheckpointListResponse {
+  string request_id = 1;
+  repeated CheckpointManifest checkpoints = 2;
+}
+
+message CheckpointListResult {
+  oneof result {
+    CheckpointListResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message CheckpointDeleteRequest {
+  string request_id = 1;
+  string name = 2;
+}
+
+message CheckpointDeleteResponse {
+  string request_id = 1;
+  string name = 2;
+  bool deleted = 3;
+}
+
+message CheckpointDeleteResult {
+  oneof result {
+    CheckpointDeleteResponse success = 1;
+    BridgeError error = 2;
+  }
+}

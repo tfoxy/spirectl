@@ -1,0 +1,18 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-bundle-select
+description: Ironclad NIBBITS combat with a bundle-selection overlay on top (ScrollBoxes-style "take a whole group of cards", 2 bundles).
+run:
+  seed: fixture-combat-bundle
+  players:
+    - id: "p:1"
+      creature: { currentHp: 67, maxHp: 80 }
+      overlays:
+        - bundleSelection:
+            bundles:
+              - id: offensive
+                cardIds: [STRIKE_IRONCLAD, ANGER, SWORD_BOOMERANG]
+              - id: defensive
+                cardIds: [DEFEND_IRONCLAD, BASH, CONFLAGRATION]
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL

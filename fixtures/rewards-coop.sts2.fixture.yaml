@@ -1,0 +1,31 @@
+schemaVersion: spirectl.fixture/v0
+name: rewards-coop
+description: >-
+  Two-seat couch-coop rewards screen. p:1 is the local "me" seat (keeps the native
+  rewards screen); p:2 is a host-local, browser-only seat whose rewards have NO
+  native screen on the host (RewardsSet.Offer early-returns at the LocalContext
+  gate) and are instead captured + surfaced by the bridge, exactly as in live couch
+  play. Both seats receive the same authored reward set (gold, a 3-card choice, a
+  card removal, and a relic) so the per-player commit can be exercised on the
+  non-host seat: choose a card, remove a deck card, and claim the immediate
+  gold/relic — each applying to that seat's own run state.
+run:
+  seed: fixture-rewards-coop
+  actFloor: 8
+  players:
+    - id: "p:1"
+      isLocal: true
+      isHostLocalSeat: false
+      creature: { currentHp: 58, maxHp: 80 }
+      overlays:
+        - rewards:
+            roomType: elite
+            items:
+              - gold: 25
+              - card: { modelIds: [BASH, ANGER, DEMON_FORM] }   # 3-card choice
+              - cardRemoval: true
+              - relic: { modelId: ANCHOR }                       # immediate grant
+    - id: "p:2"
+      isLocal: true
+      isHostLocalSeat: true
+      creature: { currentHp: 50, maxHp: 70 }

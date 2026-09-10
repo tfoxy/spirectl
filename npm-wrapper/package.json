@@ -1,0 +1,49 @@
+{
+  "name": "@spirectl/sts2",
+  "version": "0.1.0",
+  "description": "Node wrapper and release-backed launcher for the sts2 CLI.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "README.md",
+    "bin/",
+    "src/",
+    "examples/"
+  ],
+  "bin": {
+    "sts2": "./bin/sts2.js",
+    "sts2-mcp": "./bin/sts2-mcp.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./playwright": {
+      "types": "./src/playwright.d.ts",
+      "import": "./src/playwright.js"
+    }
+  },
+  "types": "./src/index.d.ts",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tfoxy/spirectl.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tfoxy/spirectl/issues"
+  },
+  "homepage": "https://github.com/tfoxy/spirectl#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

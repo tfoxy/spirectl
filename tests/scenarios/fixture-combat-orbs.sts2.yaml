@@ -1,0 +1,45 @@
+name: fixture-combat-orbs
+description: Loads the combat-orbs fixture and asserts the authored Defect orb queue (lightning + plasma + one empty slot) and the Ironclad ally's single frost orb.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/combat-orbs.sts2.fixture.yaml
+
+  - dev.assert:
+      path: run.currentRoom.roomType
+      equals: Monster
+
+  - dev.assert:
+      path: run.currentRoom.combat.encounterId
+      equals: NIBBITS_WEAK
+
+  # Defect host: capacity 3 with two authored orbs leaves one empty slot. The
+  # opening combat-start orb is cleared so the authored set is exact.
+  - dev.assert:
+      path: run.players[0].combat.orbQueue.capacity
+      equals: 3
+
+  - dev.assert:
+      path: run.players[0].combat.orbQueue.orbs[0].modelId
+      equals: LIGHTNING_ORB
+
+  - dev.assert:
+      path: run.players[0].combat.orbQueue.orbs[1].modelId
+      equals: PLASMA_ORB
+
+  - dev.assert:
+      path: run.players[0].combat.orbQueue.orbs[1].ownerPlayerId
+      equals: p:1
+
+  # Ironclad ally: base orb capacity is 0, raised to 1 to hold a single frost orb.
+  - dev.assert:
+      path: run.players[1].combat.orbQueue.capacity
+      equals: 1
+
+  - dev.assert:
+      path: run.players[1].combat.orbQueue.orbs[0].modelId
+      equals: FROST_ORB
+
+  - dev.assert:
+      path: run.players[1].combat.orbQueue.orbs[0].ownerPlayerId
+      equals: p:2

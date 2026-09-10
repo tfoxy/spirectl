@@ -1,0 +1,15 @@
+name: fixture-basic-bundle-selection
+description: Loads the checked-in bundle-selection fixture through the live bridge and asserts the resulting screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-bundle-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].bundleSelection
+      exists: true
+  - dev.assert:
+      path: actions[args.bundleId=card-selection:bundle:offensive-pack:0].kind
+      source: actions
+      equals: select-bundle
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].bundleSelection.bundles[0].id
+      equals: card-selection:bundle:offensive-pack:0

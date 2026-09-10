@@ -1,0 +1,5 @@
+# Deterministic map mock transport config for typed-state probe scenarios.
+
+transport:
+  kind: mock
+  mockScenario: map

@@ -1,0 +1,14 @@
+{
+  "captures": {
+    "gameInfo": "captured",
+    "inspectActions": "captured",
+    "logs": "captured",
+    "sceneTree": "error",
+    "screenshot": "skipped",
+    "state": "captured"
+  },
+  "logHealth": {
+    "status": "healthy"
+  },
+  "status": "partial"
+}

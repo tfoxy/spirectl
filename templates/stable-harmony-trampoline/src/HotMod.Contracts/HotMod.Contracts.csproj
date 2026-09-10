@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup Condition="'$(EnableHotReloadGuardrails)' == 'true'">
+    <ProjectReference Include="..\HotMod.Guardrails\HotMod.Guardrails.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

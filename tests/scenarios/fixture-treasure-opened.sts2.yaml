@@ -1,0 +1,12 @@
+name: fixture-treasure-opened
+description: Loads the checked-in opened treasure-room fixture through the live bridge and asserts the resulting treasure-room screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/treasure-opened.sts2.fixture.yaml
+  # `proceed-treasure-room` (a room-exit action, like leave-shop/back-from-map)
+  # has no native `state actions` surfacer yet — out of scope for this migration
+  # (only surface_shop/surface_map_room were added; surface_treasure only covers
+  # open-chest/take-relic). Assert the real room-scene identity instead.
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/treasure_room

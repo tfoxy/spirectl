@@ -1,0 +1,188 @@
+name: Publish release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: version
+        shell: bash
+        run: |
+          bash scripts/verify-release-version.sh "${GITHUB_REF_NAME}"
+          echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+  bridge-and-nuget:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Verify pinned STS2 compilation references
+        run: bash scripts/verify-sts2-reference-sdk.sh
+      - name: Package bridge release payload
+        run: >-
+          bash scripts/package-bridge-release.sh
+          --version '${{ needs.metadata.outputs.version }}'
+          --output-dir dist/release-assets
+      - name: Build reference SDK for NuGet pack
+        run: >-
+          dotnet build eng/Sts2.ReferenceSdk/Sts2.ReferenceSdk.csproj
+          --configuration Release --output artifacts/reference-sdk
+          -m:1 -p:RestoreLockedMode=true -p:ContinuousIntegrationBuild=true
+      - name: Pack Spirectl.Sts2
+        run: >-
+          dotnet pack bridge-mod/src/Spirectl.Sts2/Spirectl.Sts2.csproj
+          --configuration Release --output dist/nuget
+          -m:1 -p:Sts2AssembliesDir="$PWD/artifacts/reference-sdk"
+          -p:EnableSts2LiveHost=true -p:Version='${{ needs.metadata.outputs.version }}'
+          -p:ContinuousIntegrationBuild=true -p:DebugSymbols=false -p:DebugType=None
+      - name: Verify NuGet payload excludes game references
+        shell: bash
+        run: |
+          package="dist/nuget/Spirectl.Sts2.${{ needs.metadata.outputs.version }}.nupkg"
+          test -f "$package"
+          ! unzip -l "$package" | rg -i '(^|/)(sts2|GodotSharp|0Harmony|MonoMod|Sentry|SmartFormat|Steamworks\.NET)\.dll$'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bridge-release-assets
+          path: dist/release-assets/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nuget-package
+          path: dist/nuget/Spirectl.Sts2.*.nupkg
+          if-no-files-found: error
+
+  cli:
+    needs: metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            binary: sts2
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            binary: sts2.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test and build CLI
+        run: cargo test -p sts2 && cargo build --release -p sts2
+      - name: Package Linux CLI assets
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          version='${{ needs.metadata.outputs.version }}'
+          mkdir -p dist/release-assets
+          cp target/release/sts2 "dist/release-assets/sts2-v${version}-${{ matrix.target }}"
+          tar -C dist/release-assets -czf "dist/release-assets/sts2-v${version}-${{ matrix.target }}.tar.gz" "sts2-v${version}-${{ matrix.target }}"
+      - name: Package Windows CLI assets
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = '${{ needs.metadata.outputs.version }}'
+          New-Item -ItemType Directory -Force dist/release-assets | Out-Null
+          Copy-Item target/release/sts2.exe "dist/release-assets/sts2-v$version-${{ matrix.target }}.exe"
+          Compress-Archive -Path "dist/release-assets/sts2-v$version-${{ matrix.target }}.exe" -DestinationPath "dist/release-assets/sts2-v$version-${{ matrix.target }}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: dist/release-assets/
+          if-no-files-found: error
+
+  npm-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: https://registry.npmjs.org
+      - run: npm --prefix npm-wrapper ci
+      - run: npm --prefix npm-wrapper test
+      - working-directory: npm-wrapper
+        run: npm pack --dry-run --json
+
+  publish:
+    needs: [metadata, bridge-and-nuget, cli, npm-test]
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          registry-url: https://registry.npmjs.org
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bridge-release-assets
+          path: dist/release-assets
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: dist/release-assets
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: nuget-package
+          path: dist/nuget
+      - name: Create and verify release manifest
+        shell: bash
+        run: |
+          bash scripts/create-release-manifest.sh --version '${{ needs.metadata.outputs.version }}' --output-dir dist/release-assets
+          bash scripts/verify-bridge-release.sh --zip "dist/release-assets/spirectlbridge-v${{ needs.metadata.outputs.version }}.zip" --version '${{ needs.metadata.outputs.version }}'
+          test -f "dist/nuget/Spirectl.Sts2.${{ needs.metadata.outputs.version }}.nupkg"
+      - name: Refuse to replace an existing GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '! gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}"'
+      - run: npm --prefix npm-wrapper ci
+      - name: Publish npm package with trusted publishing
+        working-directory: npm-wrapper
+        run: npm publish --access public --provenance
+      - name: Exchange OIDC for temporary NuGet key
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+      - name: Publish NuGet package
+        run: >-
+          dotnet nuget push 'dist/nuget/Spirectl.Sts2.${{ needs.metadata.outputs.version }}.nupkg'
+          --source https://api.nuget.org/v3/index.json
+          --api-key '${{ steps.nuget-login.outputs.NUGET_API_KEY }}'
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create '${{ github.ref_name }}' dist/release-assets/*
+          --repo '${{ github.repository }}'
+          --title 'spirectl ${{ github.ref_name }}' --generate-notes
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/release-assets/*

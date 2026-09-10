@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-potion-card
+description: Deterministic two-player Ironclad combat with p:1 card-flow potion cases.
+run:
+  seed: fixture-combat-potion-card
+  players:
+    - id: "p:1"
+      potions:
+        - modelId: ATTACK_POTION
+        - modelId: GAMBLERS_BREW
+        - modelId: DISTILLED_CHAOS
+    - id: "p:2"
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

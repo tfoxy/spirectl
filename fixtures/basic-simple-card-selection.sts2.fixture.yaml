@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-simple-card-selection
+description: Deterministic authored simple-card-selection fixture using typed visible card choices.
+run:
+  seed: fixture-basic-simple-card-selection
+  actFloor: 6
+  players:
+    - id: p1
+      creature: { currentHp: 54, maxHp: 80 }
+      overlays:
+        - simpleCardSelection:
+            canConfirm: true
+            cards:
+              - modelId: BASH
+              - modelId: ANGER

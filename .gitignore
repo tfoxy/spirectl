@@ -1,0 +1,33 @@
+/.vscode
+/.agents
+/.codex
+/.codexpotter
+/.claude
+# MCP has local FS paths
+/.mcp.json
+/.ai
+/target
+**/bin
+**/obj
+**/TestResults
+!npm-wrapper/bin
+!npm-wrapper/bin/sts2.js
+node_modules
+__pycache__/
+.playwright
+.playwright-cli
+.sts2
+.sts2-cache
+spirectl-cache
+artifacts
+sts2.local.yaml
+/tmp
+/raw
+**/metadata-catalog/**/*.tmp
+*.dmp
+*.mdmp
+*.crashdump
+
+# Local-only leftovers of the extracted presentation dev app (captured fixtures, node_modules, caches);
+# the app itself now lives in the private spirectl-presentation archive.
+presentation/dev/

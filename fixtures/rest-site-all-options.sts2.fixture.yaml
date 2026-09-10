@@ -1,0 +1,27 @@
+schemaVersion: spirectl.fixture/v0
+name: rest-site-all-options
+description: >-
+  Two-player host-local rest site showing all 8 campfire options. HEAL/SMITH are
+  always present; MEND appears because the run is multiplayer; DIG/COOK/LIFT come
+  from granting player 1 the Shovel/Meat Cleaver/Girya relics; CLONE and HATCH are
+  force-injected because their natural triggers can't run headlessly (Pael's Growth
+  opens an interactive enchant dialog on obtain, and the Byrdonis egg must occupy a
+  deck pile).
+run:
+  seed: fixture-rest-site-all-options
+  actFloor: 6
+  players:
+    - id: "p:1"
+      creature: { currentHp: 67, maxHp: 80 }
+      relics:
+        - modelId: SHOVEL
+        - modelId: MEAT_CLEAVER
+        - modelId: GIRYA
+    - id: "p:2"
+      creature: { currentHp: 80, maxHp: 80 }
+  currentRoom:
+    restSite:
+      playerStates:
+        - options:
+            - optionId: CLONE
+            - optionId: HATCH

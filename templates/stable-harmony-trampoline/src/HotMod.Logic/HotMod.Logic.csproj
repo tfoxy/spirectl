@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\HotMod.Contracts\HotMod.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(EnableHotReloadGuardrails)' == 'true'">
+    <ProjectReference Include="..\HotMod.Guardrails\HotMod.Guardrails.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <HotReloadDeployDir Condition="'$(HotReloadDeployDir)' != ''">$([System.IO.Path]::GetFullPath('$(HotReloadDeployDir)'))</HotReloadDeployDir>
+  </PropertyGroup>
+
+  <Target Name="CopyHotReloadLogic" AfterTargets="Build" Condition="'$(HotReloadDeployDir)' != ''">
+    <MakeDir Directories="$(HotReloadDeployDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(HotReloadDeployDir)" />
+    <Message Importance="High" Text="Copied reloadable logic to $(HotReloadDeployDir)" />
+  </Target>
+
+  <Target Name="CleanHotReloadArtifacts">
+    <RemoveDir Directories="$(HotReloadDeployDir)" Condition="'$(HotReloadDeployDir)' != '' and Exists('$(HotReloadDeployDir)')" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)/../../.sts2/hot-reload/hotmod.template" Condition="Exists('$(MSBuildProjectDirectory)/../../.sts2/hot-reload/hotmod.template')" />
+  </Target>
+</Project>

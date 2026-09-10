@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "google/protobuf/struct.proto";
+
+enum BridgeErrorCode {
+  BRIDGE_ERROR_CODE_UNSPECIFIED = 0;
+  BRIDGE_ERROR_CODE_NOT_IMPLEMENTED = 1;
+  BRIDGE_ERROR_CODE_INVALID_ACTION = 2;
+  BRIDGE_ERROR_CODE_INVALID_QUERY_FILTER = 3;
+  BRIDGE_ERROR_CODE_TRANSPORT_UNAVAILABLE = 4;
+  BRIDGE_ERROR_CODE_BRIDGE_NOT_ATTACHED = 5;
+  BRIDGE_ERROR_CODE_RUNTIME_FAILURE = 6;
+  BRIDGE_ERROR_CODE_INVALID_FIXTURE = 7;
+  BRIDGE_ERROR_CODE_IPC_SOCKET_MISSING = 8;
+  BRIDGE_ERROR_CODE_IPC_CONNECTION_FAILED = 9;
+  BRIDGE_ERROR_CODE_BRIDGE_BOOTSTRAP_FAILED = 10;
+  BRIDGE_ERROR_CODE_TRANSPORT_MISCONFIGURED = 11;
+  BRIDGE_ERROR_CODE_TRANSPORT_CONNECTION_FAILED = 12;
+  BRIDGE_ERROR_CODE_BRIDGE_RPC_TIMEOUT = 13;
+  BRIDGE_ERROR_CODE_PRESENTATION_GEOMETRY_UNAVAILABLE = 14;
+}
+
+enum ErrorActionFailureReasonCode {
+  ERROR_ACTION_FAILURE_REASON_CODE_UNSPECIFIED = 0;
+  ERROR_ACTION_FAILURE_REASON_CODE_NOT_IMPLEMENTED = 1;
+  ERROR_ACTION_FAILURE_REASON_CODE_INVALID_ACTION = 2;
+  ERROR_ACTION_FAILURE_REASON_CODE_BRIDGE_NOT_ATTACHED = 3;
+  ERROR_ACTION_FAILURE_REASON_CODE_RUNTIME_FAILURE = 4;
+  ERROR_ACTION_FAILURE_REASON_CODE_WRONG_SCREEN = 5;
+  ERROR_ACTION_FAILURE_REASON_CODE_WRONG_PLAYER = 6;
+  ERROR_ACTION_FAILURE_REASON_CODE_NOT_VISIBLE = 7;
+  ERROR_ACTION_FAILURE_REASON_CODE_NOT_ENABLED = 8;
+  ERROR_ACTION_FAILURE_REASON_CODE_MISSING_HOOK = 9;
+  ERROR_ACTION_FAILURE_REASON_CODE_AMBIGUOUS_HOOK = 10;
+  ERROR_ACTION_FAILURE_REASON_CODE_STALE_ID = 11;
+  ERROR_ACTION_FAILURE_REASON_CODE_UNSUPPORTED_PERSPECTIVE = 12;
+  ERROR_ACTION_FAILURE_REASON_CODE_DANGEROUS_MODE_REQUIRED = 13;
+}
+
+message ErrorDetail {
+  string field = 1;
+  string value = 2;
+  string note = 3;
+  ErrorActionFailureReasonCode action_reason_code = 4;
+  string screen = 5;
+  string player_id = 6;
+  string perspective = 7;
+  repeated string checked_hook_paths = 8;
+  repeated FieldDiagnostic field_diagnostics = 9;
+  string requested_player_id = 10;
+  string resolved_owner_player_id = 11;
+  string local_player_id = 12;
+  string host_player_id = 13;
+  MultiplayerRole local_role = 14;
+  string action = 15;
+  RemoteClientOrchestrationCapability remote_orchestration = 16;
+  google.protobuf.Struct diagnostic = 17;
+}
+
+message BridgeError {
+  BridgeErrorCode code = 1;
+  string message = 2;
+  repeated ErrorDetail details = 3;
+  ActionFailureDetail action_failure = 4;
+}
+
+message ActionFailureDetail {
+  ErrorActionFailureReasonCode reason_code = 1;
+  string screen = 2;
+  string player_id = 3;
+  string perspective = 4;
+  repeated string checked_hook_paths = 5;
+  repeated FieldDiagnostic field_diagnostics = 6;
+  string requested_player_id = 7;
+  string resolved_owner_player_id = 8;
+  string local_player_id = 9;
+  string host_player_id = 10;
+  MultiplayerRole local_role = 11;
+  string action = 12;
+  RemoteClientOrchestrationCapability remote_orchestration = 13;
+}
+
+message FieldDiagnostic {
+  string field = 1;
+  string value = 2;
+  string note = 3;
+}

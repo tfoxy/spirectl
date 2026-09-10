@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+import "spirectl/v0/runtime.proto";
+import "spirectl/v0/scenario.proto";
+
+message FixtureLoadRequest {
+  string request_id = 1;
+  string schema_version = 2;
+  string fixture_name = 3;
+  string source_path = 4;
+  string fixture_json = 5;
+}
+
+message FixtureLoadResponse {
+  string request_id = 1;
+  string fixture_name = 2;
+  string source_path = 3;
+  DataSource source = 4;
+  bool provisional = 5;
+  ScreenInfo screen = 6;
+  PerspectiveInfo resolved_perspective = 7;
+  repeated StateNotice notices = 8;
+  FixtureRecipeRestoreReport recipe_report = 9;
+}
+
+message FixtureRecipeRestoreReport {
+  string recipe_name = 1;
+  repeated FixtureRecipeFieldReport applied_fields = 2;
+  repeated FixtureRecipeFieldReport inferred_fields = 3;
+  repeated FixtureRecipeFieldReport omitted_fields = 4;
+  repeated FixtureRecipeFieldReport unsupported_fields = 5;
+  repeated FixtureRecipeFieldReport degraded_multiplayer_fields = 6;
+  FixtureBridgeValidationResult bridge_validation = 7;
+}
+
+message FixtureRecipeFieldReport {
+  string field_path = 1;
+  string value_summary = 2;
+  string reason_code = 3;
+  string message = 4;
+}
+
+message FixtureBridgeValidationResult {
+  string status = 1;
+  repeated FixtureRecipeFieldReport details = 2;
+}
+
+message FixtureLoadResult {
+  oneof result {
+    FixtureLoadResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message RecordedFixtureRequest {
+  string request_id = 1;
+  PerspectiveSelector perspective = 2;
+}
+
+message RecordedFixtureMetadata {
+  string schema_version = 1;
+  string recorded_at = 2;
+  ScreenInfo screen = 3;
+  string game_version = 4;
+  string bridge_version = 5;
+  string spirectl_version = 6;
+  RestoreQuality restore_quality = 7;
+  repeated RestoreCompatibilityNote known_omissions = 8;
+  repeated StateNotice notices = 9;
+}
+
+message RecordedFixtureResponse {
+  string request_id = 1;
+  string fixture_yaml = 2;
+  string fixture_json = 3;
+  RecordedFixtureMetadata metadata = 4;
+  DataSource source = 5;
+  bool provisional = 6;
+}
+
+message RecordedFixtureResult {
+  oneof result {
+    RecordedFixtureResponse success = 1;
+    BridgeError error = 2;
+  }
+}

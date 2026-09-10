@@ -1,0 +1,13 @@
+schemaVersion: spirectl.fixture/v0
+name: event-crystal-sphere-grid
+run:
+  seed: event-crystal-sphere-grid
+  currentRoom:
+    event:
+      canonicalEventModelId: CRYSTAL_SPHERE
+      playerStates:
+        - options:
+            - textKey: CRYSTAL_SPHERE.pages.INITIAL.options.UNCOVER_FUTURE
+              wasChosen: false
+            - textKey: CRYSTAL_SPHERE.pages.INITIAL.options.PAYMENT_PLAN
+              wasChosen: true

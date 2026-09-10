@@ -1,0 +1,12 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-end-turn-theirs
+description: Two-player Ironclad NIBBITS_WEAK combat; the ally (p:2) has ended their turn, the perspective player (p:1) has not.
+run:
+  seed: fixture-combat-end-turn-theirs
+  players:
+    - id: "p:1"
+    - id: "p:2"
+      endedTurn: true
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

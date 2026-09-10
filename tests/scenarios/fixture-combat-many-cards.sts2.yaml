@@ -1,0 +1,70 @@
+name: fixture-combat-many-cards
+description: Loads the many-cards combat fixture and asserts exact authored pile/deck sizes.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/combat-many-cards.sts2.fixture.yaml
+
+  - dev.assert:
+      path: rootScene
+      equals: run
+
+  - dev.assert:
+      path: run.currentRoom.combat.encounterId
+      equals: NIBBITS_NORMAL
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[9]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[10]
+      notExists: true
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[modelId=NEOWS_FURY]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[modelId=INFECTION]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[modelId=BURN]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.hand.cards[modelId=REGRET]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.drawPile.cards[29]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.drawPile.cards[30]
+      notExists: true
+
+  - dev.assert:
+      path: run.players[0].combat.discardPile.cards[29]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.discardPile.cards[30]
+      notExists: true
+
+  - dev.assert:
+      path: run.players[0].combat.exhaustPile.cards[29]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].combat.exhaustPile.cards[30]
+      notExists: true
+
+  - dev.assert:
+      path: run.players[0].deck.cards[49]
+      exists: true
+
+  - dev.assert:
+      path: run.players[0].deck.cards[50]
+      notExists: true

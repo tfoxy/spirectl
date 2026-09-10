@@ -1,0 +1,82 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-enchantments
+description: >-
+  Ironclad combat showcasing card enchantments: 10 enchanted cards in hand and the draw
+  pile filled with one card per enchantment (all of them). Cards are paired to satisfy the
+  game's CanEnchant rules (SHARP/INSTINCT/VIGOROUS are Attack-only, IMBUED is Skill-only).
+run:
+  seed: fixture-combat-enchantments
+  players:
+    - id: "p:1"
+      characterId: IRONCLAD
+      creature: { currentHp: 67, maxHp: 80 }
+      # Master deck (the top-bar Deck viewer): replace the Ironclad starter with one card
+      # per enchantment, so the deck viewer shows all 22 enchantments instead of the starter.
+      deck:
+        replace: true
+        cards:
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: ADROIT, enchantAmount: 2 }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: CLONE }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: CORRUPTED }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: GLAM }
+          - { modelId: DEFEND_IRONCLAD, enchantmentId: GOOPY }
+          - { modelId: DEFEND_IRONCLAD, enchantmentId: IMBUED }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: INKY }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: INSTINCT }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: MOMENTUM, enchantAmount: 2 }
+          - { modelId: DEFEND_IRONCLAD, enchantmentId: NIMBLE, enchantAmount: 2 }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: PERFECT_FIT }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: ROYALLY_APPROVED }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: SHARP, enchantAmount: 2 }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: SLITHER }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: SLUMBERING_ESSENCE }
+          - { modelId: FEED, enchantmentId: SOULS_POWER }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: SOWN, enchantAmount: 1 }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: SPIRAL }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: STEADY }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: SWIFT, enchantAmount: 1 }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: TEZCATARAS_EMBER }
+          - { modelId: STRIKE_IRONCLAD, enchantmentId: VIGOROUS, enchantAmount: 3 }
+      combat:
+        # 10 enchanted cards in hand — a spread including amount-showing enchantments and
+        # TEZCATARAS_EMBER (the "Costs 0 / Eternal / Inmutabilidad" example).
+        hand:
+          cards:
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: SHARP, enchantAmount: 2 }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: TEZCATARAS_EMBER }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: ADROIT, enchantAmount: 3 }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: CORRUPTED }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: GLAM }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: STEADY }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: SPIRAL }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: INKY }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: MOMENTUM, enchantAmount: 2 }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: VIGOROUS, enchantAmount: 3 }
+        # Draw pile: one card per enchantment, covering all 22.
+        drawPile:
+          cards:
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: ADROIT, enchantAmount: 2 }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: CLONE }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: CORRUPTED }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: GLAM }
+            - { modelId: DEFEND_IRONCLAD, enchantmentId: GOOPY }
+            - { modelId: DEFEND_IRONCLAD, enchantmentId: IMBUED }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: INKY }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: INSTINCT }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: MOMENTUM, enchantAmount: 2 }
+            - { modelId: DEFEND_IRONCLAD, enchantmentId: NIMBLE, enchantAmount: 2 }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: PERFECT_FIT }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: ROYALLY_APPROVED }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: SHARP, enchantAmount: 2 }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: SLITHER }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: SLUMBERING_ESSENCE }
+            - { modelId: FEED, enchantmentId: SOULS_POWER }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: SOWN, enchantAmount: 1 }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: SPIRAL }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: STEADY }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: SWIFT, enchantAmount: 1 }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: TEZCATARAS_EMBER }
+            - { modelId: STRIKE_IRONCLAD, enchantmentId: VIGOROUS, enchantAmount: 3 }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL

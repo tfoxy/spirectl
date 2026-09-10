@@ -1,0 +1,22 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-card-frail-block
+description: >-
+  Two-player Ironclad QUEEN_BOSS combat where p:1 has Frail and a Defend (block
+  card) is pre-selected. Frail is a self power that reduces block gained, so the
+  card's Block number drops while in hand and renders in red via the generic
+  status-aware :diff() coloring. Block-card counterpart to combat-card-weak.
+run:
+  seed: fixture-combat-card-selected
+  currentActIndex: 2
+  actFloor: 51
+  players:
+    - powers:
+        - modelId: FRAIL_POWER
+          amount: 1
+    - {}
+  view:
+    selectedCard:
+      cardModelId: DEFEND_IRONCLAD
+  currentRoom:
+    combat:
+      encounterId: QUEEN_BOSS

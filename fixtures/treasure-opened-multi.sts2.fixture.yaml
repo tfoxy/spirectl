@@ -1,0 +1,14 @@
+schemaVersion: spirectl.fixture/v0
+name: treasure-opened-multi
+description: Opened treasure-room fixture with multiple host-local players.
+run:
+  seed: treasure-opened-multi
+  actFloor: 9
+  players: 3
+  currentRoom:
+    treasure:
+      currentRelicsActive: true
+      playerVotes:
+        - playerId: "p:2"
+          index: 0
+        - playerId: "p:3"

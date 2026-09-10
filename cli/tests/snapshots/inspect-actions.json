@@ -1,0 +1,2207 @@
+{
+  "availableActions": [],
+  "notices": [],
+  "provisional": true,
+  "resolvedPerspective": null,
+  "screen": null,
+  "source": "bridge",
+  "stateContract": {
+    "compatibilityMetadata": [
+      "choiceKind",
+      "intentKind",
+      "ownerPlayerId",
+      "perspective",
+      "preferredAction",
+      "hostPlayerId",
+      "localRole",
+      "remoteOrchestration"
+    ],
+    "fallbackChoosePolicy": "Use typed overlay state and preferredAction metadata first. Generic choose is retained only for currently executable compatibility controls or unmodeled visible overlay controls; close/back actions are advertised only when the bridge can validate a legal hook.",
+    "noticeFields": [
+      "path",
+      "severity",
+      "source",
+      "stability",
+      "perspective"
+    ],
+    "overlayPolicy": {
+      "blocking": "Blocking overlays take precedence in default state and preserve underlying screen breadcrumbs when observable.",
+      "passive": "Passive overlays keep the underlying screen authoritative while exposing additive typed overlay detail and a notice.",
+      "unsupported": "Unsupported or partial named overlays emit structured notices instead of exposing raw scene-tree internals or fabricating choices."
+    },
+    "ownershipFailureReasonCodes": [
+      "wrong_player",
+      "unsupported_perspective"
+    ],
+    "perspectiveInputs": {
+      "act": [
+        "--player-id <stable-player-id> on semantic action commands"
+      ],
+      "rules": [
+        "Single-player callers can omit perspective and playerId; the bridge resolves the local default.",
+        "playerId selects the requested owner/perspective, but action legality remains separate from remote-client orchestration capability.",
+        "Wrong-owner actions are rejected with actionFailure.reasonCode=wrong_player and ownership details."
+      ],
+      "state": [
+        "--perspective local",
+        "--perspective omniscient",
+        "--player-id <stable-player-id>"
+      ]
+    },
+    "preferredReadSurface": "typed-state-sections",
+    "remoteOrchestrationStates": [
+      "unavailable",
+      "local-only-degraded",
+      "host-local-seat",
+      "host-mediated",
+      "configured-client",
+      "unsupported"
+    ],
+    "runtimeInternals": "Raw runtime scene internals are excluded from default state; use dev scene tree, dev scene node, or dev scene children for developer scene diagnostics. dev scene node --properties may include text-bearing label fields such as Text/raw text and rich-text enablement when available, but those fields remain outside default observable state.",
+    "typedNonCombatSectionDetails": {
+      "eventRoom": "Typed event-room state. eventRoom.page exposes the currently visible localized rich event title/body/shared label with LocString provenance when available; ancient event banner/epithet/dialogue live under eventRoom.page.ancient, and eventRoom.options[] exposes visible option labels and descriptions."
+    },
+    "typedNonCombatSections": [
+      "map",
+      "eventRoom",
+      "treasureRoom",
+      "relicSelection",
+      "restSite",
+      "shop",
+      "rewards",
+      "cardSelection",
+      "simpleCardSelection",
+      "deckCardSelection",
+      "bundleSelection",
+      "lobby"
+    ],
+    "typedOverlaySectionDetails": {
+      "cardOverlay": "Typed partial card detail overlay state. Prefer this section before compatibility choices/actions; it may include visible card/detail data, preview text, source-screen breadcrumbs, overlayPolicy, validated close/back compatibility metadata, fallback visible controls, and structured notices for partial, passive, unsupported, or ambiguous ownership cases."
+    },
+    "typedOverlaySections": [
+      "cardOverlay"
+    ]
+  },
+  "supportedActions": [
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "cardId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable card id from state.combat.hand[].id.",
+          "valueType": "string"
+        },
+        {
+          "allowedValues": [],
+          "name": "targetId",
+          "required": false,
+          "stableId": false,
+          "summary": "Optional stable target id when the card requires a target.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act play-card --card c_1 --target e_1",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "play-card",
+      "kind": "play-card",
+      "kindDescriptor": {
+        "commandName": "play-card",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "play-card",
+        "kind": "play-card",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "combat"
+        ],
+        "summary": "Play a card against an optional target."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "cardId",
+          "required": true,
+          "summary": "Stable card id from state.combat.hand[].id.",
+          "valueType": "string"
+        },
+        {
+          "name": "targetId",
+          "required": false,
+          "summary": "Optional stable target id when the card requires a target.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Play a card against an optional target."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "potionId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable potion id from state.combat.potions[].id.",
+          "valueType": "string"
+        },
+        {
+          "allowedValues": [],
+          "name": "targetId",
+          "required": false,
+          "stableId": false,
+          "summary": "Optional stable target id when the potion requires a combat target.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act use-potion --potion potion:p:100:0:fire-potion --target e_1",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "use-potion",
+      "kind": "use-potion",
+      "kindDescriptor": {
+        "commandName": "use-potion",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "use-potion",
+        "kind": "use-potion",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "combat"
+        ],
+        "summary": "Use a combat potion against an optional target."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "potionId",
+          "required": true,
+          "summary": "Stable potion id from state.combat.potions[].id.",
+          "valueType": "string"
+        },
+        {
+          "name": "targetId",
+          "required": false,
+          "summary": "Optional stable target id when the potion requires a combat target.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Use a combat potion against an optional target."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "choiceId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable fallback compatibility choice id from state.choices[].id or availableActions[].arguments.choiceId.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act choose --choice reward:p1:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "choose",
+      "kind": "choose",
+      "kindDescriptor": {
+        "commandName": "choose",
+        "dangerous": false,
+        "fallback": true,
+        "intentKind": "choose",
+        "kind": "choose",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "generic",
+          "modded",
+          "unmodeled-visible-choice"
+        ],
+        "summary": "Fallback-only compatibility action for generic, modded, or unmodeled visible choices."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "choiceId",
+          "required": true,
+          "summary": "Stable fallback compatibility choice id from state.choices[].id or availableActions[].arguments.choiceId.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "local-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Fallback-only compatibility action for generic, modded, or unmodeled visible choices when no modeled preferredAction exists."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act confirm-selection",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "confirm-selection",
+      "kind": "confirm-selection",
+      "kindDescriptor": {
+        "commandName": "confirm-selection",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "confirm-selection",
+        "kind": "confirm-selection",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.CardSelection.NSimpleCardSelectScreen",
+          "Screens.CardSelection.NDeckCardSelectScreen",
+          "Screens.CardSelection.NChooseABundleSelectionScreen"
+        ],
+        "summary": "Confirm the currently staged selection on a supported selection overlay."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Confirm the currently staged selection on a supported selection overlay."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act cancel-selection",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "cancel-selection",
+      "kind": "cancel-selection",
+      "kindDescriptor": {
+        "commandName": "cancel-selection",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "cancel-selection",
+        "kind": "cancel-selection",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.CardSelection.NSimpleCardSelectScreen",
+          "Screens.CardSelection.NDeckCardSelectScreen",
+          "Screens.CardSelection.NChooseABundleSelectionScreen"
+        ],
+        "summary": "Cancel the currently staged selection on a supported selection overlay."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Cancel the currently staged selection on a supported selection overlay."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "mapNodeId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable map node id from state.map.nodes[].id, state.choices[].id, or availableActions[].arguments.mapNodeId.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act select-map-node --node map-node:3:1",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "select-map-node",
+      "kind": "select-map-node",
+      "kindDescriptor": {
+        "commandName": "select-map-node",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "select-map-node",
+        "kind": "select-map-node",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.Map.NMapScreen"
+        ],
+        "summary": "Select an executable map node by stable id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "mapNodeId",
+          "required": true,
+          "summary": "Stable map node id from state.map.nodes[].id, state.choices[].id, or availableActions[].arguments.mapNodeId.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Select an executable map node by stable id."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act end-turn",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "end-turn",
+      "kind": "end-turn",
+      "kindDescriptor": {
+        "commandName": "end-turn",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "end-turn",
+        "kind": "end-turn",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "combat"
+        ],
+        "summary": "End the current turn for the active player."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "End the current turn for the active player."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "characterId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable character id from state.lobby.availableCharacters[].id or the visible lobby state.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act select-character --character silent",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "select-character",
+      "kind": "select-character",
+      "kindDescriptor": {
+        "commandName": "select-character",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "select-character",
+        "kind": "select-character",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.CharacterSelect.NCharacterSelectScreen",
+          "Screens.CharacterSelect.NMultiplayerLoadGameScreen"
+        ],
+        "summary": "Select an executable multiplayer lobby character by stable id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "characterId",
+          "required": true,
+          "summary": "Stable character id from state.lobby.availableCharacters[].id or the visible lobby state.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Select an executable multiplayer lobby character by stable id."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act ready",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "ready",
+      "kind": "ready",
+      "kindDescriptor": {
+        "commandName": "ready",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "ready",
+        "kind": "ready",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.CharacterSelect.NCharacterSelectScreen",
+          "Screens.CharacterSelect.NMultiplayerLoadGameScreen"
+        ],
+        "summary": "Mark the local multiplayer lobby player ready when the screen allows it."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Mark the local multiplayer lobby player ready when the screen allows it."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act unready",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "unready",
+      "kind": "unready",
+      "kindDescriptor": {
+        "commandName": "unready",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "unready",
+        "kind": "unready",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.CharacterSelect.NCharacterSelectScreen",
+          "Screens.CharacterSelect.NMultiplayerLoadGameScreen"
+        ],
+        "summary": "Clear the local multiplayer lobby ready state when the screen allows it."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Clear the local multiplayer lobby ready state when the screen allows it."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "rewardId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable reward id from state.rewards.rewards[].id.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act claim-reward --reward reward:p1:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "claim-reward",
+      "kind": "claim-reward",
+      "kindDescriptor": {
+        "commandName": "claim-reward",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "claim-reward",
+        "kind": "claim-reward",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.NRewardsScreen"
+        ],
+        "summary": "Claim a visible reward by stable reward id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "rewardId",
+          "required": true,
+          "summary": "Stable reward id from state.rewards.rewards[].id.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Claim a visible reward by stable reward id."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act skip-rewards",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "skip-rewards",
+      "kind": "skip-rewards",
+      "kindDescriptor": {
+        "commandName": "skip-rewards",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "skip-rewards",
+        "kind": "skip-rewards",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.NRewardsScreen"
+        ],
+        "summary": "Skip the visible rewards flow when legal."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Skip the visible rewards flow when legal."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "cardId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable card id from the visible card-selection state.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act select-card --card card-selection:card:bash:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "select-card",
+      "kind": "select-card",
+      "kindDescriptor": {
+        "commandName": "select-card",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "select-card",
+        "kind": "select-card",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.CardSelection.NCardRewardSelectionScreen",
+          "Screens.CardSelection.NChooseACardSelectionScreen",
+          "Screens.CardSelection.NSimpleCardSelectScreen",
+          "Screens.CardSelection.NDeckCardSelectScreen",
+          "card-overlay"
+        ],
+        "summary": "Select a visible card from a supported card-selection screen."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "cardId",
+          "required": true,
+          "summary": "Stable card id from the visible card-selection state.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Select a visible card from a supported card-selection screen."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act skip-card-selection",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "skip-card-selection",
+      "kind": "skip-card-selection",
+      "kindDescriptor": {
+        "commandName": "skip-card-selection",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "skip-card-selection",
+        "kind": "skip-card-selection",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.CardSelection.NCardRewardSelectionScreen",
+          "Screens.CardSelection.NChooseACardSelectionScreen",
+          "Screens.CardSelection.NSimpleCardSelectScreen",
+          "Screens.CardSelection.NDeckCardSelectScreen",
+          "card-overlay"
+        ],
+        "summary": "Skip a skippable card-selection flow."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Skip a skippable card-selection flow."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "bundleId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable bundle id from state.bundleSelection.bundles[].id.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act select-bundle --bundle card-selection:bundle:offensive-pack:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "select-bundle",
+      "kind": "select-bundle",
+      "kindDescriptor": {
+        "commandName": "select-bundle",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "select-bundle",
+        "kind": "select-bundle",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.CardSelection.NChooseABundleSelectionScreen"
+        ],
+        "summary": "Select a visible card bundle by stable bundle id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "bundleId",
+          "required": true,
+          "summary": "Stable bundle id from state.bundleSelection.bundles[].id.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Select a visible card bundle by stable bundle id."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "shopItemId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable shop item id from state.shop.purchasableItems[].id.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act buy-card --shop-item shop:p1:card:strike:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "buy-card",
+      "kind": "buy-card",
+      "kindDescriptor": {
+        "commandName": "buy-card",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "buy-card",
+        "kind": "buy-card",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.Shops.NMerchantInventory",
+          "Screens.Shops.NFakeMerchantInventory"
+        ],
+        "summary": "Buy a visible shop card by stable shop item id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "shopItemId",
+          "required": true,
+          "summary": "Stable shop item id from state.shop.purchasableItems[].id.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Buy a visible shop card by stable shop item id."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "shopItemId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable shop item id from state.shop.purchasableItems[].id.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act buy-relic --shop-item shop:p1:relic:anchor:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "buy-relic",
+      "kind": "buy-relic",
+      "kindDescriptor": {
+        "commandName": "buy-relic",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "buy-relic",
+        "kind": "buy-relic",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.Shops.NMerchantInventory",
+          "Screens.Shops.NFakeMerchantInventory"
+        ],
+        "summary": "Buy a visible shop relic by stable shop item id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "shopItemId",
+          "required": true,
+          "summary": "Stable shop item id from state.shop.purchasableItems[].id.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Buy a visible shop relic by stable shop item id."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "shopItemId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable shop item id from state.shop.purchasableItems[].id.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act buy-potion --shop-item shop:p1:potion:fire-potion:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "buy-potion",
+      "kind": "buy-potion",
+      "kindDescriptor": {
+        "commandName": "buy-potion",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "buy-potion",
+        "kind": "buy-potion",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.Shops.NMerchantInventory",
+          "Screens.Shops.NFakeMerchantInventory"
+        ],
+        "summary": "Buy a visible shop potion by stable shop item id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "shopItemId",
+          "required": true,
+          "summary": "Stable shop item id from state.shop.purchasableItems[].id.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Buy a visible shop potion by stable shop item id."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "shopItemId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable shop service id from state.shop.purchasableItems[].id.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act remove-card --shop-item shop:p1:card-removal:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "remove-card",
+      "kind": "remove-card",
+      "kindDescriptor": {
+        "commandName": "remove-card",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "remove-card",
+        "kind": "remove-card",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.Shops.NMerchantInventory",
+          "Screens.Shops.NFakeMerchantInventory"
+        ],
+        "summary": "Use a visible shop card-removal service."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "shopItemId",
+          "required": true,
+          "summary": "Stable shop service id from state.shop.purchasableItems[].id.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Use a visible shop card-removal service."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act leave-shop",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "leave-shop",
+      "kind": "leave-shop",
+      "kindDescriptor": {
+        "commandName": "leave-shop",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "leave-shop",
+        "kind": "leave-shop",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.Shops.NMerchantInventory",
+          "Screens.Shops.NFakeMerchantInventory"
+        ],
+        "summary": "Leave the current shop when the shop exit is visible and legal."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Leave the current shop when the shop exit is visible and legal."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act close-shop-inventory",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "close-shop-inventory",
+      "kind": "close-shop-inventory",
+      "kindDescriptor": {
+        "commandName": "close-shop-inventory",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "close-shop-inventory",
+        "kind": "close-shop-inventory",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.Shops.NMerchantInventory",
+          "Screens.Shops.NFakeMerchantInventory"
+        ],
+        "summary": "Close an opened Fake Merchant shop inventory when visible."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Close an opened Fake Merchant shop inventory when visible."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act rest",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "rest",
+      "kind": "rest",
+      "kindDescriptor": {
+        "commandName": "rest",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "rest",
+        "kind": "rest",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NRestSiteRoom"
+        ],
+        "summary": "Use the visible rest option at a rest site."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Use the visible rest option at a rest site."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "cardId",
+          "required": false,
+          "stableId": false,
+          "summary": "Optional card id when the smith flow can accept a card directly.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act smith --card c_1",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "smith",
+      "kind": "smith",
+      "kindDescriptor": {
+        "commandName": "smith",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "smith",
+        "kind": "smith",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NRestSiteRoom"
+        ],
+        "summary": "Use the visible smith option at a rest site."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "cardId",
+          "required": false,
+          "summary": "Optional card id when the smith flow can accept a card directly.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Use the visible smith option at a rest site."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "restOptionId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable rest-site option id from state.restSite.controls[].id or action arguments.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act use-rest-site-option --rest-option heal",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "use-rest-site-option",
+      "kind": "use-rest-site-option",
+      "kindDescriptor": {
+        "commandName": "use-rest-site-option",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "use-rest-site-option",
+        "kind": "use-rest-site-option",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NRestSiteRoom"
+        ],
+        "summary": "Use another visible rest-site option by stable option id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "restOptionId",
+          "required": true,
+          "summary": "Stable rest-site option id from state.restSite.controls[].id or action arguments.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Use another visible rest-site option by stable option id."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act proceed-rest-site",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "proceed-rest-site",
+      "kind": "proceed-rest-site",
+      "kindDescriptor": {
+        "commandName": "proceed-rest-site",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "proceed-rest-site",
+        "kind": "proceed-rest-site",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NRestSiteRoom"
+        ],
+        "summary": "Proceed from a rest site when the proceed control is visible."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Proceed from a rest site when the proceed control is visible."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act open-chest",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "open-chest",
+      "kind": "open-chest",
+      "kindDescriptor": {
+        "commandName": "open-chest",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "open-chest",
+        "kind": "open-chest",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NTreasureRoom",
+          "Screens.TreasureRoomRelic.NTreasureRoomRelicCollection",
+          "Screens.NChooseARelicSelection"
+        ],
+        "summary": "Open a visible treasure-room chest."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Open a visible treasure-room chest."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "relicId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable relic id from the visible relic state.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act take-relic --relic anchor",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "take-relic",
+      "kind": "take-relic",
+      "kindDescriptor": {
+        "commandName": "take-relic",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "take-relic",
+        "kind": "take-relic",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NTreasureRoom",
+          "Screens.TreasureRoomRelic.NTreasureRoomRelicCollection",
+          "Screens.NChooseARelicSelection"
+        ],
+        "summary": "Take a visible treasure-room or relic-selection relic by stable relic id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "relicId",
+          "required": true,
+          "summary": "Stable relic id from the visible relic state.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Take a visible treasure-room or relic-selection relic by stable relic id."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act proceed-treasure-room",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "proceed-treasure-room",
+      "kind": "proceed-treasure-room",
+      "kindDescriptor": {
+        "commandName": "proceed-treasure-room",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "proceed-treasure-room",
+        "kind": "proceed-treasure-room",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NTreasureRoom",
+          "Screens.TreasureRoomRelic.NTreasureRoomRelicCollection",
+          "Screens.NChooseARelicSelection"
+        ],
+        "summary": "Proceed from a treasure room when visible."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Proceed from a treasure room when visible."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act back-from-map",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "back-from-map",
+      "kind": "back-from-map",
+      "kindDescriptor": {
+        "commandName": "back-from-map",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "back-from-map",
+        "kind": "back-from-map",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Screens.Map.NMapScreen"
+        ],
+        "summary": "Go back from the map when the back control is visible."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Go back from the map when the back control is visible."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "eventOptionId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable event option id from state.eventRoom.options[].id.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act select-event-option --event-option event-room:gain-gold:0",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "select-event-option",
+      "kind": "select-event-option",
+      "kindDescriptor": {
+        "commandName": "select-event-option",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "select-event-option",
+        "kind": "select-event-option",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NEventRoom"
+        ],
+        "summary": "Select a visible first-party event option by stable option id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "eventOptionId",
+          "required": true,
+          "summary": "Stable event option id from state.eventRoom.options[].id.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Select a visible first-party event option by stable option id."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "eventOptionId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable event option id for the shop-entry control.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act open-event-shop --event-option event-room:fake-merchant:open-shop",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "open-event-shop",
+      "kind": "open-event-shop",
+      "kindDescriptor": {
+        "commandName": "open-event-shop",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "open-event-shop",
+        "kind": "open-event-shop",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NEventRoom"
+        ],
+        "summary": "Open a visible event-owned shop entry point such as Fake Merchant."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "eventOptionId",
+          "required": true,
+          "summary": "Stable event option id for the shop-entry control.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Open a visible event-owned shop entry point such as Fake Merchant."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "controlId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable Crystal Sphere control id from event-room state.",
+          "valueType": "string"
+        },
+        {
+          "allowedValues": [],
+          "name": "selectedTool",
+          "required": false,
+          "stableId": false,
+          "summary": "Optional Crystal Sphere tool override for cell controls: big or small.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act use-crystal-sphere-control --control crystal-sphere:tool:big",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "use-crystal-sphere-control",
+      "kind": "use-crystal-sphere-control",
+      "kindDescriptor": {
+        "commandName": "use-crystal-sphere-control",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "use-crystal-sphere-control",
+        "kind": "use-crystal-sphere-control",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Events.Custom.CrystalSphere.NCrystalSphereScreen"
+        ],
+        "summary": "Use a visible Crystal Sphere control by stable control id."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "controlId",
+          "required": true,
+          "summary": "Stable Crystal Sphere control id from event-room state.",
+          "valueType": "string"
+        },
+        {
+          "name": "selectedTool",
+          "required": false,
+          "summary": "Optional Crystal Sphere tool override for cell controls: big or small.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Use a visible Crystal Sphere control by stable control id."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act proceed-event",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "proceed-event",
+      "kind": "proceed-event",
+      "kindDescriptor": {
+        "commandName": "proceed-event",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "proceed-event",
+        "kind": "proceed-event",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "Rooms.NEventRoom",
+          "Events.Custom.CrystalSphere.NCrystalSphereScreen"
+        ],
+        "summary": "Proceed from an event when the proceed control is visible."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Proceed from an event when the proceed control is visible."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act toggle-map",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "toggle-map",
+      "kind": "toggle-map",
+      "kindDescriptor": {
+        "commandName": "toggle-map",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "toggle-map",
+        "kind": "toggle-map",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Toggle the run top-bar map."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Toggle the run top-bar map."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act toggle-deck",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "toggle-deck",
+      "kind": "toggle-deck",
+      "kindDescriptor": {
+        "commandName": "toggle-deck",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "toggle-deck",
+        "kind": "toggle-deck",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Toggle the run top-bar deck view."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Toggle the run top-bar deck view."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act toggle-settings",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "toggle-settings",
+      "kind": "toggle-settings",
+      "kindDescriptor": {
+        "commandName": "toggle-settings",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "toggle-settings",
+        "kind": "toggle-settings",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Toggle the run top-bar settings menu."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Toggle the run top-bar settings menu."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "by",
+          "required": true,
+          "stableId": false,
+          "summary": "Deck view sort key: obtained, type, cost, or alphabet.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act sort-deck-view --by type",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "sort-deck-view",
+      "kind": "sort-deck-view",
+      "kindDescriptor": {
+        "commandName": "sort-deck-view",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "sort-deck-view",
+        "kind": "sort-deck-view",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Sort the run deck view."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "by",
+          "required": true,
+          "summary": "Deck view sort key: obtained, type, cost, or alphabet.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Sort the run deck view."
+    },
+    {
+      "argumentSchema": [],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act toggle-deck-view-upgrades",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "toggle-deck-view-upgrades",
+      "kind": "toggle-deck-view-upgrades",
+      "kindDescriptor": {
+        "commandName": "toggle-deck-view-upgrades",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "toggle-deck-view-upgrades",
+        "kind": "toggle-deck-view-upgrades",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Toggle run deck view upgrade previews."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Toggle run deck view upgrade previews."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "potionId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable potion id or slot index from state.run.players[].potions[].",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act open-potion-popup --potion potion:p1:0:fire-potion",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "open-potion-popup",
+      "kind": "open-potion-popup",
+      "kindDescriptor": {
+        "commandName": "open-potion-popup",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "open-potion-popup",
+        "kind": "open-potion-popup",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Open a visible top-bar potion popup."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "potionId",
+          "required": true,
+          "summary": "Stable potion id or slot index from state.run.players[].potions[].",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Open a visible top-bar potion popup."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "potionId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable potion id or slot index from state.run.players[].potions[].",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act start-potion-targeting --potion potion:p1:0:fire-potion",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "start-potion-targeting",
+      "kind": "start-potion-targeting",
+      "kindDescriptor": {
+        "commandName": "start-potion-targeting",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "start-potion-targeting",
+        "kind": "start-potion-targeting",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Enter target selection for a visible potion."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "potionId",
+          "required": true,
+          "summary": "Stable potion id or slot index from state.run.players[].potions[].",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Enter target selection for a visible potion."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "targetId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable target id derived from state.run.view.selectedPotion, combat creatures, or action arguments.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act select-target --target e_1",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "select-target",
+      "kind": "select-target",
+      "kindDescriptor": {
+        "commandName": "select-target",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "select-target",
+        "kind": "select-target",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Select a visible target while target selection is active."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "targetId",
+          "required": true,
+          "summary": "Stable target id derived from state.run.view.selectedPotion, combat creatures, or action arguments.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Select a visible target while target selection is active."
+    },
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "potionId",
+          "required": true,
+          "stableId": false,
+          "summary": "Stable potion id or slot index from state.run.players[].potions[].",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act discard-potion --potion potion:p1:0:fire-potion",
+      "failureReasonCodes": [
+        "wrong_screen",
+        "wrong_player",
+        "not_visible",
+        "not_enabled",
+        "missing_hook",
+        "ambiguous_hook",
+        "stale_id",
+        "unsupported_perspective",
+        "invalid_action",
+        "runtime_failure"
+      ],
+      "id": "discard-potion",
+      "kind": "discard-potion",
+      "kindDescriptor": {
+        "commandName": "discard-potion",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "discard-potion",
+        "kind": "discard-potion",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "run"
+        ],
+        "summary": "Discard a visible top-bar potion through its popup."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "potionId",
+          "required": true,
+          "summary": "Stable potion id or slot index from state.run.players[].potions[].",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "owner-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Discard a visible top-bar potion through its popup."
+    }
+  ]
+}

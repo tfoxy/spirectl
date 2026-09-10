@@ -1,0 +1,13 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-draw-pile-open
+description: Deterministic two-player Ironclad combat with the draw pile viewer (NCardPileScreen) open.
+run:
+  seed: fixture-combat-draw-pile-open
+  view:
+    capstone:
+      cardPileView:
+        pileType: draw
+  players: 2
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

@@ -1,0 +1,4986 @@
+{
+  "adapter": {
+    "inspectCommand": "sts2 --json inspect ai-tools",
+    "name": "sts2-mcp",
+    "notes": [
+      "This catalog describes the thin machine-facing adapter surface for the repo-local MCP server.",
+      "The safe default MCP path is local stdio; network MCP is an explicit service mode.",
+      "Tool success payloads preserve the underlying CLI JSON output instead of inventing a second business-logic schema.",
+      "Unsupported or scaffolded capabilities stay explicit through tool status, limitations, and structured CLI errors."
+    ],
+    "serviceModes": {
+      "default": "stdio",
+      "network": {
+        "auth": "bearer",
+        "command": "sts2 --json service serve --mcp-mode network",
+        "defaultBind": "127.0.0.1:4318",
+        "nonLoopbackRequirements": [
+          "--mcp-auth-token",
+          "--acknowledge-non-loopback-mcp-threat-model"
+        ]
+      }
+    },
+    "sourceOfTruth": "sts2 CLI",
+    "transport": "stdio"
+  },
+  "source": "command-catalog",
+  "tools": [
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "limitations": [
+        "This reports configured transport and bridge metadata; it does not launch, attach, or repair the game process."
+      ],
+      "mapsTo": [
+        "game info"
+      ],
+      "name": "game_info",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "bridge",
+            "summary": "Handshake-derived bridge metadata including supported action kinds."
+          },
+          {
+            "path": "transport",
+            "summary": "Configured and effective transport details."
+          },
+          {
+            "path": "config",
+            "summary": "Resolved CLI config defaults and overrides."
+          },
+          {
+            "path": "notes",
+            "summary": "Important environment and lifecycle caveats for automation."
+          }
+        ],
+        "summary": "Structured environment, transport, bridge, and config metadata for the current CLI setup."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Call game_info first so the agent can see transport.kind, supportedActions, and current environment notes before choosing a workflow."
+      ],
+      "status": "implemented",
+      "summary": "Describe the configured transport and bridge handshake state."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "limitations": [
+        "This is a read-only setup probe that reports configured-vs-detected install paths and live-bridge layout status; it does not attach to a running game."
+      ],
+      "mapsTo": [
+        "game detect"
+      ],
+      "name": "game_detect",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Whether the game path was configured, auto-detected, or missing."
+          },
+          {
+            "path": "configuredPath",
+            "summary": "Install root from config when one was supplied or resolved."
+          },
+          {
+            "path": "detectedPath",
+            "summary": "Install root discovered from Steam-backed host detection when available."
+          },
+          {
+            "path": "liveBridge",
+            "summary": "Derived bridge layout, endpoint, and next-step notes for the current setup."
+          }
+        ],
+        "summary": "Configured-vs-detected install metadata plus the derived live-bridge layout for the current local setup."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use game_detect before game_info when install roots or local bridge layout are uncertain and you need setup guidance."
+      ],
+      "status": "implemented",
+      "summary": "Report configured or detected game path status."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "disableBackgroundThrottle": {
+            "description": "Developer opt-in: keep the launched instance responsive while its window is backgrounded (skips the game's background FPS limit and pins vertical sync on, which stops the engine parking its main loop while hidden).",
+            "type": "boolean"
+          },
+          "intervalMs": {
+            "description": "Polling interval between attachment attempts.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "launchArgs": {
+            "description": "Optional Godot/game arguments appended after configured game.launchArgs for this launch.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "noDetachSession": {
+            "description": "Unix-only opt-out: keep the launched game in the CLI process session instead of detaching it.",
+            "type": "boolean"
+          },
+          "rpcTimeoutMs": {
+            "description": "Maximum time to wait for each live bridge RPC during launch attachment.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timeoutMs": {
+            "description": "Maximum time to wait for live attachment after launch.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "verifyStableMs": {
+            "description": "Optional post-attach stability window; zero disables the extra check.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This may close or kill an existing configured game process before launching a fresh one; it is not a read-only probe.",
+        "Use game_attach or implicit profile/test launch flows when you want to reuse an already running bridge instead of restarting.",
+        "If the deployed bridge layout is missing or stale, the CLI may repair it before launch using the same safe bridge payload rules as the normal lifecycle flow."
+      ],
+      "mapsTo": [
+        "game launch"
+      ],
+      "name": "game_launch",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "launch",
+            "summary": "Spawned process metadata, endpoint details, and launch command context."
+          },
+          {
+            "path": "attachment",
+            "summary": "Live bridge attachment result including screen, endpoint, and game-info snapshots."
+          },
+          {
+            "path": "stability",
+            "summary": "Optional post-attach stability result when verifyStableMs is non-zero."
+          }
+        ],
+        "summary": "Launch metadata plus the successful live-attachment payload gathered after the game starts."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Call game_info first, then use game_launch when you need a fresh game process with the current bridge and launch configuration."
+      ],
+      "status": "implemented",
+      "summary": "Close any existing configured game process, then launch a fresh one."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "intervalMs": {
+            "description": "Polling interval between attachment attempts.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "rpcTimeoutMs": {
+            "description": "Maximum time to wait for each live bridge RPC during lifecycle polling.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timeoutMs": {
+            "description": "Maximum time to wait for live attachment.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This only waits for an already running bridge/game process; it does not launch the game or repair installs on its own."
+      ],
+      "mapsTo": [
+        "game attach"
+      ],
+      "name": "game_attach",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "gameInfo",
+            "summary": "Handshake-derived transport and bridge metadata after attachment succeeds."
+          },
+          {
+            "path": "screen",
+            "summary": "Current visible screen snapshot at the time of attachment."
+          },
+          {
+            "path": "endpoint",
+            "summary": "Resolved local IPC/TCP endpoint used for the attachment."
+          },
+          {
+            "path": "elapsedMs",
+            "summary": "Total wait time before attachment succeeded."
+          }
+        ],
+        "summary": "Successful live-attachment result including endpoint details, game-info metadata, and the current screen."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Call game_info first, then prefer game_attach when the game is already running and you only need to wait for the bridge to come up."
+      ],
+      "status": "implemented",
+      "summary": "Poll the configured Unix-socket bridge until live IPC attachment succeeds."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "intervalMs": {
+            "description": "Polling interval between attachment attempts.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "rpcTimeoutMs": {
+            "description": "Maximum time to wait for each live bridge RPC during lifecycle polling.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timeoutMs": {
+            "description": "Maximum time to wait for graceful shutdown.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This mutates local process state and may run configured game.stopCommand.",
+        "Force kill remains intentionally outside the AI/MCP catalog."
+      ],
+      "mapsTo": [
+        "game close"
+      ],
+      "name": "game_close",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "strategy",
+            "summary": "Shutdown strategy used: bridge, configured-command, or platform-graceful."
+          },
+          {
+            "path": "matchedPids",
+            "summary": "Exact local process ids considered to be STS2."
+          },
+          {
+            "path": "remainingPids",
+            "summary": "Exact process ids still present after the bounded wait."
+          },
+          {
+            "path": "notices",
+            "summary": "Bridge or fallback notices gathered during shutdown."
+          }
+        ],
+        "summary": "Structured graceful shutdown result with strategy, process ids, endpoint metadata, elapsed time, and notices."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use game_close before lifecycle flows that need the local game stopped without forcing termination."
+      ],
+      "status": "implemented",
+      "summary": "Gracefully stop the local game process through bridge, configured stop command, or exact platform process matching."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "build": {
+            "description": "Run the configured mod build command before copying deploy artifacts.",
+            "type": "boolean"
+          },
+          "intervalMs": {
+            "description": "Polling interval between verification attachment attempts.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "path": {
+            "description": "Path to the authored mod project root to build and deploy.",
+            "type": "string"
+          },
+          "restart": {
+            "description": "Stop the current game process and relaunch after copying the bridge and mod payload.",
+            "type": "boolean"
+          },
+          "rpcTimeoutMs": {
+            "description": "Maximum time to wait for each live bridge RPC during deploy verification.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timeoutMs": {
+            "description": "Maximum time to wait for launch/attach verification steps.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "verify": {
+            "description": "Wait for a successful live bridge attachment after deploy or restart.",
+            "type": "boolean"
+          },
+          "verifyStableMs": {
+            "description": "Optional post-attach stability window for restart or verification attachment; zero disables the extra check.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Provide an authored mod project path; this mutates the configured mods directory and may stop/restart the local game process when requested.",
+        "Prefer game_deploy over lower-level repair/install steps when the goal is to get a mod plus bridge into a runnable state."
+      ],
+      "mapsTo": [
+        "game deploy"
+      ],
+      "name": "game_deploy",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "bridge",
+            "summary": "Bridge install/deploy summary for the configured live layout."
+          },
+          {
+            "path": "mod",
+            "summary": "Resolved project, source, and target directories for the deployed mod payload."
+          },
+          {
+            "path": "restart",
+            "summary": "Whether restart was requested plus any launch result when a restart occurred."
+          },
+          {
+            "path": "verify",
+            "summary": "Whether verification was requested plus the resulting attachment payload."
+          }
+        ],
+        "summary": "Bridge deploy result, copied mod metadata, optional build output, and optional restart/verification payloads."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Call game_info first, then use game_deploy for the end-to-end local deploy flow instead of trying to sequence install-only lifecycle commands yourself."
+      ],
+      "status": "implemented",
+      "summary": "Deploy the bridge plus a mod project, with optional build, restart, and verify."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "limitations": [
+        "This is repo-local environment metadata only; it does not run recovery or mutate any files."
+      ],
+      "mapsTo": [
+        "toolchain info"
+      ],
+      "name": "toolchain_info",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "roots",
+            "summary": "Resolved repo-local toolchain, shared-cache, and profiles-file roots with provenance."
+          },
+          {
+            "path": "tools",
+            "summary": "Availability and provenance metadata for embedded and configured helper tools. The dotnet-helper entry includes launch diagnostics with configuredPath, resolvedPath, invocationPath, launchKind, available, buildNeeded, buildReason, failureReason, and notes."
+          }
+        ],
+        "summary": "Managed toolchain roots, config provenance, and helper availability for the current repo-local environment."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use toolchain_info before recovery, profile, or hook workflows when you need to confirm which repo-local paths and helper binaries the CLI will use."
+      ],
+      "status": "stable",
+      "summary": "Report managed toolchain roots, config provenance, and offline helper availability."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "perspective": {
+            "description": "Optional runtime perspective scope for multiplayer-aware state queries.",
+            "enum": [
+              "local",
+              "omniscient"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "description": "Optional stable player id used with multiplayer-aware perspective selection.",
+            "type": "string"
+          },
+          "rpcTimeoutMs": {
+            "description": "Maximum time to wait for the live bridge state RPC.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "view": {
+            "description": "Optional state view. Omit for current state; use full only when the expanded bridge-native payload is required.",
+            "enum": [
+              "full",
+              "screen",
+              "actions",
+              "refs"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "state is the runtime envelope only; immutable model data, localization text, assets, and resolved actions are not inlined.",
+        "Use state actions for the live, resolved semantic action list; act remains authoritative for legality."
+      ],
+      "mapsTo": [
+        "state"
+      ],
+      "name": "state",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "rootScene",
+            "summary": "The current root scene path (e.g. screens/character_select_screen or run)."
+          },
+          {
+            "path": "characterSelect",
+            "summary": "Character-select lobby, character buttons, and view; null outside the start-run character select screen."
+          },
+          {
+            "path": "run",
+            "summary": "Active run: players, map, currentRoom (combat/event/treasure/shop/rest), and view; null when no run is active."
+          },
+          {
+            "path": "language",
+            "summary": "Active localization language code for the attached client."
+          }
+        ],
+        "summary": "Runtime-only presentation state envelope (schemaVersion spirectl.state/v0): the screen-aware snapshot of what the attached client can observe."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Read state to understand the current screen and run, then use state actions to pick an executable action by kind and args.",
+        "Remote-perspective view objects are omitted with notices when the attached client cannot observe that player's UI."
+      ],
+      "status": "implemented",
+      "summary": "Runtime-only presentation state envelope (spirectl.state/v0); state actions returns the native semantic action list."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "limitations": [
+        "supportedActions describe bridge-known action kinds, while availableActions only lists the actions that are executable on the current screen and perspective.",
+        "Use ownerPlayerId and actionFailure.reasonCode=wrong_player for ownership repair; remoteOrchestration states include host-local-seat for host-owned local seats and describe whether this bridge can execute or mediate remote-owned actions.",
+        "For non-combat screens and overlays, inspect typed state sections first; generic choose remains only a compatibility/fallback action for currently executable generic, modded, or unmodeled visible controls until the intent-first action contract lands.",
+        "Overlay close/back controls are advertised only when the bridge can validate a legal hook; unsupported or partial overlays should emit structured notices instead of fabricated actions.",
+        "cardOverlay is the typed card detail overlay section. Passive overlays keep the underlying screen authoritative, blocking overlays take precedence, and unsupported overlays should appear as structured notices.",
+        "Presentation interaction metadata describes initiation semantics only; presentation action refs, act, or ExecuteAction remain authoritative for mutation, legality, wrong-player failures, and unsupported-perspective errors.",
+        "Dangerous raw input remains outside presentation semantics and should be used only as an explicit dangerous-mode fallback.",
+        "Raw scene debugging is intentionally outside inspect_actions; use dev scene tree, dev scene node, or dev scene children when runtime internals are required.",
+        "Use --offline or --config tests/sts2.mock.yaml when only static JSON metadata rendering is needed and no live host should be contacted."
+      ],
+      "mapsTo": [
+        "inspect actions"
+      ],
+      "name": "inspect_actions",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "supportedActions",
+            "summary": "Handshake-level action kinds, parameters, and implementation status."
+          },
+          {
+            "path": "availableActions",
+            "summary": "Screen-specific currently executable actions and their arguments, including ownerPlayerId, ownerRole, remoteOrchestration, perspective, intentKind, and preferredAction metadata when available."
+          },
+          {
+            "path": "presentation.interaction",
+            "summary": "The scene-first presentation surface combines state, models, localization, ResourceLoader scene data, assets, and action refs so downstream consumers can render without screen-kind heuristics."
+          },
+          {
+            "path": "stateContract.perspectiveInputs/remoteOrchestrationStates/ownershipFailureReasonCodes",
+            "summary": "Machine-readable guidance for --perspective, --player-id, wrong-player repair, and remote orchestration capability states."
+          },
+          {
+            "path": "screen",
+            "summary": "Current screen classification used to resolve availability."
+          },
+          {
+            "path": "notices",
+            "summary": "Explicit caveats about partial or unstable action/state surfaces, using structured notice fields when the bridge can provide them."
+          }
+        ],
+        "summary": "Supported bridge action kinds plus currently available runtime actions for the active screen and perspective."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Call inspect_actions before act when the agent needs parameter guidance, preferredAction linkage, or needs to distinguish implemented vs scaffolded action kinds.",
+        "Pair inspect_actions with state so preferredAction links and compatibility ids can be resolved against the active typed screen or cardOverlay section."
+      ],
+      "status": "implemented",
+      "summary": "Describe bridge-supported actions and current availability, with explicit --offline/mock paths for static metadata rendering without a live host."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "bundleId": {
+            "description": "Stable bundle id from state.scene.items[].id or state.actions[].args.bundleId.",
+            "type": "string"
+          },
+          "by": {
+            "description": "Deck view sort key for sort-deck-view.",
+            "enum": [
+              "obtained",
+              "type",
+              "cost",
+              "alphabet"
+            ],
+            "type": "string"
+          },
+          "cardId": {
+            "description": "Stable card id from state.combat.hand[].id or state.actions[].args.cardId.",
+            "type": "string"
+          },
+          "characterId": {
+            "description": "Stable lobby character id from state.scene.items[].id or state.actions[].args.characterId.",
+            "type": "string"
+          },
+          "choiceId": {
+            "description": "Stable fallback choice id from state.fallbackChoices[].id or state.actions[].args.choiceId. Use choose only for generic, modded, or unmodeled visible choices when no modeled action exists.",
+            "type": "string"
+          },
+          "controlId": {
+            "description": "Stable Crystal Sphere control id from state.scene.items[].id or state.actions[].args.controlId.",
+            "type": "string"
+          },
+          "eventOptionId": {
+            "description": "Stable event option id from state.scene.items[].id or state.actions[].args.eventOptionId.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Semantic action kind to execute through the CLI-backed bridge surface.",
+            "enum": [
+              "confirm-selection",
+              "cancel-selection",
+              "select-map-node",
+              "end-turn",
+              "cancel-end-turn",
+              "ready",
+              "unready",
+              "select-character",
+              "claim-reward",
+              "skip-rewards",
+              "select-card",
+              "skip-card-selection",
+              "select-bundle",
+              "buy-card",
+              "buy-relic",
+              "buy-potion",
+              "remove-card",
+              "leave-shop",
+              "close-shop-inventory",
+              "rest",
+              "smith",
+              "use-rest-site-option",
+              "proceed-rest-site",
+              "open-chest",
+              "take-relic",
+              "proceed-treasure-room",
+              "back-from-map",
+              "select-event-option",
+              "open-event-shop",
+              "use-crystal-sphere-control",
+              "proceed-event",
+              "toggle-map",
+              "toggle-deck",
+              "toggle-settings",
+              "sort-deck-view",
+              "toggle-deck-view-upgrades",
+              "view-draw-pile",
+              "view-discard-pile",
+              "view-exhaust-pile",
+              "inspect-relic",
+              "close-inspect-relic",
+              "select-hand-card",
+              "deselect-hand-card",
+              "confirm-hand-selection",
+              "use-potion",
+              "play-card",
+              "choose"
+            ],
+            "type": "string"
+          },
+          "mapNodeId": {
+            "description": "Stable map node id from state.scene.items[].id or state.actions[].args.mapNodeId.",
+            "type": "string"
+          },
+          "playerId": {
+            "description": "Optional stable player id for multiplayer-aware action legality; unsupported remote-player actions can still be rejected by the bridge.",
+            "type": "string"
+          },
+          "potionId": {
+            "description": "Stable potion id from state.combat.potions[].id or state.actions[].args.potionId.",
+            "type": "string"
+          },
+          "relicId": {
+            "description": "Stable relic id from state.scene.items[].id or state.actions[].args.relicId.",
+            "type": "string"
+          },
+          "restOptionId": {
+            "description": "Stable rest option id from state.scene.controls[].id or state.actions[].args.restOptionId.",
+            "type": "string"
+          },
+          "rewardId": {
+            "description": "Stable reward id from state.scene.items[].id or state.actions[].args.rewardId.",
+            "type": "string"
+          },
+          "shopItemId": {
+            "description": "Stable shop item id from state.scene.items[].id or state.actions[].args.shopItemId.",
+            "type": "string"
+          },
+          "targetId": {
+            "description": "Optional stable target id from runtime state when the action requires a target.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Use state.actions[] first; each action already carries kind, compact args, owner, and stateRefs for the current screen.",
+        "choose is fallback-only for generic, modded, or unmodeled visible controls exposed through state.fallbackChoices[].",
+        "play-card may require targetId depending on the chosen card; prefer state.actions[].args over guessing from card text.",
+        "For multiplayer actions, pass playerId only when intentionally targeting a stable player id; wrong-owner or unsupported-perspective failures preserve requestedPlayerId, resolvedOwnerPlayerId, localPlayerId, hostPlayerId, localRole, action, and remoteOrchestration in the structured error payload. host-local-seat is actionable through semantic actions; true remote clients still require an owning configured-client or host-mediated path."
+      ],
+      "mapsTo": [
+        "act confirm-selection",
+        "act cancel-selection",
+        "act select-map-node",
+        "act end-turn",
+        "act ready",
+        "act unready",
+        "act select-character",
+        "act use-potion",
+        "act play-card",
+        "act choose"
+      ],
+      "name": "act",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "requestId",
+            "summary": "Stable request id generated by the CLI."
+          },
+          {
+            "path": "actionInstanceId",
+            "summary": "Bridge action instance identifier when accepted."
+          },
+          {
+            "path": "kind",
+            "summary": "Resolved semantic action kind."
+          },
+          {
+            "path": "accepted",
+            "summary": "Whether the bridge accepted the requested action."
+          },
+          {
+            "path": "message",
+            "summary": "Human-readable bridge response message."
+          }
+        ],
+        "summary": "Accepted or rejected action result preserving the bridge-backed CLI payload."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Read state and inspect_actions before calling act so the agent uses currently executable action ids."
+      ],
+      "status": "partial",
+      "summary": "Execute one semantic runtime action through the CLI-backed bridge surface."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "args": {
+            "description": "Arguments passed to the STS2 in-game developer console command.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "command": {
+            "description": "STS2 in-game developer console command name.",
+            "type": "string"
+          },
+          "mode": {
+            "description": "Optional CLI mode for persisted-change console commands. Use dangerous only for achievement, cloud, or unlock.",
+            "enum": [
+              "dangerous"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "command"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This is explicit developer console execution, not a semantic action and not default state.",
+        "Safe commands run in normal mode by default.",
+        "achievement, cloud, and unlock require dangerous mode because they can mutate persisted files."
+      ],
+      "mapsTo": [
+        "dev console"
+      ],
+      "name": "console",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "requestId",
+            "summary": "Stable request id generated by the CLI."
+          },
+          {
+            "path": "command",
+            "summary": "Console command name sent to the bridge."
+          },
+          {
+            "path": "args",
+            "summary": "Console arguments sent after the command name."
+          },
+          {
+            "path": "line",
+            "summary": "Canonical command line joined from command and args."
+          },
+          {
+            "path": "accepted",
+            "summary": "Whether the bridge delivered the request to the runtime console API."
+          },
+          {
+            "path": "success",
+            "summary": "STS2 console CmdResult success flag."
+          },
+          {
+            "path": "output",
+            "summary": "Captured STS2 console CmdResult message text."
+          },
+          {
+            "path": "outputLines",
+            "summary": "Captured console output split into non-empty lines."
+          },
+          {
+            "path": "source",
+            "summary": "Whether the response came from stub or live bridge data."
+          },
+          {
+            "path": "provisional",
+            "summary": "Whether the response is provisional stub data."
+          },
+          {
+            "path": "notices",
+            "summary": "Structured console execution notices."
+          }
+        ],
+        "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use console for developer setup and validation commands such as help, help draw, draw 3, or die when semantic actions are not the right surface."
+      ],
+      "status": "implemented",
+      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "afterCursor": {
+            "description": "Return only matching entries whose cursor is greater than this value.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "level": {
+            "description": "Optional minimum log level filter.",
+            "enum": [
+              "trace",
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of recent log entries to return.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tail": {
+            "description": "Return the latest matching entries instead of the default recent window size.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "target": {
+            "description": "Optional substring filter applied to structured log targets.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "The AI tool surface is one-shot only; CLI follow mode is available through `sts2 dev logs --follow` rather than this catalog entry."
+      ],
+      "mapsTo": [
+        "dev logs"
+      ],
+      "name": "logs",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "entries",
+            "summary": "Ordered recent log entries returned by the current bridge transport, each with a stable cursor."
+          },
+          {
+            "path": "nextCursor",
+            "summary": "Cursor to resume from in a later CLI follow/tail poll."
+          },
+          {
+            "path": "source",
+            "summary": "Origin of the log payload."
+          },
+          {
+            "path": "provisional",
+            "summary": "Whether the underlying log surface is still provisional."
+          }
+        ],
+        "summary": "Recent structured bridge logs with cursor metadata plus bounded filtering by level and target."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use logs after failures or surprising runtime state to capture recent bridge evidence for debugging.",
+        "Use `tail` to anchor the latest matching window, then continue with CLI follow mode if you need a live stream."
+      ],
+      "status": "implemented",
+      "summary": "Read recent structured bridge logs, tail a recent window, or follow new entries through the typed transport client."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "afterCursor": {
+            "description": "Inspect only entries whose cursor is greater than this value.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "excludeMessageRegexes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "excludeTargets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "level": {
+            "description": "Optional minimum log level filter.",
+            "enum": [
+              "trace",
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of recent log entries to inspect.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "tail": {
+            "description": "Inspect the latest matching entries instead of the default recent window size.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "target": {
+            "description": "Optional substring filter applied to structured log targets.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This checks the bounded current log window only; use logs for full investigation when you need raw recent history."
+      ],
+      "mapsTo": [
+        "dev log-health"
+      ],
+      "name": "log_health",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Healthy/unhealthy evaluation result."
+          },
+          {
+            "path": "unhealthyEntryCount",
+            "summary": "Number of entries that failed the health check after exclusions."
+          },
+          {
+            "path": "excludedEntryCount",
+            "summary": "Number of entries ignored by the configured exclusions."
+          },
+          {
+            "path": "entries",
+            "summary": "Matching unhealthy log entries when the window is not healthy."
+          }
+        ],
+        "summary": "Structured bounded log-health evaluation with excluded-entry counts and offending records when unhealthy."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use log_health inside repo-local smoke checks or failure triage when you need a boolean health gate over recent logs rather than the full log stream."
+      ],
+      "status": "stable",
+      "summary": "Fail when the recent runtime log window contains unhealthy error or exception-shaped entries after optional exclusions."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "afterCursor": {
+            "description": "Inspect only entries whose cursor is greater than this value.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "bundleDir": {
+            "description": "Optional directory where diagnostics.json and sibling evidence artifacts should be written.",
+            "type": "string"
+          },
+          "excludeMessageRegexes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "excludeTargets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "height": {
+            "description": "Explicit viewport height in pixels when not using a preset.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "level": {
+            "description": "Optional minimum log level filter.",
+            "enum": [
+              "trace",
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ],
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of recent log entries to inspect.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "preset": {
+            "description": "Optional viewport preset name from inspect_viewport_presets.",
+            "type": "string"
+          },
+          "presetCatalogs": {
+            "description": "Optional explicit viewport preset catalog paths loaded in addition to built-ins.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "tail": {
+            "description": "Inspect the latest matching entries instead of the default recent window size.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "target": {
+            "description": "Optional substring filter applied to structured log targets.",
+            "type": "string"
+          },
+          "width": {
+            "description": "Explicit viewport width in pixels when not using a preset.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This is an evidence surface, not the primary state API; use state and inspect_actions for normal runtime control flow."
+      ],
+      "mapsTo": [
+        "dev diagnostics"
+      ],
+      "name": "diagnostics",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Overall diagnostics capture status."
+          },
+          {
+            "path": "logHealth",
+            "summary": "Embedded log-health result for the inspected window."
+          },
+          {
+            "path": "captures",
+            "summary": "Per-surface capture status and data for state, actions, logs, and related evidence."
+          },
+          {
+            "path": "bundle",
+            "summary": "Persisted diagnostics.json and sibling artifact paths when bundleDir was requested."
+          }
+        ],
+        "summary": "One structured diagnostics payload with log-health evaluation, captures, and optional bundle paths."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use diagnostics after failures or before deleting fallback evidence flows so automation can persist one predictable bundle instead of hand-assembling screenshots and logs."
+      ],
+      "status": "stable",
+      "summary": "Collect one stable runtime diagnostics payload and optionally write a predictable evidence bundle."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project": {
+            "description": "Explicit local M57/M60 hot-reload project root containing sts2.hot-reload.yaml.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Requires an explicit local project containing sts2.hot-reload.yaml.",
+        "Only M57-compatible shells advertising spirectl.m57.hot-reload-shell are supported.",
+        "This does not deploy the shell, restart the game, or edit source files."
+      ],
+      "mapsTo": [
+        "dev mod-reload status"
+      ],
+      "name": "hot_reload_status",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "project",
+            "summary": "Resolved hot-reload project metadata."
+          },
+          {
+            "path": "shell",
+            "summary": "Current shell protocol support, active generation, last report, and restart-required state."
+          },
+          {
+            "path": "notices",
+            "summary": "Structured support and mismatch notices from the bridge."
+          }
+        ],
+        "summary": "Status for an M57/M60 shell-supported hot-reload project, including active generation, last reload report, restart-required state, and notices."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use hot_reload_status before hot_reload when an automation agent needs to confirm the current generation and shell support."
+      ],
+      "status": "partial",
+      "summary": "Report active shell protocol, generation, last reload report, and restart-required state for a hot-reload project."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "build": {
+            "description": "Run the project's logicBuildProfile before requesting reload.",
+            "type": "boolean"
+          },
+          "intervalMs": {
+            "description": "Polling interval in milliseconds for wait-oriented reload flows.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project": {
+            "description": "Explicit local M57/M60 hot-reload project root containing sts2.hot-reload.yaml.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Maximum reload wait duration in milliseconds.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "wait": {
+            "description": "Wait for the shell to complete the reload request and return the final report.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Requires an explicit local project containing sts2.hot-reload.yaml.",
+        "Only M57-compatible shells advertising spirectl.m57.hot-reload-shell are supported.",
+        "This does not deploy the shell, restart the game, mutate original game files, or edit mod source files.",
+        "Failures preserve whether the previous generation remains active and whether a restart is required."
+      ],
+      "mapsTo": [
+        "dev mod-reload"
+      ],
+      "name": "hot_reload",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Reload request status such as accepted, loaded, or failed."
+          },
+          {
+            "path": "requestId",
+            "summary": "Stable reload request id generated by the CLI."
+          },
+          {
+            "path": "build",
+            "summary": "Optional logic build result when build=true."
+          },
+          {
+            "path": "shell",
+            "summary": "Post-request shell status and restart-required state."
+          },
+          {
+            "path": "reload",
+            "summary": "Shell reload report including generation, unload/collection details, previous-generation status, and structured errors."
+          }
+        ],
+        "summary": "Build and request reload for an M57/M60 shell-supported hot-reload project through the live bridge."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use hot_reload with build=true and wait=true after editing reloadable logic, then inspect reload.generation and reload.previousRemainsActive before continuing validation."
+      ],
+      "status": "partial",
+      "summary": "Build and request reload for an M57/M60 shell-supported hot-reload project through the live bridge."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "execution": {
+            "description": "Execution strategy for extraction: use offline-only, force live-only, or auto-export readable configured resources offline before escalating to live IPC when needed.",
+            "enum": [
+              "auto",
+              "offline",
+              "live"
+            ],
+            "type": "string"
+          },
+          "format": {
+            "description": "Optional artifact format for raster outputs. `auto` preserves offline raster bytes and uses PNG for live previews.",
+            "enum": [
+              "auto",
+              "png",
+              "webp"
+            ],
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Asset query routed through the existing `assets extract` CLI surface. Accepts filesystem/packed asset path or substring queries, raw font files, direct `res://...` paths, typed model keys such as `model://characters/<id>/visuals`, `model://characters/<id>/iconOutline`, `model://relics/<id>/bigIcon`, and `model://monsters/<id>/visuals`, and composed keys such as `composed://combat-background/<id>/image` or `composed://encounters/<id>/background/image`.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This writes extraction artifacts to disk and may still trigger the existing lifecycle repair/launch flow when live execution is required.",
+        "Generic extraction searches configured resource/mod roots and packed entries only; recovered-project files are used only if the caller passes that directory as an explicit resource root.",
+        "Typed keys distinguish model-backed assets from composed outputs; live-only families remain environment-gated.",
+        "Use this for repo-local asset export only; it is not a runtime scene-inspection or live UI-observation API."
+      ],
+      "mapsTo": [
+        "assets extract"
+      ],
+      "name": "assets_extract",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "query",
+            "summary": "Original asset search query."
+          },
+          {
+            "path": "executionMode",
+            "summary": "Resolved offline/live execution mode used by the CLI."
+          },
+          {
+            "path": "outputDir",
+            "summary": "Artifact root where extracted files were written."
+          },
+          {
+            "path": "exports",
+            "summary": "Per-match extraction results including output paths and provenance."
+          }
+        ],
+        "summary": "Artifact-writing extract result preserving the CLI export summary and per-match output metadata."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use assets_extract when you need filesystem artifacts for representative keys such as model://characters/ironclad/visuals, model://cards/strike_r/image, composed://combat-background/hive/image, or composed://encounters/knowledge_demon_boss/background/image."
+      ],
+      "status": "implemented",
+      "summary": "Search filesystem, packed, font, typed model-backed assets, and composed render targets, and export them with offline/live execution modes."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "execution": {
+            "description": "Execution strategy for explanation. Asset explain currently supports live only.",
+            "enum": [
+              "live"
+            ],
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Composed asset query to explain. Supports `composed://combat-background/<id>/image` and checked-in encounter scene packages such as `composed://encounters/kaiser_crab_boss/scene-package`, `composed://encounters/ovicopter_normal/scene-package`, and `composed://encounters/knowledge_demon_boss/scene-package`.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Supports composed://combat-background/<id>/image and cataloged composed://encounters/<id>/scene-package metadata for Kaiser Crab, Ovicopter, Knowledge Demon Boss, and later additive base-game packages.",
+        "Unknown or uncataloged encounters should be handled as structured notices/failures from the bridge, not inferred visual packages.",
+        "This does not write extraction artifacts and does not replace assets_extract."
+      ],
+      "mapsTo": [
+        "assets explain"
+      ],
+      "name": "assets_explain",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "rootScene",
+            "summary": "Authored combat-background root scene and load source."
+          },
+          {
+            "path": "layerGroups",
+            "summary": "Discovered candidates, selected variants, and ordering."
+          },
+          {
+            "path": "selectedLayers",
+            "summary": "Loaded layers with texture refs and bounds."
+          },
+          {
+            "path": "bounds",
+            "summary": "Viewport, final composed, final visible, and transparency diagnostics."
+          },
+          {
+            "path": "warnings",
+            "summary": "Missing layers, transparent-heavy output, suspicious bounds, and active-scene differences."
+          },
+          {
+            "path": "encounterScenePackage",
+            "summary": "Encounter package metadata exposed as `explanation` fields including viewport, camera, background, logical actors, visual parts, selector diagnostics, states, transitions, render target decisions, optional render diagnostics, isolation evidence, and notices for cataloged encounters such as Kaiser Crab, Ovicopter, and Knowledge Demon Boss."
+          },
+          {
+            "path": "renderDiagnostics",
+            "summary": "Optional failed live encounter render evidence, when supplied by the bridge, including request/render target ids, selector resolution, hidden/kept part ids, viewport, frame, hook/timing notes, and alpha/RGB pixel evidence."
+          },
+          {
+            "path": "selectorDiagnostics",
+            "summary": "Catalog selector resolution details with normalized selectors, missing selectors, candidate paths, resolved nodes, bounding boxes, status, target state, and render target decisions."
+          },
+          {
+            "path": "notices",
+            "summary": "Structured package notices, including unsupported dynamic parts, live-only VFX requirements, inferred bounds, missing selectors, and provisional catalog coverage when the bridge can report it."
+          }
+        ],
+        "summary": "Structured composition, encounter package, and optional render diagnostics for live composed assets without writing artifacts."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use assets_explain before changing extraction behavior when a composed combat background, encounter package, VFX-backed visual part, or encounter render target looks incomplete, misframed, selector-missing, non-isolated, or unsupported."
+      ],
+      "status": "implemented",
+      "summary": "Explain composed live asset decisions, expanded encounter package metadata, selector diagnostics, render diagnostics, isolation evidence, bounds, notices, and warnings without writing artifacts."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "dryRun": {
+            "description": "Validate the batch request surface without resolving roots, launching the game, or writing artifacts.",
+            "type": "boolean"
+          },
+          "execution": {
+            "description": "Default extraction strategy for manifest requests that omit execution.",
+            "enum": [
+              "auto",
+              "offline",
+              "live"
+            ],
+            "type": "string"
+          },
+          "failFast": {
+            "description": "Stop after the first failed or no-match request and mark later requests skipped.",
+            "type": "boolean"
+          },
+          "format": {
+            "description": "Default artifact format for manifest requests that omit format. `auto` preserves offline raster bytes and uses PNG for live previews.",
+            "enum": [
+              "auto",
+              "png",
+              "webp"
+            ],
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "manifest": {
+            "description": "Path to a generic JSON asset batch manifest with version 0 and assets[].",
+            "type": "string"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "output": {
+            "description": "Optional output directory for the batch artifact tree. Defaults to <artifacts.dir>/assets-batch.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This writes extraction artifacts to disk and may trigger the existing lifecycle repair/launch flow when live execution is required by any request.",
+        "For S90/S107 encounter reliability, feed catalog render target queries from assets_explain or dev visual-preflight into a manifest and run m78-live-encounter-artifacts for the opt-in live artifact path.",
+        "This is generic batch extraction only; downstream repos remain responsible for choosing assets and building project-specific indexes or bundle layouts.",
+        "Do not collapse uncataloged encounter failures into no-match ambiguity; consume the per-request error/details or per-export notices."
+      ],
+      "mapsTo": [
+        "assets extract-batch"
+      ],
+      "name": "assets_extract_batch",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Aggregate batch status: ok, partial, or failed."
+          },
+          {
+            "path": "outputDir",
+            "summary": "Batch artifact root where request-scoped outputs were written."
+          },
+          {
+            "path": "results",
+            "summary": "Per-request extraction results including carried metadata, output paths, provenance, notes, notices, and errors."
+          },
+          {
+            "path": "exports",
+            "summary": "Per-export artifact records preserve bridge notes/notices/provenance, artifact checks, and optional renderDiagnostics so encounter render target diagnostics stay attached to the artifact."
+          },
+          {
+            "path": "renderDiagnostics",
+            "summary": "Optional failed live encounter render evidence on exports, including selector, frame, hook, timing, alpha, and RGB evidence for transparent, blank, misframed, or invalid captures."
+          },
+          {
+            "path": "artifactChecks",
+            "summary": "When the live helper can validate rendered outputs, checks summarize nonblank pixels, expected transparency, framing, part/overlay isolation, and selector/bounds failures."
+          },
+          {
+            "path": "error",
+            "summary": "Per-request failure envelope preserves structured bridge payloads for unsupported uncataloged encounters, selector failures, and error.details.diagnostic render evidence when a live render fails before export."
+          }
+        ],
+        "summary": "Generic batch extraction result preserving per-request artifact records, failures, render diagnostics, and caller metadata."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use assets_extract_batch when a downstream workflow already has a manifest of model, composed, and direct res:// asset queries and needs stable artifact paths plus script-friendly partial failure reports."
+      ],
+      "status": "implemented",
+      "summary": "Extract many filesystem, packed, or virtual model-backed assets from a generic JSON manifest while preserving per-request combat catalog notes, notices, provenance, failures, render diagnostics, and artifact-check diagnostics."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "description": "Path to one authored .sts2.fixture.yaml recipe file. The CLI validates and normalizes the recipe locally, then sends canonical JSON to the bridge.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Only file-backed authored fixture recipes are supported here; inline fixture bodies and arbitrary runtime mutation remain out of scope.",
+        "Use this only against checked-in or otherwise intentional recipe files, not as a generic state-editing API.",
+        "The shipped executable fixture subset currently covers main-menu, combat, game-derived screen ids for map, rewards, rest-site, event-room, treasure/relic, shop, card/simple/deck/bundle selection, card-overlay, passive-card-overlay, Screens.CharacterSelect.NCharacterSelectScreen start-run recipes, and Screens.CharacterSelect.NMultiplayerLoadGameScreen load-run recipes including explicit event options, opened treasure-room proceed flow, shop inventory/card-removal overrides, visible overlay entry, and local-only degraded multiplayer reporting.",
+        "Exact native sidecars and dev.load-scenario sparse artifacts are separate restore surfaces; load_fixture does not restore hidden combat queues, RNG continuation, animation state, enemy AI history, or transient UI internals."
+      ],
+      "mapsTo": [
+        "dev fixture load"
+      ],
+      "name": "load_fixture",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Fixture-load status reported by the CLI/runtime bridge."
+          },
+          {
+            "path": "fixture",
+            "summary": "Canonicalized fixture metadata and authored recipe summary when available."
+          },
+          {
+            "path": "recipeReport",
+            "summary": "Structured recipe diagnostics with recipeName, appliedFields, inferredFields, omittedFields, unsupportedFields, degradedMultiplayerFields, and bridgeValidation."
+          },
+          {
+            "path": "loaded",
+            "summary": "Bridge/runtime payload describing loaded screen, resolvedPerspective, notices, and the same recipeReport for step-artifact consumers."
+          }
+        ],
+        "summary": "Canonicalized live fixture-load metadata preserving the bridge-backed result envelope."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Call game_info first, then use load_fixture only when you already have an authored recipe file for deterministic setup."
+      ],
+      "status": "implemented",
+      "summary": "Load an authored sparse recipe fixture into the attached live bridge and report recipeReport/bridgeValidation diagnostics."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "includeExact": {
+            "description": "Also write an opaque exact sidecar when native save-backed or fixture-backed continuation data is available. The sidecar is hash/size validated and remains separate from the reviewable sparse recipe.",
+            "type": "boolean"
+          },
+          "output": {
+            "description": "Path where the shareable .sts2.scenario.yaml artifact should be written.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Requires an attached local bridge; this is not a normal gameplay command.",
+        "Exact sidecars are opt-in opaque continuation data, not sparse recipes and not recorded screen-entry fixtures.",
+        "Lobby multiplayer metadata is captured when observable; active multiplayer restore still requires explicit degraded local-only opt-in and reports omitted remote clients, or returns structured unsupported errors.",
+        "Native save-backed exact continuation is bounded to supported save/run data; hidden queues, RNG continuations, enemy AI history, and transient UI state are not claimed as exact unless exposed by a supported native path."
+      ],
+      "mapsTo": [
+        "dev scenario export"
+      ],
+      "name": "scenario_export",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "path",
+            "summary": "Filesystem path of the written sparse scenario YAML artifact."
+          },
+          {
+            "path": "exactBundlePath",
+            "summary": "Optional opaque sidecar path when includeExact was requested and save-backed or fixture-backed continuation data was available."
+          },
+          {
+            "path": "exactBundleKind",
+            "summary": "Optional sidecar kind: save-backed for native run-save bundles or fixture-backed for JSON fixture bundles."
+          },
+          {
+            "path": "restoreQuality",
+            "summary": "Bridge-reported restore quality expected from the exported artifact."
+          },
+          {
+            "path": "restoreSupport",
+            "summary": "per-field restore support report with exact, partial, inferred, omitted, unsupported, and degraded-local-multiplayer field details."
+          },
+          {
+            "path": "restoreSupport.fields[].supportClass",
+            "summary": "Field-level support class for the exported public state/action path."
+          },
+          {
+            "path": "restoreSupport.fields[].reasonCode",
+            "summary": "Stable reason code explaining why the field has that restore support class."
+          },
+          {
+            "path": "restoreSupport.fields[].suggestedNextStep",
+            "summary": "Actionable next step for partial, inferred, omitted, unsupported, or degraded fields."
+          },
+          {
+            "path": "screen",
+            "summary": "Captured screen metadata used as the restore anchor."
+          },
+          {
+            "path": "multiplayer",
+            "summary": "Optional multiplayer capture metadata, including lobby players, host/local identity, and restore limits."
+          }
+        ],
+        "summary": "Shareable sparse scenario export metadata plus optional exact sidecar path and field-level restoreSupport."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use scenario_export when a live local state should become a reviewable repro artifact for test-runner workflows."
+      ],
+      "status": "partial",
+      "summary": "Export the attached state as a shareable sparse spirectl.scenario/v0 YAML artifact with field-level restoreSupport and optional exact sidecar metadata."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "allowDegradedLocalMultiplayer": {
+            "description": "Explicitly allow active multiplayer artifacts to restore as degraded local-only state and report omitted remote clients.",
+            "type": "boolean"
+          },
+          "intervalMs": {
+            "description": "Polling interval between validation attempts.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "path": {
+            "description": "Path to one shareable .sts2.scenario.yaml artifact.",
+            "type": "string"
+          },
+          "restart": {
+            "description": "Restart the local game before restoring the scenario.",
+            "type": "boolean"
+          },
+          "timeoutMs": {
+            "description": "Maximum time to wait for lifecycle and restore validation steps.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "May restart the local game when restart is true.",
+        "Scenario load is bridge-mediated and bounded; it is not unstructured runtime memory editing.",
+        "Exact sidecar restore, sparse recipe restore, native save-backed continuation, and recorded screen-entry fixtures are separate workflows with separate fidelity claims.",
+        "Lobby multiplayer restore is supported where the bridge can materialize it; active multiplayer restore requires allowDegradedLocalMultiplayer for local-only degradation and must report omitted remote clients, or fails explicitly."
+      ],
+      "mapsTo": [
+        "dev scenario load"
+      ],
+      "name": "scenario_load",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "path",
+            "summary": "Scenario YAML path loaded by the CLI."
+          },
+          {
+            "path": "restoreQuality",
+            "summary": "Bridge-reported restore quality after exact or sparse restore."
+          },
+          {
+            "path": "exactBundleUsed",
+            "summary": "Whether the bridge used an exact-bundle sidecar during restore."
+          },
+          {
+            "path": "sparseFallbackUsed",
+            "summary": "Whether the bridge fell back from exact restore to sparse restore."
+          },
+          {
+            "path": "validation.status",
+            "summary": "Post-restore validation status for the screen/run anchor."
+          },
+          {
+            "path": "validation.expectedSummary",
+            "summary": "Expected public-state summary used for post-restore validation when available."
+          },
+          {
+            "path": "validation.observedSummary",
+            "summary": "Observed public-state summary after restore when available."
+          },
+          {
+            "path": "validation.mismatches",
+            "summary": "Per-field restore validation mismatches with path, expected/observed summaries, supportClass, reasonCode, and suggestedNextStep."
+          },
+          {
+            "path": "validation.mismatches[].supportClass",
+            "summary": "Support class for the mismatched field: exact, partial, inferred, omitted, unsupported, or degraded-local-multiplayer."
+          },
+          {
+            "path": "validation.mismatches[].reasonCode",
+            "summary": "Stable reason code explaining the mismatch."
+          },
+          {
+            "path": "validation.mismatches[].suggestedNextStep",
+            "summary": "Actionable repair or validation guidance for the mismatch."
+          },
+          {
+            "path": "multiplayerRestore",
+            "summary": "Optional multiplayer restore mode, restored player ids, omitted remote player ids, and remote-client requirement metadata."
+          }
+        ],
+        "summary": "Scenario restore result with lifecycle metadata, restore quality, and field-level post-restore validation."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use scenario_load at the start of a runner or automation workflow when an exported repro state should anchor later actions and assertions."
+      ],
+      "status": "partial",
+      "summary": "Load a shareable spirectl.scenario/v0 YAML artifact through the live bridge, with field-level restore validation and degraded multiplayer reporting."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "description": "Optional leased debugger session id used to explain ownership or conflict in the returned status.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This dev-only surface still depends on a live host build exposing debug hooks; mock/stub transports will continue to report unsupported status honestly.",
+        "Pause/resume, waiting, and stepping are explicit runtime controls and should not be treated as a general-purpose automation prerequisite for routine scenarios."
+      ],
+      "mapsTo": [
+        "dev debug status"
+      ],
+      "name": "debug_status",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "supported",
+            "summary": "Whether the attached live host currently exposes executable debug hooks."
+          },
+          {
+            "path": "executionState",
+            "summary": "Current live debug execution state: running, paused, or unsupported."
+          },
+          {
+            "path": "sessionOwnership",
+            "summary": "Whether the request is session-free, owner-bound, conflicted, or requires a leased session."
+          },
+          {
+            "path": "activeSession",
+            "summary": "Current leased debugger session metadata when the bridge owns one."
+          },
+          {
+            "path": "pauseReason",
+            "summary": "Why the runtime is currently paused when executionState is paused."
+          },
+          {
+            "path": "breakpoints",
+            "summary": "Registered debug breakpoints visible to the live bridge."
+          },
+          {
+            "path": "lastBreakpointHit",
+            "summary": "Most recent matching breakpoint metadata when available."
+          }
+        ],
+        "summary": "Live debug status payload exposing runtime pause state, leased-session ownership, registered breakpoints, and the most recent breakpoint hit."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use debug_status first in live debugging workflows to confirm hook support, inspect the current lease owner, and review the current breakpoint registry."
+      ],
+      "status": "partial",
+      "summary": "Inspect explicit dev-only debug status, leased-session ownership, breakpoint registry, and hook support."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "leaseTimeoutMs": {
+            "description": "Lease duration in milliseconds before the bridge expires the session.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "name": {
+            "description": "Optional human-readable debugger session label.",
+            "type": "string"
+          },
+          "pause": {
+            "description": "Pause immediately after the debugger session is leased.",
+            "type": "boolean"
+          },
+          "role": {
+            "description": "Requested debugger session role; controller is the compatibility default.",
+            "enum": [
+              "controller",
+              "observer"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "Session leasing still depends on a live host build exposing debug hooks; unsupported or non-live hosts return structured notices instead of pretending a lease exists.",
+        "Only one controller lease is supported at a time; observer sessions can attach without mutating debugger state."
+      ],
+      "mapsTo": [
+        "dev debug session start"
+      ],
+      "name": "debug_session_start",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "session",
+            "summary": "Debugger session metadata including stable id, optional name, role, and expiry."
+          },
+          {
+            "path": "status",
+            "summary": "Post-start live debug status snapshot including ownership and breakpoints."
+          },
+          {
+            "path": "paused",
+            "summary": "Whether the runtime was paused as part of session start."
+          }
+        ],
+        "summary": "Leased debugger-session result preserving the created session id, ownership details, and post-start live debug status."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use debug_session_start before leased pause, step, wait, or breakpoint workflows so the bridge can enforce one explicit owner for mutating debugger operations."
+      ],
+      "status": "partial",
+      "summary": "Start an explicit debugger session as the controller lease owner or as a passive observer."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "follow": {
+            "description": "Poll until at least one event is available or timeoutMs elapses.",
+            "type": "boolean"
+          },
+          "fromSequence": {
+            "description": "Replay cursor sequence to start from; 0 asks the bridge for its retained window.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "limit": {
+            "description": "Maximum events to return per bounded replay request.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "session": {
+            "description": "Optional debugger session id used to describe caller role.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Bounded follow timeout in milliseconds.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This is an explicit dev debugger surface; it is not part of default gameplay actions.",
+        "Follow mode is bounded polling over unary transports and reports timeout metadata instead of waiting indefinitely."
+      ],
+      "mapsTo": [
+        "dev debug events"
+      ],
+      "name": "debug_events",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "events",
+            "summary": "Retained debugger events with sequence numbers, kind, session id, session role, notices, and kind-specific detail."
+          },
+          {
+            "path": "nextSequence",
+            "summary": "Cursor callers should use for the next replay request."
+          },
+          {
+            "path": "oldestRetainedSequence",
+            "summary": "Oldest event sequence still retained by the live bridge."
+          },
+          {
+            "path": "newestSequence",
+            "summary": "Newest event sequence known to the live bridge."
+          },
+          {
+            "path": "expired",
+            "summary": "Whether the requested fromSequence was older than the retained window."
+          },
+          {
+            "path": "overflow",
+            "summary": "Whether more events were available than the requested limit."
+          }
+        ],
+        "summary": "Bounded debugger event replay payload exposing sequence cursors, retention metadata, lease role context, and structured notices."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use debug_events after debug_session_start with role=observer when a passive consumer needs replay or live-ish status, breakpoint, pause, resume, or step events."
+      ],
+      "status": "partial",
+      "summary": "Replay bounded debugger events by sequence cursor, with optional bounded follow polling."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Stable leased debugger session id returned by debug_session_start.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Session ids are lease-scoped and may expire; callers must handle not-found or expired responses explicitly."
+      ],
+      "mapsTo": [
+        "dev debug session status"
+      ],
+      "name": "debug_session_status",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "session",
+            "summary": "Current metadata for the requested debugger session id."
+          },
+          {
+            "path": "status",
+            "summary": "Live debug status snapshot including current ownership and breakpoints."
+          },
+          {
+            "path": "found",
+            "summary": "Whether the requested debugger session id is still active."
+          }
+        ],
+        "summary": "One leased debugger-session snapshot plus the current live debug status."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use debug_session_status when a workflow needs to refresh lease metadata or confirm whether a previously created debugger session is still active."
+      ],
+      "status": "partial",
+      "summary": "Inspect one leased debugger session by stable id."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Stable leased debugger session id returned by debug_session_start.",
+            "type": "string"
+          },
+          "resume": {
+            "description": "Resume the runtime before releasing the session lease.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Ending a session is a mutating dev-only operation and may fail with structured ownership or not-found notices when the lease is gone or belongs to another caller."
+      ],
+      "mapsTo": [
+        "dev debug session end"
+      ],
+      "name": "debug_session_end",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "ended",
+            "summary": "Whether the requested debugger session lease was released."
+          },
+          {
+            "path": "resumed",
+            "summary": "Whether the runtime resumed as part of ending the session."
+          },
+          {
+            "path": "status",
+            "summary": "Post-end live debug status snapshot."
+          }
+        ],
+        "summary": "Debugger-session release result preserving whether the lease ended, whether the runtime resumed, and the post-end live debug status."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use debug_session_end when a leased workflow is finished so later debugger calls do not stay blocked behind a stale owner."
+      ],
+      "status": "partial",
+      "summary": "Release a leased debugger session and optionally resume the runtime."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "description": "Optional leased debugger session id that should own this pause request.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This is dev-only live control, not a safe read-only inspection command.",
+        "Hosts without wired debug hooks or inactive live runtimes may return structured unsupported/idempotent notices instead of pausing.",
+        "When a lease owner exists, callers should pass the matching session id instead of relying on session-free mutation."
+      ],
+      "mapsTo": [
+        "dev debug pause"
+      ],
+      "name": "debug_pause",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "applied",
+            "summary": "Whether the live host actually transitioned into a paused state."
+          },
+          {
+            "path": "status",
+            "summary": "Post-operation live debug status snapshot."
+          },
+          {
+            "path": "notices",
+            "summary": "Structured notices when the runtime was already paused or hooks are unavailable."
+          }
+        ],
+        "summary": "Manual live debug pause result preserving whether the pause request applied, the post-operation status, and any idempotent notices."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use debug_pause only after debug_status or debug_session_start confirms the attached host supports live debug control and the workflow truly needs a paused runtime."
+      ],
+      "status": "partial",
+      "summary": "Request a manual pause through the bridge-owned debug control surface."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "description": "Optional leased debugger session id that should own this resume request.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This is dev-only live control, not a read-only inspection command.",
+        "Resuming may be a no-op with structured notices when the runtime is not currently paused."
+      ],
+      "mapsTo": [
+        "dev debug resume"
+      ],
+      "name": "debug_resume",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "applied",
+            "summary": "Whether the live host actually transitioned back into a running state."
+          },
+          {
+            "path": "status",
+            "summary": "Post-operation live debug status snapshot."
+          },
+          {
+            "path": "notices",
+            "summary": "Structured notices when the runtime was already running or hooks are unavailable."
+          }
+        ],
+        "summary": "Manual live debug resume result preserving whether the resume request applied, the post-operation status, and any idempotent notices."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use debug_resume only after an intentional leased or session-free pause/step/wait workflow when the runtime should continue running."
+      ],
+      "status": "partial",
+      "summary": "Request a resume through the bridge-owned debug control surface."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "description": "Optional positive step count; defaults to 1 when omitted.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "kind": {
+            "description": "Requested live debug step kind.",
+            "enum": [
+              "frame",
+              "action"
+            ],
+            "type": "string"
+          },
+          "session": {
+            "description": "Optional leased debugger session id that should own this step request.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Step requests require a live debug runtime that is already paused; unsupported or running runtimes return structured notices instead of guessing.",
+        "Action stepping remains tied to the live host's current action-queue boundaries and can report partial/idle outcomes honestly."
+      ],
+      "mapsTo": [
+        "dev debug step"
+      ],
+      "name": "debug_step",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "kind",
+            "summary": "Requested step kind echoed back by the CLI envelope."
+          },
+          {
+            "path": "count",
+            "summary": "Requested step count echoed back by the CLI envelope."
+          },
+          {
+            "path": "applied",
+            "summary": "Whether the live host completed a step request."
+          },
+          {
+            "path": "status",
+            "summary": "Post-step live debug status snapshot."
+          }
+        ],
+        "summary": "Bounded live debug step result preserving the requested step kind/count, whether the step applied, the post-step status, and any notices."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use debug_step after debug_pause when the workflow needs one bounded frame or action progression instead of fully resuming the runtime."
+      ],
+      "status": "partial",
+      "summary": "Request a bounded frame/action step through the explicit debug surface."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "description": "Leased debugger session id that owns the wait operation.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Maximum wait duration in milliseconds before the CLI reports a timeout result.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This still depends on a live host build exposing debug hooks plus a currently leased debugger session id.",
+        "Wait is not a general scenario-runner primitive; it is a debugger-oriented resume-until-breakpoint operation."
+      ],
+      "mapsTo": [
+        "dev debug wait"
+      ],
+      "name": "debug_wait",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "completed",
+            "summary": "Whether the wait finished without transport-level failure."
+          },
+          {
+            "path": "timedOut",
+            "summary": "Whether the wait reached its timeout before a breakpoint matched."
+          },
+          {
+            "path": "breakpointHit",
+            "summary": "Breakpoint-hit metadata when the wait stopped on a match."
+          },
+          {
+            "path": "status",
+            "summary": "Post-wait live debug status snapshot."
+          }
+        ],
+        "summary": "Leased debug wait result preserving whether a breakpoint hit before timeout, the matched breakpoint when present, and the post-wait live debug status."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use debug_wait after debug_session_start and breakpoint_add when the workflow should resume execution until one observed change or match breakpoint fires."
+      ],
+      "status": "partial",
+      "summary": "Resume under a leased debugger session until a breakpoint hits or a timeout elapses."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "description": "Optional leased debugger session id used to explain ownership for the listed breakpoint registry.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "Breakpoint listing is dev-only and only as useful as the attached live runtime's current debug support."
+      ],
+      "mapsTo": [
+        "dev breakpoint list"
+      ],
+      "name": "breakpoint_list",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "breakpoints",
+            "summary": "Registered debug breakpoints with stable ids, kinds, hit counts, and predicates or observed values."
+          },
+          {
+            "path": "status",
+            "summary": "Current live debug status, including the latest breakpoint hit when available."
+          },
+          {
+            "path": "notices",
+            "summary": "Structured notices returned alongside the registry snapshot."
+          }
+        ],
+        "summary": "Live debug breakpoint registry plus the current live debug status snapshot."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use breakpoint_list before removing breakpoints or to confirm the current live registry and latest hit metadata."
+      ],
+      "status": "partial",
+      "summary": "List registered debug breakpoints and the current live debug status."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "autoRemoveOnHit": {
+            "description": "Automatically remove the breakpoint after the first reported hit.",
+            "type": "boolean"
+          },
+          "contains": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "equals": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "exists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "gt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "gte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "kind": {
+            "description": "Breakpoint behavior: match evaluates a predicate, while change fires when the observed JSON value changes.",
+            "enum": [
+              "match",
+              "change"
+            ],
+            "type": "string"
+          },
+          "lt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "lte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "minHitCount": {
+            "description": "Minimum hit count before the breakpoint is reported as matched; defaults to 1.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "name": {
+            "description": "Optional human-readable breakpoint label.",
+            "type": "string"
+          },
+          "notExists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "path": {
+            "description": "Observable state query path to evaluate for the debug breakpoint.",
+            "type": "string"
+          },
+          "regex": {
+            "description": "Regular expression matched against a string state value.",
+            "type": "string"
+          },
+          "session": {
+            "description": "Optional leased debugger session id that should own this breakpoint registration.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Match breakpoints require exactly one predicate option matching the shared dev assert / wait-for grammar, while change breakpoints watch for observed JSON value changes and may omit predicates.",
+        "Malformed paths or regex predicates fail fast with structured invalid_query_filter errors from the bridge."
+      ],
+      "mapsTo": [
+        "dev breakpoint add"
+      ],
+      "name": "breakpoint_add",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "added",
+            "summary": "Whether the requested breakpoint was registered."
+          },
+          {
+            "path": "breakpoint",
+            "summary": "Stored breakpoint metadata including stable id and normalized predicate."
+          },
+          {
+            "path": "status",
+            "summary": "Current live debug status after registration."
+          }
+        ],
+        "summary": "Breakpoint registration result preserving the stored predicate, the post-add live debug status, and validation/notices from the bridge."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use breakpoint_add after debug_status or debug_session_start when you need either a predicate-backed match breakpoint or a change-watching breakpoint on a known observable state path."
+      ],
+      "status": "partial",
+      "summary": "Register a live debug breakpoint with match/change kinds and the shared predicate grammar."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Stable breakpoint id returned by breakpoint_list or breakpoint_add.",
+            "type": "string"
+          },
+          "session": {
+            "description": "Optional leased debugger session id that should own this breakpoint removal.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Removal is dev-only and requires a stable breakpoint id previously returned by breakpoint_list or breakpoint_add."
+      ],
+      "mapsTo": [
+        "dev breakpoint remove"
+      ],
+      "name": "breakpoint_remove",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "removed",
+            "summary": "Whether a registered breakpoint with the requested id was removed."
+          },
+          {
+            "path": "id",
+            "summary": "Breakpoint id the CLI attempted to remove."
+          },
+          {
+            "path": "status",
+            "summary": "Current live debug status after removal."
+          }
+        ],
+        "summary": "Breakpoint removal result preserving whether the id was removed, the post-remove live debug status, and any idempotent notices."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use breakpoint_remove after breakpoint_list when a named live breakpoint is no longer needed."
+      ],
+      "status": "partial",
+      "summary": "Remove a previously registered debug breakpoint by stable id."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Optional raw request body string.",
+            "type": "string"
+          },
+          "contains": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "equals": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "exists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "expectHeaders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "expectStatus": {
+            "description": "Optional exact HTTP status code expected from the response.",
+            "minimum": 100,
+            "type": "integer"
+          },
+          "gt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "gte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "headers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "lt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "lte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "method": {
+            "description": "HTTP method to use; defaults to GET.",
+            "type": "string"
+          },
+          "notExists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "query": {
+            "description": "Optional JSON path used to validate the probe response body, headers, or derived fields.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Maximum request or total wait time in milliseconds.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "url": {
+            "description": "HTTP or HTTPS URL to request.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Probe success still depends on the external endpoint being reachable and in the expected state."
+      ],
+      "mapsTo": [
+        "dev http"
+      ],
+      "name": "http",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "probe",
+            "summary": "Probe family identifier."
+          },
+          {
+            "path": "status",
+            "summary": "Structured success/failure status for the requested HTTP check."
+          },
+          {
+            "path": "response",
+            "summary": "Captured HTTP response metadata including status, headers, and body details when available."
+          }
+        ],
+        "summary": "One bounded HTTP probe result preserving response metadata, optional query evaluation, and failure details."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use http for one-shot external validation steps that should stay in the CLI/test-runner flow instead of inventing repo-specific shell probes."
+      ],
+      "status": "partial",
+      "summary": "Run one bounded HTTP probe with optional status, header, and JSON/text query assertions."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "description": "Optional raw request body string.",
+            "type": "string"
+          },
+          "contains": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "equals": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "exists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "expectHeaders": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "expectStatus": {
+            "description": "Optional exact HTTP status code expected from the response.",
+            "minimum": 100,
+            "type": "integer"
+          },
+          "gt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "gte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "headers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "intervalMs": {
+            "description": "Polling interval in milliseconds between repeated HTTP checks.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "lt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "lte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "method": {
+            "description": "HTTP method to use; defaults to GET.",
+            "type": "string"
+          },
+          "notExists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "query": {
+            "description": "Optional JSON path used to validate the probe response body, headers, or derived fields.",
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Maximum request or total wait time in milliseconds.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "url": {
+            "description": "HTTP or HTTPS URL to request.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Probe success still depends on the external endpoint being reachable and eventually satisfying the requested contract."
+      ],
+      "mapsTo": [
+        "dev http-wait"
+      ],
+      "name": "http_wait",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "probe",
+            "summary": "Probe family identifier."
+          },
+          {
+            "path": "status",
+            "summary": "Structured success/failure status for the waited HTTP check."
+          },
+          {
+            "path": "attempts",
+            "summary": "Number of probe attempts before success or timeout."
+          },
+          {
+            "path": "elapsedMs",
+            "summary": "Total wait duration before the probe finished."
+          }
+        ],
+        "summary": "Polling HTTP probe result preserving the final response, attempts, and elapsed time."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use http_wait when a repo-local service needs time to warm up and you want the existing CLI/test-runner wait semantics instead of a separate shell loop."
+      ],
+      "status": "partial",
+      "summary": "Poll one HTTP endpoint until the requested status, header, or JSON/text query assertions match."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "contains": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "equals": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "exists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "expectSha256": {
+            "description": "Optional expected SHA-256 digest for the fetched bytes.",
+            "type": "string"
+          },
+          "gt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "gte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "lt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "lte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "notExists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "output": {
+            "description": "Optional filesystem path where the fetched bytes should be written.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Optional JSON path used to validate the probe response body, headers, or derived fields.",
+            "type": "string"
+          },
+          "source": {
+            "description": "Filesystem path or supported source argument for dev fetch.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Fetch success depends on the referenced source existing and being readable from the current machine."
+      ],
+      "mapsTo": [
+        "dev fetch"
+      ],
+      "name": "fetch",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "probe",
+            "summary": "Probe family identifier."
+          },
+          {
+            "path": "status",
+            "summary": "Structured success/failure status for the fetch step."
+          },
+          {
+            "path": "output",
+            "summary": "Persisted output metadata when the fetched bytes were written to disk."
+          },
+          {
+            "path": "sha256",
+            "summary": "Computed SHA-256 digest for the fetched bytes."
+          }
+        ],
+        "summary": "Fetch result preserving output-path, digest, and optional query-evaluation metadata."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use fetch when a repo-local workflow needs reproducible artifact download/copy validation inside the same CLI/test-runner surface as other checks."
+      ],
+      "status": "partial",
+      "summary": "Fetch one local or HTTP artifact, optionally write it to disk, and assert over parsed JSON/text content."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "expectText": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "headers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "sendText": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "timeoutMs": {
+            "description": "Maximum session duration in milliseconds.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "url": {
+            "description": "WebSocket URL to open.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Probe success depends on the external websocket endpoint being reachable and returning the expected frames."
+      ],
+      "mapsTo": [
+        "dev websocket"
+      ],
+      "name": "websocket",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "probe",
+            "summary": "Probe family identifier."
+          },
+          {
+            "path": "status",
+            "summary": "Structured success/failure status for the websocket session."
+          },
+          {
+            "path": "receivedText",
+            "summary": "Observed text frames captured before the session completed."
+          },
+          {
+            "path": "elapsedMs",
+            "summary": "Total session duration before success or timeout."
+          }
+        ],
+        "summary": "Bounded websocket probe result preserving sent/received frames and timing metadata."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use websocket for repo-local event-stream smoke checks that should share the CLI/test-runner output and exit-code contract with the other probe tools."
+      ],
+      "status": "partial",
+      "summary": "Open one bounded websocket validation session with optional text sends and expected text frames."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "limitations": [
+        "This only reads the configured profiles file; it does not validate live game state or execute any lifecycle steps."
+      ],
+      "mapsTo": [
+        "project profile list"
+      ],
+      "name": "project_profile_list",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "sourcePath",
+            "summary": "Profiles file path used for the listing."
+          },
+          {
+            "path": "profiles",
+            "summary": "Profile names, descriptions, and declared step kinds."
+          }
+        ],
+        "summary": "Checked-in lifecycle profile summaries with source-path provenance."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use project_profile_list before project_profile_show or project_profile_run when you need the repo-authored profile names available in the current checkout."
+      ],
+      "status": "stable",
+      "summary": "List checked-in profiles that may compose lifecycle and repo-local command steps."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Exact checked-in lifecycle profile name from project_profile_list.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This reads repo-authored profile data only; execution still happens through project_profile_run."
+      ],
+      "mapsTo": [
+        "project profile show"
+      ],
+      "name": "project_profile_show",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "name",
+            "summary": "Resolved profile name."
+          },
+          {
+            "path": "sourcePath",
+            "summary": "Profiles file path used for the lookup."
+          },
+          {
+            "path": "profile",
+            "summary": "Resolved step definitions with defaults and normalized paths applied."
+          }
+        ],
+        "summary": "One resolved lifecycle profile with normalized step settings and path resolution."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use project_profile_show before project_profile_run when an agent needs to inspect the exact composed lifecycle steps and resolved deploy paths."
+      ],
+      "status": "stable",
+      "summary": "Show one resolved checked-in profile with lifecycle and repo-local command steps."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Exact checked-in lifecycle profile name from project_profile_list.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Execution success depends on the underlying lifecycle steps, local config, and live environment readiness."
+      ],
+      "mapsTo": [
+        "project profile run"
+      ],
+      "name": "project_profile_run",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "name",
+            "summary": "Resolved profile name."
+          },
+          {
+            "path": "steps",
+            "summary": "Per-step execution results or structured errors."
+          },
+          {
+            "path": "sourcePath",
+            "summary": "Profiles file path used for the run."
+          }
+        ],
+        "summary": "Profile-run result preserving per-step success or structured failure details from the composed lifecycle commands."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use project_profile_run for repo-authored lifecycle orchestration when the checked-in profile already matches the desired deploy/launch/attach flow."
+      ],
+      "status": "partial",
+      "summary": "Run one checked-in profile by composing lifecycle commands and repo-local command steps."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "limitations": [
+        "This only reads the configured hooks file; it does not spawn any repo hook commands."
+      ],
+      "mapsTo": [
+        "project hook list"
+      ],
+      "name": "project_hook_list",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "sourcePath",
+            "summary": "Hooks file path used for the listing."
+          },
+          {
+            "path": "hooks",
+            "summary": "Available hook names and descriptions."
+          }
+        ],
+        "summary": "Repo-authored hook summaries with source-path provenance."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use project_hook_list before project_hook_show or project_hook_run when you need to discover the repo-authored extension points available in the current checkout."
+      ],
+      "status": "stable",
+      "summary": "List registered repo-local validation hooks from the checked-in hooks file."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Exact repo-local hook name from project_hook_list.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This reads repo-authored hook metadata only; execution still happens through project_hook_run."
+      ],
+      "mapsTo": [
+        "project hook show"
+      ],
+      "name": "project_hook_show",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "name",
+            "summary": "Resolved hook name."
+          },
+          {
+            "path": "sourcePath",
+            "summary": "Hooks file path used for the lookup."
+          },
+          {
+            "path": "hook",
+            "summary": "Resolved command, args, cwd, and env for the selected hook."
+          }
+        ],
+        "summary": "One resolved repo-local hook definition with normalized command, cwd, and env metadata."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use project_hook_show before project_hook_run when an agent needs to inspect what the repo-authored extension will execute and which working directory it uses."
+      ],
+      "status": "stable",
+      "summary": "Show one registered repo-local validation hook with resolved command and cwd paths."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "input": {
+            "description": "Optional JSON-serializable input payload passed through the hook stdin contract.",
+            "type": [
+              "string",
+              "object",
+              "array"
+            ]
+          },
+          "name": {
+            "description": "Exact repo-local hook name from project_hook_list.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Execution success depends on the repo-authored hook command, local files, and any external tools it shells out to."
+      ],
+      "mapsTo": [
+        "project hook run"
+      ],
+      "name": "project_hook_run",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "name",
+            "summary": "Resolved hook name."
+          },
+          {
+            "path": "sourcePath",
+            "summary": "Hooks file path used for the run."
+          },
+          {
+            "path": "result",
+            "summary": "Hook-reported output payload plus resolved artifact metadata."
+          }
+        ],
+        "summary": "Hook execution result preserving repo-local hook output and declared artifacts."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use project_hook_run only for repo-authored extension flows that already exist in the checked-in hooks file; it is not a second plugin protocol."
+      ],
+      "status": "partial",
+      "summary": "Run one registered repo-local validation hook through the JSON stdin/stdout contract."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "description": "Optional skill root where the checked-in spirectl skill pack should be installed.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This installs the checked-in repo-local skill pack into another repo tree; it is not a hosted package installer or remote registry workflow.",
+        "When path is omitted, the CLI writes the self-contained spirectl skill under ./.agents/skills/ in the current working directory."
+      ],
+      "mapsTo": [
+        "skill install"
+      ],
+      "name": "skill_install",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "name",
+            "summary": "Installed skill name."
+          },
+          {
+            "path": "path",
+            "summary": "Filesystem path to the written router SKILL.md entrypoint."
+          },
+          {
+            "path": "skillDir",
+            "summary": "Directory containing the installed repo-local router skill."
+          },
+          {
+            "path": "sourcePath",
+            "summary": "Checked-in source router skill path copied by the CLI."
+          },
+          {
+            "path": "installedFiles",
+            "summary": "Skill and reference files written under the installed skill directory."
+          }
+        ],
+        "summary": "Repo-local skill installation metadata preserving the CLI-written target paths."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use skill_install when another local repo needs the checked-in spirectl skill directory without shelling out to a separate installer."
+      ],
+      "status": "implemented",
+      "summary": "Install the checked-in spirectl skill pack into a project-local .agents/skills directory or an explicit root path."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "height": {
+            "description": "Explicit viewport height in pixels when not using a preset.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "output": {
+            "description": "Optional explicit PNG output path. When omitted, the CLI writes into the configured artifacts directory.",
+            "type": "string"
+          },
+          "preset": {
+            "description": "Optional viewport preset name from inspect_viewport_presets.",
+            "type": "string"
+          },
+          "presetCatalogs": {
+            "description": "Optional explicit viewport preset catalog paths loaded in addition to built-ins.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "rpcTimeoutMs": {
+            "description": "Maximum bridge RPC time in milliseconds before screenshot capture fails with bridge_rpc_timeout.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "width": {
+            "description": "Explicit viewport width in pixels when not using a preset.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This captures an artifact to disk; use state for structured runtime inspection instead of treating screenshots as the primary data surface."
+      ],
+      "mapsTo": [
+        "dev screenshot"
+      ],
+      "name": "screenshot",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "path",
+            "summary": "Filesystem path of the written screenshot artifact."
+          },
+          {
+            "path": "format",
+            "summary": "Encoded image format reported by the bridge."
+          },
+          {
+            "path": "screen",
+            "summary": "Visible screen metadata captured at screenshot time."
+          },
+          {
+            "path": "byteLength",
+            "summary": "Written PNG byte length."
+          }
+        ],
+        "summary": "PNG artifact metadata for one bridge-backed runtime screenshot written to disk."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Call game_info first, then use screenshot when you need a visual artifact or debugging evidence tied to a known file path."
+      ],
+      "status": "implemented",
+      "summary": "Capture a bridge-backed PNG screenshot to a file."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "presetCatalogs": {
+            "description": "Optional explicit viewport preset catalog paths loaded in addition to built-ins.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [],
+      "mapsTo": [
+        "inspect viewport-presets"
+      ],
+      "name": "inspect_viewport_presets",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "source",
+            "summary": "Catalog source marker."
+          },
+          {
+            "path": "presets",
+            "summary": "Preset names plus dimensions and source metadata."
+          }
+        ],
+        "summary": "Effective viewport preset catalog for repeatable screenshot and diagnostics capture."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use inspect_viewport_presets before screenshot, screenshot_diff, or diagnostics when you need repeatable viewport sizing without hardcoding dimensions."
+      ],
+      "status": "stable",
+      "summary": "List the effective viewport preset catalog available to visual capture commands."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "actual": {
+            "description": "Optional explicit PNG path for offline diff mode; when omitted the CLI captures a fresh live screenshot.",
+            "type": "string"
+          },
+          "baseline": {
+            "description": "Path to the baseline PNG file to compare against a live screenshot or explicit actual PNG.",
+            "type": "string"
+          },
+          "bundleDir": {
+            "description": "Optional directory where comparison.json, baseline.png, actual.png, diff.png, and any requested foreground/ROI diff PNGs should be written.",
+            "type": "string"
+          },
+          "foregroundMaxDiffRatio": {
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "height": {
+            "description": "Explicit viewport height in pixels when not using a preset.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "ignoreAlpha": {
+            "description": "Compare RGB only, ignoring the alpha channel.",
+            "type": "boolean"
+          },
+          "mask": {
+            "description": "Optional foreground mask PNG path. Nonzero mask pixels select foreground pixels for the foreground comparison.",
+            "type": "string"
+          },
+          "maxDiffPixels": {
+            "description": "Maximum differing pixels allowed before the comparison fails.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxDiffRatio": {
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "pixelTolerance": {
+            "description": "Maximum absolute per-channel delta that still counts as an identical pixel. Absorbs renderer anti-aliasing jitter; maxDiffPixels and maxDiffRatio still count and threshold whole pixels. Default 0 = exact RGBA.",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "preset": {
+            "description": "Optional viewport preset name from inspect_viewport_presets.",
+            "type": "string"
+          },
+          "presetCatalogs": {
+            "description": "Optional explicit viewport preset catalog paths loaded in addition to built-ins.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "regions": {
+            "description": "Optional ROI regions JSON path. Accepts either an array of {id,x,y,width,height} regions or an object with a regions array.",
+            "type": "string"
+          },
+          "requiredComparisons": {
+            "description": "Comparison modes that must be present. Missing foreground mask or ROI regions produce structured notices and a failed comparison.",
+            "items": {
+              "enum": [
+                "full",
+                "foreground",
+                "roi"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "roiMaxDiffRatio": {
+            "exclusiveMaximum": 1.0,
+            "minimum": 0.0,
+            "type": "number"
+          },
+          "rpcTimeoutMs": {
+            "description": "Maximum bridge RPC time in milliseconds for live screenshot capture when actual is omitted.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "width": {
+            "description": "Explicit viewport width in pixels when not using a preset.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "baseline"
+        ],
+        "type": "object"
+      },
+      "limitations": [],
+      "mapsTo": [
+        "dev screenshot-diff"
+      ],
+      "name": "screenshot_diff",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "matched",
+            "summary": "Whether the screenshot comparison stayed within the requested diff thresholds."
+          },
+          {
+            "path": "diffPixels",
+            "summary": "Number of differing pixels."
+          },
+          {
+            "path": "diffRatio",
+            "summary": "Ratio of differing pixels to total pixels."
+          },
+          {
+            "path": "bundle",
+            "summary": "Persisted comparison artifact paths when bundleDir was requested."
+          }
+        ],
+        "summary": "Screenshot comparison result preserving diff metrics and optional bundle paths for live or offline diffing."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use screenshot_diff when visual regression checks should stay on the same CLI/test-runner path as live screenshot capture and diagnostics."
+      ],
+      "status": "stable",
+      "summary": "Compare a baseline PNG against either a live screenshot or an explicit actual PNG and optionally write a diff bundle."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "output": {
+            "description": "Directory where the exported baseline bundle should be written.",
+            "type": "string"
+          },
+          "spec": {
+            "description": "Path to the authored .sts2.snapshot.yaml spec file.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec",
+          "output"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Snapshot export is compare/export oriented only; it does not create a restore or runtime-mutation surface.",
+        "The authored spec must stay within the bounded sections supported by the CLI snapshot workflow."
+      ],
+      "mapsTo": [
+        "dev snapshot export"
+      ],
+      "name": "snapshot_export",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Export status for the requested bounded snapshot bundle."
+          },
+          {
+            "path": "outputDir",
+            "summary": "Directory where the baseline bundle was written."
+          },
+          {
+            "path": "captures",
+            "summary": "Per-section captured bundle file paths and normalized values."
+          }
+        ],
+        "summary": "Bounded snapshot baseline export result with inspectable JSON captures and optional runtime PNG evidence."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use snapshot_export to create or refresh a checked-in bounded regression baseline after deterministic setup through existing scenarios or fixtures."
+      ],
+      "status": "stable",
+      "summary": "Capture one bounded snapshot-regression baseline bundle from the current runtime."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "description": "Directory containing an exported baseline bundle.",
+            "type": "string"
+          },
+          "bundleDir": {
+            "description": "Optional directory where current comparison captures should be written.",
+            "type": "string"
+          },
+          "spec": {
+            "description": "Path to the authored .sts2.snapshot.yaml spec file.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec",
+          "baseline"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Snapshot comparison requires a previously exported bounded baseline bundle; it is not a generic full-state diff or replay mechanism."
+      ],
+      "mapsTo": [
+        "dev snapshot compare"
+      ],
+      "name": "snapshot_compare",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "matched",
+            "summary": "Whether every requested bounded snapshot section matched the baseline."
+          },
+          {
+            "path": "sections",
+            "summary": "Per-section normalized comparison details."
+          },
+          {
+            "path": "mismatches",
+            "summary": "Summary of any section-level mismatches."
+          },
+          {
+            "path": "bundle",
+            "summary": "Current comparison bundle paths when bundleDir was requested."
+          }
+        ],
+        "summary": "Bounded snapshot regression comparison result with per-section mismatches and optional current evidence bundle paths."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use snapshot_compare after deterministic setup when a stable screen or workflow should match a checked-in bounded regression baseline."
+      ],
+      "status": "stable",
+      "summary": "Compare a bounded snapshot spec against an exported baseline bundle and optionally write current evidence."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "equals"
+            ]
+          },
+          {
+            "required": [
+              "contains"
+            ]
+          },
+          {
+            "required": [
+              "regex"
+            ]
+          },
+          {
+            "required": [
+              "gt"
+            ]
+          },
+          {
+            "required": [
+              "gte"
+            ]
+          },
+          {
+            "required": [
+              "lt"
+            ]
+          },
+          {
+            "required": [
+              "lte"
+            ]
+          },
+          {
+            "required": [
+              "exists"
+            ]
+          },
+          {
+            "required": [
+              "notExists"
+            ]
+          }
+        ],
+        "properties": {
+          "contains": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "equals": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "exists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "gt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "gte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "intervalMs": {
+            "description": "Polling interval in milliseconds between state reads.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "lt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "lte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "notExists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "path": {
+            "description": "Dotted JSON path into the queried document, including numeric indexes, array wildcards, nested or object-wide array filter selectors, or by-id maps.",
+            "type": "string"
+          },
+          "perspective": {
+            "description": "Optional runtime perspective scope for multiplayer-aware state queries.",
+            "enum": [
+              "local",
+              "omniscient"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "description": "Optional stable player id used with multiplayer-aware perspective selection.",
+            "type": "string"
+          },
+          "regex": {
+            "description": "Rust-style regular expression matched against a string state value.",
+            "type": "string"
+          },
+          "source": {
+            "description": "Document to query. Omitted queries the plain state snapshot; `actions` queries the resolved `spirectl.state-actions/v0` envelope instead (the same document `sts2 state actions` returns).",
+            "enum": [
+              "actions"
+            ],
+            "type": "string"
+          },
+          "timeoutMs": {
+            "description": "Maximum total wait duration in milliseconds.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Only the current simple dotted-path query language is supported; array wildcards and array filter selectors (`=`, `!=`, `*=`, `~=`, `>`, `>=`, `<`, `<=`) are available.",
+        "source: \"actions\" queries the resolved spirectl.state-actions/v0 document (the same document `sts2 state actions` returns) instead of the plain state snapshot."
+      ],
+      "mapsTo": [
+        "dev wait-for"
+      ],
+      "name": "wait_for",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "matched",
+            "summary": "Whether the predicate eventually matched."
+          },
+          {
+            "path": "actual",
+            "summary": "Last observed value for the requested state path."
+          },
+          {
+            "path": "attempts",
+            "summary": "Number of polling attempts performed."
+          },
+          {
+            "path": "elapsedMs",
+            "summary": "Total wait duration before success or timeout."
+          }
+        ],
+        "summary": "Assertion-style wait result that preserves timeout failures and last observed values."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use wait_for for script-friendly eventual conditions, then follow with state or assert once the condition is satisfied."
+      ],
+      "status": "implemented",
+      "summary": "Poll bridge-backed state until a simple path assertion succeeds. `--source actions` polls the resolved `state actions` document instead of the plain state snapshot."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "equals"
+            ]
+          },
+          {
+            "required": [
+              "contains"
+            ]
+          },
+          {
+            "required": [
+              "regex"
+            ]
+          },
+          {
+            "required": [
+              "gt"
+            ]
+          },
+          {
+            "required": [
+              "gte"
+            ]
+          },
+          {
+            "required": [
+              "lt"
+            ]
+          },
+          {
+            "required": [
+              "lte"
+            ]
+          },
+          {
+            "required": [
+              "exists"
+            ]
+          },
+          {
+            "required": [
+              "notExists"
+            ]
+          }
+        ],
+        "properties": {
+          "contains": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "equals": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          },
+          "exists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "gt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "gte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "lt": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "lte": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "notExists": {
+            "const": true,
+            "type": "boolean"
+          },
+          "path": {
+            "description": "Dotted JSON path into the queried document, including numeric indexes, array wildcards, nested or object-wide array filter selectors, or by-id maps.",
+            "type": "string"
+          },
+          "perspective": {
+            "description": "Optional runtime perspective scope for multiplayer-aware state queries.",
+            "enum": [
+              "local",
+              "omniscient"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "description": "Optional stable player id used with multiplayer-aware perspective selection.",
+            "type": "string"
+          },
+          "regex": {
+            "description": "Rust-style regular expression matched against a string state value.",
+            "type": "string"
+          },
+          "source": {
+            "description": "Document to query. Omitted queries the plain state snapshot; `actions` queries the resolved `spirectl.state-actions/v0` envelope instead (the same document `sts2 state actions` returns).",
+            "enum": [
+              "actions"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Only the current simple dotted-path query language is supported; array wildcards and array filter selectors (`=`, `!=`, `*=`, `~=`, `>`, `>=`, `<`, `<=`) are available.",
+        "source: \"actions\" queries the resolved spirectl.state-actions/v0 document (the same document `sts2 state actions` returns) instead of the plain state snapshot."
+      ],
+      "mapsTo": [
+        "dev assert"
+      ],
+      "name": "assert",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "matched",
+            "summary": "Whether the predicate matched the current value."
+          },
+          {
+            "path": "actual",
+            "summary": "Observed value at the requested state path."
+          },
+          {
+            "path": "expected",
+            "summary": "Expected predicate value when applicable."
+          },
+          {
+            "path": "resolution",
+            "summary": "Missing-path details when the lookup cannot be fully resolved."
+          }
+        ],
+        "summary": "Immediate assertion result against the current runtime state snapshot."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use assert for single-snapshot checks after state or wait_for, especially in test and automation workflows."
+      ],
+      "status": "implemented",
+      "summary": "Assert a simple path against the current bridge-backed state. `--source actions` queries the resolved `state actions` document (`spirectl.state-actions/v0`) instead of the plain state snapshot."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of matches to return.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Search query or exact id/name understood by the helper tool.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          },
+          "subject": {
+            "description": "Static inspection subject to search for.",
+            "enum": [
+              "type",
+              "method",
+              "symbol"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This is static inspection only and does not use the live runtime bridge.",
+        "Managed dependency DLLs are excluded by default; set includeDependencies=true only when dependency symbols are the intended target.",
+        "includeDependencies is independent from includeMods."
+      ],
+      "mapsTo": [
+        "code locate"
+      ],
+      "name": "code_locate",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "matchCount",
+            "summary": "Total number of returned matches."
+          },
+          {
+            "path": "matches",
+            "summary": "Ranked static inspection results with stable ids for follow-up commands."
+          }
+        ],
+        "summary": "Search-oriented static inspection result for managed types/methods or fallback symbols."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use code_locate first in managed-code workflows so later commands can consume stable type or method ids instead of repeating fuzzy queries."
+      ],
+      "status": "implemented",
+      "summary": "Locate types and methods in installed game or mod assemblies."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Exact type or method query, usually a stable id returned by code_locate.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          },
+          "subject": {
+            "description": "Exact static inspection subject to resolve.",
+            "enum": [
+              "type",
+              "method"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This expects an exact subject query and may return structured ambiguous_query or no_match errors when the input is fuzzy.",
+        "Managed dependency DLLs are excluded by default; set includeDependencies=true only when dependency symbols are the intended target.",
+        "includeDependencies is independent from includeMods."
+      ],
+      "mapsTo": [
+        "code describe"
+      ],
+      "name": "code_describe",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "result",
+            "summary": "Resolved type or method metadata."
+          },
+          {
+            "path": "notes",
+            "summary": "Coverage notes when enrichment is partial."
+          }
+        ],
+        "summary": "Exact structured metadata view for one type or method resolved from static inspection."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Follow code_locate with code_describe once the agent has selected a stable id or exact symbol."
+      ],
+      "status": "implemented",
+      "summary": "Describe an exact type or method with structured metadata."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of matches to return.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Search query or exact id/name understood by the helper tool.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          },
+          "subject": {
+            "description": "Static inspection subject to search for.",
+            "enum": [
+              "type",
+              "method",
+              "symbol"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Symbol-mode reference search is a fallback and can be broader or less exact than type or method lookups.",
+        "Managed dependency DLLs are excluded by default; set includeDependencies=true only when dependency symbols are the intended target.",
+        "includeDependencies is independent from includeMods."
+      ],
+      "mapsTo": [
+        "code refs"
+      ],
+      "name": "code_refs",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "matchCount",
+            "summary": "Total number of returned references."
+          },
+          {
+            "path": "matches",
+            "summary": "Reference records including container ids and precision metadata."
+          }
+        ],
+        "summary": "Static reference navigation result for one exact symbol or a symbol-name fallback search."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Prefer code_refs after code_describe when the agent already knows the exact type or method id it wants to navigate from."
+      ],
+      "status": "implemented",
+      "summary": "Find static references to an exact type or method, or do name-based fallback reference search."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of derived relationships to return.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Exact type query or stable type id returned by code_locate.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          },
+          "subject": {
+            "description": "Derived relationship subject.",
+            "enum": [
+              "type"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Only type relationships are supported; methods and symbols are out of scope for this command.",
+        "Managed dependency DLLs are excluded by default; set includeDependencies=true only when dependency symbols are the intended target.",
+        "includeDependencies is independent from includeMods."
+      ],
+      "mapsTo": [
+        "code derived"
+      ],
+      "name": "code_derived",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "matchCount",
+            "summary": "Total number of returned relationships."
+          },
+          {
+            "path": "matches",
+            "summary": "Derived or implementation edges anchored to stable type ids."
+          }
+        ],
+        "summary": "Direct derived and implementation relationships for one exact static type."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use code_derived after code_locate or code_describe when the agent needs inheritance or implementation context."
+      ],
+      "status": "implemented",
+      "summary": "Find direct derived classes, implementers, and interface inheritance relationships for a type."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "full": {
+            "description": "Request embedded ILSpy output instead of the default metadata summary view.",
+            "type": "boolean"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Exact type or method query, usually a stable id returned by code_locate.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          },
+          "subject": {
+            "description": "Exact static inspection subject to resolve.",
+            "enum": [
+              "type",
+              "method"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject",
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Use the default metadata path first; set full=true only when the lightweight summary is not enough.",
+        "Managed dependency DLLs are excluded by default; set includeDependencies=true only when dependency symbols are the intended target.",
+        "includeDependencies is independent from includeMods."
+      ],
+      "mapsTo": [
+        "code decompile"
+      ],
+      "name": "code_decompile",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "backend",
+            "summary": "Which decompile backend produced the text field."
+          },
+          {
+            "path": "result",
+            "summary": "Metadata summary text by default, or ILSpy-backed text when full=true."
+          },
+          {
+            "path": "notes",
+            "summary": "Coverage notes for the selected metadata or ILSpy decompile backend."
+          }
+        ],
+        "summary": "Explicit deeper static view for one exact type or method, with optional ILSpy full output when metadata alone is not enough."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use code_decompile last, after code_locate and code_describe, and reserve full=true for exact matches that need source-grade detail."
+      ],
+      "status": "implemented",
+      "summary": "Show metadata-derived text by default, or ILSpy-backed output with --full."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "assembly": {
+            "description": "Restrict hook candidates to one assembly name.",
+            "type": "string"
+          },
+          "form": {
+            "description": "Restrict hook candidates to one or more advisory hook forms.",
+            "items": {
+              "enum": [
+                "managed-prefix",
+                "managed-postfix",
+                "managed-override",
+                "managed-interface-contract"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "hasScript": {
+            "description": "Only return hook candidates with a resolved Godot script path.",
+            "type": "boolean"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of hook candidates to return.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "offset": {
+            "description": "Zero-based catalog offset for paginated hook browsing.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "query": {
+            "description": "Optional hook-oriented method search query; omit it to browse the static catalog.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Hook catalog sort order.",
+            "enum": [
+              "relevance",
+              "name",
+              "reference-count",
+              "assembly"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "description": "Restrict hook candidates to game or mod assemblies.",
+            "enum": [
+              "game",
+              "mod"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This is staged static inspection only; it does not prove runtime patch safety or load-order behavior.",
+        "Omit query to browse the installed hook catalog; use limit and offset for large result sets."
+      ],
+      "mapsTo": [
+        "code hooks"
+      ],
+      "name": "code_hooks",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "totalCount",
+            "summary": "Total hook candidates after filters."
+          },
+          {
+            "path": "returnedCount",
+            "summary": "Number of hook candidates returned in this page."
+          },
+          {
+            "path": "matches",
+            "summary": "Hook candidates with stable ids, advisory forms, reference counts, and script hints."
+          }
+        ],
+        "summary": "Paginated hook-oriented static catalog with likely managed method targets, script hints, filters, facets, and follow-up ids."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use code_hooks to browse or narrow hook candidates before resolving one exact candidate with code_hook_info."
+      ],
+      "status": "stable",
+      "summary": "List static managed hook candidates with pagination, filters, script hints, and staged follow-up ids."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Exact method id or exact lookup signature returned by code_hooks.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "This expects one exact hook candidate and will return structured ambiguous-query or no-match failures when the input is still fuzzy."
+      ],
+      "mapsTo": [
+        "code hook-info"
+      ],
+      "name": "code_hook_info",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "id",
+            "summary": "Exact managed method id resolved by the helper."
+          },
+          {
+            "path": "signature",
+            "summary": "Exact lookup signature that can be reused in later commands."
+          }
+        ],
+        "summary": "Exact hook-ready signature projection for one managed method id or exact lookup signature."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use code_hook_info after code_hooks once the agent has chosen one exact method candidate to carry into docs, decompile, or follow-up reference navigation."
+      ],
+      "status": "stable",
+      "summary": "Resolve one exact managed hook candidate into a hook-ready method signature projection."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "limit": {
+            "description": "Maximum number of matches to return.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "query": {
+            "description": "Scene, node, or resource search query for static Godot text, binary, and packed assets.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Scene inspection is static-only in this spec and does not reflect the live runtime scene tree."
+      ],
+      "mapsTo": [
+        "code scene-search"
+      ],
+      "name": "code_scene_search",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "matchCount",
+            "summary": "Total number of returned scene/resource matches."
+          },
+          {
+            "path": "matches",
+            "summary": "Ranked scene, node, or resource matches with follow-up ids."
+          }
+        ],
+        "summary": "Search-oriented static Godot scene/resource inspection result with stable ids for follow-up scene commands."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use code_scene_search first for UI/resource workflows, then follow with code_scene_tree or code_scene_node using the returned ids."
+      ],
+      "status": "implemented",
+      "summary": "Search static Godot text, binary, and packed scenes, nodes, and resources without using the runtime bridge."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          },
+          "scene": {
+            "description": "Exact static scene path or stable scene id returned by code_scene_search.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scene"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Static scene inspection covers supported text, binary, and packed assets only; live runtime trees remain a separate dev surface."
+      ],
+      "mapsTo": [
+        "code scene-tree"
+      ],
+      "name": "code_scene_tree",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "scene",
+            "summary": "Resolved scene metadata."
+          },
+          {
+            "path": "nodes",
+            "summary": "Tree-ordered static node structure."
+          }
+        ],
+        "summary": "Exact static scene tree for one supported Godot text, binary, or packed scene asset."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use code_scene_tree after code_scene_search when the agent needs the full node hierarchy for one scene."
+      ],
+      "status": "implemented",
+      "summary": "Show one exact static Godot scene tree from supported text, binary, or packed scene assets."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assembliesDir": {
+            "description": "Optional override for the managed assembly search root.",
+            "type": "string"
+          },
+          "gamePath": {
+            "description": "Optional override for the STS2 install root used to derive assemblies, resources, and mods.",
+            "type": "string"
+          },
+          "includeDependencies": {
+            "description": "Include managed dependency DLLs in static inspection; dependencies are excluded by default.",
+            "type": "boolean"
+          },
+          "includeMods": {
+            "description": "Include mod assemblies and resources in addition to the base game search roots.",
+            "type": "boolean"
+          },
+          "modsDir": {
+            "description": "Optional override for the mod search root used when includeMods is true.",
+            "type": "string"
+          },
+          "nodePath": {
+            "description": "Exact node path within the resolved static scene.",
+            "type": "string"
+          },
+          "resourcesDir": {
+            "description": "Optional override for the Godot scene/resource search root.",
+            "type": "string"
+          },
+          "scene": {
+            "description": "Exact static scene path or stable scene id returned by code_scene_search.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scene",
+          "nodePath"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Static scene inspection covers supported text, binary, and packed assets only; live runtime node observation remains a separate dev surface."
+      ],
+      "mapsTo": [
+        "code scene-node"
+      ],
+      "name": "code_scene_node",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "command",
+            "summary": "Helper command that produced the response."
+          },
+          {
+            "path": "status",
+            "summary": "Structured helper status."
+          },
+          {
+            "path": "scene",
+            "summary": "Resolved scene metadata."
+          },
+          {
+            "path": "node",
+            "summary": "Resolved node details including references and attached script ids when available."
+          }
+        ],
+        "summary": "Exact static node details for one node inside one supported Godot text, binary, or packed scene asset."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use code_scene_node after code_scene_search or code_scene_tree when the agent needs one exact node and its attached script/resource references."
+      ],
+      "status": "implemented",
+      "summary": "Describe one exact static Godot scene node from supported text, binary, or packed scene assets, including NodePath and resource references."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "limitations": [
+        "This is a checked-in reference catalog, not a live search engine or IDE-grade documentation index."
+      ],
+      "mapsTo": [
+        "inspect reference-topics"
+      ],
+      "name": "inspect_reference_topics",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "source",
+            "summary": "Catalog source marker."
+          },
+          {
+            "path": "topics",
+            "summary": "Reference topics with limits, related commands, and example sequences."
+          }
+        ],
+        "summary": "Checked-in modding workflow topic catalog with staged commands, limits, and doc links."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use inspect_reference_topics when replacing legacy modding-reference lookups with the shipped staged workflow catalog before drilling into code_hook_* or scene commands."
+      ],
+      "status": "stable",
+      "summary": "List checked-in modding discovery and hot-reload workflow references, limits, and staged command sequences."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "path"
+            ]
+          },
+          {
+            "required": [
+              "inline"
+            ]
+          }
+        ],
+        "properties": {
+          "artifactsDir": {
+            "description": "Optional override for the persisted test artifact root.",
+            "type": "string"
+          },
+          "durable": {
+            "description": "When routed through the automation service /v0/test-runs endpoint, request filesystem-backed durable job metadata and remote artifact indexing.",
+            "type": "boolean"
+          },
+          "failureArtifacts": {
+            "description": "Failure artifact persistence mode.",
+            "enum": [
+              "on-failure",
+              "never"
+            ],
+            "type": "string"
+          },
+          "inline": {
+            "description": "Inline YAML or JSON scenario body executed as one scenario without reading a .sts2.yaml or .sts2.json file from disk.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Path to one .sts2.yaml or .sts2.json scenario file or a directory of scenarios.",
+            "type": "string"
+          },
+          "profile": {
+            "description": "Optional named test profile from config.test.profiles.",
+            "type": "string"
+          },
+          "tag": {
+            "description": "Optional scenario tag filters applied in addition to any selected test profile includeTags.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "Existing .sts2.yaml and .sts2.json files/directories plus inline YAML or JSON bodies are supported, but there is still no non-document runner API beyond the current scenario model.",
+        "Named test profiles are project-defined config entries; profile names such as mock or live are not built in.",
+        "durable is honored by the automation-service /v0/test-runs job store; local CLI execution ignores remote job persistence and does not expose a separate MCP runner schema."
+      ],
+      "mapsTo": [
+        "test run"
+      ],
+      "name": "test_run",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Aggregate run status across all discovered scenarios."
+          },
+          {
+            "path": "scenarios",
+            "summary": "Per-scenario step history, outputs, and structured failures."
+          },
+          {
+            "path": "artifacts",
+            "summary": "Persisted summary and failure artifact locations."
+          },
+          {
+            "path": "remoteArtifacts",
+            "summary": "Service-backed completed runs add S92 artifact metadata with relativePath and downloadUrl values."
+          },
+          {
+            "path": "exitCode",
+            "summary": "CLI exit code preserved for automation."
+          }
+        ],
+        "summary": "Structured scenario-run summary with persisted artifact locations and per-step outputs/errors."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use profile for project-defined scenario selection/config/lifecycle policy, path for checked-in reusable .sts2.yaml or .sts2.json scenarios, or inline for one-off YAML/JSON bodies.",
+        "Use durable with a service-backed client when callers need restart-recoverable job status and remoteArtifacts[] for later artifact download."
+      ],
+      "status": "implemented",
+      "summary": "Execute YAML- or JSON-authored test scenarios with persisted summaries and failure artifacts."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "required": [
+              "path",
+              "iterations"
+            ]
+          },
+          {
+            "required": [
+              "path",
+              "durationMs"
+            ]
+          }
+        ],
+        "properties": {
+          "artifactsDir": {
+            "description": "Optional override for the persisted stress-run artifact root.",
+            "type": "string"
+          },
+          "cooldownMs": {
+            "description": "Optional cooldown between iterations in milliseconds.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "durationMs": {
+            "description": "Maximum elapsed runtime budget in milliseconds.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "failureArtifacts": {
+            "description": "Failure artifact persistence mode for each nested test run.",
+            "enum": [
+              "on-failure",
+              "never"
+            ],
+            "type": "string"
+          },
+          "iterations": {
+            "description": "Exact number of repeated iterations to execute.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "maxFailures": {
+            "description": "Maximum failed iterations allowed before the stress run stops.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "path": {
+            "description": "Path to one .sts2.yaml or .sts2.json scenario file or a directory of scenarios.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "limitations": [
+        "This reuses the existing scenario runner only; there is still no distributed or remote orchestration service.",
+        "Exactly one bound must be supplied: iterations or durationMs."
+      ],
+      "mapsTo": [
+        "test stress"
+      ],
+      "name": "test_stress",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "status",
+            "summary": "Aggregate stress-run status across all completed iterations."
+          },
+          {
+            "path": "completedIterations",
+            "summary": "Number of iterations actually executed before the stop condition."
+          },
+          {
+            "path": "iterations",
+            "summary": "Per-iteration nested run summaries and artifact paths."
+          },
+          {
+            "path": "firstFailure",
+            "summary": "First failed iteration reference when any iteration failed."
+          },
+          {
+            "path": "lastFailure",
+            "summary": "Last failed iteration reference when any iteration failed."
+          },
+          {
+            "path": "artifacts",
+            "summary": "Persisted aggregate summary path and stress artifact root."
+          }
+        ],
+        "summary": "Aggregate repeated-run summary with per-iteration nested run references, failure caps, and persisted stress artifacts."
+      },
+      "readOnly": false,
+      "recommendedUsage": [
+        "Use test_stress when an existing stable scenario should be replayed repeatedly with bounded failure tolerance and inspectable aggregate artifacts."
+      ],
+      "status": "stable",
+      "summary": "Repeat an existing scenario path under bounded iteration or duration controls and persist aggregate summaries."
+    }
+  ]
+}

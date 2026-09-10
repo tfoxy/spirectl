@@ -1,0 +1,20 @@
+name: deploy-and-fixture-smoke
+description: Deploys the current mod project explicitly, then loads the checked-in combat fixture and asserts the resulting combat state.
+
+steps:
+  - game.deploy:
+      path: ../../mods/MyMod
+      build: true
+      restart: true
+      verify: true
+
+  - dev.load-fixture:
+      path: ../../fixtures/basic-combat.sts2.fixture.yaml
+
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/combat_room
+
+  - dev.assert:
+      path: run.players[id=p1].characterId
+      equals: ironclad

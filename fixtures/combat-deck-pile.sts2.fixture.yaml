@@ -1,0 +1,12 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-deck-pile
+description: Deterministic two-player Ironclad combat with the master deck viewer open.
+run:
+  seed: fixture-combat-deck-pile
+  view:
+    capstone:
+      deckView: {}
+  players: 2
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

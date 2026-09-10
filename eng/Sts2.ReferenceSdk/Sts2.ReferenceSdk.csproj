@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>Spirectl.Sts2.ReferenceSdk</AssemblyName>
+    <RootNamespace>Spirectl.Sts2.ReferenceSdk</RootNamespace>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Build-only inputs. The target below stages the reviewed DLL allowlist. -->
+    <PackageReference
+      Include="FuYnAloft.Sts2.References"
+      Version="[0.107.0-beta]"
+      GeneratePathProperty="true"
+      PrivateAssets="all"
+      ExcludeAssets="all" />
+    <PackageReference
+      Include="GodotSharp"
+      Version="[4.5.1]"
+      GeneratePathProperty="true"
+      PrivateAssets="all"
+      ExcludeAssets="all" />
+  </ItemGroup>
+
+  <Target Name="StageSts2ReferenceSdk" AfterTargets="Build">
+    <ItemGroup>
+      <Sts2ReferenceSdkFile Include="$(PkgFuYnAloft_Sts2_References)/lib/net9.0/sts2.dll" />
+      <Sts2ReferenceSdkFile Include="$(PkgFuYnAloft_Sts2_References)/lib/net9.0/0Harmony.dll" />
+      <Sts2ReferenceSdkFile Include="$(PkgFuYnAloft_Sts2_References)/lib/net9.0/MonoMod.Backports.dll" />
+      <Sts2ReferenceSdkFile Include="$(PkgFuYnAloft_Sts2_References)/lib/net9.0/MonoMod.ILHelpers.dll" />
+      <Sts2ReferenceSdkFile Include="$(PkgFuYnAloft_Sts2_References)/lib/net9.0/Sentry.dll" />
+      <Sts2ReferenceSdkFile Include="$(PkgFuYnAloft_Sts2_References)/lib/net9.0/SmartFormat.dll" />
+      <Sts2ReferenceSdkFile Include="$(PkgFuYnAloft_Sts2_References)/lib/net9.0/SmartFormat.ZString.dll" />
+      <Sts2ReferenceSdkFile Include="$(PkgFuYnAloft_Sts2_References)/lib/net9.0/Steamworks.NET.dll" />
+      <Sts2ReferenceSdkFile Include="$(PkgGodotSharp)/lib/net8.0/GodotSharp.dll" />
+    </ItemGroup>
+
+    <Error
+      Condition="!Exists('%(Sts2ReferenceSdkFile.Identity)')"
+      Text="Pinned STS2 reference package is missing reviewed compile input: %(Sts2ReferenceSdkFile.Identity)" />
+    <Copy
+      SourceFiles="@(Sts2ReferenceSdkFile)"
+      DestinationFolder="$(OutputPath)"
+      SkipUnchangedFiles="true" />
+  </Target>
+</Project>

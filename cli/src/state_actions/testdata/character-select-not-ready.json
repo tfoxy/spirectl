@@ -1,0 +1,53 @@
+{
+  "actions": [
+    {
+      "args": {
+        "characterId": "the-silent"
+      },
+      "enabled": true,
+      "id": "action:lobby:select-character:the-silent",
+      "kind": "select-character",
+      "label": "the-silent",
+      "ownerPlayerId": "p1",
+      "sourcePath": "characterSelect.characterButtons[0]"
+    },
+    {
+      "args": {},
+      "enabled": true,
+      "id": "action:lobby:ready",
+      "kind": "ready",
+      "label": "Ready",
+      "ownerPlayerId": "p1",
+      "sourcePath": "characterSelect.lobby"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:lobby:leave-lobby-player:p1",
+      "kind": "leave-lobby-player",
+      "label": "Back",
+      "ownerPlayerId": "p1",
+      "sourcePath": "characterSelect.view"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "screens/character_select_screen",
+    "scene": null
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": "spirectl.state/v0"
+  },
+  "warnings": []
+}

@@ -1,0 +1,22 @@
+# Checked-in generic lifecycle profiles owned by sts2.
+# Downstream repos can point project.profilesFile at their own checked-in file
+# when they need repo-specific deploy paths or additional profiles.
+
+profiles:
+  install-bridge:
+    description: Build and install only the bridge payload into the configured mods directory.
+    steps:
+      - kind: install-bridge
+
+  launch-and-attach:
+    description: Launch the configured game process and wait for live bridge attachment.
+    steps:
+      - kind: launch
+      - kind: attach
+
+  install-launch-and-attach:
+    description: Install the bridge payload, then launch and attach.
+    steps:
+      - kind: install-bridge
+      - kind: launch
+      - kind: attach

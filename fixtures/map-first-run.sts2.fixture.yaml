@@ -1,0 +1,13 @@
+schemaVersion: spirectl.fixture/v0
+name: map-first-run
+description: >-
+  Act 1 map as a profile's FIRST run: the starting (row-0) node is a combat (Monster) node, not Neow —
+  the game only seats an enemy first node before Neow has been encountered (RunManager stamps the start
+  Monster when !StartedWithNeow && act 0). Start-parked: the start node is the current/visited position
+  and the first regular row is travelable.
+run:
+  seed: fixture-basic-map
+  actFloor: 1
+  currentRoom:
+    mapRoom:
+      firstNode: combat

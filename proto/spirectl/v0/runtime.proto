@@ -1,0 +1,1091 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/common.proto";
+import "spirectl/v0/errors.proto";
+import "spirectl/v0/models.proto";
+
+enum StateWatchEventType {
+  STATE_WATCH_EVENT_TYPE_UNSPECIFIED = 0;
+  STATE_WATCH_EVENT_TYPE_INITIAL = 1;
+  STATE_WATCH_EVENT_TYPE_CHANGED = 2;
+  STATE_WATCH_EVENT_TYPE_ERROR = 3;
+}
+
+message StateRequest {
+  PerspectiveSelector perspective = 1;
+}
+
+message StateResult {
+  oneof result {
+    StateResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message StateResponse {
+  string schema_version = 1;
+  string language = 2;
+  reserved 3;
+  reserved "screen_id";
+  StateCharacterSelect character_select = 4;
+  StateRun run = 5;
+  string root_scene = 6;
+}
+
+// Reactive state stream. Mirrors StateWatchRequest/StateWatchEvent but carries
+// the presentation StateResponse envelope instead of the current StateResponse. The
+// bridge pushes on the game's main-thread tick and suppresses duplicates via a
+// semantic fingerprint, so a quiescent game emits nothing.
+message StateWatchRequest {
+  StateRequest state = 1;
+  uint64 max_events = 2;
+  uint64 timeout_ms = 3;
+  bool fail_fast = 4;
+  uint64 min_capture_interval_ms = 5;
+  uint64 state_timeout_ms = 6;
+  int32 buffer_capacity = 7;
+  // Reserved for a future opt-in RFC6902 JSON-Patch diff mode. Not yet honored;
+  // the bridge always emits full snapshots regardless of this flag.
+  bool emit_diff = 8;
+}
+
+message StateWatchEvent {
+  StateWatchEventType type = 1;
+  uint64 sequence = 2;
+  string observed_at_utc = 3;
+  string fingerprint = 4;
+  uint64 semantic_revision = 5;
+  oneof payload {
+    StateResponse state = 6;
+    BridgeError error = 7;
+  }
+}
+
+// Ordered, NON-deduplicated stream of transient combat events (floating damage
+// numbers today; block/heal/death/card-play later). Distinct from StateWatch: the
+// producer is an in-game damage hook (NOT the fingerprint-dedup main-thread tick),
+// events carry a monotonic `sequence`, and a bounded server-side ring buffer lets a
+// (re)connecting client resume from `since_sequence`. A host consumes this and
+// synthesizes StateCombatState.transient_effects (id=fx:{sequence}, anchor=target,
+// kind, amount); the bridge itself never populates that field.
+enum CombatEventType {
+  COMBAT_EVENT_TYPE_UNSPECIFIED = 0;
+  COMBAT_EVENT_TYPE_DAMAGE = 1;
+  COMBAT_EVENT_TYPE_ERROR = 2;
+  // A card was upgraded mid-combat (e.g. STONE_CRACKER at room entry, Armaments).
+  // Carries CombatCardUpgradeEvent; a host synthesizes a transient_effects entry
+  // (kind="cardUpgrade", centered, no creature anchor) to preview the upgraded card.
+  COMBAT_EVENT_TYPE_CARD_UPGRADE = 3;
+  // A game VFX scene was spawned (the generic "native VFX backbone": one bridge hook
+  // on the common spawn seam captures every N*Vfx by its res:// scene path). Carries
+  // CombatVfxEvent; a host synthesizes a transient_effects entry (kind="vfx",
+  // scene_path set, anchored to the target creature) and the renderer mounts that
+  // scene — particles/shaders animate natively, no per-effect catalog binding.
+  COMBAT_EVENT_TYPE_VFX = 4;
+}
+
+// A creature took unblocked damage (the value the game shows as a floating number:
+// DamageResult.UnblockedDamage [+ OverkillDamage unless the target is an Osty]).
+// Fully-blocked hits (amount == 0) are not emitted. Ids match the renderer/state
+// scheme (Sts2CombatIds): creature ids are `creature:{CombatId}`.
+message CombatDamageEvent {
+  string target_creature_id = 1;
+  int32 amount = 2;
+  string dealer_creature_id = 3; // empty when unsourced (e.g. environment)
+  string source_card_model_id = 4; // empty when not card-sourced
+}
+
+// A card was upgraded during combat. Ids match the renderer/state scheme: card_id
+// is the in-combat card instance id, card_model_id is the upgraded model (e.g.
+// "STRIKE_IRONCLAD"), source_relic_model_id names the relic that drove the upgrade
+// (e.g. "STONE_CRACKER"); empty when not relic-sourced.
+message CombatCardUpgradeEvent {
+  string card_id = 1;
+  string card_model_id = 2;
+  string source_relic_model_id = 3; // empty when not relic-sourced
+}
+
+// A game VFX node was spawned in combat. Captured generically at the common spawn
+// seam (GodotTreeExtensions.AddChildSafely), so every N*Vfx is described by the
+// res://-relative scene path it instances (e.g. "vfx/hit_spark_vfx") plus where it
+// anchors. Ids match the renderer/state scheme (Sts2CombatIds): creature ids are
+// `creature:{CombatId}`; anchor empty = a centered / full-screen effect.
+message CombatVfxEvent {
+  string scene_path = 1; // res://-relative scene id, e.g. "vfx/hit_spark_vfx"
+  string anchor_creature_id = 2; // creature it spawns over; empty = centered/full-screen
+  int32 amount = 3; // optional numeric payload (0 when the VFX carries no number)
+}
+
+message CombatEvent {
+  CombatEventType type = 1;
+  uint64 sequence = 2;
+  string observed_at_utc = 3;
+  oneof payload {
+    CombatDamageEvent damage = 4;
+    BridgeError error = 5;
+    CombatCardUpgradeEvent card_upgrade = 6;
+    CombatVfxEvent vfx = 7;
+  }
+}
+
+message WatchCombatEventsRequest {
+  uint64 max_events = 1;
+  uint64 timeout_ms = 2;
+  bool fail_fast = 3;
+  // Resume cursor: replay buffered events with sequence > since_sequence, then
+  // stream live. 0 = only live events from subscribe time forward.
+  uint64 since_sequence = 4;
+  int32 buffer_capacity = 5;
+}
+
+message StateCharacterSelect {
+  StateCharacterSelectLobby lobby = 1;
+  repeated StateCharacterButton character_buttons = 2;
+  reserved 3;
+  reserved "selected_character_button_id";
+  StateCharacterSelectView view = 4;
+}
+
+message StateCharacterSelectView {
+  string selected_character_button_id = 1;
+  string player_id = 2;
+}
+
+message StateCharacterSelectLobby {
+  string net_game_type = 1;
+  string local_player_id = 2;
+  string host_player_id = 3;
+  uint32 connecting_player_count = 4;
+  int32 ascension = 5;
+  int32 max_ascension = 6;
+  string act1 = 7;
+  string seed = 8;
+  repeated string modifier_ids = 9;
+  repeated StateCharacterSelectPlayer players = 10;
+  // Present only when resuming a saved run (load-run lobby); unset for start-run.
+  StateCharacterSelectSavedRun saved_run = 11;
+  // The lobby's own player cap: StartRunLobby.MaxPlayers for a start-run lobby, the saved roster's size for a
+  // load-run one (which admits exactly the netIds in the save). 4 in the stock game; the multiplayer limit mods
+  // raise it, so callers sizing anything per player must read this rather than assume.
+  int32 max_players = 12;
+}
+
+message StateCharacterSelectPlayer {
+  string id = 1;
+  int32 slot_id = 2;
+  string character_id = 3;
+  bool is_ready = 4;
+  int32 max_multiplayer_ascension_unlocked = 5;
+  string display_name = 6;
+  // Lobby connection state. Mirrors RunLobby.ConnectedPlayerIds / NRemoteLobbyPlayer._isConnected:
+  // the local player is always connected; a remote player is connected iff their net id is in the
+  // lobby's ConnectedPlayerIds. The disconnected indicator renders when this is false.
+  bool is_connected = 7;
+}
+
+// Saved-run summary shown on the load-run lobby InfoPanel.
+// Mirrors MegaCrit.Sts2.Core.Saves.SerializableRun; field names follow the game's save schema.
+message StateCharacterSelectSavedRun {
+  int32 current_act_index = 1;                       // SerializableRun.current_act_index (0-based)
+  int32 act_floor = 2;                               // derived: count of map_point_history entries
+  repeated StateCharacterSelectSavedRunPlayer players = 3;  // mirrors SerializableRun.players
+}
+
+// Mirrors MegaCrit.Sts2.Core.Saves.Runs.SerializablePlayer.
+message StateCharacterSelectSavedRunPlayer {
+  string id = 1;          // p:<net_id> — same id path as the lobby players (reads the same NetId)
+  int32 current_hp = 2;   // SerializablePlayer.current_hp
+  int32 max_hp = 3;       // SerializablePlayer.max_hp
+  int32 gold = 4;         // SerializablePlayer.gold
+}
+
+message StateCharacterButton {
+  string id = 1;
+  string character_id = 2;
+  reserved 3;
+  reserved "visible";
+  bool is_locked = 4;
+}
+
+message StateRun {
+  string source_type = 1;
+  string manager_source_type = 2;
+  string net_game_type = 3;
+  string game_mode = 4;
+  string seed = 5;
+  int32 ascension_level = 6;
+  string act_id = 7;
+  int32 current_act_index = 8;
+  int32 act_floor = 9;
+  int32 total_floor = 10;
+  StateMapCoord current_map_coord = 11;
+  string current_map_point_id = 12;
+  repeated StateMapCoord visited_map_coords = 13;
+  repeated StateRunPlayer players = 14;
+  StateRunMap map = 15;
+  repeated StateNotice notices = 16;
+  StateRunCurrentRoom current_room = 17;
+  string boss_encounter_id = 18;
+  string second_boss_encounter_id = 19;
+  StateRunView view = 20;
+}
+
+message StateLocRef {
+  string table = 1;
+  string key = 2;
+}
+
+message StateRunView {
+  StateRunCapstoneView capstone = 1;
+  string player_id = 2;
+  StateSelectedPotion selected_potion = 3;
+  bool is_in_card_selection = 4;
+  StateSelectedCard selected_card = 5;
+  StateInspectRelicView inspect_relic = 6;
+  StateHandSelectionView hand_selection = 7;
+  StateGameOverView game_over = 8;
+}
+
+// In-hand card selection mode (NPlayerHand SimpleSelect/UpgradeSelect), e.g.
+// Survivor's "Discard 1 card." prompt. Local-client view state: only the
+// attached seat's hand selection is observable. Cards are referenced by the
+// same ids as run.players[].combat.hand.cards — selected cards stay in the
+// hand pile while staged; only their UI holders move.
+message StateHandSelectionView {
+  string player_id = 1;  // owning seat
+  string mode = 2;       // simple-select | upgrade-select
+  string prompt_text = 3;
+  StateLocRef prompt_loc = 4; // best-effort
+  int32 min_select = 5;
+  int32 max_select = 6;
+  // Informational prefs flag: in the current game build the hand UI always
+  // requires the confirm button (selecting at max swaps the last pick).
+  bool require_manual_confirmation = 7;
+  bool can_confirm = 8; // min_select <= selected <= max_select
+  repeated string selected_card_ids = 9;    // selection order
+  repeated string selectable_card_ids = 10; // filter-passing, visible holders
+  string source_card_id = 11;  // best-effort: card instance that opened selection
+  string source_model_id = 12; // e.g. SURVIVOR
+  bool is_peeking = 13;        // peek active; selection input blocked
+  // In `upgrade-select` mode the hand shows a preview of the upgraded version of
+  // the currently focused card (e.g. Armaments). Null in `simple-select` mode or
+  // when no card is focused. Carries the upgraded vars inline via dynamic_vars.
+  StateCard preview_card = 14;
+}
+
+// The in-game relic-details overlay (NInspectRelicScreen) when open. It lives
+// outside the capstone stack (NGame parents it under InspectionContainer), so
+// it is exposed as its own local-client view field. The screen browses a list
+// of the owning player's relics; index/count drive the prev/next arrows.
+message StateInspectRelicView {
+  string relic_model_id = 1; // currently displayed relic
+  int32 index = 2;           // position in the browse list
+  int32 count = 3;           // browse list length
+}
+
+// The run-terminal game-over / defeat overlay (NGameOverScreen) when open. Pushed
+// onto the overlay stack (capstone closed) when a run ends; an IOverlayScreen, so
+// it is exposed as a local-client view field like inspect_relic. The banner and
+// death quote are RNG-picked at runtime, so banner_text / death_quote carry the
+// LIVE resolved node text (not re-derived). score / killed_by_encounter_id are
+// data-only (the score lives in the deferred post-Continue summary panel).
+message StateGameOverView {
+  bool win = 1;                      // _history.Win (false on defeat)
+  string banner_text = 2;            // resolved live banner label text
+  string death_quote = 3;            // resolved live death-quote text
+  int32 score = 4;                   // _score (ScoreUtility.CalculateScore)
+  string killed_by_encounter_id = 5; // _history.KilledByEncounter
+}
+
+message StateSelectedPotion {
+  string mode = 1; // popup | targeting
+  int32 slot_index = 2;
+}
+
+message StateSelectedCard {
+  string card_id = 1;
+  string player_id = 2;
+}
+
+message StateRunCapstoneView {
+  string scene = 1;
+  string source_type = 2;
+  repeated StateRunStackEntry stack = 3;
+  StateDeckView deck_view = 4;
+  StateCardPileView card_pile_view = 5;
+}
+
+// Which combat card pile the in-game NCardPileScreen is currently showing.
+// The pile's cards are sourced from run.players[].combat.{draw,discard,exhaust}Pile.
+message StateCardPileView {
+  string pile_type = 1; // normalized: draw | discard | exhaust
+  string player_id = 2; // owning player whose pile is shown
+}
+
+message StateRunStackEntry {
+  string scene = 1;
+  string source_type = 2;
+}
+
+message StateDeckView {
+  repeated StateDeckViewSort sort = 1;
+  bool show_upgrades = 2;
+}
+
+message StateDeckViewSort {
+  string by = 1;
+  string direction = 2;
+}
+
+message StateRunCurrentRoom {
+  string source_type = 1;
+  string room_type = 2;
+  string model_id = 3;
+  StateRunEventRoom event = 4;
+  StateRunCombatRoom combat = 5;
+  StateRunTreasureRoom treasure = 6;
+  StateRunShopRoom shop = 7;
+  StateRunRestSiteRoom rest_site = 8;
+  StateRunMapRoom map_room = 9;
+  optional int32 id = 10;
+  string scene = 11;
+}
+
+message StateRunCombatRoom {
+  string encounter_id = 1;
+  string parent_event_id = 2;
+  double gold_proportion = 3;
+  bool is_pre_finished = 4;
+  bool should_create_combat = 5;
+  bool should_resume_parent_event_after_combat = 6;
+  StateCombatState combat_state = 7;
+  repeated StateNotice notices = 8;
+  // The room's actual composited background: the root scene plus the game's
+  // seeded layer pick (one per bg group + one fg), read from the live combat
+  // background node. Empty out of combat.
+  StateCombatBackground background = 9;
+}
+
+message StateCombatBackground {
+  string scene_path = 1;  // root background scene res:// (e.g. overgrowth_background.tscn)
+  // Chosen layers in paint order (bg groups ascending, then foreground); each
+  // res_path is a self-contained centered TextureRect layer scene.
+  repeated CombatBackgroundLayerInfo layers = 2;
+}
+
+message StateRunEventRoom {
+  string canonical_event_model_id = 1;
+  string canonical_source_type = 2;
+  bool is_pre_finished = 3;
+  bool is_shared = 4;
+  repeated StateRunEventPlayerState player_states = 5;
+  repeated StateRunEventSharedVote shared_votes = 6;
+  repeated StateNotice notices = 7;
+  string scene = 8;
+}
+
+message StateRunEventPlayerState {
+  string player_id = 1;
+  string event_model_id = 2;
+  string canonical_event_model_id = 3;
+  string source_type = 4;
+  string owner_player_id = 5;
+  string layout_type = 6;
+  bool is_finished = 7;
+  StateLocRef description_loc = 8;
+  repeated StateRunEventOption options = 9;
+  StateRunEventAncient ancient = 10;
+}
+
+message StateRunEventOption {
+  string id = 1;
+  uint32 index = 2;
+  string text_key = 3;
+  StateLocRef title_loc = 4;
+  StateLocRef description_loc = 5;
+  bool is_locked = 6;
+  bool is_proceed = 7;
+  bool was_chosen = 8;
+  string relic_id = 9;
+  bool should_save_choice_to_history = 10;
+  bool should_save_variables_to_history = 11;
+  string title_text = 12;
+  string description_text = 13;
+  // The option's hover tips (EventOption.HoverTips, e.g. a relic option's
+  // HoverTipsExcludingRelic), resolved up front like relic/potion model tips.
+  repeated ModelHoverTipInfo hover_tips = 14;
+  // The card this option previews, if its HoverTips contains a CardHoverTip
+  // (e.g. an option that adds a specific card). Drives the focus card preview.
+  // Absent when the option previews no card.
+  StateCard previewed_card = 15;
+}
+
+message StateRunEventSharedVote {
+  string player_id = 1;
+  bool has_option_index = 2;
+  uint32 option_index = 3;
+}
+
+message StateRunEventAncient {
+  int32 healed_amount = 1;
+  reserved 2;
+  reserved "visible_dialogue";
+  StateRunEventAncientView view = 3;
+}
+
+message StateRunEventAncientView {
+  StateRunEventAncientVisibleDialogue visible_dialogue = 1;
+}
+
+message StateRunEventAncientVisibleDialogue {
+  string source_type = 1;
+  string dialogue_id = 2;
+  int32 current_line_index = 3;
+  string current_line_loc_key = 4;
+  repeated string line_loc_keys = 5;
+}
+
+message StateRunTreasureRoom {
+  // True once the chest is opened and its relics are revealed. While the chest
+  // is still closed this is false and current_relics is left empty even though
+  // the run has already pre-assigned the relics behind the scenes.
+  bool current_relics_active = 1;
+  repeated StateTreasureRelic current_relics = 2;
+  repeated StateTreasurePlayerVote player_votes = 3;
+  repeated StateNotice notices = 4;
+  // True when the proceed/skip control is visible and executable (only after the
+  // chest is opened).
+  bool can_proceed = 5;
+}
+
+message StateTreasureRelic {
+  string id = 1;
+  string model_id = 2;
+}
+
+message StateTreasurePlayerVote {
+  string player_id = 1;
+  optional int32 index = 2;
+  bool vote_received = 3;
+}
+
+message StateRunShopRoom {
+  StateShopInventory inventory = 1;
+  repeated StateNotice notices = 2;
+  StateShopView view = 3;
+}
+
+message StateShopView {
+  bool is_open = 1;
+}
+
+message StateShopInventory {
+  string source_type = 1;
+  string player_id = 2;
+  repeated StateShopCardEntry character_card_entries = 3;
+  repeated StateShopCardEntry colorless_card_entries = 4;
+  repeated StateShopRelicEntry relic_entries = 5;
+  repeated StateShopPotionEntry potion_entries = 6;
+  StateShopCardRemovalEntry card_removal_entry = 7;
+}
+
+message StateShopCardEntry {
+  string id = 1;
+  string source_type = 2;
+  optional int32 cost = 3;
+  bool is_on_sale = 4;
+  StateCard card = 5;
+}
+
+message StateShopRelicEntry {
+  string id = 1;
+  string source_type = 2;
+  optional int32 cost = 3;
+  string model_id = 4;
+}
+
+message StateShopPotionEntry {
+  string id = 1;
+  string source_type = 2;
+  optional int32 cost = 3;
+  string model_id = 4;
+}
+
+message StateShopCardRemovalEntry {
+  string id = 1;
+  string source_type = 2;
+  optional int32 cost = 3;
+  bool used = 4;
+}
+
+message StateRunRestSiteRoom {
+  repeated StateRestSitePlayerState player_states = 1;
+  repeated StateNotice notices = 2;
+  reserved 3; // was can_proceed; moved to the machine-local `view` below
+  reserved "can_proceed";
+  // Machine-local-only UI state for the rest-site (the local seat's controls), kept
+  // out of the per-player `player_states` which carry shared/broadcast state.
+  StateRestSiteRoomView view = 4;
+}
+
+// Machine-local-only rest-site UI state (the local seat), not tied to any player.
+message StateRestSiteRoomView {
+  // True when the local proceed/continue control is visible and executable (i.e. the
+  // player may leave without choosing a rest-site option). False when forced to pick.
+  bool can_proceed = 1;
+}
+
+message StateRestSitePlayerState {
+  string player_id = 1;
+  optional int32 hovered_option_index = 2;
+  optional int32 chosen_option_index = 3;
+  repeated StateRestSiteOption options = 4;
+}
+
+message StateRestSiteOption {
+  string id = 1;
+  string source_type = 2;
+  string option_id = 3;
+  bool is_enabled = 4;
+  optional int32 smith_count = 5;
+  // LIFT only: remaining lifts (`3 - Girya.TimesLifted`); non-derivable from other
+  // state fields. Absent for non-LIFT options.
+  optional int32 lifts_left = 6;
+  // Why the option is not executable: "not-enabled" (game IsEnabled false) or
+  // "confirmation-required" (game RequiresConfirmation). Absent when executable.
+  optional string disabled_reason = 7;
+}
+
+message StateRunMapRoom {
+  repeated StateNotice notices = 1;
+}
+
+message StateRunPlayer {
+  string id = 1;
+  string source_type = 2;
+  string net_id = 3;
+  string display_name = 4;
+  string character_id = 5;
+  bool is_local = 6;
+  bool is_host = 7;
+  bool is_remote = 8;
+  StateRunCreature creature = 9;
+  int32 gold = 10;
+  StateCardPile deck = 11;
+  repeated StateRelic relics = 12;
+  bool inventory_complete = 13;
+  repeated StateNotice notices = 14;
+  StateRunPlayerCombat combat = 15;
+  reserved 16; // was potion_slot_model_ids; replaced by structured potions
+  reserved "potion_slot_model_ids";
+  repeated StateRunOverlay overlays = 17;
+  repeated StateCombatPotion potions = 18;
+  reserved 19; // was potion_ui; local-only UI now lives under run.view.selected_potion
+  reserved "potion_ui";
+  bool can_remove_potions = 20;
+}
+
+message StateRunOverlay {
+  string id = 1;
+  string screen_type = 2;
+  string screen_id = 3;
+  string scene = 4;
+  StateChooseACardOverlay choose_a_card = 5;
+  StateRewardsOverlay rewards = 6;
+  StateDeckCardSelectionOverlay deck_card_selection = 7;
+  StateSimpleGridCardSelectionOverlay simple_grid_card_selection = 8;
+  StateBundleCardSelectionOverlay bundle_card_selection = 9;
+  StateCrystalSphereOverlay crystal_sphere = 10;
+}
+
+message StateChooseACardOverlay {
+  bool can_skip = 1;
+  repeated StateCard cards = 2;
+}
+
+message StateCrystalSphereOverlay {
+  int32 divinations_remaining = 1;
+  string selected_tool = 2; // "big", "small", or "none"
+  bool is_finished = 3;
+  repeated StateCrystalSphereCell cells = 4;
+  repeated StateCrystalSphereItem revealed_items = 5;
+}
+
+message StateCrystalSphereCell {
+  string id = 1; // stable id (`crystal-sphere:cell:<x>:<y>`)
+  int32 x = 2;
+  int32 y = 3;
+  bool is_hidden = 4;
+  bool is_highlighted = 5;
+  bool is_hovered = 6;
+  bool enabled = 7;
+}
+
+message StateCrystalSphereItem {
+  string id = 1; // stable id (`crystal-sphere:item:<x>:<y>:<width>:<height>`)
+  int32 x = 2;
+  int32 y = 3;
+  int32 width_cells = 4;
+  int32 height_cells = 5;
+  string icon_asset_key = 6;
+  bool shows_card = 7;
+  string card_rarity = 8;
+  string card_banner_material_key = 9;
+  string card_frame_material_key = 10;
+}
+
+// A grid of cards to pick from (`NSimpleCardSelectScreen`): Headbutt's "Place a
+// card from your discard pile on top of your draw pile", Hologram, etc. Unlike
+// choose-a-card it has explicit confirm/cancel buttons and a min/max selection
+// count (single-pick screens auto-resolve in the game and never reach here).
+message StateSimpleGridCardSelectionOverlay {
+  string prompt_text = 1;
+  StateLocRef prompt_loc = 2; // best-effort
+  int32 min_select = 3;
+  int32 max_select = 4;
+  bool can_confirm = 5;
+  bool can_cancel = 6;
+  bool preview_active = 7; // a staged-card preview panel is showing
+  repeated string selected_card_ids = 8;
+  repeated StateCard cards = 9;
+}
+
+// Choosing one of several card bundles (`NChooseABundleSelectionScreen`): the
+// ScrollBoxes relic offers groups of cards and the player takes a whole group.
+// Each bundle is a stable-id'd set of cards; `select_bundle` takes the group.
+message StateBundleCardSelectionOverlay {
+  repeated StateCardBundle bundles = 1;
+  bool can_confirm = 2;
+  bool preview_active = 3;     // a bundle was clicked; its preview panel is showing
+  string selected_bundle_id = 4; // staged bundle, empty until one is clicked
+}
+
+message StateCardBundle {
+  string id = 1; // stable id (`card-selection:bundle:...`), as accepted by select-bundle
+  repeated StateCard cards = 2;
+}
+
+// Selecting a card from the player's own deck — the rest-site smith (upgrade)
+// dialog and its siblings (transform/enchant/remove), which the live game shows
+// as `NDeck*SelectScreen` overlays. `kind` discriminates the operation; each card
+// carries its upgraded preview inline via `StateCard.next_dynamic_vars`.
+message StateDeckCardSelectionOverlay {
+  StateDeckCardSelectionKind kind = 1;
+  bool can_skip = 2;
+  bool can_confirm = 3;
+  repeated StateCard cards = 4;
+  bool preview_active = 5;
+  // The `enchant` kind also targets a specific enchantment, shown in the dialog's
+  // description panel. These mirror the live `NDeckEnchantSelectScreen` labels
+  // (player-facing, already formatted with the chosen amount applied) and are
+  // empty for the other kinds.
+  string enchantment_title = 6;
+  string enchantment_description = 7;
+  string enchantment_icon_path = 8;
+  // Selection sizing, prompt, and current selection — mirrors
+  // StateSimpleGridCardSelectionOverlay so the renderer can drive confirm
+  // visibility (min!=max && selected>=min), the bottom prompt, and per-card
+  // selected state. can_cancel mirrors the live `_prefs.Cancelable` close button
+  // (distinct from can_skip, which is the separate skip button).
+  string prompt_text = 9;
+  StateLocRef prompt_loc = 10; // best-effort
+  int32 min_select = 11;
+  int32 max_select = 12;
+  repeated string selected_card_ids = 13;
+  bool can_cancel = 14;
+  // The short text the enchantment appends to an affected card's description (the
+  // live `Enchantment.DynamicExtraCardText`, e.g. "Calce perfecto." for PerfectFit),
+  // already formatted with the chosen amount. Empty when the enchantment has no
+  // extra card text or for non-enchant kinds. Renders the "after" preview card.
+  string enchantment_extra_card_text = 15;
+}
+
+enum StateDeckCardSelectionKind {
+  STATE_DECK_CARD_SELECTION_KIND_UNSPECIFIED = 0;
+  STATE_DECK_CARD_SELECTION_KIND_UPGRADE = 1;
+  STATE_DECK_CARD_SELECTION_KIND_TRANSFORM = 2;
+  STATE_DECK_CARD_SELECTION_KIND_ENCHANT = 3;
+  STATE_DECK_CARD_SELECTION_KIND_REMOVE = 4;
+}
+
+message StateRewardsOverlay {
+  StateRewardFlow flow = 1;
+  repeated StateRewardItem items = 2;
+  repeated StateNotice notices = 3;
+}
+
+message StateRewardFlow {
+  string mode = 1;
+  bool enabled = 2;
+}
+
+message StateRewardItem {
+  string id = 1;
+  string source_type = 2;
+  StateLocRef description = 3;
+  optional int32 gold = 4;
+  string relic = 5;
+  string potion = 6;
+  StateCard card = 7;
+  StateCardReward card_reward = 8;
+  bool card_removal = 9;
+  repeated StateRewardItem linked = 10;
+  // res:// texture path for the reward's icon (from the game's Reward.IconPath),
+  // exposed for every reward kind so the UI does not special-case gold.
+  string icon_asset_key = 11;
+  // Substitution variables for the localized description template (from the
+  // game's LocString variables, e.g. {"gold": "30"}). Stringified, screen-agnostic.
+  map<string, string> description_args = 12;
+}
+
+message StateCardReward {
+  repeated StateCard cards = 1;
+  bool can_reroll = 2;
+  bool can_skip = 3;
+}
+
+message StateRunCreature {
+  string source_type = 1;
+  int32 current_hp = 2;
+  int32 max_hp = 3;
+  string id = 4;
+  reserved 5; // was combat_id; encoded in id (creature:{CombatId})
+  reserved "combat_id";
+  string model_id = 6;
+  string side = 7;
+  string slot_name = 8;
+  optional int32 block = 9;
+  optional bool is_hittable = 10;
+  reserved 11; // was is_stunned; derivable from next_move.id == "STUNNED"
+  reserved "is_stunned";
+  repeated StateCombatPowerInstance power_instances = 12;
+  StateCombatNextMove next_move = 13; // null for players
+  // The card this creature's hover (Entity.HoverTips — intent + powers) previews, if any
+  // tip is a CardHoverTip (e.g. a power like PersonalHive that adds Dazed). Drives the
+  // focus card preview on the creature body. Absent when the creature previews no card.
+  StateCard previewed_card = 14;
+}
+
+message StateRunPlayerCombat {
+  string source_type = 1;
+  int32 energy = 2;
+  int32 max_energy = 3;
+  int32 stars = 4;
+  StateCombatCardPile hand = 5;
+  StateCombatCardPile draw_pile = 6;
+  StateCombatCardPile discard_pile = 7;
+  StateCombatCardPile exhaust_pile = 8;
+  StateCombatCardPile play_pile = 9;
+  repeated StateRunCreature pet_creatures = 10;
+  StateCombatOrbQueue orb_queue = 11;
+  repeated StateNotice notices = 12;
+  // Co-op: this player has ended their own turn and is waiting for the others.
+  // Mirrors CombatManager.IsPlayerReadyToEndTurn(player); false outside combat
+  // and for any seat still acting.
+  bool has_ended_turn = 13;
+}
+
+message StateCombatCardPile {
+  string source_type = 1;
+  string id = 2;
+  string type = 3;
+  repeated StateCombatCard cards = 4;
+}
+
+// A card's applied enchantment (CardModel.Enchantment). Display strings are
+// game-resolved (DynamicDescription/DynamicExtraCardText already substitute the
+// amount + card dynamic vars + energy icons), mirroring the deck-enchant overlay.
+message StateCardEnchantment {
+  string model_id = 1; // slug, UPPER (e.g. TEZCATARAS_EMBER)
+  string title = 2; // resolved title
+  string description = 3; // resolved DynamicDescription (hover tip body)
+  string extra_card_text = 4; // resolved DynamicExtraCardText; "" when none/disabled
+  string icon_path = 5; // res:// enchantment icon path
+  int32 display_amount = 6;
+  bool show_amount = 7; // whether the badge shows the amount label
+  string status = 8; // "Normal" | "Disabled"
+  // The enchantment's referenced hover tips (EnchantmentModel.ExtraHoverTips):
+  // the "second tip" stack — e.g. GLAM->Replay, INKY->Weak, TEZCATARAS_EMBER->Eternal,
+  // STEADY->Retain — resolved up front (formatted text + is_debuff + icon) like
+  // option/power tips. The renderer stacks these beside the enchantment's own tip.
+  repeated ModelHoverTipInfo extra_hover_tips = 9;
+  // Keyword IDs the enchantment adds to the card (card.Keywords - CanonicalKeywords),
+  // UPPER (e.g. ETERNAL, RETAIN, INNATE). The renderer appends one gold keyword line
+  // per id to the card body. Empty when the enchantment adds no keyword.
+  repeated string added_keywords = 10;
+  // card.GetEnchantedReplayCount() — drives the gold "Rejugada {n}" card-body line.
+  // 0 when the enchantment grants no extra replays.
+  int32 replay_count = 11;
+}
+
+message StateCombatCard {
+  string id = 1;
+  string model_id = 2;
+  int32 upgrade_level = 3;
+  reserved 4; // was owner_player_id; card sits under its player
+  reserved "owner_player_id";
+  string current_target_creature_id = 5;
+  reserved 6; // was current_star_cost; replaced by star_cost
+  reserved "current_star_cost";
+  bool exhaust_on_next_play = 7;
+  bool has_single_turn_retain = 8;
+  bool has_single_turn_sly = 9;
+  bool should_retain_this_turn = 10;
+  int32 energy_cost = 11; // runtime modifier-applied energy cost
+  int32 star_cost = 12; // runtime star cost; -1 = not star-costed
+  repeated string unplayable_reason = 13; // set UnplayableReason flag names; empty/absent = playable
+  bool should_glow_gold = 14; // game hand-card gold glow flag
+  bool should_glow_red = 15; // game hand-card red glow flag
+  string affliction_model_id = 16;
+  int32 affliction_amount = 17;
+  StateCardEnchantment enchantment = 18; // absent when the card has no enchantment
+  // Host-computed card values (hand cards only). description_template carries `<damage>`/`<block>`
+  // sentinel slots for the per-target numbers; empty when not templatable (see preview.rendered_by_target).
+  // description_text is the verbatim no-target render. preview is the game-truth post-modifier matrix.
+  string description_template = 19;
+  string description_text = 20;
+  StateCombatCardPreview preview = 21; // absent when the card has no numbered damage/block
+}
+
+// The game's own post-modifier numbers for one hand card, plus the slot descriptors filling
+// description_template. Keys in damage_by_target / rendered_by_target are the same creature ids used
+// elsewhere in state.
+message StateCombatCardPreview {
+  int32 block = 1; // no-target block
+  int32 self_damage = 2; // no-target damage (dealer-side modifiers only)
+  map<string, int32> damage_by_target = 3; // per hittable enemy final damage
+  repeated StateCombatCardSlot slots = 4; // how description_template tokens are filled
+  map<string, string> rendered_by_target = 5; // pathological-card fallback: fully rendered body per target
+}
+
+// One sentinel slot in description_template.
+message StateCombatCardSlot {
+  string token = 1; // literal placeholder, e.g. "<damage>"
+  string kind = 2; // "damage" | "block" | "selfDamage"
+  int32 baseline = 3; // enchanted no-combat-modifier value (diff-highlight comparison basis)
+  bool inverse = 4; // HighlightDifferencesInverse coloring (green for lower)
+}
+
+message StateCombatPowerInstance {
+  string id = 1;
+  string model_id = 2;
+  string source_type = 3;
+  int32 amount = 4;
+  int32 display_amount = 5;
+  int32 amount_on_turn_start = 6;
+  string type = 7;
+  string type_for_current_amount = 8;
+  string stack_type = 9;
+  bool is_visible = 10;
+  bool skip_next_duration_tick = 11;
+  string owner_creature_id = 12;
+  string target_creature_id = 13;
+  string applier_creature_id = 14;
+  string amount_label_color = 15; // CSS color for the displayed stack amount
+  // The instance's resolved hover-tip stack (PowerModel.HoverTips: the power's own
+  // tip — smart description with live owner/amount vars — plus its ExtraHoverTips),
+  // projected up front like potion/relic model tips.
+  repeated ModelHoverTipInfo hover_tips = 16;
+  // The card this power previews, if its HoverTips contains a CardHoverTip
+  // (e.g. SwipePower's stolen card, PainfulStabs->Wound, SwordSage->SovereignBlade).
+  // Drives the focus card preview. Absent when the power previews no card.
+  StateCard previewed_card = 17;
+}
+
+message StateCombatOrbQueue {
+  string source_type = 1;
+  int32 capacity = 2;
+  repeated StateCombatOrb orbs = 3;
+}
+
+message StateCombatOrb {
+  string id = 1;
+  string model_id = 2;
+  double passive_val = 3;
+  double evoke_val = 4;
+  string owner_player_id = 5;
+  bool has_been_removed_from_state = 6;
+}
+
+message StateCombatState {
+  string source_type = 1;
+  string current_side = 2;
+  int32 round_number = 3;
+  repeated string modifier_ids = 4;
+  reserved 5, 6, 7; // were player_ids / ally_creature_ids / enemy_creature_ids (derivable from enemies + players)
+  reserved "player_ids", "ally_creature_ids", "enemy_creature_ids";
+  repeated string escaped_creature_ids = 8;
+  repeated StateRunCreature enemies = 9;
+  bool player_actions_disabled = 10;
+  // Transient, time-bound combat VFX (floating damage numbers today; block/heal/
+  // card-play later). The renderer mounts one node per entry anchored to a creature,
+  // plays a one-shot animation, and unmounts when the entry leaves the list. The
+  // producer (a host time-bounding a live event stream, or an authored fixture) owns
+  // the lifetime; the renderer never holds a timer. Empty outside combat / when idle.
+  repeated StateCombatTransientEffect transient_effects = 11;
+}
+
+// One in-flight transient combat effect (e.g. a floating damage number). See
+// StateCombatState.transient_effects. `id` must be stable for the effect's lifetime —
+// the renderer uses it as the DOM/animation key, so a stable id keeps a one-shot
+// animation from restarting across re-renders.
+message StateCombatTransientEffect {
+  string id = 1; // stable per-effect id (DOM key + CSS-animation identity)
+  string anchor_creature_id = 2; // creature this floats over (e.g. "creature:1"); empty = centered (e.g. cardUpgrade)
+  string kind = 3; // "damage"; "cardUpgrade"; "vfx" (generic scene mount); "block"/"heal"/... later
+  int32 amount = 4; // e.g. DamageResult.UnblockedDamage; entry present only when > 0
+  int64 spawned_at_ms = 5; // producer's monotonic spawn time; used to time-bound the entry
+  // Card identity for kind="cardUpgrade" (a centered card preview); empty for damage.
+  string card_model_id = 6; // upgraded card model, e.g. "STRIKE_IRONCLAD"
+  string card_id = 7; // in-combat card instance id, when known
+  string source_relic_model_id = 8; // relic that drove the upgrade, e.g. "STONE_CRACKER"
+  // Scene to mount for kind="vfx" (the native VFX backbone): a res://-relative scene
+  // id, e.g. "vfx/hit_spark_vfx". The renderer mounts this scene at the anchor and lets
+  // its particles/shaders animate natively; empty for damage/cardUpgrade.
+  string scene_path = 9;
+}
+
+message StateCombatNextMove {
+  string id = 1;
+  repeated StateCombatIntent intents = 2;
+}
+
+message StateCombatIntent {
+  string type = 1; // AbstractIntent.IntentType: Attack/Buff/Debuff/DebuffStrong/Defend/Escape/Heal/Summon/Sleep/Stun/CardDebuff/Unknown
+  StateCombatAttackIntent attack = 2; // populated only when type == Attack
+  optional int32 card_count = 3; // StatusIntent.CardCount; populated only when type == StatusCard
+}
+
+message StateCombatAttackIntent {
+  int32 damage = 1; // local-perspective single-hit damage
+  int32 hits = 2; // DEPRECATED (= Repeats + 1, off-by-one); use `repeats`. Kept for back-compat.
+  // Game AttackIntent.Repeats: number of attack instances. SingleAttackIntent => 1
+  // (display "{damage}"); MultiAttackIntent => N (display "{damage}x{N}", total = damage*N).
+  int32 repeats = 3;
+}
+
+message StateCombatPotion {
+  int32 id = 1; // slot index
+  string model_id = 2; // empty/absent = empty slot
+  bool is_queued = 3;
+  bool passes_usability_check = 4;
+  reserved 5, 6, 7, 8, 9, 10, 11; // were derived id/target/usability fields
+  reserved "potion_id", "slot_index", "target_type", "requires_target", "target_ids", "usable", "unusable_reason";
+}
+
+message StateCardPile {
+  string source_type = 1;
+  string id = 2;
+  string type = 3;
+  int32 count = 4;
+  repeated StateCard cards = 5;
+  bool order_observable = 6;
+}
+
+message StateCard {
+  string id = 1;
+  string model_id = 2;
+  int32 upgrade_level = 3;
+  map<string, int32> dynamic_vars = 4;
+  map<string, int32> next_dynamic_vars = 5;
+  string affliction_model_id = 6;
+  int32 affliction_amount = 7;
+  StateCardEnchantment enchantment = 8; // absent when the card has no enchantment
+  int32 energy_cost = 9; // modifier-applied energy cost (e.g. TEZCATARAS_EMBER -> 0); mirrors StateCombatCard.energy_cost
+}
+
+message StateRelic {
+  string id = 1;
+  string model_id = 2;
+  int32 slot_index = 3;
+  bool has_counter = 4;
+  int32 counter = 5;
+}
+
+message StateRunMap {
+  string source_type = 1;
+  int32 row_count = 2;
+  int32 column_count = 3;
+  string starting_map_point_id = 4;
+  string boss_map_point_id = 5;
+  string second_boss_map_point_id = 6;
+  repeated StateMapPointHistoryAct map_point_history = 7;
+  repeated StateMapPoint points = 8;
+  StateRunMapView view = 9;
+}
+
+message StateRunMapView {
+  bool is_open = 1;
+  // The host is presenting the map for selection right now (travel enabled, not
+  // mid-travel) — drives the travelable-node highlight/clickability.
+  bool is_accepting_votes = 2;
+}
+
+message StateMapCoord {
+  int32 row = 1;
+  int32 col = 2;
+}
+
+message StateMapPointHistoryAct {
+  repeated StateMapPointHistoryEntry entries = 1;
+}
+
+message StateMapPointHistoryEntry {
+  int32 floor = 1;
+  StateMapCoord coord = 2;
+  string map_point_type = 3;
+}
+
+message StateMapPoint {
+  string id = 1;
+  string source_type = 2;
+  StateMapCoord coord = 3;
+  string point_type = 4;
+  bool can_be_modified = 5;
+  repeated string parent_ids = 6;
+  repeated string child_ids = 7;
+  // Run-global (shared party position). Travelable: reachable from the current
+  // position right now (a selectable next node). Visited: already traveled.
+  bool travelable = 8;
+  bool visited = 9;
+  // For a VISITED "Unknown" (`?`) node, the resolved room type behind it (the game
+  // reveals an Unknown node's category once travelled — NNormalMapPoint.UpdateIcon reads
+  // MapPointHistory[act][row].Rooms.First().RoomType). One of the RoomType enum names
+  // (Monster/Elite/Shop/Treasure/RestSite/Event/...). Empty for non-Unknown points, for an
+  // un-travelled `?`, or when no history is available. Lets the renderer show the revealed
+  // category icon instead of a plain `?`.
+  string revealed_room_type = 10;
+}
+
+message LobbyCharacter {
+  string id = 1;
+  string name = 2;
+  bool is_unlocked = 3;
+  string name_key = 4;
+  string description = 5;
+  int32 starting_hp = 6;
+  int32 starting_gold = 7;
+  string passive_id = 8;
+  string passive_name = 9;
+  string passive_description = 10;
+  string passive_icon_asset_key = 11;
+  string portrait_asset_key = 12;
+  string icon_asset_key = 13;
+  string select_background_asset_key = 14;
+  string name_color = 15;
+}
+
+message StateNotice {
+  string code = 1;
+  string message = 2;
+  bool provisional = 3;
+  string path = 4;
+  string severity = 5;
+  string source = 6;
+  string stability = 7;
+  string perspective = 8;
+}

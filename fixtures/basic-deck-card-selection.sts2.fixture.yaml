@@ -1,0 +1,16 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-deck-card-selection
+description: Deterministic authored deck-card-selection fixture using typed deck selection state.
+run:
+  seed: fixture-basic-deck-card-selection
+  actFloor: 6
+  players:
+    - id: p1
+      creature: { currentHp: 54, maxHp: 80 }
+      overlays:
+        - deckCardSelection:
+            kind: select
+            canConfirm: true
+            cards:
+              - modelId: BASH
+              - modelId: ANGER

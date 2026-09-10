@@ -1,0 +1,27 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-orbs
+description: Defect host with a lightning orb (channeled naturally by its Cracked Core relic at combat start), an authored plasma (energy) orb, and one empty orb slot, plus an Ironclad ally holding a single frost orb (allies can hold orbs in special situations).
+run:
+  seed: fixture-combat-orbs
+  players:
+    - id: "p:1"
+      characterId: DEFECT
+      creature: { currentHp: 60, maxHp: 70 }
+      # Defect's default Cracked Core relic channels a Lightning orb at combat start, so
+      # we author only the Plasma orb (no relic generates plasma). Authored orbs are
+      # additive — they don't clear the relic orb. Defect's base orb capacity is 3, so
+      # Lightning + Plasma leaves one empty slot (no orbSlotCount override needed).
+      orbs:
+        - modelId: PLASMA_ORB
+    - id: "p:2"
+      characterId: IRONCLAD
+      creature: { currentHp: 67, maxHp: 80 }
+      # Ironclad's base orb capacity is 0; raise it to 1 to hold the ally orb.
+      orbSlotCount: 1
+      orbs:
+        - modelId: FROST_ORB
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK
+  view:
+    playerId: "p:1"

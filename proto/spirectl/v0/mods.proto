@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/errors.proto";
+
+message ModListRequest {
+  string request_id = 1;
+}
+
+enum LiveModLoadState {
+  LIVE_MOD_LOAD_STATE_UNSPECIFIED = 0;
+  LIVE_MOD_LOAD_STATE_NONE = 1;
+  LIVE_MOD_LOAD_STATE_LOADED = 2;
+  LIVE_MOD_LOAD_STATE_DISABLED = 3;
+  LIVE_MOD_LOAD_STATE_FAILED = 4;
+  LIVE_MOD_LOAD_STATE_ADDED_AT_RUNTIME = 5;
+  LIVE_MOD_LOAD_STATE_UNKNOWN = 6;
+}
+
+message LiveModInfo {
+  string id = 1;
+  string name = 2;
+  string version = 3;
+  string source = 4;
+  string path = 5;
+  LiveModLoadState load_state = 6;
+  bool enabled = 7;
+  bool active = 8;
+  string assembly_path = 9;
+  repeated string errors = 10;
+}
+
+message ModListResponse {
+  string request_id = 1;
+  repeated LiveModInfo mods = 2;
+  repeated string notices = 3;
+}
+
+message ModListResult {
+  oneof result {
+    ModListResponse success = 1;
+    BridgeError error = 2;
+  }
+}

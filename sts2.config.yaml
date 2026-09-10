@@ -1,0 +1,85 @@
+# Committed baseline config for `sts2`.
+# Keep repo-wide defaults here.
+# Put machine-specific STS2 install and search roots in sts2.local.yaml
+# (see sts2.local.example.yaml) rather than committing personal absolute paths.
+
+game:
+  path: auto
+  # Optional explicit STS2 managed-assembly directory for live bridge deploys
+  # and static inspection.
+  assembliesDir:
+  # Optional explicit STS2 resource root for static scene inspection.
+  resourcesDir:
+  # Optional explicit mods directory for live bridge deploys and static inspection.
+  modsDir:
+
+mode:
+  default: normal
+
+transport:
+  kind: ipc
+  mockScenario: main-menu
+
+tools:
+  dotnetToolsPath: dotnet-tools/src/Spirectl.DotnetTools/Spirectl.DotnetTools.csproj
+  # Optional external GDRE executable for recovered-project export workflows.
+  gdrePath:
+
+toolchain:
+  # Optional managed toolchain root. Defaults to ./.sts2/toolchain
+  dir:
+  # Optional shared cache root. Defaults to the platform user cache dir under spirectl.
+  sharedCacheDir:
+
+project:
+  # Optional checked-in lifecycle profiles file. Defaults to ./sts2.profiles.yaml
+  profilesFile:
+
+artifacts:
+  dir: ./.sts2/artifacts
+
+instances:
+  # Paths inside the shared STS2 user-data dir (~/.local/share/SlayTheSpire2)
+  # that a new instance symlinks to the shared copy instead of duplicating.
+  # Use it for big, mostly-regenerable mod caches every instance would otherwise
+  # clone. Paths are relative to that root; nested paths work too
+  # (e.g. `my-mod/asset-cache`). Machine-specific entries belong in
+  # sts2.local.yaml.
+  symlinkUserDataDirs: []
+
+test:
+  profiles:
+    mock:
+      description: Deterministic mock scenario baseline for repo-local CI and fast agent validation.
+      config:
+        transport:
+          kind: mock
+          mockScenario: main-menu
+      paths:
+        - tests/scenarios/smoke-main-menu.sts2.yaml
+      excludeTags:
+        - liveValidation
+    live:
+      description: Real-game validation gate for spec signoff.
+      config:
+        transport:
+          kind: ipc
+      paths:
+        - tests/scenarios
+      includeTags:
+        - liveValidation
+      preflight:
+        deployBridge: true
+        launch: true
+        timeoutMs: 60000
+        intervalMs: 500
+        verifyStableMs: 2000
+        rpcTimeoutMs: 30000
+      gate:
+        requireMatchingScenario: true
+        allowNotApplicable: true
+        requireLiveTransport: true
+
+visualValidation:
+  # Optional explicit viewport preset catalogs loaded in addition to built-ins.
+  presetCatalogs: []

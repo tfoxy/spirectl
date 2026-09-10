@@ -1,0 +1,13 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-discard-pile-open
+description: Deterministic two-player Ironclad combat with the discard pile viewer (NCardPileScreen) open.
+run:
+  seed: fixture-combat-discard-pile-open
+  view:
+    capstone:
+      cardPileView:
+        pileType: discard
+  players: 2
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

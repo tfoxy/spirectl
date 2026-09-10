@@ -1,0 +1,25 @@
+schemaVersion: spirectl.fixture/v0
+name: field-of-man-sized-holes-enchant
+description: >-
+  Field of Man-Sized Holes event with the ENTER_YOUR_HOLE (enchant) option already
+  selected: the deck enchant-selection dialog ("Choose a card to enchant") composed
+  on top of the event room. Shows the player's deck cards in the grid with the
+  Perfect Fit enchantment available to apply, mirroring the live ENTER_YOUR_HOLE
+  card-select flow.
+run:
+  seed: fixture-field-of-man-sized-holes-enchant
+  actFloor: 6
+  players:
+    - id: p1
+      characterId: IRONCLAD
+      creature: { currentHp: 67, maxHp: 80 }
+      # The room-composed enchant overlay reads the grid from the live deck pile,
+      # so the grid shows the Ironclad starter deck (5 Strike + 4 Defend + Bash).
+      overlays:
+        - deckCardSelection:
+            kind: enchant
+            enchantmentId: PERFECT_FIT
+            enchantAmount: 1
+  currentRoom:
+    event:
+      canonicalEventModelId: FIELD_OF_MAN_SIZED_HOLES

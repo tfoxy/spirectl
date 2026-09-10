@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package spirectl.v0;
+
+option csharp_namespace = "Spirectl.Proto.V0";
+
+import "spirectl/v0/errors.proto";
+
+message GameCloseRequest {
+  string request_id = 1;
+}
+
+message GameCloseResponse {
+  string request_id = 1;
+  bool accepted = 2;
+  repeated string notices = 3;
+}
+
+message GameCloseResult {
+  oneof result {
+    GameCloseResponse success = 1;
+    BridgeError error = 2;
+  }
+}

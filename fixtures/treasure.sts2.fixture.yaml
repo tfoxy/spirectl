@@ -1,0 +1,12 @@
+schemaVersion: spirectl.fixture/v0
+name: treasure
+description: Deterministic authored treasure-room fixture using typed chest state.
+run:
+  seed: fixture-basic-treasure-room
+  currentActIndex: 1
+  actFloor: 9
+  players:
+    - id: p1
+      creature: { currentHp: 49, maxHp: 80 }
+  currentRoom:
+    treasure: {}

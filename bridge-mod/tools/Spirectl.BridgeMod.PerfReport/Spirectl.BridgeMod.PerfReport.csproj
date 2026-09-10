@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RollForward>LatestMajor</RollForward>
+    <AssemblyName>spirectl-perf-report</AssemblyName>
+    <RootNamespace>Spirectl.BridgeMod.PerfReport</RootNamespace>
+    <!-- The report writer only touches the Godot-free half of Spirectl.Sts2, so it always builds the
+         non-live-host configuration (same as the default bridge test path) even on a machine where the STS2
+         assemblies are discoverable. -->
+    <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == ''">false</EnableSts2LiveHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference
+      Include="..\..\src\Spirectl.BridgeMod\Spirectl.BridgeMod.csproj"
+      AdditionalProperties="EnableSts2LiveHost=$(EnableSts2LiveHost)" />
+  </ItemGroup>
+</Project>

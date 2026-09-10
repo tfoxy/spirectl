@@ -1,0 +1,22 @@
+name: fixture-two-ironclad-neow
+description: Loads the two-Ironclad host-local Neow event fixture and asserts the resulting mock event-room screen.
+tags:
+  - liveValidation
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/two-ironclad-neow.sts2.fixture.yaml
+
+  # The mock transport's fixture loader only threads screen identity through
+  # from the authored fixture (see cli/src/bridge/stub_service/
+  # fixture_asset_impl.rs `load_fixture`) — it does not simulate a specific
+  # event's real content, per-player ownership, or host-local-seat/
+  # remoteOrchestration metadata, none of which exist in the state schema
+  # either. Assert the real, mock-producible room-scene identity instead.
+  - dev.assert:
+      path: rootScene
+      equals: run
+
+  - dev.assert:
+      path: run.currentRoom.scene
+      equals: rooms/event_room

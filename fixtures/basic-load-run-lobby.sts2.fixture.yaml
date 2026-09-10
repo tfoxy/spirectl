@@ -1,0 +1,14 @@
+schemaVersion: spirectl.fixture/v0
+name: basic-load-run-lobby
+description: Deterministic authored load-run multiplayer lobby fixture using stable player ids and ownership metadata.
+characterSelect:
+  kind: load-run
+  lobby:
+    seed: fixture-basic-load-run-lobby
+    hostPlayerId: "p:1"
+    players:
+      - id: "p:1"
+        characterId: IRONCLAD
+      - id: "p:2"
+        characterId: SILENT
+        isReady: true

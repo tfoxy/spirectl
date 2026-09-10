@@ -1,0 +1,112 @@
+{
+  "actions": [
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-map",
+      "kind": "toggle-map",
+      "label": "Map",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-deck",
+      "kind": "toggle-deck",
+      "label": "Deck",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:top-bar:toggle-settings",
+      "kind": "toggle-settings",
+      "label": "Settings",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.view"
+    },
+    {
+      "args": {
+        "cardId": "card:1",
+        "playerId": "p1",
+        "targetId": "enemy:1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:play-card:card:1:enemy:1",
+      "kind": "play-card",
+      "label": "strike → nibbit",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.players[].combat.hand.cards[0]"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:end-turn",
+      "kind": "end-turn",
+      "label": "End Turn",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.currentRoom.combat.combatState"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:view-draw-pile",
+      "kind": "view-draw-pile",
+      "label": "Draw Pile",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.players[].combat.drawPile"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:view-discard-pile",
+      "kind": "view-discard-pile",
+      "label": "Discard Pile",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.players[].combat.discardPile"
+    },
+    {
+      "args": {
+        "playerId": "p1"
+      },
+      "enabled": true,
+      "id": "action:combat-room:view-exhaust-pile",
+      "kind": "view-exhaust-pile",
+      "label": "Exhaust Pile",
+      "ownerPlayerId": "p1",
+      "sourcePath": "run.players[].combat.exhaustPile"
+    }
+  ],
+  "diagnostics": [],
+  "perspective": {
+    "playerId": "p1",
+    "requestedPlayerId": null,
+    "scope": "local",
+    "seatCount": 1,
+    "usesDefault": true
+  },
+  "schemaVersion": "spirectl.state-actions/v0",
+  "screen": {
+    "rootScene": "run",
+    "scene": "rooms/combat_room"
+  },
+  "source": {
+    "actionsCatalogVersion": "spirectl.presentation.actions/v0",
+    "stateSchemaVersion": ""
+  },
+  "warnings": []
+}

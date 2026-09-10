@@ -1,0 +1,21 @@
+schemaVersion: spirectl.fixture/v0
+name: combat-hand-upgrade-select
+description: Ironclad NIBBITS combat with the hand in upgrade-select mode (Armaments-style "upgrade a card in your hand"); exercises the upgrade preview panel.
+run:
+  seed: fixture-hand-upgrade
+  players:
+    - id: "p:1"
+      creature: { currentHp: 67, maxHp: 80 }
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_NORMAL
+  view:
+    handSelection:
+      sourceModelId: ARMAMENTS
+      mode: upgrade-select
+      minSelect: 1
+      maxSelect: 1
+      # Pre-stage the first hand card so the before/after upgrade preview panel
+      # is populated and visible for rendering (selecting in upgrade mode shows
+      # the preview without confirming).
+      selectedCardIndexes: [0]

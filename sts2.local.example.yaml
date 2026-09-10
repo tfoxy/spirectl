@@ -1,0 +1,77 @@
+# Copy this file to sts2.local.yaml for machine-specific STS2 overrides.
+# sts2.local.yaml is intended to stay local and should not be committed.
+# Prefer these authoritative roots over copied sibling mod-repo libs when both exist.
+# The default config stack may auto-fill game.path after Steam autodiscovery; commands that resolve assemblies may also fill game.assembliesDir.
+# Commands run with --config <path> do not rewrite this file.
+
+game:
+  path: /path/to/SlayTheSpire2
+  assembliesDir: /path/to/SlayTheSpire2/data_sts2_<platform>
+  resourcesDir: /path/to/SlayTheSpire2
+  modsDir: /path/to/SlayTheSpire2/mods
+  # Optional Godot user-dir override (saves/settings/logs). Normally left unset;
+  # `--instance <name>` sets this automatically per instance for isolation.
+  # userDir: /path/to/instance-user-dir
+  # Temporary auto-player workaround. When true, the launcher sets
+  # SPIRECTL_BRIDGE_ASSET_LOAD_GUARD=1 so the bridge installs its asset-load
+  # crash guards (texture + Ancient-event). Those guards replace real game-side
+  # textures/visuals with empty placeholders, so leave this false for normal
+  # launches (otherwise textures render as a purple missing-texture grid). Only
+  # the auto-player — whose software-rendered (xvfb) launch still crashes on
+  # game-side texture loads — should enable it. Remove once that crash is fixed.
+  # assetLoadGuard: false
+  # Developer opt-in for long-lived automation instances. When true, the launcher
+  # sets SPIRECTL_BRIDGE_DISABLE_BACKGROUND_THROTTLE=1 so the bridge skips the
+  # game's background frame cap and pins vertical sync ON for the session (that
+  # is what lets the engine stop drawing a hidden surface instead of parking the
+  # whole main loop in an unbounded swapchain acquire, which otherwise wedges
+  # bridge RPCs and queues actions until the window is visible again). Nothing is
+  # persisted. Leave false for normal play.
+  # disableBackgroundThrottle: false
+  # Leave enabled unset to launch without changing saved mod settings.
+  # Use [] to pass STS2's native "nomods" launch arg.
+  modLoadout:
+    enabled:
+      - spirectlbridge
+      - BaseLib
+    settingsFile: auto
+    temporary: true
+    restoreAfterNoBridgeMs: 5000
+
+transport:
+  kind: ipc
+  ipcPath: /tmp/spirectl-bridge.sock
+
+# Root for per-instance state (`--instance <name>`): each instance gets its own
+# bridge socket, Godot user-dir, optional game/mods mirror, and registry entry
+# under <dir>/<name>/. Defaults to ./.sts2/instances.
+instances:
+  dir: ./.sts2/instances
+  # Optional default active instance for this checkout. When set, ordinary
+  # `sts2 ...` commands behave as if `--instance <name>` was passed unless
+  # `--instance` or SPIRECTL_INSTANCE overrides it.
+  # default: work-a
+  # Optional default isolated-build mode for the active instance. This gives the
+  # instance its own game/mods mirror; `--isolated-build` can force this on for
+  # one command when false.
+  isolatedBuild: false
+  # Paths inside the shared STS2 user-data dir (~/.local/share/SlayTheSpire2)
+  # that a new instance symlinks to the shared copy instead of duplicating, for
+  # big mod caches every instance would otherwise clone. Nested paths work too.
+  # symlinkUserDataDirs:
+  #   - my-mod
+  #   - my-mod/asset-cache
+
+tools:
+  gdrePath: /path/to/gdre
+
+toolchain:
+  dir: /path/to/project/.sts2/toolchain
+  sharedCacheDir: /path/to/shared/spirectl-cache
+
+project:
+  profilesFile: /path/to/project/sts2.profiles.yaml
+
+visualValidation:
+  presetCatalogs:
+    - /path/to/project/custom.sts2.viewport-presets.yaml

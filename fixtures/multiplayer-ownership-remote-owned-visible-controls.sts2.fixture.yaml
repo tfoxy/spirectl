@@ -1,0 +1,15 @@
+schemaVersion: spirectl.fixture/v0
+name: multiplayer-ownership-remote-owned-visible-controls
+description: Lobby slice with visible remote player metadata but local-only execution.
+characterSelect:
+  kind: load-run
+  lobby:
+    seed: fixture-multiplayer-ownership-remote-visible
+    hostPlayerId: "p:100"
+    players:
+      - id: "p:100"
+        characterId: IRONCLAD
+        isReady: true
+      - id: "p:200"
+        characterId: SILENT
+        isReady: false

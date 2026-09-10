@@ -1,0 +1,15 @@
+name: fixture-basic-relic-selection
+description: Loads the checked-in relic-selection fixture through the live bridge and asserts the resulting relic-selection screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-relic-selection.sts2.fixture.yaml
+  - dev.assert:
+      path: run.currentRoom.treasure.currentRelics
+      exists: true
+  - dev.assert:
+      path: actions[args.relicId=treasure-room:relic:anchor:0].kind
+      source: actions
+      equals: take-relic
+  - dev.assert:
+      path: run.currentRoom.treasure.currentRelics[id=treasure-room:relic:anchor:0].modelId
+      equals: ANCHOR

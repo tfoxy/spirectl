@@ -1,0 +1,24 @@
+{
+  "selectors": [
+    {
+      "path": "screen.id",
+      "resolution": null,
+      "value": "main-menu"
+    },
+    {
+      "path": "screen.title",
+      "resolution": null,
+      "value": "Main Menu"
+    },
+    {
+      "path": "choices[0].id",
+      "resolution": null,
+      "value": "menu:start-run"
+    }
+  ],
+  "versions": {
+    "bridgeVersion": "spirectl-bridge/0.0.0",
+    "gameVersion": "unknown",
+    "schemaVersion": "spirectl/v0"
+  }
+}

@@ -1,0 +1,13 @@
+name: fixture-basic-rewards
+description: Loads the checked-in rewards fixture through the live bridge and asserts the resulting rewards screen.
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-rewards.sts2.fixture.yaml
+  # state has no top-level `rewards` document, and the mock transport doesn't
+  # populate `run.players[].overlays[].rewards` content for a loaded fixture
+  # (see cli/src/bridge/mock_data/state_run.rs `mock_overlays`) — ownership/
+  # label on a specific reward item isn't independently assertable here. The
+  # overlay's own screenType is real and confirms the rewards screen loaded.
+  - dev.assert:
+      path: run.players[id=p1].overlays[0].screenType
+      equals: Rewards

@@ -1,0 +1,33 @@
+name: fixture-basic-lobby
+description: Loads the checked-in multiplayer lobby fixture through the live bridge and asserts the resulting lobby screen.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/basic-lobby.sts2.fixture.yaml
+
+  - dev.assert:
+      path: rootScene
+      equals: screens/character_select_screen
+
+  # ownerRole/remoteOrchestration on action items and a per-player unified "role"
+  # string have no state native representation (characterSelect.lobby.players[]
+  # carries no isLocal/isHost/isRemote/role fields — only
+  # run.players[].{isLocal,isHost,isRemote} do, for players already in a run; see
+  # cli/src/state.rs `character_select_player_json`). Assert the real,
+  # mock-producible lobby membership and host/local identity instead.
+  - dev.assert:
+      path: characterSelect.lobby.localPlayerId
+      equals: p:100
+  - dev.assert:
+      path: characterSelect.lobby.hostPlayerId
+      equals: p:100
+  - dev.assert:
+      path: characterSelect.lobby.players[0].id
+      equals: p:100
+  - dev.assert:
+      path: characterSelect.lobby.players[id=p:200].id
+      equals: p:200
+  - dev.assert:
+      path: actions[kind=ready].ownerPlayerId
+      source: actions
+      equals: p:100

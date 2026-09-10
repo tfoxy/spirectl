@@ -1,0 +1,9 @@
+schemaVersion: spirectl.fixture/v0
+name: two-ironclad-nibbits-weak-combat
+description: Deterministic two-player Ironclad host-local combat against nibbits-weak.
+run:
+  seed: fixture-two-ironclad-nibbits-weak-combat
+  players: 2
+  currentRoom:
+    combat:
+      encounterId: NIBBITS_WEAK

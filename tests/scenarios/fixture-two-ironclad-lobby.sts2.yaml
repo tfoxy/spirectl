@@ -1,0 +1,32 @@
+name: fixture-two-ironclad-lobby
+description: Loads the two-Ironclad lobby fixture and asserts the resulting mock lobby membership.
+
+steps:
+  - dev.load-fixture:
+      path: ../../fixtures/two-ironclad-lobby.sts2.fixture.yaml
+
+  # The mock transport's fixture loader only threads player ids through from the
+  # authored fixture (see cli/src/bridge/stub_service/fixture_asset_impl.rs
+  # `load_fixture` / mock_data `mock_character_select`) — it does not simulate
+  # per-player readiness, character selection, or host-local-seat/
+  # remoteOrchestration ownership metadata, none of which exist in the state
+  # native actions schema either (`emit_action` in cli/src/state_actions.rs
+  # carries only id/kind/label/args/ownerPlayerId/sourcePath, no ownerRole or
+  # remoteOrchestration). Assert the real, mock-producible facts instead: scene
+  # identity, player presence, and a real select-character action.
+  - dev.assert:
+      path: rootScene
+      equals: screens/character_select_screen
+
+  - dev.assert:
+      path: characterSelect.lobby.players[id=p:1].id
+      equals: "p:1"
+
+  - dev.assert:
+      path: characterSelect.lobby.players[id=p:2].id
+      equals: "p:2"
+
+  - dev.assert:
+      path: actions[kind=select-character].id
+      source: actions
+      exists: true
