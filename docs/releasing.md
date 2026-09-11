@@ -1,5 +1,11 @@
 # Releasing
 
+Before tagging, write the release notes: `CHANGELOG.md` needs a section for the version, drafted
+from the `Changelog:` trailers on the commits since the last tag. That is step 1–3 of
+[commit-and-release.md](commit-and-release.md), and `scripts/verify-release-version.sh` now refuses
+a version with no section — the workflow publishes that same section as the GitHub Release body
+instead of generating notes from commit subjects.
+
 Push a strict semantic-version tag such as `v0.1.0`. The tag-triggered
 [`release.yml`](../.github/workflows/release.yml) first verifies that the Rust
 CLI, bridge/NuGet package, and npm wrapper all declare that exact version. It

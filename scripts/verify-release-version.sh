@@ -33,4 +33,8 @@ assembly_version="$(sed -n 's:.*<AssemblyVersion>\([^<]*\)</AssemblyVersion>.*:\
   exit 1
 }
 
+# Release notes are part of a release, not an afterthought: the workflow feeds this same section
+# to `gh release create --notes-file`, so a tag with no section would publish an empty release.
+scripts/changelog-section.sh "$version" > /dev/null
+
 echo "release version verified: $tag"
