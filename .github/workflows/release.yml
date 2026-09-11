@@ -175,13 +175,18 @@ jobs:
           dotnet nuget push 'dist/nuget/Spirectl.Sts2.${{ needs.metadata.outputs.version }}.nupkg'
           --source https://api.nuget.org/v3/index.json
           --api-key '${{ steps.nuget-login.outputs.NUGET_API_KEY }}'
+      # Release notes are written by hand from the Changelog: trailers, not generated from
+      # commit subjects. A tag with no CHANGELOG.md section fails here.
+      - name: Verify release notes exist
+        run: ./scripts/changelog-section.sh '${{ github.ref_name }}' > "$RUNNER_TEMP/release-notes.md"
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create '${{ github.ref_name }}' dist/release-assets/*
           --repo '${{ github.repository }}'
-          --title 'spirectl ${{ github.ref_name }}' --generate-notes
+          --title 'spirectl ${{ github.ref_name }}'
+          --notes-file "$RUNNER_TEMP/release-notes.md"
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@v2
         with:
