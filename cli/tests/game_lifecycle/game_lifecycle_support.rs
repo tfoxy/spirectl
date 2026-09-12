@@ -168,35 +168,86 @@ fn create_deployed_bridge_layout(mods_dir: &Path) {
     create_deployed_bridge_layout_with_version(mods_dir, current_bridge_semver());
 }
 
+/// A deployed payload that claims no game build — the default, so tests that are
+/// not about the game-build gate see `compatibility.gameBuild.status: "unknown"`.
 fn create_deployed_bridge_layout_with_version(mods_dir: &Path, version: &str) {
+    create_deployed_bridge_layout_with_game_build(mods_dir, version, None);
+}
+
+/// A deployed payload stamped with the game build it was compiled against, as a
+/// source build writes it: `(lane, release_info.json version, main_assembly_hash)`.
+fn create_deployed_bridge_layout_with_game_build(
+    mods_dir: &Path,
+    version: &str,
+    game_build: Option<(&str, &str, i64)>,
+) {
     let deploy_dir = mods_dir.join("spirectlbridge");
     fs::create_dir_all(&deploy_dir).expect("create bridge deploy dir");
+    let (lane, built_against) = match game_build {
+        Some((lane, game_version, main_assembly_hash)) => (
+            serde_json::Value::String(lane.to_string()),
+            serde_json::json!({
+                "identitySource": "install-release-info",
+                "version": game_version,
+                "mainAssemblyHash": main_assembly_hash,
+                "referencePackageVersion": serde_json::Value::Null
+            }),
+        ),
+        None => (
+            serde_json::Value::Null,
+            serde_json::json!({
+                "identitySource": "unknown",
+                "version": serde_json::Value::Null,
+                "mainAssemblyHash": serde_json::Value::Null,
+                "referencePackageVersion": serde_json::Value::Null
+            }),
+        ),
+    };
     fs::write(
         deploy_dir.join("spirectlbridge.json"),
-        format!(
-            r#"{{
-  "id": "spirectlbridge",
-  "version": "{version}",
-  "has_pck": false,
-  "has_dll": true,
-  "affects_gameplay": false,
-  "buildIdentity": {{
-    "bridgeSemVer": "{version}",
-    "bridgeVersion": "spirectl-bridge/{version}",
-    "assemblyInformationalVersion": "{version}",
-    "sourceFreshness": {{
-      "status": "known",
-      "newestModifiedUnixSeconds": 1,
-      "newestPath": "test"
-    }}
-  }}
-}}"#
-        ),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "id": "spirectlbridge",
+            "version": version,
+            "has_pck": false,
+            "has_dll": true,
+            "affects_gameplay": false,
+            "buildIdentity": {
+                "bridgeSemVer": version,
+                "bridgeVersion": format!("spirectl-bridge/{version}"),
+                "assemblyInformationalVersion": version,
+                "sts2ApiLane": lane,
+                "builtAgainstGame": built_against,
+                "sourceFreshness": {
+                    "status": "known",
+                    "newestModifiedUnixSeconds": 1,
+                    "newestPath": "test"
+                }
+            }
+        }))
+        .expect("manifest json"),
     )
     .expect("write manifest");
     fs::write(deploy_dir.join("spirectlbridge.dll"), []).expect("write loader dll");
     fs::write(deploy_dir.join("Spirectl.BridgeMod.Sts2Host.dll"), []).expect("write host dll");
     fs::write(deploy_dir.join("Spirectl.BridgeMod.dll"), []).expect("write bridge dll");
+}
+
+/// Give a fake install a `release_info.json`, so the CLI can tell which STS2
+/// game build it is. Both real-world builds are in the committed lane table:
+/// `v0.107.1` -> `v107` (stable) and `v0.111.0` -> `v111` (public beta).
+fn write_game_release_info(game_dir: &Path, version: &str, main_assembly_hash: i64) {
+    fs::write(
+        game_dir.join("release_info.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "commit": "0badc0de",
+            "version": version,
+            "date": "2026-06-18T15:43:56-07:00",
+            "branch": version,
+            "main_assembly_hash": main_assembly_hash
+        }))
+        .expect("release info json"),
+    )
+    .expect("write release_info.json");
 }
 
 fn write_settings_save(path: &Path, entries: &[(&str, bool, &str)]) {
@@ -238,8 +289,32 @@ fn test_bridge_build_identity(built_at_utc: &str) -> proto::BridgeBuildIdentity 
         bridge_version: sts2::bridge::bridge_version().to_string(),
         assembly_informational_version: current_bridge_semver().to_string(),
         built_at_utc: built_at_utc.to_string(),
+        // Claims no game build. Tests about the game-build gate use
+        // `test_bridge_build_identity_for_game_build`.
+        sts2_api_lane: String::new(),
+        built_against_game_version: String::new(),
+        built_against_main_assembly_hash: String::new(),
     }
 }
+
+/// A live bridge that says which STS2 game build it was compiled for, the way a
+/// real source-built payload does. Built in the far future so `stale_live_host`
+/// never fires and the game-build arm is the only thing under test.
+fn test_bridge_build_identity_for_game_build(
+    lane: &str,
+    game_version: &str,
+    main_assembly_hash: i64,
+) -> proto::BridgeBuildIdentity {
+    proto::BridgeBuildIdentity {
+        sts2_api_lane: lane.to_string(),
+        built_against_game_version: game_version.to_string(),
+        built_against_main_assembly_hash: main_assembly_hash.to_string(),
+        ..test_bridge_build_identity(NEVER_STALE_BUILT_AT_UTC)
+    }
+}
+
+/// Far enough in the future that no bridge source file can postdate it.
+const NEVER_STALE_BUILT_AT_UTC: &str = "4102444800";
 
 fn wait_for_file(path: &Path) {
     for _ in 0..100 {

@@ -933,6 +933,7 @@ fn write_bridge_manifest(
     target_dir: &Path,
     semver: &str,
     content_hash: &str,
+    game_build: &BridgeGameBuildStamp,
 ) -> Result<(), AppError> {
     let source_freshness = bridge_manifest_source_freshness_json();
     let contents = serde_json::to_string_pretty(&json!({
@@ -948,6 +949,16 @@ fn write_bridge_manifest(
             // Identity of the staged payload, so a redeploy can tell "same
             // bridge" from "same version, different build".
             "contentHash": content_hash,
+            // Which STS2 game build this payload binds to. The lane decides
+            // which GameApi sources compiled; `builtAgainstGame` says what the
+            // compiler actually saw. Those two are not the same claim, and a
+            // released payload can only make the first: it compiles against the
+            // locked, declaration-only reference SDK, which has no
+            // release_info.json and therefore no game version and no
+            // main_assembly_hash. Both stay null there rather than being
+            // invented. `identitySource` names which case this is.
+            "sts2ApiLane": game_build.api_lane,
+            "builtAgainstGame": game_build.to_json(),
             "sourceFreshness": source_freshness
         }
     }))

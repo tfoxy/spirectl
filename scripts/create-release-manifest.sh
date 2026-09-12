@@ -18,14 +18,24 @@ done
 
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && -n "$output_dir" ]] || usage
 
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 assets=(
   "sts2-v${version}-x86_64-unknown-linux-gnu"
   "sts2-v${version}-x86_64-unknown-linux-gnu.tar.gz"
   "sts2-v${version}-x86_64-pc-windows-msvc.exe"
   "sts2-v${version}-x86_64-pc-windows-msvc.zip"
-  "spirectlbridge-v${version}.zip"
-  "spirectlbridge-v${version}.manifest.json"
 )
+
+# One bridge payload per RELEASABLE STS2 API lane, because the bridge binds game
+# members that were renamed between game builds. The lane list comes from
+# bridge-mod/Sts2GameApi.props, never from a copy of it here.
+while IFS= read -r lane; do
+  assets+=(
+    "spirectlbridge-v${version}-${lane}.zip"
+    "spirectlbridge-v${version}-${lane}.manifest.json"
+  )
+done < <("$repo_root/scripts/sts2-api-lanes.sh" --releasable)
 
 for asset in "${assets[@]}"; do
   [[ -f "$output_dir/$asset" ]] || {

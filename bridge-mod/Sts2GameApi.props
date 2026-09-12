@@ -14,8 +14,10 @@
       3. otherwise fail the build (`ValidateSts2GameApiLane`), naming the version, this file, and the
          `-p:Sts2GameApi=` escape hatch.
 
-    Outputs: `$(Sts2GameApi)` (the lane), `$(Sts2GameVersion)` (the detected game version, empty when
-    undetectable) and one of the `STS2_API_V107` / `STS2_API_V111` compile constants.
+    Outputs: `$(Sts2GameApi)` (the lane), `$(Sts2GameVersion)` and `$(Sts2GameMainAssemblyHash)` (the
+    detected game build's identity, both empty when undetectable) and one of the
+    `STS2_API_V107` / `STS2_API_V111` compile constants. `Directory.Build.props` stamps all three into
+    the bridge assembly, which is how a loaded bridge can say which build it was compiled for.
 
     Adding a build: add its `version=lane` row to `Sts2GameApiLaneTable`. Adding a lane: add it to
     `Sts2GameApiLanes`, create `src/Spirectl.Sts2/GameApi/<lane>/`, and add the lane's `ItemGroup`s to
@@ -39,6 +41,27 @@
         v0.111.0 -> v111   the public-beta branch
     -->
     <Sts2GameApiLaneTable>;v0.107.1=v107;v0.111.0=v111;</Sts2GameApiLaneTable>
+
+    <!--
+      THE SUBSET THAT CAN BE RELEASED. A released bridge payload is compiled against the locked,
+      declaration-only STS2 reference SDK (`eng/Sts2.ReferenceSdk`), which pins ONE game build's
+      declarations — `FuYnAloft.Sts2.References 0.107.0-beta` today. A lane whose sources need a type or
+      member that package does not declare cannot be built there at all, so it cannot be packaged:
+      `v111`'s `GameApiAliases.cs` needs `StartRunLobbyPlayer`, which the v107 reference package has no
+      declaration for. Verified 2026-09-12: packaging lane v111 fails with CS0234 on that alias.
+      (XML comments cannot carry a double hyphen, so flags are named without one throughout this file.)
+
+      So this is a superset relationship, not a duplicate: every releasable lane is a lane, and a lane
+      becomes releasable when a reference package that declares its game build exists and is pinned. It is
+      a property rather than a workflow constant so the gap lives in the lane table, where the next person
+      adding a lane will see it. Release packaging, the release manifest and `install-bridge`'s no-build
+      refusal all read it; `scripts/sts2-api-lanes.sh` with the `releasable` flag prints it for shell
+      callers.
+
+      A non-releasable lane is still fully supported from source: `game install-bridge` detects it and
+      builds against the real install.
+    -->
+    <Sts2GameApiReleasableLanes>v107</Sts2GameApiReleasableLanes>
   </PropertyGroup>
 
   <!-- (2) Detect the lane from the install the bridge is being compiled against. -->
@@ -46,6 +69,9 @@
     <Sts2GameApiReleaseInfoPath Condition="'$(Sts2GameApiReleaseInfoPath)' == '' and '$(Sts2AssembliesDir)' != ''">$([System.IO.Path]::GetFullPath('$(Sts2AssembliesDir)/../release_info.json'))</Sts2GameApiReleaseInfoPath>
     <Sts2GameApiReleaseInfoText Condition="'$(Sts2GameApiReleaseInfoPath)' != '' and Exists('$(Sts2GameApiReleaseInfoPath)')">$([System.IO.File]::ReadAllText('$(Sts2GameApiReleaseInfoPath)'))</Sts2GameApiReleaseInfoText>
     <Sts2GameVersion Condition="'$(Sts2GameVersion)' == '' and '$(Sts2GameApiReleaseInfoText)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiReleaseInfoText)', '"version"[ \t]*:[ \t]*"([^"]*)"').Groups[1].Value)</Sts2GameVersion>
+    <!-- The game's own content identity for sts2.dll. It moves on builds that keep the version string,
+         so it is the sharper half of "which build was this compiled against". -->
+    <Sts2GameMainAssemblyHash Condition="'$(Sts2GameMainAssemblyHash)' == '' and '$(Sts2GameApiReleaseInfoText)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiReleaseInfoText)', '"main_assembly_hash"[ \t]*:[ \t]*(-?[0-9]+)').Groups[1].Value)</Sts2GameMainAssemblyHash>
 
     <Sts2GameApiLanePattern Condition="'$(Sts2GameVersion)' != ''">;$([System.Text.RegularExpressions.Regex]::Escape('$(Sts2GameVersion)'))=([^;]+);</Sts2GameApiLanePattern>
     <Sts2GameApiDetectedLane Condition="'$(Sts2GameApiLanePattern)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiLaneTable)', '$(Sts2GameApiLanePattern)').Groups[1].Value)</Sts2GameApiDetectedLane>

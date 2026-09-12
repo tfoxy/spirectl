@@ -33,11 +33,20 @@ jobs:
           dotnet-version: '9.0.x'
       - name: Verify pinned STS2 compilation references
         run: bash scripts/verify-sts2-reference-sdk.sh
-      - name: Package bridge release payload
-        run: >-
-          bash scripts/package-bridge-release.sh
-          --version '${{ needs.metadata.outputs.version }}'
-          --output-dir dist/release-assets
+      # One payload per RELEASABLE STS2 API lane: the bridge binds game members that
+      # were renamed or reshaped between game builds, so a single archive cannot
+      # serve every supported build — and a release can only cover the builds the
+      # pinned reference SDK declares. Both lists come from
+      # bridge-mod/Sts2GameApi.props.
+      - name: Package bridge release payloads
+        shell: bash
+        run: |
+          while IFS= read -r lane; do
+            bash scripts/package-bridge-release.sh \
+              --version '${{ needs.metadata.outputs.version }}' \
+              --lane "$lane" \
+              --output-dir dist/release-assets
+          done < <(bash scripts/sts2-api-lanes.sh --releasable)
       - name: Build reference SDK for NuGet pack
         run: >-
           dotnet build eng/Sts2.ReferenceSdk/Sts2.ReferenceSdk.csproj
@@ -48,7 +57,8 @@ jobs:
           dotnet pack bridge-mod/src/Spirectl.Sts2/Spirectl.Sts2.csproj
           --configuration Release --output dist/nuget
           -m:1 -p:Sts2AssembliesDir="$PWD/artifacts/reference-sdk"
-          -p:EnableSts2LiveHost=true -p:Version='${{ needs.metadata.outputs.version }}'
+          -p:EnableSts2LiveHost=true -p:Sts2GameApi=v107
+          -p:Version='${{ needs.metadata.outputs.version }}'
           -p:ContinuousIntegrationBuild=true -p:DebugSymbols=false -p:DebugType=None
       - name: Verify NuGet payload excludes game references
         shell: bash
@@ -155,7 +165,12 @@ jobs:
         shell: bash
         run: |
           bash scripts/create-release-manifest.sh --version '${{ needs.metadata.outputs.version }}' --output-dir dist/release-assets
-          bash scripts/verify-bridge-release.sh --zip "dist/release-assets/spirectlbridge-v${{ needs.metadata.outputs.version }}.zip" --version '${{ needs.metadata.outputs.version }}'
+          while IFS= read -r lane; do
+            bash scripts/verify-bridge-release.sh \
+              --zip "dist/release-assets/spirectlbridge-v${{ needs.metadata.outputs.version }}-$lane.zip" \
+              --version '${{ needs.metadata.outputs.version }}' \
+              --lane "$lane"
+          done < <(bash scripts/sts2-api-lanes.sh --releasable)
           test -f "dist/nuget/Spirectl.Sts2.${{ needs.metadata.outputs.version }}.nupkg"
       - name: Refuse to replace an existing GitHub Release
         env:

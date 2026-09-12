@@ -34,6 +34,26 @@ message BridgeBuildIdentity {
   string bridge_version = 2;
   string assembly_informational_version = 3;
   string built_at_utc = 4;
+
+  // Which STS2 game build this payload was compiled for. The bridge binds game
+  // members that were renamed or reshaped between builds, so a payload loaded
+  // into the wrong build starts, logs a few soft "not found" lines, and then
+  // throws on the first lobby walk. These three carry enough for a client to
+  // catch that before attaching.
+  //
+  // Deliberately asymmetric. A payload built from source compiles against a
+  // real install, so it names all three. A released payload compiles against
+  // the locked, declaration-only reference SDK, which has no release_info.json
+  // and no game hash — it can claim only the lane, and no hash is invented for
+  // it. Empty therefore means "cannot claim one", never "matches anything".
+
+  // The src/Spirectl.Sts2/GameApi/<lane>/ sources that were compiled, e.g. "v107".
+  string sts2_api_lane = 5;
+  // release_info.json "version" of the install compiled against, e.g. "v0.111.0".
+  string built_against_game_version = 6;
+  // release_info.json "main_assembly_hash" of that install, as written. Text
+  // rather than a number so "unknown" stays distinguishable from a real 0.
+  string built_against_main_assembly_hash = 7;
 }
 
 message HandshakeResult {

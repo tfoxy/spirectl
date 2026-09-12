@@ -3,6 +3,7 @@ pub struct StubBridgeService {
     scenario: MockScenario,
     debug_state: Arc<Mutex<StubDebugState>>,
     build_identity: Option<proto::BridgeBuildIdentity>,
+    bridge_version: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -20,12 +21,26 @@ impl StubBridgeService {
             scenario,
             debug_state: Arc::new(Mutex::new(StubDebugState::default())),
             build_identity: None,
+            bridge_version: None,
         }
     }
 
     pub fn with_build_identity(mut self, build_identity: proto::BridgeBuildIdentity) -> Self {
         self.build_identity = Some(build_identity);
         self
+    }
+
+    /// Answer the handshake with a bridge version other than the CLI's own, so a
+    /// caller can exercise the `live_version_mismatch` arm of `bridge-health`.
+    pub fn with_bridge_version(mut self, bridge_version: &str) -> Self {
+        self.bridge_version = Some(bridge_version.to_string());
+        self
+    }
+
+    fn handshake_bridge_version(&self) -> String {
+        self.bridge_version
+            .clone()
+            .unwrap_or_else(|| BRIDGE_VERSION.to_string())
     }
 
     /// True for the first transition-status sample of this service instance.
@@ -255,13 +270,19 @@ impl StubBridgeService {
                 proto::HandshakeResponse {
                     schema_version: "spirectl/v0".to_string(),
                     game_version: "unknown".to_string(),
-                    bridge_version: BRIDGE_VERSION.to_string(),
+                    bridge_version: self.handshake_bridge_version(),
                     build_identity: Some(self.build_identity.clone().unwrap_or(
                         proto::BridgeBuildIdentity {
                             bridge_semver: BRIDGE_SEMVER.to_string(),
                             bridge_version: BRIDGE_VERSION.to_string(),
                             assembly_informational_version: BRIDGE_SEMVER.to_string(),
                             built_at_utc: "mock".to_string(),
+                            // A stub bridge was compiled against no game build at
+                            // all, so it claims none. Tests that exercise the
+                            // game-build gate override build_identity instead.
+                            sts2_api_lane: String::new(),
+                            built_against_game_version: String::new(),
+                            built_against_main_assembly_hash: String::new(),
                         },
                     )),
                     transport_kind: proto::TransportKind::Mock as i32,

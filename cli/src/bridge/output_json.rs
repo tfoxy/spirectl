@@ -138,7 +138,15 @@ fn bridge_build_identity_json(identity: &proto::BridgeBuildIdentity) -> Value {
         "bridgeSemVer": identity.bridge_semver,
         "bridgeVersion": identity.bridge_version,
         "assemblyInformationalVersion": identity.assembly_informational_version,
-        "builtAtUtc": identity.built_at_utc
+        "builtAtUtc": identity.built_at_utc,
+        // The game build this payload was compiled for. Null means the payload
+        // cannot claim one, not that it matches anything: a released payload
+        // compiles against the declaration-only reference SDK, which has no
+        // release_info.json and no game hash, so only the lane is ever set
+        // there. A bridge predating these fields reports all three as null.
+        "sts2ApiLane": empty_string_as_null(&identity.sts2_api_lane),
+        "builtAgainstGameVersion": empty_string_as_null(&identity.built_against_game_version),
+        "builtAgainstMainAssemblyHash": empty_string_as_null(&identity.built_against_main_assembly_hash)
     })
 }
 

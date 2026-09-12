@@ -1011,7 +1011,13 @@ async fn game_bridge_health_verbose_preserves_full_diagnostic_payload() {
     assert!(status.success(), "payload: {payload:#}");
     assert_eq!(payload["status"], "reachable_current");
     assert_eq!(payload["nonMutating"], true);
-    assert_eq!(payload["compatibility"], serde_json::json!({}));
+    // Reserved-but-empty until W2 filled it with the game-build comparison. A
+    // fake install carries no release_info.json, so nothing is comparable here.
+    assert_eq!(payload["compatibility"]["gameBuild"]["status"], "unknown");
+    assert_eq!(
+        payload["compatibility"]["gameBuild"]["mismatches"],
+        serde_json::json!([])
+    );
     assert_eq!(
         payload["liveBridge"]["bridgeVersion"],
         sts2::bridge::bridge_version()
@@ -1180,6 +1186,393 @@ async fn game_bridge_health_allows_missing_deployed_manifest_when_live_bridge_is
     assert_eq!(
         payload["safeNextCommands"],
         serde_json::json!(["sts2 --json state"])
+    );
+    server.abort();
+}
+
+/// The headline case this exists for: Steam updates the game under a bridge
+/// that was correctly installed for the previous build. The payload still
+/// loads, so nothing else notices — until it walks a lobby and throws. Here the
+/// deployed manifest says it was built for the public beta (`v0.111.0` -> lane
+/// `v111`) while the install's own `release_info.json` says stable (`v0.107.1`
+/// -> `v107`), and the loaded bridge agrees with the manifest.
+#[cfg(unix)]
+#[tokio::test]
+async fn game_bridge_health_reports_a_bridge_built_for_another_game_build() {
+    let game_dir = create_fake_game_layout();
+    write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
+    let socket_path = game_dir.path().join("game-build-health.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
+    let service = StubBridgeGrpcService::new(MockScenario::MainMenu).with_build_identity(
+        test_bridge_build_identity_for_game_build("v111", "v0.111.0", 1_579_942_752),
+    );
+    let server = ipc_bridge_support::spawn_unix_bridge_service(listener, service);
+    create_deployed_bridge_layout_with_game_build(
+        &game_dir.path().join("mods"),
+        current_bridge_semver(),
+        Some(("v111", "v0.111.0", 1_579_942_752)),
+    );
+    let config = write_config(&AppConfig {
+        game: GameConfig {
+            path: game_dir.path().to_string_lossy().into_owned(),
+            ..GameConfig::default()
+        },
+        transport: sts2::TransportConfig {
+            kind: TransportKind::Ipc,
+            ipc_path: Some(socket_path.to_string_lossy().into_owned()),
+            ..sts2::TransportConfig::default()
+        },
+        ..AppConfig::default()
+    });
+
+    let game_path = game_dir.path().to_path_buf();
+    let (status, payload) = tokio::task::spawn_blocking(move || {
+        run_output_in_dir_with_env(
+            &game_path,
+            &[
+                "--json",
+                "--config",
+                config.path().to_str().expect("utf8 path"),
+                "game",
+                "bridge-health",
+                "--non-mutating",
+                "--rpc-timeout-ms",
+                "5000",
+            ],
+            &[],
+        )
+    })
+    .await
+    .expect("join bridge health command");
+
+    // A mismatched game build must abort, not attach.
+    assert_eq!(status.code(), Some(4), "payload: {payload:#}");
+    assert_eq!(payload["error"]["code"], "game_version_mismatch");
+    assert_eq!(payload["health"]["status"], "game_version_mismatch");
+    assert_eq!(payload["health"]["connection"]["status"], "reachable");
+    assert_eq!(payload["health"]["bridge"]["gameBuildStatus"], "mismatch");
+
+    let game_build = &payload["health"]["compatibility"]["gameBuild"];
+    assert_eq!(game_build["install"]["version"], "v0.107.1");
+    assert_eq!(game_build["install"]["apiLane"], "v107");
+    assert_eq!(game_build["install"]["mainAssemblyHash"], 1_692_500_715i64);
+    assert_eq!(game_build["liveBridge"]["sts2ApiLane"], "v111");
+    assert_eq!(
+        game_build["liveBridge"]["builtAgainstMainAssemblyHash"],
+        1_579_942_752i64
+    );
+    assert_eq!(game_build["deployedBridge"]["sts2ApiLane"], "v111");
+
+    // Every comparable field is reported, from both the loaded bridge and the
+    // deployed manifest, so the operator does not have to guess which is stale.
+    let mismatches = game_build["mismatches"]
+        .as_array()
+        .expect("mismatches")
+        .iter()
+        .map(|entry| {
+            (
+                entry["source"].as_str().expect("source").to_string(),
+                entry["field"].as_str().expect("field").to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+    for source in ["live", "deployed"] {
+        for field in [
+            "sts2ApiLane",
+            "builtAgainstGameVersion",
+            "builtAgainstMainAssemblyHash",
+        ] {
+            assert!(
+                mismatches.contains(&(source.to_string(), field.to_string())),
+                "missing {source}/{field} in {mismatches:?}"
+            );
+        }
+    }
+
+    assert_eq!(
+        payload["health"]["safeNextCommands"],
+        serde_json::json!([
+            "sts2 code verify-references",
+            "sts2 game install-bridge",
+            "sts2 game close",
+            "sts2 game launch"
+        ])
+    );
+    server.abort();
+}
+
+/// The same install, the matching bridge. Proves the gate is a comparison and
+/// not a blanket refusal whenever `release_info.json` happens to be readable.
+#[cfg(unix)]
+#[tokio::test]
+async fn game_bridge_health_accepts_a_bridge_built_for_the_configured_game_build() {
+    let game_dir = create_fake_game_layout();
+    write_game_release_info(game_dir.path(), "v0.111.0", 1_579_942_752);
+    let socket_path = game_dir.path().join("game-build-match.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
+    let service = StubBridgeGrpcService::new(MockScenario::MainMenu).with_build_identity(
+        test_bridge_build_identity_for_game_build("v111", "v0.111.0", 1_579_942_752),
+    );
+    let server = ipc_bridge_support::spawn_unix_bridge_service(listener, service);
+    create_deployed_bridge_layout_with_game_build(
+        &game_dir.path().join("mods"),
+        current_bridge_semver(),
+        Some(("v111", "v0.111.0", 1_579_942_752)),
+    );
+    let config = write_config(&AppConfig {
+        game: GameConfig {
+            path: game_dir.path().to_string_lossy().into_owned(),
+            ..GameConfig::default()
+        },
+        transport: sts2::TransportConfig {
+            kind: TransportKind::Ipc,
+            ipc_path: Some(socket_path.to_string_lossy().into_owned()),
+            ..sts2::TransportConfig::default()
+        },
+        ..AppConfig::default()
+    });
+
+    let game_path = game_dir.path().to_path_buf();
+    let (status, payload) = tokio::task::spawn_blocking(move || {
+        run_output_in_dir_with_env(
+            &game_path,
+            &[
+                "--json",
+                "--config",
+                config.path().to_str().expect("utf8 path"),
+                "game",
+                "bridge-health",
+                "--non-mutating",
+                "--rpc-timeout-ms",
+                "5000",
+            ],
+            &[],
+        )
+    })
+    .await
+    .expect("join bridge health command");
+
+    assert!(status.success(), "payload: {payload:#}");
+    assert_eq!(payload["status"], "reachable_current");
+    assert_eq!(payload["bridge"]["gameBuildStatus"], "match");
+    // A match is not worth the bytes in the polled output.
+    assert!(payload.get("compatibility").is_none());
+    server.abort();
+}
+
+/// A released payload can only ever claim its API lane: it is compiled against
+/// the declaration-only reference SDK, which has no `release_info.json`. The
+/// lane alone still catches the wrong build, and no game version or hash is
+/// compared because none was claimed.
+#[cfg(unix)]
+#[tokio::test]
+async fn game_bridge_health_catches_a_released_payload_from_its_lane_alone() {
+    let game_dir = create_fake_game_layout();
+    write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
+    let socket_path = game_dir.path().join("game-build-lane-only.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
+    let service = StubBridgeGrpcService::new(MockScenario::MainMenu).with_build_identity(
+        sts2::bridge::proto::BridgeBuildIdentity {
+            sts2_api_lane: "v111".to_string(),
+            ..test_bridge_build_identity(NEVER_STALE_BUILT_AT_UTC)
+        },
+    );
+    let server = ipc_bridge_support::spawn_unix_bridge_service(listener, service);
+    create_deployed_bridge_layout(&game_dir.path().join("mods"));
+    let config = write_config(&AppConfig {
+        game: GameConfig {
+            path: game_dir.path().to_string_lossy().into_owned(),
+            ..GameConfig::default()
+        },
+        transport: sts2::TransportConfig {
+            kind: TransportKind::Ipc,
+            ipc_path: Some(socket_path.to_string_lossy().into_owned()),
+            ..sts2::TransportConfig::default()
+        },
+        ..AppConfig::default()
+    });
+
+    let game_path = game_dir.path().to_path_buf();
+    let (status, payload) = tokio::task::spawn_blocking(move || {
+        run_output_in_dir_with_env(
+            &game_path,
+            &[
+                "--json",
+                "--config",
+                config.path().to_str().expect("utf8 path"),
+                "game",
+                "bridge-health",
+                "--non-mutating",
+                "--rpc-timeout-ms",
+                "5000",
+                "--verbose",
+            ],
+            &[],
+        )
+    })
+    .await
+    .expect("join bridge health command");
+
+    assert_eq!(status.code(), Some(4), "payload: {payload:#}");
+    assert_eq!(payload["error"]["code"], "game_version_mismatch");
+    let game_build = &payload["health"]["compatibility"]["gameBuild"];
+    assert_eq!(
+        game_build["liveBridge"]["builtAgainstGameVersion"],
+        serde_json::Value::Null
+    );
+    assert_eq!(
+        game_build["liveBridge"]["builtAgainstMainAssemblyHash"],
+        serde_json::Value::Null
+    );
+    // The deployed manifest claims nothing at all, so it contributes nothing.
+    assert_eq!(
+        game_build["deployedBridge"],
+        serde_json::Value::Null,
+        "{game_build:#}"
+    );
+    assert_eq!(
+        game_build["mismatches"],
+        serde_json::json!([{
+            "source": "live",
+            "field": "sts2ApiLane",
+            "expected": "v107",
+            "found": "v111"
+        }])
+    );
+    server.abort();
+}
+
+/// An install with no readable `release_info.json` — an unpacked build, a
+/// bespoke layout — must not be turned into a refusal. Nothing is comparable,
+/// so the verdict is `unknown` and the command still passes.
+#[cfg(unix)]
+#[tokio::test]
+async fn game_bridge_health_reports_unknown_when_the_install_build_is_unreadable() {
+    let game_dir = create_fake_game_layout();
+    let socket_path = game_dir.path().join("game-build-unknown.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
+    let service = StubBridgeGrpcService::new(MockScenario::MainMenu).with_build_identity(
+        test_bridge_build_identity_for_game_build("v111", "v0.111.0", 1_579_942_752),
+    );
+    let server = ipc_bridge_support::spawn_unix_bridge_service(listener, service);
+    create_deployed_bridge_layout(&game_dir.path().join("mods"));
+    let config = write_config(&AppConfig {
+        game: GameConfig {
+            path: game_dir.path().to_string_lossy().into_owned(),
+            ..GameConfig::default()
+        },
+        transport: sts2::TransportConfig {
+            kind: TransportKind::Ipc,
+            ipc_path: Some(socket_path.to_string_lossy().into_owned()),
+            ..sts2::TransportConfig::default()
+        },
+        ..AppConfig::default()
+    });
+
+    let game_path = game_dir.path().to_path_buf();
+    let (status, payload) = tokio::task::spawn_blocking(move || {
+        run_output_in_dir_with_env(
+            &game_path,
+            &[
+                "--json",
+                "--config",
+                config.path().to_str().expect("utf8 path"),
+                "game",
+                "bridge-health",
+                "--non-mutating",
+                "--rpc-timeout-ms",
+                "5000",
+                "--verbose",
+            ],
+            &[],
+        )
+    })
+    .await
+    .expect("join bridge health command");
+
+    assert!(status.success(), "payload: {payload:#}");
+    assert_eq!(payload["status"], "reachable_current");
+    let game_build = &payload["compatibility"]["gameBuild"];
+    assert_eq!(game_build["status"], "unknown");
+    assert_eq!(game_build["install"]["version"], serde_json::Value::Null);
+    assert_eq!(game_build["mismatches"], serde_json::json!([]));
+    assert_eq!(
+        game_build["knownApiLanes"],
+        serde_json::json!(["v107", "v111"])
+    );
+    server.abort();
+}
+
+/// `live_version_mismatch` had no test at all. It outranks the game-build arm,
+/// so pin the ordering while proving the arm itself: a live bridge whose version
+/// does not match the CLI's is reported as the version mismatch even though the
+/// game build ALSO disagrees.
+#[cfg(unix)]
+#[tokio::test]
+async fn game_bridge_health_reports_a_live_bridge_version_mismatch_first() {
+    let game_dir = create_fake_game_layout();
+    write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
+    let socket_path = game_dir.path().join("live-version-mismatch.sock");
+    let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
+    let service = StubBridgeGrpcService::new(MockScenario::MainMenu)
+        .with_bridge_version("spirectl-bridge/0.0.1")
+        .with_build_identity(test_bridge_build_identity_for_game_build(
+            "v111",
+            "v0.111.0",
+            1_579_942_752,
+        ));
+    let server = ipc_bridge_support::spawn_unix_bridge_service(listener, service);
+    create_deployed_bridge_layout(&game_dir.path().join("mods"));
+    let config = write_config(&AppConfig {
+        game: GameConfig {
+            path: game_dir.path().to_string_lossy().into_owned(),
+            ..GameConfig::default()
+        },
+        transport: sts2::TransportConfig {
+            kind: TransportKind::Ipc,
+            ipc_path: Some(socket_path.to_string_lossy().into_owned()),
+            ..sts2::TransportConfig::default()
+        },
+        ..AppConfig::default()
+    });
+
+    let game_path = game_dir.path().to_path_buf();
+    let (status, payload) = tokio::task::spawn_blocking(move || {
+        run_output_in_dir_with_env(
+            &game_path,
+            &[
+                "--json",
+                "--config",
+                config.path().to_str().expect("utf8 path"),
+                "game",
+                "bridge-health",
+                "--non-mutating",
+                "--rpc-timeout-ms",
+                "5000",
+            ],
+            &[],
+        )
+    })
+    .await
+    .expect("join bridge health command");
+
+    assert_eq!(status.code(), Some(4), "payload: {payload:#}");
+    assert_eq!(payload["error"]["code"], "live_version_mismatch");
+    assert_eq!(payload["health"]["status"], "live_version_mismatch");
+    assert_eq!(payload["health"]["bridge"]["liveVersion"], "spirectl-bridge/0.0.1");
+    assert_eq!(
+        payload["health"]["bridge"]["expectedVersion"],
+        sts2::bridge::bridge_version()
+    );
+    // The game-build comparison is still reported; it just does not win.
+    assert_eq!(payload["health"]["bridge"]["gameBuildStatus"], "mismatch");
+    assert_eq!(
+        payload["health"]["safeNextCommands"],
+        serde_json::json!([
+            "sts2 game install-bridge",
+            "sts2 game close",
+            "sts2 game launch"
+        ])
     );
     server.abort();
 }

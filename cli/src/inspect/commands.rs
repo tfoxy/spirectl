@@ -828,7 +828,7 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
     },
     CommandInfo {
         name: "game bridge-health",
-        summary: "Diagnose live bridge readiness without mutating game files or processes.",
+        summary: "Diagnose live bridge readiness, including whether the bridge was built for the installed game build, without mutating game files or processes.",
         status: "implemented",
         read_only: true,
         examples: &[
@@ -839,7 +839,7 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
     },
     CommandInfo {
         name: "game install-bridge",
-        summary: "Build and install only the bridge payload into the configured mods directory.",
+        summary: "Build and install only the bridge payload for the installed game build into the configured mods directory.",
         status: "implemented",
         read_only: false,
         examples: &[
