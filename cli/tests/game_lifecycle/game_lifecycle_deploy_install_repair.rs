@@ -1526,3 +1526,154 @@ async fn game_install_bridge_progress_writes_ndjson_to_stderr_only() {
     assert!(phases.iter().any(|phase| phase == "bridge.publish"));
     assert!(phases.iter().any(|phase| phase == "bridge.copy"));
 }
+
+/// A source build knows exactly which install it compiled against, so it stamps
+/// both the API lane and that install's `release_info.json` identity into the
+/// deployed manifest. That stamp is what lets a later `bridge-health` notice
+/// Steam swapping the game build out from under a correctly-installed bridge.
+#[cfg(unix)]
+#[tokio::test]
+async fn game_install_bridge_stamps_the_game_build_it_compiled_against() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let fake_bin_dir = workspace.path().join("fake-bin");
+    fs::create_dir_all(&fake_bin_dir).expect("fake bin dir");
+    write_fake_dotnet(&fake_bin_dir);
+
+    let game_dir = create_fake_game_layout();
+    write_game_release_info(game_dir.path(), "v0.111.0", 1_579_942_752);
+    let config = write_config(&AppConfig {
+        game: GameConfig {
+            path: game_dir.path().to_string_lossy().into_owned(),
+            ..GameConfig::default()
+        },
+        ..AppConfig::default()
+    });
+
+    let path_value = std::env::var("PATH").expect("PATH");
+    let prefixed_path = format!("{}:{}", fake_bin_dir.display(), path_value);
+    let data_root = workspace.path().join("data");
+    fs::create_dir_all(&data_root).expect("data root");
+    let xdg_data_home = data_root.to_string_lossy().into_owned();
+    let workdir = workspace.path().to_path_buf();
+    let config_path = config.path().to_string_lossy().into_owned();
+
+    let payload = tokio::task::spawn_blocking(move || {
+        run_json_in_dir_with_env(
+            &workdir,
+            &[
+                "--json",
+                "--config",
+                &config_path,
+                "game",
+                "install-bridge",
+            ],
+            &[
+                ("PATH", &prefixed_path),
+                ("XDG_DATA_HOME", &xdg_data_home),
+            ],
+        )
+    })
+    .await
+    .expect("join install task");
+
+    assert_eq!(payload["installed"], true);
+    assert_eq!(payload["gameBuild"]["version"], "v0.111.0");
+    assert_eq!(payload["gameBuild"]["apiLane"], "v111");
+    assert_eq!(payload["gameBuild"]["mainAssemblyHash"], 1_579_942_752i64);
+    assert_eq!(payload["acquisition"]["sts2ApiLane"], "v111");
+
+    let manifest: Value = serde_json::from_str(
+        &fs::read_to_string(game_dir.path().join("mods/spirectlbridge/spirectlbridge.json"))
+            .expect("deployed manifest"),
+    )
+    .expect("deployed manifest json");
+    let identity = &manifest["buildIdentity"];
+    assert_eq!(identity["sts2ApiLane"], "v111");
+    assert_eq!(
+        identity["builtAgainstGame"]["identitySource"],
+        "install-release-info"
+    );
+    assert_eq!(identity["builtAgainstGame"]["version"], "v0.111.0");
+    assert_eq!(
+        identity["builtAgainstGame"]["mainAssemblyHash"],
+        1_579_942_752i64
+    );
+    // Only a released payload has a reference package to name.
+    assert_eq!(
+        identity["builtAgainstGame"]["referencePackageVersion"],
+        Value::Null
+    );
+}
+
+/// An install the CLI cannot identify must still install — but it must not be
+/// given a build identity it has no basis for. `unknown` there is what keeps
+/// `bridge-health` reporting `unknown` instead of a fabricated match.
+#[cfg(unix)]
+#[tokio::test]
+async fn game_install_bridge_claims_no_game_build_when_the_install_is_unidentifiable() {
+    let workspace = tempfile::tempdir().expect("workspace");
+    let fake_bin_dir = workspace.path().join("fake-bin");
+    fs::create_dir_all(&fake_bin_dir).expect("fake bin dir");
+    write_fake_dotnet(&fake_bin_dir);
+
+    let game_dir = create_fake_game_layout();
+    let config = write_config(&AppConfig {
+        game: GameConfig {
+            path: game_dir.path().to_string_lossy().into_owned(),
+            ..GameConfig::default()
+        },
+        ..AppConfig::default()
+    });
+
+    let path_value = std::env::var("PATH").expect("PATH");
+    let prefixed_path = format!("{}:{}", fake_bin_dir.display(), path_value);
+    let data_root = workspace.path().join("data");
+    fs::create_dir_all(&data_root).expect("data root");
+    let xdg_data_home = data_root.to_string_lossy().into_owned();
+    let workdir = workspace.path().to_path_buf();
+    let config_path = config.path().to_string_lossy().into_owned();
+
+    let payload = tokio::task::spawn_blocking(move || {
+        run_json_in_dir_with_env(
+            &workdir,
+            &[
+                "--json",
+                "--config",
+                &config_path,
+                "game",
+                "install-bridge",
+            ],
+            &[
+                ("PATH", &prefixed_path),
+                ("XDG_DATA_HOME", &xdg_data_home),
+            ],
+        )
+    })
+    .await
+    .expect("join install task");
+
+    assert_eq!(payload["installed"], true);
+    assert_eq!(payload["gameBuild"]["version"], Value::Null);
+    assert_eq!(payload["gameBuild"]["apiLane"], Value::Null);
+    assert!(
+        payload["gameBuild"]["releaseInfoPath"]
+            .as_str()
+            .expect("release info path")
+            .ends_with("release_info.json")
+    );
+
+    let manifest: Value = serde_json::from_str(
+        &fs::read_to_string(game_dir.path().join("mods/spirectlbridge/spirectlbridge.json"))
+            .expect("deployed manifest"),
+    )
+    .expect("deployed manifest json");
+    assert_eq!(manifest["buildIdentity"]["sts2ApiLane"], Value::Null);
+    assert_eq!(
+        manifest["buildIdentity"]["builtAgainstGame"]["identitySource"],
+        "unknown"
+    );
+    assert_eq!(
+        manifest["buildIdentity"]["builtAgainstGame"]["version"],
+        Value::Null
+    );
+}

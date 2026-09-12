@@ -11,7 +11,7 @@ use super::{
     execute_runtime_scene_unhover_json, execute_screenshot_diff_json, execute_screenshot_json,
     execute_wait_for_json, handshake_request,
 };
-use crate::{AppContext, AppError, RenderedCommand, bridge, lifecycle};
+use crate::{AppContext, AppError, RenderedCommand, bridge, game_build, lifecycle};
 use crate::{
     AssertArgs, BreakpointSubcommand, BridgeHealthArgs, DebugSessionSubcommand, DebugSubcommand,
     DevCommand, DevFetchArgs, DevHttpArgs, DevHttpWaitArgs, DevSceneSubcommand, DevSubcommand,
@@ -705,6 +705,10 @@ pub(crate) fn bridge_health_compact_json(full: &Value) -> Value {
             "liveVersion": clone_field(live_bridge, "bridgeVersion"),
             "localVersion": clone_field(local_bridge, "bridgeVersion"),
             "gameVersion": clone_field(live_bridge, "gameVersion"),
+            "gameBuildStatus": full
+                .pointer("/compatibility/gameBuild/status")
+                .cloned()
+                .unwrap_or(Value::Null),
             "sourceScanMode": local_bridge
                 .pointer("/sourceFreshness/scanMode")
                 .cloned()
@@ -720,6 +724,15 @@ pub(crate) fn bridge_health_compact_json(full: &Value) -> Value {
 
     if !duplicate_entries.is_empty() {
         compact["duplicateBridgeMods"]["entries"] = Value::Array(duplicate_entries);
+    }
+    // Only when it actually mismatched. The compact output is polled, and
+    // "unknown" or "match" is already carried by `bridge.gameBuildStatus`; the
+    // per-field expected/found list is only worth its bytes when it is the
+    // finding.
+    if full.pointer("/compatibility/gameBuild/status") == Some(&json!("mismatch")) {
+        compact["compatibility"] = json!({
+            "gameBuild": full.pointer("/compatibility/gameBuild").cloned().unwrap_or(Value::Null)
+        });
     }
     if full.get("latestLog").is_some_and(|value| !value.is_null()) {
         compact["latestLog"] = clone_field(full, "latestLog");
@@ -780,11 +793,27 @@ pub(crate) fn bridge_health_json(args: BridgeHealthArgs, context: AppContext<'_>
                 .and_then(Value::as_str)
                 .unwrap_or("unknown");
             let deployed_known_mismatch = deployed_status == "version_mismatch";
+            let live_bridge_json = handshake_json(&handshake);
+            let game_build =
+                bridge_health_game_build_json(context, &manifest, Some(&live_bridge_json));
+            let game_build_mismatch = game_build["status"] == "mismatch";
             let (status, code, message) = if !live_current {
                 (
                     "live_version_mismatch",
                     "live_version_mismatch",
                     "Reachable live bridge version does not match the CLI bridge version.",
+                )
+            } else if game_build_mismatch {
+                // Outranks both staleness arms below on purpose. Those two say
+                // "rebuild to pick up newer bridge source"; this one says the
+                // bridge is bound to a game build that is not the one on disk,
+                // which is not a staleness gradient — the first lobby walk
+                // throws. Steam updating the game under a correctly-installed
+                // bridge lands here.
+                (
+                    "game_version_mismatch",
+                    "game_version_mismatch",
+                    "Live bridge is reachable, but it was built for a different STS2 game build than the configured install.",
                 )
             } else if live_stale {
                 (
@@ -819,8 +848,8 @@ pub(crate) fn bridge_health_json(args: BridgeHealthArgs, context: AppContext<'_>
                 "localBridge": local_bridge,
                 "deployedBridge": manifest,
                 "duplicateBridgeMods": duplicate_bridge_mods,
-                "liveBridge": handshake_json(&handshake),
-                "compatibility": {},
+                "liveBridge": live_bridge_json,
+                "compatibility": { "gameBuild": game_build },
                 "safeNextCommands": bridge_health_next_commands(status)
             })
         }
@@ -847,6 +876,12 @@ pub(crate) fn bridge_health_json(args: BridgeHealthArgs, context: AppContext<'_>
                 _ => "unreachable_bridge",
             };
             let latest_log = latest_relevant_log_json();
+            // Diagnostic only on this path. With no reachable bridge there is
+            // nothing to compare the live side against, and the endpoint status
+            // is the actionable one — but the deployed manifest can still be
+            // checked against the install, and saying so here saves a second
+            // round trip after the launch that the next commands recommend.
+            let game_build = bridge_health_game_build_json(context, &manifest, None);
             let stale_cleanup = if args.repair_stale_endpoint {
                 let cleanup = endpoint.cleanup_stale_local_endpoint(&endpoint_probe);
                 let endpoint_after_probe = endpoint.classify_probe();
@@ -886,7 +921,7 @@ pub(crate) fn bridge_health_json(args: BridgeHealthArgs, context: AppContext<'_>
                     "deployedBridge": manifest,
                     "duplicateBridgeMods": duplicate_bridge_mods,
                     "liveBridge": Value::Null,
-                    "compatibility": {},
+                    "compatibility": { "gameBuild": game_build },
                     "safeNextCommands": bridge_health_next_commands(status_after)
                 });
             } else {
@@ -921,7 +956,7 @@ pub(crate) fn bridge_health_json(args: BridgeHealthArgs, context: AppContext<'_>
                 "deployedBridge": manifest,
                 "duplicateBridgeMods": duplicate_bridge_mods,
                 "liveBridge": Value::Null,
-                "compatibility": {},
+                "compatibility": { "gameBuild": game_build },
                 "safeNextCommands": bridge_health_next_commands(status)
             })
         }
@@ -1263,6 +1298,16 @@ pub(crate) fn bridge_health_next_commands(status: &str) -> Vec<&'static str> {
                 "sts2 --json game bridge-health",
             ]
         }
+        // A rebuild against the install that is actually on disk is the fix.
+        // `code verify-references` comes first because it answers the question
+        // the operator will ask next — which bindings this build actually broke
+        // — without needing the game running.
+        "game_version_mismatch" => vec![
+            "sts2 code verify-references",
+            "sts2 game install-bridge",
+            "sts2 game close",
+            "sts2 game launch",
+        ],
         "deployed_version_mismatch" | "live_version_mismatch" => vec![
             "sts2 game install-bridge",
             "sts2 game close",
@@ -1283,6 +1328,206 @@ pub(crate) fn bridge_health_next_commands(status: &str) -> Vec<&'static str> {
         }
         _ => vec!["sts2 game detect"],
     }
+}
+
+/// Is the bridge bound to the game build it is actually sitting in?
+///
+/// Nothing else in the CLI asks this. The bridge binds game members that were
+/// renamed or reshaped between builds, so a payload built for one build and
+/// loaded into another starts, logs a few soft `not found` lines, and then
+/// throws `MissingMethodException` the first time it walks a lobby. Steam
+/// updating the game under a correctly-installed bridge is exactly that case.
+///
+/// Three claims are compared against the install's `release_info.json`:
+///
+/// - the **live** bridge's build identity — what is loaded right now, and the
+///   strongest signal when the handshake carries it;
+/// - the **deployed** manifest's build identity — what the next launch will
+///   load, which is the only signal available for a bridge that predates these
+///   fields on the wire;
+/// - the running game version the live bridge reports, which catches a bridge
+///   attached to a different install than the CLI is configured for.
+///
+/// Only claims that both sides actually make are compared. An absent claim is
+/// `unknown`, never a match: a released payload compiles against the
+/// declaration-only reference SDK and can only ever claim its API lane.
+fn bridge_health_game_build_json(
+    context: AppContext<'_>,
+    deployed_manifest: &Value,
+    live_handshake: Option<&Value>,
+) -> Value {
+    let install_root = bridge_health_install_root(context);
+    let release_info_path = install_root
+        .as_deref()
+        .map(game_build::release_info_path)
+        .map(|path| path.display().to_string());
+    let install = install_root
+        .as_deref()
+        .and_then(game_build::read_release_info);
+    let install_lane = install
+        .as_ref()
+        .and_then(game_build::GameReleaseInfo::api_lane);
+
+    let deployed_claim = bridge_health_game_build_claim(
+        deployed_manifest.pointer("/buildIdentity"),
+        /* nested = */ true,
+    );
+    let live_claim = bridge_health_game_build_claim(
+        live_handshake.and_then(|value| value.pointer("/buildIdentity")),
+        /* nested = */ false,
+    );
+    let live_running_version = live_handshake
+        .and_then(|value| value.get("gameVersion"))
+        .and_then(Value::as_str)
+        .filter(|version| !version.is_empty() && *version != "unknown");
+
+    let mut mismatches: Vec<Value> = Vec::new();
+    let mut compared = false;
+    for (source, claim) in [("live", &live_claim), ("deployed", &deployed_claim)] {
+        let Some(claim) = claim else { continue };
+        if let (Some(install_lane), Some(claim_lane)) = (install_lane, claim.api_lane.as_deref()) {
+            compared = true;
+            if install_lane != claim_lane {
+                mismatches.push(json!({
+                    "source": source,
+                    "field": "sts2ApiLane",
+                    "expected": install_lane,
+                    "found": claim_lane
+                }));
+            }
+        }
+        if let (Some(install), Some(claim_version)) =
+            (install.as_ref(), claim.game_version.as_deref())
+        {
+            compared = true;
+            if install.version != claim_version {
+                mismatches.push(json!({
+                    "source": source,
+                    "field": "builtAgainstGameVersion",
+                    "expected": install.version,
+                    "found": claim_version
+                }));
+            }
+        }
+        if let (Some(Some(install_hash)), Some(claim_hash)) = (
+            install.as_ref().map(|info| info.main_assembly_hash),
+            claim.main_assembly_hash,
+        ) {
+            compared = true;
+            if install_hash != claim_hash {
+                mismatches.push(json!({
+                    "source": source,
+                    "field": "builtAgainstMainAssemblyHash",
+                    "expected": install_hash,
+                    "found": claim_hash
+                }));
+            }
+        }
+    }
+    if let (Some(install), Some(running)) = (install.as_ref(), live_running_version) {
+        compared = true;
+        if install.version != running {
+            mismatches.push(json!({
+                "source": "live",
+                "field": "runningGameVersion",
+                "expected": install.version,
+                "found": running
+            }));
+        }
+    }
+
+    let status = if !mismatches.is_empty() {
+        "mismatch"
+    } else if compared {
+        "match"
+    } else {
+        "unknown"
+    };
+    json!({
+        "status": status,
+        "install": {
+            "releaseInfoPath": release_info_path,
+            "version": install.as_ref().map(|info| info.version.clone()),
+            "commit": install.as_ref().map(|info| info.commit.clone()),
+            "mainAssemblyHash": install.as_ref().and_then(|info| info.main_assembly_hash),
+            "apiLane": install_lane
+        },
+        "liveBridge": live_claim.as_ref().map(BridgeGameBuildClaim::to_json),
+        "deployedBridge": deployed_claim.as_ref().map(BridgeGameBuildClaim::to_json),
+        "runningGameVersion": live_running_version,
+        "knownApiLanes": game_build::api_lanes(),
+        "mismatches": mismatches
+    })
+}
+
+/// What one side claims about the game build it was compiled for. Every field is
+/// optional because every field is genuinely unclaimable by some payload.
+struct BridgeGameBuildClaim {
+    api_lane: Option<String>,
+    game_version: Option<String>,
+    main_assembly_hash: Option<i64>,
+}
+
+impl BridgeGameBuildClaim {
+    fn to_json(&self) -> Value {
+        json!({
+            "sts2ApiLane": self.api_lane,
+            "builtAgainstGameVersion": self.game_version,
+            "builtAgainstMainAssemblyHash": self.main_assembly_hash
+        })
+    }
+}
+
+/// The deployed manifest nests the game build under `builtAgainstGame` (it also
+/// records how the identity was obtained); the handshake carries three flat
+/// fields, with the hash as text so "unknown" stays expressible.
+fn bridge_health_game_build_claim(
+    build_identity: Option<&Value>,
+    nested: bool,
+) -> Option<BridgeGameBuildClaim> {
+    let build_identity = build_identity?;
+    let string_at = |pointer: &str| {
+        build_identity
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    };
+    let claim = if nested {
+        BridgeGameBuildClaim {
+            api_lane: string_at("/sts2ApiLane"),
+            game_version: string_at("/builtAgainstGame/version"),
+            main_assembly_hash: build_identity
+                .pointer("/builtAgainstGame/mainAssemblyHash")
+                .and_then(Value::as_i64),
+        }
+    } else {
+        BridgeGameBuildClaim {
+            api_lane: string_at("/sts2ApiLane"),
+            game_version: string_at("/builtAgainstGameVersion"),
+            main_assembly_hash: string_at("/builtAgainstMainAssemblyHash")
+                .and_then(|value| value.parse::<i64>().ok()),
+        }
+    };
+    (claim.api_lane.is_some() || claim.game_version.is_some() || claim.main_assembly_hash.is_some())
+        .then_some(claim)
+}
+
+/// The install root `release_info.json` sits in. Read straight off config, the
+/// way `bridge_health_manifest_json` reads the mods directory: `bridge-health`
+/// is a read-only probe and must not trigger install discovery as a side effect.
+fn bridge_health_install_root(context: AppContext<'_>) -> Option<PathBuf> {
+    let game_path = &context.config.game.path;
+    if !game_path.is_empty() && game_path != "auto" {
+        return Some(PathBuf::from(game_path));
+    }
+    context
+        .config
+        .game
+        .assemblies_dir
+        .as_ref()
+        .map(PathBuf::from)
+        .and_then(|dir| dir.parent().map(Path::to_path_buf))
 }
 
 pub(crate) fn bridge_health_local_bridge_json(full_scan: bool) -> Value {

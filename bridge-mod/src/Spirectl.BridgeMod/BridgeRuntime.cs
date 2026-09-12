@@ -193,7 +193,7 @@ public sealed class BridgeRuntime : IDisposable
 
         return new BridgeHandshakeSnapshot(
             SchemaVersion: "spirectl/v0",
-            GameVersion: "unknown",
+            GameVersion: ResolveLiveGameVersion(),
             BridgeVersion: BridgeBuildInfo.BridgeVersion,
             BuildIdentity: ToHandshakeBuildIdentity(BridgeBuildInfo.BuildIdentity),
             TransportKind: transport.TransportKind,
@@ -244,7 +244,31 @@ public sealed class BridgeRuntime : IDisposable
             identity.BridgeSemVer,
             identity.BridgeVersion,
             identity.AssemblyInformationalVersion,
-            identity.BuiltAtUtc);
+            identity.BuiltAtUtc,
+            identity.Sts2ApiLane,
+            identity.BuiltAgainstGameVersion,
+            identity.BuiltAgainstMainAssemblyHash);
+
+    // The build that is actually RUNNING, as opposed to BuildIdentity's "the build this payload was
+    // compiled for". A client compares the two to catch a bridge that survived a game update.
+    // The reference-data provider already reads the game's own release info; the "version" topic is
+    // its cheapest question, and it degrades to a stub result off the live host.
+    private string ResolveLiveGameVersion()
+    {
+        try
+        {
+            var result = GetReference(new ReferenceRequestSnapshot("version", []));
+            return result.Payload is GameVersionInfoSnapshot version && !string.IsNullOrEmpty(version.Version)
+                ? version.Version
+                : "unknown";
+        }
+        catch (Exception)
+        {
+            // A handshake must answer. An unreadable version is reported as unknown, never thrown:
+            // "which build is this" is exactly the question a mis-bound bridge cannot answer.
+            return "unknown";
+        }
+    }
 
 
     public GameStateSnapshot GetState(GameStateQuery query)

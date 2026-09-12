@@ -32,5 +32,28 @@
       <_Parameter1>SpirectlBridgeBuiltAtUtc</_Parameter1>
       <_Parameter2>$(SpirectlBridgeBuiltAtUtc)</_Parameter2>
     </AssemblyAttribute>
+    <!--
+      The game build this bridge was compiled for, so a loaded bridge can be checked against the install
+      it ended up in. Deliberately asymmetric, and the asymmetry is the honest part:
+
+        - a SOURCE build compiles against a real install, so all three values are populated;
+        - a RELEASED payload compiles against the locked, declaration-only reference SDK, which has no
+          `release_info.json` and no game hash. It can claim the lane it was told to compile and nothing
+          more, so the version and hash stay empty rather than being invented.
+
+      Empty therefore means "this payload cannot claim one", never "matches anything".
+    -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>SpirectlSts2ApiLane</_Parameter1>
+      <_Parameter2>$(Sts2GameApi)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>SpirectlBuiltAgainstGameVersion</_Parameter1>
+      <_Parameter2>$(Sts2GameVersion)</_Parameter2>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>SpirectlBuiltAgainstMainAssemblyHash</_Parameter1>
+      <_Parameter2>$(Sts2GameMainAssemblyHash)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>

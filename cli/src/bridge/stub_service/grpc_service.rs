@@ -14,6 +14,11 @@ impl StubBridgeGrpcService {
         self.inner = self.inner.with_build_identity(build_identity);
         self
     }
+
+    pub fn with_bridge_version(mut self, bridge_version: &str) -> Self {
+        self.inner = self.inner.with_bridge_version(bridge_version);
+        self
+    }
 }
 
 #[tonic::async_trait]

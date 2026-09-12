@@ -14,6 +14,7 @@ mod dev_probes;
 mod diagnostics;
 mod dotnet_helper;
 mod fixtures;
+pub mod game_build;
 mod host_paths;
 mod hot_reload;
 pub mod install_paths;

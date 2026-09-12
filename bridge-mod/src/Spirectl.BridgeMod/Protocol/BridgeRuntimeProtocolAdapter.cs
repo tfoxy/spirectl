@@ -66,6 +66,9 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
             BridgeVersion = snapshot.BridgeVersion,
             AssemblyInformationalVersion = snapshot.AssemblyInformationalVersion,
             BuiltAtUtc = snapshot.BuiltAtUtc,
+            Sts2ApiLane = snapshot.Sts2ApiLane,
+            BuiltAgainstGameVersion = snapshot.BuiltAgainstGameVersion,
+            BuiltAgainstMainAssemblyHash = snapshot.BuiltAgainstMainAssemblyHash,
         };
 
     public StateResult HandleGetState(StateRequest request)

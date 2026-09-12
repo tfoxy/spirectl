@@ -1539,6 +1539,19 @@ fn deploy_bridge(
     fs::create_dir_all(&stage_dir).map_err(io_lifecycle_error(command_name))?;
     fs::create_dir_all(&layout.mods_dir).map_err(io_lifecycle_error(command_name))?;
 
+    // Which game build this install IS, resolved before anything is staged. The
+    // bridge payload is per-build, so this is what selects it: a payload built
+    // for another build will load, log a few soft "not found" lines, and then
+    // throw on the first lobby walk. The assemblies-dir fallback uses the `..`
+    // anchor `bridge-mod/Sts2GameApi.props` compiles against, so the CLI and
+    // MSBuild can never disagree about which install a build was for.
+    let release_info_path = game_build::release_info_path(&layout.game_path);
+    let install_release_info = game_build::read_release_info(&layout.game_path)
+        .or_else(|| game_build::read_release_info_for_assemblies_dir(&layout.assemblies_dir));
+    let install_lane = install_release_info
+        .as_ref()
+        .and_then(game_build::GameReleaseInfo::api_lane);
+
     let source_checkout = resolve_repo_root(command_name).ok();
     let acquisition = if !options.no_build {
         if let Some(repo_root) = source_checkout.as_deref() {
@@ -1549,10 +1562,20 @@ fn deploy_bridge(
                 &publish_dir,
                 &stage_dir,
                 semver,
+                install_release_info.as_ref(),
                 true,
             )?
         } else {
-            stage_release_bridge(command_name, &artifacts_root, &stage_dir, semver, true)?
+            stage_release_bridge(
+                command_name,
+                &artifacts_root,
+                &stage_dir,
+                semver,
+                install_lane,
+                install_release_info.as_ref(),
+                &release_info_path,
+                true,
+            )?
         }
     } else {
         match stage_release_bridge(
@@ -1560,6 +1583,9 @@ fn deploy_bridge(
             &artifacts_root,
             &stage_dir,
             semver,
+            install_lane,
+            install_release_info.as_ref(),
+            &release_info_path,
             source_checkout.is_none(),
         ) {
             Ok(acquisition) => acquisition,
@@ -1575,6 +1601,7 @@ fn deploy_bridge(
                         &publish_dir,
                         &stage_dir,
                         semver,
+                        install_release_info.as_ref(),
                         false,
                     ) {
                         Ok(acquisition) => acquisition,
@@ -1643,10 +1670,19 @@ fn deploy_bridge(
         "buildIdentity": {
             "contentHash": content_hash,
             "installedContentHash": installed_hash
+        },
+        "gameBuild": {
+            "releaseInfoPath": release_info_path.display().to_string(),
+            "version": install_release_info.as_ref().map(|info| info.version.clone()),
+            "mainAssemblyHash": install_release_info
+                .as_ref()
+                .and_then(|info| info.main_assembly_hash),
+            "apiLane": install_lane
         }
     }))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn stage_source_bridge(
     command_name: &str,
     layout: &ResolvedLiveBridgeLayout,
@@ -1654,6 +1690,7 @@ fn stage_source_bridge(
     publish_dir: &Path,
     stage_dir: &Path,
     semver: &str,
+    install_release_info: Option<&game_build::GameReleaseInfo>,
     build: bool,
 ) -> Result<Value, AppError> {
     // A rejected release ZIP may have left partial files in staging before a
@@ -1740,24 +1777,77 @@ fn stage_source_bridge(
     )?;
     stage_publish_artifacts(command_name, publish_dir, stage_dir)?;
     let content_hash = stage_content_hash(command_name, stage_dir)?;
-    write_bridge_manifest(command_name, stage_dir, semver, &content_hash)?;
+    // A source build compiled against a real install, so it can claim that
+    // install's version AND its main_assembly_hash — the strong form of the
+    // stamp. An install whose release_info.json is unreadable claims nothing:
+    // the lane MSBuild picked is then whatever an explicit override said, and
+    // guessing an identity for it would be worse than reporting unknown.
+    let game_build_stamp = install_release_info
+        .map(BridgeGameBuildStamp::from_install)
+        .unwrap_or_else(BridgeGameBuildStamp::unknown);
+    write_bridge_manifest(
+        command_name,
+        stage_dir,
+        semver,
+        &content_hash,
+        &game_build_stamp,
+    )?;
     Ok(json!({
         "kind": if build { "source-build" } else { "source-publish" },
         "repoRoot": repo_root.display().to_string(),
-        "publishDir": publish_dir.display().to_string()
+        "publishDir": publish_dir.display().to_string(),
+        "sts2ApiLane": game_build_stamp.api_lane,
+        "builtAgainstGame": game_build_stamp.to_json()
     }))
 }
 
+/// Released bridge payloads are per-STS2-API-lane, so the *whole* selection path
+/// is lane scoped: the cache directory, the archive name and the sidecar
+/// manifest name. Keyed on the bridge semver alone, `--no-build` would happily
+/// install a payload built for another game build — which loads, logs a few soft
+/// "not found" lines, and then throws on the first lobby walk. `install_lane` is
+/// the lane the *install* needs, and there is no best-effort fallback: an
+/// unresolvable lane, a lane no release covers, or a lane with no payload, is a
+/// refusal.
+#[allow(clippy::too_many_arguments)]
 fn stage_release_bridge(
     command_name: &str,
     artifacts_root: &Path,
     stage_dir: &Path,
     semver: &str,
+    install_lane: Option<&str>,
+    install_release_info: Option<&game_build::GameReleaseInfo>,
+    release_info_path: &Path,
     allow_download: bool,
 ) -> Result<Value, AppError> {
-    let cache_dir = artifacts_root.join("release-cache").join(semver);
-    let archive_name = format!("spirectlbridge-v{semver}.zip");
-    let manifest_name = format!("spirectlbridge-v{semver}.manifest.json");
+    let lane = match install_lane {
+        Some(lane) => lane,
+        None => return Err(release_lane_unresolved_error(
+            command_name,
+            install_release_info,
+            release_info_path,
+        )),
+    };
+    // A supported lane is not automatically a released one: a release is built
+    // against the locked, declaration-only reference SDK, which pins one game
+    // build's declarations. Say that, instead of going looking for an asset that
+    // was never published and reporting a 404.
+    if !game_build::is_releasable_api_lane(lane) {
+        return Err(release_error(
+            command_name,
+            "bridge_release_lane_unreleasable",
+            format!(
+                "no released bridge payload exists for STS2 API lane '{lane}' (this install needs \
+                 that lane); released payloads are built against the pinned STS2 reference SDK, \
+                 which covers lanes {}. Build from a source checkout instead: `sts2 game \
+                 install-bridge` detects the lane from the install.",
+                game_build::releasable_api_lanes().join(", ")
+            ),
+        ));
+    }
+    let cache_dir = artifacts_root.join("release-cache").join(semver).join(lane);
+    let archive_name = format!("spirectlbridge-v{semver}-{lane}.zip");
+    let manifest_name = format!("spirectlbridge-v{semver}-{lane}.manifest.json");
     let archive_path = cache_dir.join(&archive_name);
     let manifest_path = cache_dir.join(&manifest_name);
     let tag = format!("v{semver}");
@@ -1775,11 +1865,20 @@ fn stage_release_bridge(
                 return Err(release_error(
                     command_name,
                     "bridge_release_cache_missing",
-                    "no verified bridge release archive is cached for this version".to_string(),
+                    format!(
+                        "no verified bridge release archive is cached for bridge {semver} and STS2 \
+                         API lane '{lane}' (this install needs that lane); expected \
+                         '{}'",
+                        archive_path.display()
+                    ),
                 ));
             }
             fs::create_dir_all(&cache_dir).map_err(io_lifecycle_error(command_name))?;
-            crate::progress::emit(command_name, "bridge.release-download", json!({ "tag": tag }));
+            crate::progress::emit(
+                command_name,
+                "bridge.release-download",
+                json!({ "tag": tag, "sts2ApiLane": lane }),
+            );
             let manifest_url = format!("{base_url}/{manifest_name}");
             let archive_url = format!("{base_url}/{archive_name}");
             let manifest_bytes = download_release_asset(command_name, &manifest_url)?;
@@ -1791,20 +1890,89 @@ fn stage_release_bridge(
         }
     };
 
-    crate::progress::emit(command_name, "bridge.release-stage", json!({ "source": kind }));
+    crate::progress::emit(
+        command_name,
+        "bridge.release-stage",
+        json!({ "source": kind, "sts2ApiLane": lane }),
+    );
     extract_release_bridge(command_name, &archive, stage_dir, semver)?;
+    // The payload was selected by name, so check the claim inside it too: a
+    // mis-named archive is exactly the failure lane scoping exists to stop.
+    let packaged_lane = staged_manifest_api_lane(stage_dir);
+    if packaged_lane.as_deref() != Some(lane) {
+        return Err(release_error(
+            command_name,
+            "bridge_release_lane_mismatch",
+            format!(
+                "bridge release archive '{}' is named for STS2 API lane '{lane}' but its manifest \
+                 claims {}",
+                archive_path.display(),
+                packaged_lane
+                    .as_deref()
+                    .map_or_else(|| "no lane at all".to_string(), |value| format!("'{value}'"))
+            ),
+        ));
+    }
     // The archive manifest establishes the release version before extraction;
     // rewrite the deployed manifest with the same local content identity used
     // by source builds so future installs can still skip identical copies.
+    //
+    // A released payload compiles against the locked, declaration-only STS2
+    // reference SDK. That directory has no release_info.json, so there is no
+    // game version and no main_assembly_hash to record: it can claim its lane
+    // and the reference package version it was built from, and nothing else.
     let content_hash = stage_content_hash(command_name, stage_dir)?;
-    write_bridge_manifest(command_name, stage_dir, semver, &content_hash)?;
+    let game_build_stamp = BridgeGameBuildStamp::from_reference_sdk(lane, semver);
+    write_bridge_manifest(
+        command_name,
+        stage_dir,
+        semver,
+        &content_hash,
+        &game_build_stamp,
+    )?;
     Ok(json!({
         "kind": kind,
         "tag": tag,
         "repository": RELEASE_REPOSITORY,
         "archivePath": archive_path.display().to_string(),
-        "manifestPath": manifest_path.display().to_string()
+        "manifestPath": manifest_path.display().to_string(),
+        "sts2ApiLane": lane,
+        "builtAgainstGame": game_build_stamp.to_json()
     }))
+}
+
+/// The lane claimed by the `spirectlbridge.json` a release archive carried.
+fn staged_manifest_api_lane(stage_dir: &Path) -> Option<String> {
+    let raw = fs::read_to_string(stage_dir.join(BRIDGE_MANIFEST_NAME)).ok()?;
+    let parsed = serde_json::from_str::<Value>(&raw).ok()?;
+    parsed
+        .pointer("/buildIdentity/sts2ApiLane")
+        .and_then(Value::as_str)
+        .filter(|lane| !lane.is_empty())
+        .map(str::to_string)
+}
+
+/// Never install a best-effort payload. Say which file was read, what it said,
+/// and which lanes exist.
+fn release_lane_unresolved_error(
+    command_name: &str,
+    install_release_info: Option<&game_build::GameReleaseInfo>,
+    release_info_path: &Path,
+) -> AppError {
+    let lanes = game_build::api_lanes().join(", ");
+    let detail = match install_release_info {
+        Some(info) => format!(
+            "game build '{}' has no STS2 API lane, so no released bridge payload matches this \
+             install (known lanes: {lanes})",
+            info.version
+        ),
+        None => format!(
+            "could not read a game build version from '{}', so no released bridge payload can be \
+             matched to this install (known lanes: {lanes})",
+            release_info_path.display()
+        ),
+    };
+    release_error(command_name, "bridge_release_lane_unresolved", detail)
 }
 
 fn read_release_manifest(

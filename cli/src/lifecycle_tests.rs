@@ -1378,13 +1378,18 @@ fn prune_launch_output_logs_keeps_the_newest_runs_per_stream() {
 }
 
 fn release_bridge_zip(version: &str, extra: Option<(&str, &[u8])>) -> Vec<u8> {
+    release_bridge_zip_for_lane(version, "v107", extra)
+}
+
+fn release_bridge_zip_for_lane(version: &str, lane: &str, extra: Option<(&str, &[u8])>) -> Vec<u8> {
     let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let options = zip::write::SimpleFileOptions::default();
     let bridge_manifest = serde_json::to_vec(&json!({
         "id": DEPLOYED_MOD_DIR_NAME,
         "version": version,
         "has_pck": false,
-        "has_dll": true
+        "has_dll": true,
+        "buildIdentity": { "sts2ApiLane": lane }
     }))
     .expect("bridge manifest");
     for (name, bytes) in [
@@ -1439,17 +1444,267 @@ fn release_bridge_archive_requires_matching_digest_and_extracts_only_the_rooted_
     assert!(!stage_dir.join(DEPLOYED_MOD_DIR_NAME).exists());
 }
 
+/// Seed `<artifacts>/release-cache/<semver>/<lane>/` with a payload for one
+/// lane, the way a download or a `package-bridge-release.sh --lane` run would.
+fn seed_release_cache_lane(artifacts_root: &Path, version: &str, lane: &str) {
+    let cache_dir = artifacts_root
+        .join("release-cache")
+        .join(version)
+        .join(lane);
+    fs::create_dir_all(&cache_dir).expect("cache dir");
+    let archive_name = format!("spirectlbridge-v{version}-{lane}.zip");
+    let archive = release_bridge_zip_for_lane(version, lane, None);
+    fs::write(cache_dir.join(&archive_name), &archive).expect("cache archive");
+    fs::write(
+        cache_dir.join(format!("spirectlbridge-v{version}-{lane}.manifest.json")),
+        serde_json::to_vec(&json!({
+            "schemaVersion": RELEASE_MANIFEST_SCHEMA,
+            "version": version,
+            "archive": { "name": archive_name, "sha256": sha256_hex(&archive) }
+        }))
+        .expect("release manifest"),
+    )
+    .expect("cache manifest");
+}
+
+fn release_info_for(version: &str, hash: i64) -> crate::game_build::GameReleaseInfo {
+    crate::game_build::GameReleaseInfo {
+        version: version.to_string(),
+        commit: "deadbeef".to_string(),
+        main_assembly_hash: Some(hash),
+    }
+}
+
 #[test]
 fn release_bridge_stages_a_verified_cached_archive_without_downloading() {
     let temp = tempfile::tempdir().expect("temp dir");
     let version = "9.8.7";
-    let archive_name = "spirectlbridge-v9.8.7.zip";
-    let cache_dir = temp.path().join("release-cache").join(version);
+    seed_release_cache_lane(temp.path(), version, "v107");
+
+    let stage_dir = temp.path().join("stage");
+    fs::create_dir_all(&stage_dir).expect("stage dir");
+    let release_info = release_info_for("v0.107.1", 1_692_500_715);
+    let acquisition = stage_release_bridge(
+        "test",
+        temp.path(),
+        &stage_dir,
+        version,
+        Some("v107"),
+        Some(&release_info),
+        &temp.path().join("release_info.json"),
+        false,
+    )
+    .expect("cached release stages");
+
+    assert_eq!(acquisition["kind"], "release-cache");
+    assert_eq!(acquisition["sts2ApiLane"], "v107");
+    let staged = serde_json::from_str::<Value>(
+        &fs::read_to_string(stage_dir.join(BRIDGE_MANIFEST_NAME)).expect("staged manifest"),
+    )
+    .expect("staged manifest JSON");
+    assert_eq!(staged["version"], version);
+    assert_eq!(staged["buildIdentity"]["sts2ApiLane"], "v107");
+    // A released payload compiles against the declaration-only reference SDK,
+    // so it must claim a lane and NOTHING about the game build itself.
+    assert_eq!(
+        staged["buildIdentity"]["builtAgainstGame"]["identitySource"],
+        "reference-sdk"
+    );
+    assert_eq!(
+        staged["buildIdentity"]["builtAgainstGame"]["version"],
+        Value::Null
+    );
+    assert_eq!(
+        staged["buildIdentity"]["builtAgainstGame"]["mainAssemblyHash"],
+        Value::Null
+    );
+    assert_eq!(
+        staged["buildIdentity"]["builtAgainstGame"]["referencePackageVersion"],
+        version
+    );
+}
+
+/// The cache is keyed on `<semver>/<lane>`, so a payload cached for one game
+/// build is invisible to an install that needs another. Installing it anyway
+/// would produce a bridge that loads and then throws on the first lobby walk.
+#[test]
+fn release_bridge_refuses_a_payload_cached_for_another_game_build() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let version = "9.8.7";
+    let wanted_lane = crate::game_build::releasable_api_lanes()[0];
+    // A payload for a lane this install does not need is cached; the lane this
+    // install DOES need is not.
+    seed_release_cache_lane(temp.path(), version, "v_cached_only");
+
+    let stage_dir = temp.path().join("stage");
+    fs::create_dir_all(&stage_dir).expect("stage dir");
+    let release_info = release_info_for("v0.107.1", 1_692_500_715);
+    let error = stage_release_bridge(
+        "test",
+        temp.path(),
+        &stage_dir,
+        version,
+        Some(wanted_lane),
+        Some(&release_info),
+        &temp.path().join("release_info.json"),
+        false,
+    )
+    .expect_err("another lane's cached payload must not satisfy this install");
+
+    assert_eq!(error.exit_code, 2);
+    assert_eq!(
+        error.payload["error"]["code"],
+        "bridge_release_cache_missing"
+    );
+    let message = error.payload["error"]["message"]
+        .as_str()
+        .expect("message")
+        .to_string();
+    assert!(message.contains(&format!("'{wanted_lane}'")), "{message}");
+    assert!(
+        message.contains(&format!("spirectlbridge-v{version}-{wanted_lane}.zip")),
+        "{message}"
+    );
+
+    // Seed the wanted lane too and the same call stages, from the same cache.
+    seed_release_cache_lane(temp.path(), version, wanted_lane);
+    let control_stage = temp.path().join("control-stage");
+    fs::create_dir_all(&control_stage).expect("control stage dir");
+    let acquisition = stage_release_bridge(
+        "test",
+        temp.path(),
+        &control_stage,
+        version,
+        Some(wanted_lane),
+        Some(&release_info),
+        &temp.path().join("release_info.json"),
+        false,
+    )
+    .expect("the matching lane stages");
+    assert_eq!(acquisition["sts2ApiLane"], wanted_lane);
+}
+
+/// A supported lane is not automatically a released one. Released payloads are
+/// built against the locked, declaration-only reference SDK, which pins one game
+/// build's declarations — so `--no-build` must say that rather than go looking for
+/// an asset that was never published.
+#[test]
+fn release_bridge_refuses_a_lane_no_release_covers() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let version = "9.8.7";
+    let Some(unreleasable) = crate::game_build::api_lanes()
+        .into_iter()
+        .find(|lane| !crate::game_build::is_releasable_api_lane(lane))
+    else {
+        // Every supported lane is releasable; nothing to assert.
+        return;
+    };
+    // Even WITH a payload cached under its name, the lane is refused: no released
+    // artifact for it exists, so whatever is there is not one.
+    seed_release_cache_lane(temp.path(), version, unreleasable);
+    let stage_dir = temp.path().join("stage");
+    fs::create_dir_all(&stage_dir).expect("stage dir");
+    let release_info = release_info_for("v0.111.0", 1_579_942_752);
+
+    let error = stage_release_bridge(
+        "test",
+        temp.path(),
+        &stage_dir,
+        version,
+        Some(unreleasable),
+        Some(&release_info),
+        &temp.path().join("release_info.json"),
+        true,
+    )
+    .expect_err("a lane no release covers must refuse");
+
+    assert_eq!(
+        error.payload["error"]["code"],
+        "bridge_release_lane_unreleasable"
+    );
+    let message = error.payload["error"]["message"]
+        .as_str()
+        .expect("message")
+        .to_string();
+    assert!(message.contains(&format!("'{unreleasable}'")), "{message}");
+    assert!(message.contains("install-bridge"), "{message}");
+}
+
+/// Without a resolvable lane there is nothing to match, and a best-effort
+/// install is exactly what this work item exists to prevent.
+#[test]
+fn release_bridge_refuses_when_the_install_build_cannot_be_identified() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let version = "9.8.7";
+    seed_release_cache_lane(temp.path(), version, "v107");
+    let stage_dir = temp.path().join("stage");
+    fs::create_dir_all(&stage_dir).expect("stage dir");
+    let release_info_path = temp.path().join("release_info.json");
+
+    let unreadable = stage_release_bridge(
+        "test",
+        temp.path(),
+        &stage_dir,
+        version,
+        None,
+        None,
+        &release_info_path,
+        false,
+    )
+    .expect_err("an unidentifiable install must refuse");
+    assert_eq!(
+        unreadable.payload["error"]["code"],
+        "bridge_release_lane_unresolved"
+    );
+    let message = unreadable.payload["error"]["message"]
+        .as_str()
+        .expect("message")
+        .to_string();
+    assert!(
+        message.contains(&release_info_path.display().to_string()),
+        "{message}"
+    );
+    assert!(message.contains("v107"), "{message}");
+
+    let unmapped_info = release_info_for("v0.999.0", 1);
+    let unmapped = stage_release_bridge(
+        "test",
+        temp.path(),
+        &stage_dir,
+        version,
+        None,
+        Some(&unmapped_info),
+        &release_info_path,
+        false,
+    )
+    .expect_err("an unmapped game build must refuse");
+    assert_eq!(
+        unmapped.payload["error"]["code"],
+        "bridge_release_lane_unresolved"
+    );
+    assert!(
+        unmapped.payload["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("v0.999.0")
+    );
+}
+
+/// The archive name is not a claim; the manifest inside it is. A payload whose
+/// own manifest names another lane is rejected rather than installed.
+#[test]
+fn release_bridge_rejects_an_archive_whose_manifest_claims_another_lane() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let version = "9.8.7";
+    let lane = crate::game_build::releasable_api_lanes()[0];
+    let cache_dir = temp.path().join("release-cache").join(version).join(lane);
     fs::create_dir_all(&cache_dir).expect("cache dir");
-    let archive = release_bridge_zip(version, None);
-    fs::write(cache_dir.join(archive_name), &archive).expect("cache archive");
+    let archive_name = format!("spirectlbridge-v{version}-{lane}.zip");
+    // Named for the lane this install needs, built for another one.
+    let archive = release_bridge_zip_for_lane(version, "v_some_other_lane", None);
+    fs::write(cache_dir.join(&archive_name), &archive).expect("cache archive");
     fs::write(
-        cache_dir.join("spirectlbridge-v9.8.7.manifest.json"),
+        cache_dir.join(format!("spirectlbridge-v{version}-{lane}.manifest.json")),
         serde_json::to_vec(&json!({
             "schemaVersion": RELEASE_MANIFEST_SCHEMA,
             "version": version,
@@ -1461,16 +1716,28 @@ fn release_bridge_stages_a_verified_cached_archive_without_downloading() {
 
     let stage_dir = temp.path().join("stage");
     fs::create_dir_all(&stage_dir).expect("stage dir");
-    let acquisition = stage_release_bridge("test", temp.path(), &stage_dir, version, false)
-        .expect("cached release stages");
+    let release_info = release_info_for("v0.107.1", 1_692_500_715);
+    let error = stage_release_bridge(
+        "test",
+        temp.path(),
+        &stage_dir,
+        version,
+        Some(lane),
+        Some(&release_info),
+        &temp.path().join("release_info.json"),
+        false,
+    )
+    .expect_err("a mis-named archive must be rejected");
 
-    assert_eq!(acquisition["kind"], "release-cache");
     assert_eq!(
-        serde_json::from_str::<Value>(
-            &fs::read_to_string(stage_dir.join(BRIDGE_MANIFEST_NAME)).expect("staged manifest")
-        )
-        .expect("staged manifest JSON")["version"],
-        version
+        error.payload["error"]["code"],
+        "bridge_release_lane_mismatch"
+    );
+    assert!(
+        error.payload["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("'v_some_other_lane'")
     );
 }
 

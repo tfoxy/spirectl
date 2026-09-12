@@ -3,10 +3,12 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-Usage: scripts/verify-bridge-release.sh --zip <path> --version <x.y.z>
+Usage: scripts/verify-bridge-release.sh --zip <path> --version <x.y.z> --lane <sts2-api-lane>
 
 Validate a released bridge ZIP's layout and reject references, PDBs, and .NET
-runtime metadata that must never be shipped with the bridge payload.
+runtime metadata that must never be shipped with the bridge payload. The lane is
+checked too: payloads are per STS2 API lane, and a payload whose manifest claims
+a different lane than its file name would be installed for the wrong game build.
 EOF
 }
 
@@ -17,6 +19,7 @@ die() {
 
 zip_path=""
 version=""
+lane=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --zip)
@@ -27,6 +30,11 @@ while [[ $# -gt 0 ]]; do
     --version)
       [[ $# -ge 2 ]] || die "--version requires a value"
       version="$2"
+      shift 2
+      ;;
+    --lane)
+      [[ $# -ge 2 ]] || die "--lane requires a value"
+      lane="$2"
       shift 2
       ;;
     --help|-h)
@@ -42,6 +50,9 @@ done
 
 [[ -f "$zip_path" ]] || die "--zip must name an existing file"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--version must be x.y.z"
+[[ -n "$lane" ]] || die "--lane is required"
+[[ "$(basename "$zip_path")" == "spirectlbridge-v$version-$lane.zip" ]] \
+  || die "--zip name does not match version $version and lane $lane: $(basename "$zip_path")"
 unzip -tqq "$zip_path" || die "invalid ZIP archive: $zip_path"
 
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/spirectl-bridge-verify.XXXXXX")"
@@ -83,7 +94,11 @@ content_hash="$({
 } | sha256sum | awk '{print $1}')"
 
 manifest="$(unzip -p "$zip_path" spirectlbridge/spirectlbridge.json)"
-printf '%s' "$manifest" | jq -e --arg version "$version" --arg content_hash "$content_hash" '
+# A released payload may claim its lane and the reference package version it was
+# built from, and must claim NOTHING about the game build itself: the reference
+# SDK it compiled against has no release_info.json, so a version or a hash here
+# would be fabricated.
+printf '%s' "$manifest" | jq -e --arg version "$version" --arg lane "$lane" --arg content_hash "$content_hash" '
   .id == "spirectlbridge"
   and .version == $version
   and .has_pck == false
@@ -92,6 +107,11 @@ printf '%s' "$manifest" | jq -e --arg version "$version" --arg content_hash "$co
   and .buildIdentity.bridgeVersion == ("spirectl-bridge/" + $version)
   and .buildIdentity.assemblyInformationalVersion == $version
   and .buildIdentity.contentHash == $content_hash
-' >/dev/null || die "bridge manifest does not match version $version"
+  and .buildIdentity.sts2ApiLane == $lane
+  and .buildIdentity.builtAgainstGame.identitySource == "reference-sdk"
+  and .buildIdentity.builtAgainstGame.version == null
+  and .buildIdentity.builtAgainstGame.mainAssemblyHash == null
+  and .buildIdentity.builtAgainstGame.referencePackageVersion == $version
+' >/dev/null || die "bridge manifest does not match version $version and lane $lane"
 
-echo "verify-bridge-release: ok ($zip_path)"
+echo "verify-bridge-release: ok ($zip_path, lane $lane)"

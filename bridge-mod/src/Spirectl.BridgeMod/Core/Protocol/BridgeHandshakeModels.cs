@@ -15,11 +15,17 @@ public sealed record BridgeHandshakeRequest(
     string Mode,
     string TransportKind);
 
+// The last three fields say which STS2 game build this payload was compiled for. Empty means "this
+// payload cannot claim one" — a released payload compiles against the declaration-only reference SDK,
+// which has no release_info.json and no game hash, so it can only claim its lane. See BridgeBuildInfo.
 public sealed record BridgeBuildIdentitySnapshot(
     string BridgeSemVer,
     string BridgeVersion,
     string AssemblyInformationalVersion,
-    string BuiltAtUtc);
+    string BuiltAtUtc,
+    string Sts2ApiLane,
+    string BuiltAgainstGameVersion,
+    string BuiltAgainstMainAssemblyHash);
 
 public sealed record BridgeHandshakeSnapshot(
     string SchemaVersion,

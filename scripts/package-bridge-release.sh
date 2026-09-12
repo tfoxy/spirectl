@@ -3,11 +3,20 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-Usage: scripts/package-bridge-release.sh --version <x.y.z> --output-dir <dir>
+Usage: scripts/package-bridge-release.sh --version <x.y.z> --lane <sts2-api-lane> --output-dir <dir>
 
 Build a release bridge against the locked, build-only STS2 reference SDK. The
-output directory receives spirectlbridge-v<version>.zip, its sidecar manifest,
-and SHA256SUMS. No game or reference assemblies are included in the archive.
+output directory receives spirectlbridge-v<version>-<lane>.zip, its sidecar
+manifest, and SHA256SUMS. No game or reference assemblies are included in the
+archive.
+
+One payload per STS2 API lane. The bridge binds game members that were renamed
+or reshaped between game builds, so a payload is only valid for the builds its
+lane covers; `scripts/sts2-api-lanes.sh --releasable` lists the lanes to package.
+That is a subset of the supported lanes: a release compiles against the pinned,
+declaration-only reference SDK, which covers only some game builds. The reference
+SDK carries no release_info.json, so the lane cannot be detected here and must be
+passed.
 EOF
 }
 
@@ -18,6 +27,7 @@ die() {
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 version=""
+lane=""
 output_dir=""
 
 while [[ $# -gt 0 ]]; do
@@ -25,6 +35,11 @@ while [[ $# -gt 0 ]]; do
     --version)
       [[ $# -ge 2 ]] || die "--version requires a value"
       version="$2"
+      shift 2
+      ;;
+    --lane)
+      [[ $# -ge 2 ]] || die "--lane requires a value"
+      lane="$2"
       shift 2
       ;;
     --output-dir)
@@ -45,6 +60,21 @@ done
 
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "--version must be x.y.z"
 [[ -n "$output_dir" ]] || die "--output-dir is required"
+
+# Checked against the RELEASABLE subset, not every supported lane: this script
+# builds against the locked reference SDK, which only declares the game builds that
+# subset covers. A lane outside it fails later with a raw CS0234 on whichever type
+# the reference package does not declare, which reads as a source bug rather than
+# the packaging limit it is.
+releasable_lanes="$("$repo_root/scripts/sts2-api-lanes.sh" --releasable)"
+all_lanes="$("$repo_root/scripts/sts2-api-lanes.sh")"
+[[ -n "$lane" ]] || die "--lane is required (releasable lanes: $(tr '\n' ' ' <<<"$releasable_lanes"))"
+if ! grep -Fxq "$lane" <<<"$releasable_lanes"; then
+  if grep -Fxq "$lane" <<<"$all_lanes"; then
+    die "STS2 API lane '$lane' is supported from source but not releasable: the pinned STS2 reference SDK does not declare its game build. Releasable lanes: $(tr '\n' ' ' <<<"$releasable_lanes"). See Sts2GameApiReleasableLanes in bridge-mod/Sts2GameApi.props."
+  fi
+  die "unknown STS2 API lane '$lane' (releasable lanes: $(tr '\n' ' ' <<<"$releasable_lanes"))"
+fi
 mkdir -p "$output_dir"
 output_dir="$(cd "$output_dir" && pwd)"
 
@@ -70,6 +100,9 @@ source_date_epoch="${SOURCE_DATE_EPOCH:-315532800}"
 built_at_utc="$(date -u -d "@$source_date_epoch" '+%Y-%m-%dT%H:%M:%S.0000000Z')"
 build_properties=(
   "-p:Sts2AssembliesDir=$reference_dir"
+  # The reference SDK has no release_info.json, so the lane cannot be detected
+  # and this is the only place it can come from.
+  "-p:Sts2GameApi=$lane"
   '-p:EnableSts2LiveHost=true'
   "-p:Version=$version"
   "-p:AssemblyVersion=$version.0"
@@ -125,8 +158,16 @@ content_hash="$({
   done < <(cd "$payload_dir" && find . -type f -printf '%P\0' | LC_ALL=C sort -z)
 } | sha256sum | awk '{print $1}')"
 
+# `builtAgainstGame` is deliberately thinner here than in a source build, and
+# the asymmetry is the honest part: this payload compiled against the locked,
+# declaration-only reference SDK, which has no release_info.json — so there is no
+# game version and no main_assembly_hash to record. It can claim its API lane and
+# the reference package version it was built from. Both other fields stay null
+# rather than being invented; a source build (see write_bridge_manifest in
+# cli/src/lifecycle/lifecycle_mods_settings.rs) fills all of them.
 jq -n \
   --arg version "$version" \
+  --arg lane "$lane" \
   --arg content_hash "$content_hash" \
   '{
     id: "spirectlbridge",
@@ -139,6 +180,13 @@ jq -n \
       bridgeVersion: ("spirectl-bridge/" + $version),
       assemblyInformationalVersion: $version,
       contentHash: $content_hash,
+      sts2ApiLane: $lane,
+      builtAgainstGame: {
+        identitySource: "reference-sdk",
+        version: null,
+        mainAssemblyHash: null,
+        referencePackageVersion: $version
+      },
       sourceFreshness: {
         status: "release",
         newestModifiedUnixSeconds: null,
@@ -149,7 +197,7 @@ jq -n \
 
 find "$payload_root" -print0 | xargs -0 touch -d "@$source_date_epoch"
 
-archive_name="spirectlbridge-v$version.zip"
+archive_name="spirectlbridge-v$version-$lane.zip"
 archive_path="$output_dir/$archive_name"
 archive_tmp="$work_dir/$archive_name"
 (
@@ -158,26 +206,32 @@ archive_tmp="$work_dir/$archive_name"
 )
 
 archive_hash="$(sha256sum "$archive_tmp" | awk '{print $1}')"
-manifest_name="spirectlbridge-v$version.manifest.json"
+manifest_name="spirectlbridge-v$version-$lane.manifest.json"
 manifest_path="$output_dir/$manifest_name"
 manifest_tmp="$work_dir/$manifest_name"
 jq -n \
   --arg version "$version" \
+  --arg lane "$lane" \
   --arg archive_name "$archive_name" \
   --arg archive_hash "$archive_hash" \
   '{
     schemaVersion: "spirectl-bridge-release/v1",
     version: $version,
+    sts2ApiLane: $lane,
     archive: { name: $archive_name, sha256: $archive_hash }
   }' > "$manifest_tmp"
 
-checksum_tmp="$work_dir/SHA256SUMS"
-printf '%s  %s\n' "$archive_hash" "$archive_name" > "$checksum_tmp"
+# One line per packaged lane, appended so packaging every lane into one output
+# directory leaves a single SHA256SUMS covering all of them.
+checksum_line="$work_dir/SHA256SUMS.line"
+printf '%s  %s\n' "$archive_hash" "$archive_name" > "$checksum_line"
 
 mv -f "$archive_tmp" "$archive_path"
 mv -f "$manifest_tmp" "$manifest_path"
-mv -f "$checksum_tmp" "$output_dir/SHA256SUMS"
-"$repo_root/scripts/verify-bridge-release.sh" --zip "$archive_path" --version "$version"
+touch "$output_dir/SHA256SUMS"
+grep -Fv "  $archive_name" "$output_dir/SHA256SUMS" > "$work_dir/SHA256SUMS.kept" || true
+cat "$work_dir/SHA256SUMS.kept" "$checksum_line" | LC_ALL=C sort -k2 > "$output_dir/SHA256SUMS"
+"$repo_root/scripts/verify-bridge-release.sh" --zip "$archive_path" --version "$version" --lane "$lane"
 
 echo "package-bridge-release: wrote $archive_path"
 echo "package-bridge-release: wrote $manifest_path"

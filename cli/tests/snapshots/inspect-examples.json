@@ -863,27 +863,27 @@
     {
       "command": "game bridge-health",
       "example": "sts2 game bridge-health",
-      "summary": "Diagnose live bridge readiness without mutating game files or processes."
+      "summary": "Diagnose live bridge readiness, including whether the bridge was built for the installed game build, without mutating game files or processes."
     },
     {
       "command": "game bridge-health",
       "example": "sts2 --json game bridge-health --rpc-timeout-ms 1000",
-      "summary": "Diagnose live bridge readiness without mutating game files or processes."
+      "summary": "Diagnose live bridge readiness, including whether the bridge was built for the installed game build, without mutating game files or processes."
     },
     {
       "command": "game bridge-health",
       "example": "sts2 --json game bridge-health --verbose",
-      "summary": "Diagnose live bridge readiness without mutating game files or processes."
+      "summary": "Diagnose live bridge readiness, including whether the bridge was built for the installed game build, without mutating game files or processes."
     },
     {
       "command": "game install-bridge",
       "example": "sts2 game install-bridge",
-      "summary": "Build and install only the bridge payload into the configured mods directory."
+      "summary": "Build and install only the bridge payload for the installed game build into the configured mods directory."
     },
     {
       "command": "game install-bridge",
       "example": "sts2 --json game install-bridge",
-      "summary": "Build and install only the bridge payload into the configured mods directory."
+      "summary": "Build and install only the bridge payload for the installed game build into the configured mods directory."
     },
     {
       "command": "game launch",

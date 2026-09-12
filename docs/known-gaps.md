@@ -44,6 +44,24 @@ Classification:
   changes what the published `buildIdentity.builtAtUtc` means and feeds `bridge-health`'s `stale_live_host`
   comparison — an owner decision, not a mechanical change. Parking-lot.
 
+- No released bridge payload exists for the public-beta game build. A release compiles against the locked,
+  declaration-only STS2 reference SDK (`eng/Sts2.ReferenceSdk`, pinning `FuYnAloft.Sts2.References
+  0.107.0-beta`), which declares one game build. The `v111` lane's alias needs
+  `MegaCrit.Sts2.Core.Entities.Multiplayer.StartRunLobbyPlayer`, which that package has no declaration for:
+  verified 2026-09-12, `scripts/package-bridge-release.sh --lane v111` failed with CS0234 on
+  `GameApi/V111/GameApiAliases.cs`. So `Sts2GameApiReleasableLanes` in `bridge-mod/Sts2GameApi.props` is a
+  subset of `Sts2GameApiLanes`, packaging and `create-release-manifest.sh` iterate the subset, and
+  `install-bridge --no-build` refuses a lane outside it with `bridge_release_lane_unreleasable` rather than
+  404ing on an asset that was never published. The lane is fully supported from a source checkout, which is how
+  it is used today. Fixing it needs a reference package for the newer build; then the lane moves into
+  `Sts2GameApiReleasableLanes` and nothing else changes.
+
+- The published `Spirectl.Sts2` NuGet package carries ONE STS2 API lane, pinned to `v107` in
+  `.github/workflows/release.yml` (the same pin as the reference SDK, so it is not an independent choice today).
+  Released bridge ZIPs are packaged per lane, but a NuGet package is one id at one version, so a per-lane pack
+  would need either a package-id suffix or a version scheme that encodes the lane. An embedder targeting the
+  public beta build has to build `Spirectl.Sts2` from source with `-p:Sts2GameApi=v111`. Parking-lot.
+
 ## Embedded runtime
 
 - Latest-state cache for embedded consumers — parking-lot — S118 specified `ISpirectlRuntime.GetLatestState(EmbeddableLatestStateRequest)`: a cached perspective-aware snapshot with status (`Refreshing` / `TimedOut` / `Unhealthy`), revision, captured/returned timestamps, age, freshness threshold and health diagnostics. It was never implemented, and no cached read exists on the interface today; the embedded surface is `GetCurrentState`, `SubscribeCurrentState` and `WatchCurrentStateAsync`, and an embedder that wants a last-known snapshot keeps one itself off the subscription. Docs promising it were corrected rather than deleted so the decision stays legible. If it is ever built, the entry scoping is the hard part: cache entries have to key on the semantic projection inputs (requested player/perspective, debug inclusion, included sections), because serving one player's private projection to another player is what makes a naive cache wrong rather than merely stale.

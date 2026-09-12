@@ -1039,7 +1039,62 @@ sts2 dev fixture load --path fixtures/rest-site.sts2.fixture.yaml
 sts2 dev screenshot --rpc-timeout-ms 5000 --output ./.sts2/artifacts/combat.png
 ```
 
-`game install-bridge`, `game launch`, `game attach`, `game bridge-health`, `game mods settings`, `game mods active`, `dev visual-preflight`, `game close`, `game kill`, and `game deploy` are real CLI workflows. `game bridge-health` is read-only by default: it reports compact endpoint, connection, bridge version, duplicate-mod status, structured status codes such as `endpoint_missing`, `endpoint_refused_or_stale`, `rpc_timeout`, `deployed_version_mismatch`, `live_version_mismatch`, and `reachable_current`, plus safe next commands. Use `--verbose` for the full diagnostic payload, and keep `--non-mutating` only as a compatibility no-op. Source freshness is a cheap sentinel stat by default (`bridge.sourceScanMode: "sentinel"`), because the command is polled: it stats `bridge-mod/Directory.Build.props`, `bridge-mod/src/Spirectl.BridgeMod/BridgeRuntime.cs` and `proto/spirectl/v0/runtime.proto` instead of walking every bridge and proto source file. `--check-source` (implied by `--verbose`) does the full walk and is the authoritative answer for `stale_live_host`: an edit to a bridge source file outside the sentinels is only seen in that mode. The repository root is found by walking up from the working directory and then from the binary's own directory, so a `sts2` built in one checkout reports the freshness of the checkout you are standing in. Add `--repair-stale-endpoint` only when you explicitly want stale local endpoint cleanup; no cleanup runs in default mode. The remaining lifecycle, mod, fixture, screenshot, and diagnostics commands keep the same structured output contracts and normal-mode behavior unless their command help explicitly requires dangerous mode. `dev screenshot` and live `dev screenshot-diff` accept `--rpc-timeout-ms <ms>` and return the existing structured `bridge_rpc_timeout` error if live screenshot capture exceeds that bound.
+`game install-bridge`, `game launch`, `game attach`, `game bridge-health`, `game mods settings`, `game mods active`, `dev visual-preflight`, `game close`, `game kill`, and `game deploy` are real CLI workflows. `game bridge-health` is read-only by default: it reports compact endpoint, connection, bridge version, duplicate-mod status, structured status codes such as `endpoint_missing`, `endpoint_refused_or_stale`, `rpc_timeout`, `deployed_version_mismatch`, `live_version_mismatch`, `game_version_mismatch`, and `reachable_current`, plus safe next commands. Use `--verbose` for the full diagnostic payload, and keep `--non-mutating` only as a compatibility no-op. Source freshness is a cheap sentinel stat by default (`bridge.sourceScanMode: "sentinel"`), because the command is polled: it stats `bridge-mod/Directory.Build.props`, `bridge-mod/src/Spirectl.BridgeMod/BridgeRuntime.cs` and `proto/spirectl/v0/runtime.proto` instead of walking every bridge and proto source file. `--check-source` (implied by `--verbose`) does the full walk and is the authoritative answer for `stale_live_host`: an edit to a bridge source file outside the sentinels is only seen in that mode. The repository root is found by walking up from the working directory and then from the binary's own directory, so a `sts2` built in one checkout reports the freshness of the checkout you are standing in. Add `--repair-stale-endpoint` only when you explicitly want stale local endpoint cleanup; no cleanup runs in default mode. The remaining lifecycle, mod, fixture, screenshot, and diagnostics commands keep the same structured output contracts and normal-mode behavior unless their command help explicitly requires dangerous mode. `dev screenshot` and live `dev screenshot-diff` accept `--rpc-timeout-ms <ms>` and return the existing structured `bridge_rpc_timeout` error if live screenshot capture exceeds that bound.
+
+### Game Build Binding
+
+The bridge binds game members that were renamed or reshaped between Slay the Spire 2 builds, so a bridge
+payload is valid for one build and not another. A payload in the wrong install *starts*: it logs a few soft
+`not found` lines and then throws `MissingMethodException` the first time it walks a lobby. Steam updating the
+game under a correctly-installed bridge is exactly that, so the identity is bound at both ends.
+
+`bridge-mod/Sts2GameApi.props` is the one table mapping an install's `release_info.json` `version` to an
+**STS2 API lane** (`v107`, `v111`). MSBuild reads it to choose which `src/Spirectl.Sts2/GameApi/<lane>/`
+sources compile, the CouchCoop repo imports it, and `cli/build.rs` compiles it into the CLI —
+`scripts/sts2-api-lanes.sh` prints the lane list for shell callers. There is no second copy to keep in sync.
+
+`game install-bridge` stamps what it built into `spirectlbridge.json`'s `buildIdentity`:
+
+- `sts2ApiLane` — the lane that compiled.
+- `builtAgainstGame` — `{identitySource, version, mainAssemblyHash, referencePackageVersion}`.
+
+Those two claims are not the same strength, and the difference is deliberate. A **source** build compiles
+against a real install, so it names that install's `version` and `main_assembly_hash`
+(`identitySource: "install-release-info"`). A **released** payload compiles against the locked,
+declaration-only STS2 reference SDK, which has no `release_info.json` and no game hash at all: it can claim
+its lane and the reference package version it was built from, and nothing else
+(`identitySource: "reference-sdk"`, with `version` and `mainAssemblyHash` null). No hash is invented for it,
+so `null` there means "this payload cannot claim one" — never "matches anything". An install whose
+`release_info.json` is unreadable yields `identitySource: "unknown"` and claims nothing.
+
+The same three fields ride the handshake (`liveBridge.buildIdentity.sts2ApiLane`,
+`.builtAgainstGameVersion`, `.builtAgainstMainAssemblyHash`), so the *loaded* bridge can be checked as well as
+the deployed one. `game bridge-health` compares every claim both sides actually make against the install's own
+`release_info.json` and reports the result under `compatibility.gameBuild` — `status` of `match`, `mismatch`
+or `unknown`, the install identity, both bridge claims, and a per-field `mismatches` list of
+`{source, field, expected, found}`. The compact output carries `bridge.gameBuildStatus` always and the full
+comparison only when it mismatched. A mismatch is `game_version_mismatch` at exit 4; it outranks
+`stale_live_host` and `deployed_version_mismatch`, because those two mean "rebuild for newer bridge source"
+while this one means the bridge is bound to a build that is not on disk.
+
+Released payloads are per lane end to end. `scripts/package-bridge-release.sh --lane <lane>` writes
+`spirectlbridge-v<version>-<lane>.zip` plus its sidecar manifest,
+`scripts/verify-bridge-release.sh --lane <lane>` checks the name and the manifest's own lane claim agree, and
+`install-bridge`'s cache is `<artifacts>/live-bridge/release-cache/<version>/<lane>/`. The lane is resolved
+from the install before a payload is selected, so `--no-build` installs the payload matching this install or
+refuses, and a best-effort payload is never installed:
+
+- `bridge_release_lane_unresolved` — the install's build cannot be identified, or its version has no lane.
+- `bridge_release_lane_unreleasable` — the lane is supported but no release covers it (see below).
+- `bridge_release_cache_missing` — naming the lane and the expected archive, when no payload for it is cached.
+- `bridge_release_lane_mismatch` — the archive's own manifest claims a different lane than its name.
+
+Not every supported lane is a *releasable* one, and `Sts2GameApiReleasableLanes` in the props file says which
+are. A release compiles against the pinned reference SDK, which declares one game build; a lane whose sources
+need a type that package does not declare cannot be packaged at all. Such a lane is fully supported from a
+source checkout — `game install-bridge` detects it from the install and builds against the real assemblies —
+it just has no published archive. `scripts/sts2-api-lanes.sh --releasable` prints the subset, and packaging,
+the release manifest and the `--no-build` refusal all read it.
 
 ### Deploy Build Output Contract
 
