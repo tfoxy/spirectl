@@ -150,6 +150,7 @@ pub(crate) fn canonical_usage_command(command: &Commands) -> &'static str {
             CodeSubcommand::Derived(_) => "code derived",
             CodeSubcommand::Hooks(_) => "code hooks",
             CodeSubcommand::HookInfo(_) => "code hook-info",
+            CodeSubcommand::VerifyReferences(_) => "code verify-references",
             CodeSubcommand::SceneSearch(_) => "code scene-search",
             CodeSubcommand::SceneTree(_) => "code scene-tree",
             CodeSubcommand::SceneNode(_) => "code scene-node",

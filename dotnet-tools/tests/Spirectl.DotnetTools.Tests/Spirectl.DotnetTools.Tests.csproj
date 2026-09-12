@@ -19,5 +19,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Spirectl.DotnetTools\Spirectl.DotnetTools.csproj" />
     <ProjectReference Include="..\Spirectl.DotnetTools.TestSymbols\Spirectl.DotnetTools.TestSymbols.csproj" />
+    <ProjectReference Include="..\Spirectl.DotnetTools.TestGameConsumer\Spirectl.DotnetTools.TestGameConsumer.csproj" />
+    <!--
+      The reshaped game surface repeats the control build's namespaces and type names on purpose, so
+      it is referenced under an alias: the test code needs its built file on disk, never its types.
+    -->
+    <ProjectReference Include="..\Spirectl.DotnetTools.TestGameSymbols.Reshaped\Spirectl.DotnetTools.TestGameSymbols.Reshaped.csproj" Aliases="reshaped" />
   </ItemGroup>
 </Project>

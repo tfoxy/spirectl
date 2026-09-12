@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!--
+      Built under a distinct name so it can sit beside the control build in one output directory;
+      tests copy it into a candidate assemblies directory as sts2.dll, which is how a real game
+      update arrives: same file name, different surface.
+    -->
+    <AssemblyName>sts2-reshaped</AssemblyName>
+  </PropertyGroup>
+</Project>

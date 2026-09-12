@@ -1113,6 +1113,16 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
         ],
     },
     CommandInfo {
+        name: "code verify-references",
+        summary: "Check whether built consumer assemblies still bind to a game build, reporting missing types, missing members, and reshaped signatures.",
+        status: "implemented",
+        read_only: true,
+        examples: &[
+            "sts2 code verify-references ./mods/example/Example.dll --assemblies-dir ./assemblies",
+            "sts2 --json code verify-references ./mods/example/Example.dll,./mods/example/Example.Bridge.dll --assemblies-dir ./beta-assemblies --control-assemblies-dir ./assemblies",
+        ],
+    },
+    CommandInfo {
         name: "code scene-search",
         summary: "Search static Godot text, binary, and packed scenes, nodes, and resources without using the runtime bridge.",
         status: "implemented",

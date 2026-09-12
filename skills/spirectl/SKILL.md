@@ -13,7 +13,7 @@ Keep this file as the router. Load only one reference file unless the task clear
 - `references/library-integration.md`: Node `createSts2Client`, service backend, MCP preservation rules, embedded .NET `ISpirectlRuntime`.
 - `references/render-assets.md`: asset keys/extraction, screenshots, viewport presets, screenshot diff.
 - `references/testing-debugging.md`: `test run|stress`, fixtures/scenarios, waits/asserts, diagnostics, hot reload, debugger sessions, breakpoints.
-- `references/static-modding.md`: `inspect reference-topics`, staged code inspection, hook discovery, static scenes/resources, project recover/scaffold.
+- `references/static-modding.md`: `inspect reference-topics`, staged code inspection, hook discovery, build-compatibility verification, static scenes/resources, project recover/scaffold.
 
 ## Command Resolution
 

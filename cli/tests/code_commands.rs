@@ -1839,3 +1839,149 @@ fn code_scene_node_uses_real_helper_output_against_fixture_resources() {
             })
     );
 }
+
+#[test]
+fn code_verify_references_is_a_valid_command_shape() {
+    let parsed = <Cli as Parser>::try_parse_from([
+        "sts2",
+        "--json",
+        "code",
+        "verify-references",
+        "/tmp/sts2/mods/example/Example.dll,/tmp/sts2/mods/example/Example.Bridge.dll",
+        "--assemblies-dir",
+        "/tmp/sts2/beta/data_sts2_linux_x86_64",
+        "--control-assemblies-dir",
+        "/tmp/sts2/data_sts2_linux_x86_64",
+    ]);
+
+    assert!(parsed.is_ok(), "expected code verify-references to parse");
+}
+
+#[test]
+fn code_verify_references_reports_a_reshaped_game_build_and_exits_nonzero() {
+    let control_dir = reference_control_assemblies_dir();
+    let candidate_dir = reference_candidate_assemblies_dir();
+    let consumer = reference_consumer_assembly();
+    let config = write_code_config(control_dir.path(), None);
+
+    let response = run(&[
+        "sts2",
+        "--json",
+        "--config",
+        config.path().to_str().expect("utf8 path"),
+        "code",
+        "verify-references",
+        consumer.to_str().expect("utf8 consumer path"),
+        "--assemblies-dir",
+        candidate_dir.path().to_str().expect("utf8 candidate path"),
+        "--control-assemblies-dir",
+        control_dir.path().to_str().expect("utf8 control path"),
+    ]);
+    let payload: Value = serde_json::from_str(&response.stdout).expect("json");
+
+    assert_eq!(response.exit_code, 3);
+    assert_eq!(payload["command"], "verify-references");
+    assert_eq!(payload["status"], "broken");
+    assert_eq!(payload["control"]["status"], "clean");
+    assert_eq!(payload["breakCount"], 10);
+    assert_eq!(
+        payload["missingTypes"][0]["type"],
+        "Spirectl.TestGame.Lobby.SeatRecord"
+    );
+    assert!(
+        payload["changedSignatures"]
+            .as_array()
+            .expect("changedSignatures array")
+            .iter()
+            .any(|change| change["member"] == "ModifyDamage")
+    );
+}
+
+#[test]
+fn code_verify_references_passes_against_the_build_it_was_compiled_for() {
+    let control_dir = reference_control_assemblies_dir();
+    let consumer = reference_consumer_assembly();
+    let config = write_code_config(control_dir.path(), None);
+
+    let response = run(&[
+        "sts2",
+        "--json",
+        "--config",
+        config.path().to_str().expect("utf8 path"),
+        "code",
+        "verify-references",
+        consumer.to_str().expect("utf8 consumer path"),
+        "--control-assemblies-dir",
+        control_dir.path().to_str().expect("utf8 control path"),
+    ]);
+    let payload: Value = serde_json::from_str(&response.stdout).expect("json");
+
+    // No --assemblies-dir here: the candidate directory falls back to game.assembliesDir from the
+    // active config, like every other managed code command.
+    assert_eq!(response.exit_code, 0);
+    assert_eq!(payload["status"], "ok");
+    assert_eq!(payload["breakCount"], 0);
+}
+
+fn reference_control_assemblies_dir() -> tempfile::TempDir {
+    copy_into_temp_dir(build_reference_control_assembly(), "sts2.dll")
+}
+
+fn reference_candidate_assemblies_dir() -> tempfile::TempDir {
+    copy_into_temp_dir(build_reference_reshaped_assembly(), "sts2.dll")
+}
+
+fn reference_consumer_assembly() -> &'static PathBuf {
+    build_reference_consumer_assembly()
+}
+
+fn copy_into_temp_dir(source: &Path, file_name: &str) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("assemblies dir");
+    fs::copy(source, dir.path().join(file_name)).expect("copy fixture assembly");
+    dir
+}
+
+fn build_reference_control_assembly() -> &'static PathBuf {
+    static ASSEMBLY: OnceLock<PathBuf> = OnceLock::new();
+    ASSEMBLY.get_or_init(|| {
+        build_fixture_project(
+            "dotnet-tools/tests/Spirectl.DotnetTools.TestGameSymbols/Spirectl.DotnetTools.TestGameSymbols.csproj",
+            "dotnet-tools/tests/Spirectl.DotnetTools.TestGameSymbols/bin/Debug/net9.0/sts2.dll",
+        )
+    })
+}
+
+fn build_reference_reshaped_assembly() -> &'static PathBuf {
+    static ASSEMBLY: OnceLock<PathBuf> = OnceLock::new();
+    ASSEMBLY.get_or_init(|| {
+        build_fixture_project(
+            "dotnet-tools/tests/Spirectl.DotnetTools.TestGameSymbols.Reshaped/Spirectl.DotnetTools.TestGameSymbols.Reshaped.csproj",
+            "dotnet-tools/tests/Spirectl.DotnetTools.TestGameSymbols.Reshaped/bin/Debug/net9.0/sts2-reshaped.dll",
+        )
+    })
+}
+
+fn build_reference_consumer_assembly() -> &'static PathBuf {
+    static ASSEMBLY: OnceLock<PathBuf> = OnceLock::new();
+    ASSEMBLY.get_or_init(|| {
+        build_fixture_project(
+            "dotnet-tools/tests/Spirectl.DotnetTools.TestGameConsumer/Spirectl.DotnetTools.TestGameConsumer.csproj",
+            "dotnet-tools/tests/Spirectl.DotnetTools.TestGameConsumer/bin/Debug/net9.0/Spirectl.DotnetTools.TestGameConsumer.dll",
+        )
+    })
+}
+
+fn build_fixture_project(project_relative: &str, output_relative: &str) -> PathBuf {
+    let repo_root = repo_root();
+    let status = Command::new("dotnet")
+        .arg("build")
+        .arg(repo_root.join(project_relative))
+        .current_dir(&repo_root)
+        .status()
+        .expect("build fixture project");
+    assert!(
+        status.success(),
+        "expected fixture project build to succeed"
+    );
+    repo_root.join(output_relative)
+}

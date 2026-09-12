@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!--
+      Reference verification only keeps bindings whose resolution scope is one of the game
+      assemblies, so a fixture that exercises it has to carry the game's own assembly name.
+    -->
+    <AssemblyName>sts2</AssemblyName>
+  </PropertyGroup>
+</Project>

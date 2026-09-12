@@ -1752,6 +1752,337 @@ public sealed class ToolCommandDispatcherTests
         Assert.Equal("not_found", document.RootElement.GetProperty("error").GetProperty("code").GetString());
     }
 
+    [Fact]
+    public void VerifyReferencesReportsEveryBucketAgainstAReshapedGameBuild()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "verify-references",
+                layout.ConsumerPath,
+                "--assemblies-dir",
+                layout.CandidateAssembliesDir,
+                "--control-assemblies-dir",
+                layout.ControlAssembliesDir,
+                "--json",
+            ]);
+
+        Assert.Equal(3, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+
+        Assert.Equal("verify-references", root.GetProperty("command").GetString());
+        Assert.Equal("broken", root.GetProperty("status").GetString());
+        Assert.Equal("clean", root.GetProperty("control").GetProperty("status").GetString());
+        Assert.Equal(0, root.GetProperty("control").GetProperty("unresolvedCount").GetInt32());
+        Assert.Equal(10, root.GetProperty("breakCount").GetInt32());
+        Assert.Equal(5, root.GetProperty("typeReferenceCount").GetInt32());
+        Assert.Equal(14, root.GetProperty("memberReferenceCount").GetInt32());
+        Assert.Equal(["sts2", "GodotSharp", "0Harmony"], StringRows(root, "gameAssemblies"));
+        Assert.Equal([Path.GetFileName(layout.ConsumerPath)], ConsumerAssemblies(root));
+
+        Assert.Equal(
+            ["Spirectl.TestGame.Lobby.SeatRecord"],
+            TypeRows(root, "missingTypes"));
+        Assert.Equal(
+            [
+                "Spirectl.TestGame.Lobby.SeatRecord::.ctor",
+                "Spirectl.TestGame.Lobby.SeatRecord::Id",
+                "Spirectl.TestGame.Lobby.SeatRecord::IsReady",
+                "Spirectl.TestGame.Lobby.SeatRecord::Render",
+            ],
+            MemberRows(root, "missingMembersWithMissingOwner"));
+        Assert.Equal(
+            [
+                "Spirectl.TestGame.Lobby.SeatRegistry::Close",
+                "Spirectl.TestGame.Lobby.SeatRegistry::IsOpen",
+                "Spirectl.TestGame.Lobby.SeatRegistry::get_Label",
+            ],
+            MemberRows(root, "missingMembers"));
+        Assert.Equal(
+            [
+                "Spirectl.TestGame.Lobby.AnimationTrack::Play",
+                "Spirectl.TestGame.Lobby.DamageHooks::ModifyDamage",
+            ],
+            MemberRows(root, "changedSignatures"));
+
+        var missingType = root.GetProperty("missingTypes").EnumerateArray().Single();
+        Assert.Equal("sts2", missingType.GetProperty("assembly").GetString());
+        Assert.Equal([Path.GetFileName(layout.ConsumerPath)], StringRows(missingType, "consumers"));
+
+        var missingConstructor = root.GetProperty("missingMembersWithMissingOwner")
+            .EnumerateArray()
+            .First(entry => entry.GetProperty("member").GetString() == ".ctor");
+        Assert.Equal("method", missingConstructor.GetProperty("memberKind").GetString());
+        Assert.Equal(2, missingConstructor.GetProperty("parameterCount").GetInt32());
+
+        var missingField = root.GetProperty("missingMembers")
+            .EnumerateArray()
+            .First(entry => entry.GetProperty("member").GetString() == "IsOpen");
+        Assert.Equal("field", missingField.GetProperty("memberKind").GetString());
+        Assert.False(missingField.TryGetProperty("parameterCount", out _));
+    }
+
+    [Fact]
+    public void VerifyReferencesReportsTheShapeOnBothSidesOfAChangedSignature()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "verify-references",
+                layout.ConsumerPath,
+                "--assemblies-dir",
+                layout.CandidateAssembliesDir,
+                "--control-assemblies-dir",
+                layout.ControlAssembliesDir,
+                "--json",
+            ]);
+
+        using var document = JsonDocument.Parse(result.Output);
+        var changes = document.RootElement.GetProperty("changedSignatures");
+
+        var droppedReturn = changes
+            .EnumerateArray()
+            .First(entry => entry.GetProperty("member").GetString() == "Play");
+        Assert.Equal("TrackHandle Play(String,Boolean)", droppedReturn.GetProperty("controlSignature").GetString());
+        Assert.Equal("Void Play(String,Boolean)", droppedReturn.GetProperty("candidateSignature").GetString());
+
+        var addedParameter = changes
+            .EnumerateArray()
+            .First(entry => entry.GetProperty("member").GetString() == "ModifyDamage");
+        Assert.Equal("Int32 ModifyDamage(Int32,Int32) static", addedParameter.GetProperty("controlSignature").GetString());
+        Assert.Equal("Int32 ModifyDamage(Int32,Int32,Int32) static", addedParameter.GetProperty("candidateSignature").GetString());
+    }
+
+    [Fact]
+    public void VerifyReferencesPassesWhenTheCandidateIsTheControlBuild()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "verify-references",
+                layout.ConsumerPath,
+                "--assemblies-dir",
+                layout.ControlAssembliesDir,
+                "--control-assemblies-dir",
+                layout.ControlAssembliesDir,
+                "--json",
+            ]);
+
+        Assert.Equal(0, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+
+        Assert.Equal("ok", root.GetProperty("status").GetString());
+        Assert.Equal(0, root.GetProperty("breakCount").GetInt32());
+        Assert.Empty(root.GetProperty("missingTypes").EnumerateArray());
+        Assert.Empty(root.GetProperty("missingMembers").EnumerateArray());
+        Assert.Empty(root.GetProperty("changedSignatures").EnumerateArray());
+    }
+
+    [Fact]
+    public void VerifyReferencesRefusesTheRunWhenTheControlBuildIsDirty()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "verify-references",
+                layout.ConsumerPath,
+                "--assemblies-dir",
+                layout.ControlAssembliesDir,
+                "--control-assemblies-dir",
+                layout.CandidateAssembliesDir,
+                "--json",
+            ]);
+
+        Assert.Equal(2, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+
+        Assert.Equal("control-dirty", root.GetProperty("status").GetString());
+        var control = root.GetProperty("control");
+        Assert.Equal("dirty", control.GetProperty("status").GetString());
+        Assert.Equal(8, control.GetProperty("unresolvedCount").GetInt32());
+        Assert.Equal(["Spirectl.TestGame.Lobby.SeatRecord"], TypeRows(control, "missingTypes"));
+        Assert.Equal(4, control.GetProperty("missingMembersWithMissingOwner").GetArrayLength());
+        Assert.Equal(3, control.GetProperty("missingMembers").GetArrayLength());
+
+        // The candidate buckets are still filled in — and are exactly why the refusal exists. Read
+        // on their own they say the good build reshaped two members, which is backwards; the status,
+        // the exit code and the note all say the run is void.
+        Assert.Equal(2, root.GetProperty("breakCount").GetInt32());
+        Assert.Equal(
+            [
+                "Spirectl.TestGame.Lobby.AnimationTrack::Play",
+                "Spirectl.TestGame.Lobby.DamageHooks::ModifyDamage",
+            ],
+            MemberRows(root, "changedSignatures"));
+        Assert.Contains(
+            root.GetProperty("notes").EnumerateArray().Select(note => note.GetString()!),
+            note => note.Contains("void", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void VerifyReferencesWithoutAControlReportsOnlyUnresolvedBindings()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "verify-references",
+                layout.ConsumerPath,
+                "--assemblies-dir",
+                layout.CandidateAssembliesDir,
+                "--json",
+            ]);
+
+        Assert.Equal(3, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+
+        Assert.Equal("broken", root.GetProperty("status").GetString());
+        Assert.Equal(8, root.GetProperty("breakCount").GetInt32());
+        Assert.False(root.TryGetProperty("control", out _));
+        Assert.False(root.TryGetProperty("controlAssembliesDir", out _));
+        Assert.Empty(root.GetProperty("changedSignatures").EnumerateArray());
+        Assert.Contains(
+            root.GetProperty("notes").EnumerateArray().Select(note => note.GetString()!),
+            note => note.Contains("--control-assemblies-dir", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void VerifyReferencesAcceptsSeveralCommaSeparatedConsumers()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "verify-references",
+                $"{layout.ConsumerPath},{layout.ConsumerCopyPath}",
+                "--assemblies-dir",
+                layout.CandidateAssembliesDir,
+                "--control-assemblies-dir",
+                layout.ControlAssembliesDir,
+                "--json",
+            ]);
+
+        Assert.Equal(3, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Output);
+        var root = document.RootElement;
+
+        // The same bindings arriving from two consumers stay one row each, with both consumers
+        // named, rather than doubling the reported break count.
+        Assert.Equal(10, root.GetProperty("breakCount").GetInt32());
+        Assert.Equal(
+            [Path.GetFileName(layout.ConsumerCopyPath), Path.GetFileName(layout.ConsumerPath)],
+            StringRows(root.GetProperty("missingTypes").EnumerateArray().Single(), "consumers"));
+    }
+
+    [Fact]
+    public void VerifyReferencesRendersHumanOutputWithoutJson()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "verify-references",
+                layout.ConsumerPath,
+                "--assemblies-dir",
+                layout.CandidateAssembliesDir,
+                "--control-assemblies-dir",
+                layout.ControlAssembliesDir,
+            ]);
+
+        Assert.Equal(3, result.ExitCode);
+        Assert.Contains("status: broken", result.Output);
+        Assert.Contains("breakCount: 10", result.Output);
+        Assert.Contains("control: clean (0 unresolved)", result.Output);
+        Assert.Contains("Spirectl.TestGame.Lobby.SeatRegistry::get_Label (method/0)", result.Output);
+        Assert.Contains("candidate: Int32 ModifyDamage(Int32,Int32,Int32) static", result.Output);
+    }
+
+    [Fact]
+    public void VerifyReferencesRequiresAnAssembliesDir()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(["verify-references", layout.ConsumerPath, "--json"]);
+
+        Assert.Equal(2, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Output);
+        Assert.Equal("usage_error", document.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public void VerifyReferencesRejectsAMissingConsumerAssembly()
+    {
+        using var layout = ReferenceVerificationLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "verify-references",
+                Path.Combine(layout.ControlAssembliesDir, "NotThere.dll"),
+                "--assemblies-dir",
+                layout.CandidateAssembliesDir,
+                "--json",
+            ]);
+
+        Assert.Equal(3, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Output);
+        Assert.Equal("not_found", document.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public void ControlAssembliesDirIsRejectedForOtherCommands()
+    {
+        using var layout = TestAssemblyLayout.Create();
+        var result = ToolCommandDispatcher.Dispatch(
+            [
+                "locate",
+                "type",
+                "DeckController",
+                "--assemblies-dir",
+                layout.GameAssembliesDir,
+                "--control-assemblies-dir",
+                layout.GameAssembliesDir,
+                "--json",
+            ]);
+
+        Assert.Equal(2, result.ExitCode);
+        using var document = JsonDocument.Parse(result.Output);
+        Assert.Equal("usage_error", document.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    private static string[] StringRows(JsonElement root, string property)
+    {
+        return [.. root.GetProperty(property).EnumerateArray().Select(entry => entry.GetString()!)];
+    }
+
+    private static string[] ConsumerAssemblies(JsonElement root)
+    {
+        return
+        [
+            .. root.GetProperty("consumers")
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("assembly").GetString()!),
+        ];
+    }
+
+    private static string[] TypeRows(JsonElement root, string property)
+    {
+        return
+        [
+            .. root.GetProperty(property)
+                .EnumerateArray()
+                .Select(entry => entry.GetProperty("type").GetString()!),
+        ];
+    }
+
+    private static string[] MemberRows(JsonElement root, string property)
+    {
+        return
+        [
+            .. root.GetProperty(property)
+                .EnumerateArray()
+                .Select(entry => $"{entry.GetProperty("type").GetString()}::{entry.GetProperty("member").GetString()}"),
+        ];
+    }
+
     private static InspectionCommandRequest CreateInspectionRequest(
         string command,
         string? subject,
@@ -1765,6 +2096,7 @@ public sealed class ToolCommandDispatcherTests
             SecondaryQuery: null,
             ContainerPath: null,
             AssembliesDir: assembliesDir,
+            ControlAssembliesDir: null,
             ResourcesDir: null,
             ModsDir: null,
             ExcludeDir: null,
@@ -2239,6 +2571,85 @@ public sealed class ToolCommandDispatcherTests
                 && match.GetProperty("resourceType").GetString() == "Theme"
                 && match.GetProperty("containerPath").GetString()!.EndsWith("packed-assets.pck", StringComparison.Ordinal)
                 && match.GetProperty("readableOffline").GetBoolean());
+    }
+
+    /// <summary>
+    /// A control game build, a reshaped candidate build of the same surface, and a consumer
+    /// assembly compiled against the control — the three inputs a reference verification run takes.
+    /// </summary>
+    /// <remarks>
+    /// The reshaped build ships under its own file name so both can live in one output directory,
+    /// and is copied into the candidate directory as <c>sts2.dll</c>: resolution is by file name in
+    /// a directory, which is exactly how a game update arrives.
+    /// </remarks>
+    private sealed class ReferenceVerificationLayout : IDisposable
+    {
+        private const string GameAssemblyFileName = "sts2.dll";
+        private const string ReshapedGameAssemblyFileName = "sts2-reshaped.dll";
+        private const string ConsumerAssemblyFileName = "Spirectl.DotnetTools.TestGameConsumer.dll";
+
+        private readonly string _root;
+
+        private ReferenceVerificationLayout(
+            string root,
+            string controlAssembliesDir,
+            string candidateAssembliesDir,
+            string consumerPath,
+            string consumerCopyPath)
+        {
+            _root = root;
+            ControlAssembliesDir = controlAssembliesDir;
+            CandidateAssembliesDir = candidateAssembliesDir;
+            ConsumerPath = consumerPath;
+            ConsumerCopyPath = consumerCopyPath;
+        }
+
+        public string ControlAssembliesDir { get; }
+
+        public string CandidateAssembliesDir { get; }
+
+        public string ConsumerPath { get; }
+
+        /// <summary>A second copy of the same consumer, for the multi-consumer attribution case.</summary>
+        public string ConsumerCopyPath { get; }
+
+        public static ReferenceVerificationLayout Create()
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"spirectl-verify-references-{Guid.NewGuid():N}");
+            var controlAssembliesDir = Path.Combine(root, "control");
+            var candidateAssembliesDir = Path.Combine(root, "candidate");
+            var consumerDir = Path.Combine(root, "consumer");
+            Directory.CreateDirectory(controlAssembliesDir);
+            Directory.CreateDirectory(candidateAssembliesDir);
+            Directory.CreateDirectory(consumerDir);
+
+            File.Copy(
+                Path.Combine(AppContext.BaseDirectory, GameAssemblyFileName),
+                Path.Combine(controlAssembliesDir, GameAssemblyFileName));
+            File.Copy(
+                Path.Combine(AppContext.BaseDirectory, ReshapedGameAssemblyFileName),
+                Path.Combine(candidateAssembliesDir, GameAssemblyFileName));
+
+            var consumerPath = Path.Combine(consumerDir, ConsumerAssemblyFileName);
+            var consumerCopyPath = Path.Combine(consumerDir, "Spirectl.DotnetTools.TestGameConsumer.Copy.dll");
+            File.Copy(Path.Combine(AppContext.BaseDirectory, ConsumerAssemblyFileName), consumerPath);
+            File.Copy(consumerPath, consumerCopyPath);
+
+            return new ReferenceVerificationLayout(
+                root,
+                controlAssembliesDir,
+                candidateAssembliesDir,
+                consumerPath,
+                consumerCopyPath);
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(_root))
+            {
+                Directory.Delete(_root, recursive: true);
+            }
+        }
     }
 
     private sealed class TestAssemblyLayout : IDisposable

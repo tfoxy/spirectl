@@ -292,6 +292,20 @@ pub(crate) fn handle_code(
                 args.search_roots.include_dependencies,
             );
         }
+        CodeSubcommand::VerifyReferences(args) => {
+            let search_roots = args.search_roots();
+            let search_paths = resolve_code_search_paths_for_command(context, &search_roots)?;
+
+            helper_args.push("verify-references".into());
+            helper_args.push(args.assemblies.into());
+            helper_args.push("--assemblies-dir".into());
+            helper_args.push(search_paths.assemblies_dir.into_os_string());
+
+            if let Some(control_assemblies_dir) = args.control_assemblies_dir {
+                helper_args.push("--control-assemblies-dir".into());
+                helper_args.push(control_assemblies_dir.into_os_string());
+            }
+        }
         CodeSubcommand::Decompile(args) => {
             let search_paths = resolve_code_search_paths_for_command(context, &args.search_roots)?;
 

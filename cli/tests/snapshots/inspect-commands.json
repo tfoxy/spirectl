@@ -1216,6 +1216,16 @@
     },
     {
       "examples": [
+        "sts2 code verify-references ./mods/example/Example.dll --assemblies-dir ./assemblies",
+        "sts2 --json code verify-references ./mods/example/Example.dll,./mods/example/Example.Bridge.dll --assemblies-dir ./beta-assemblies --control-assemblies-dir ./assemblies"
+      ],
+      "name": "code verify-references",
+      "readOnly": true,
+      "status": "implemented",
+      "summary": "Check whether built consumer assemblies still bind to a game build, reporting missing types, missing members, and reshaped signatures."
+    },
+    {
+      "examples": [
         "sts2 code scene-search HandPanel --resources-dir ./game-project",
         "sts2 --json code scene-search StatusConfig --resources-dir ./game-project --assemblies-dir ./assemblies"
       ],

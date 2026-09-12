@@ -12,7 +12,7 @@ public static class ToolCommandDispatcher
     {
         if (args.Length < 1)
         {
-            return Failure("usage: dotnet-tools <locate|describe|decompile|refs|derived> <subject> <query> | <hooks> [query] | <hook-info> <query> | <scene-search> <query> | <scene-tree> <scene> | <scene-node> <scene> <node-path> | <asset-search> <query> | <asset-index> | <asset-read> <container-path> <logical-path> | <decompile-export> <output-dir> [--assemblies-dir <path>] [--resources-dir <path>] [--mods-dir <path>] [--exclude-dir <path>] [--include-mods] [--include-dependencies] [--full] [--limit <n>] [--offset <n>] [--source <game|mod>] [--assembly <name>] [--form <name>] [--has-script] [--sort <relevance|name|reference-count|assembly>] [--json]");
+            return Failure("usage: dotnet-tools <locate|describe|decompile|refs|derived> <subject> <query> | <hooks> [query] | <hook-info> <query> | <verify-references> <assembly[,assembly...]> | <scene-search> <query> | <scene-tree> <scene> | <scene-node> <scene> <node-path> | <asset-search> <query> | <asset-index> | <asset-read> <container-path> <logical-path> | <decompile-export> <output-dir> [--assemblies-dir <path>] [--control-assemblies-dir <path>] [--resources-dir <path>] [--mods-dir <path>] [--exclude-dir <path>] [--include-mods] [--include-dependencies] [--full] [--limit <n>] [--offset <n>] [--source <game|mod>] [--assembly <name>] [--form <name>] [--has-script] [--sort <relevance|name|reference-count|assembly>] [--json]");
         }
 
         InspectionCommandRequest request;
@@ -32,12 +32,20 @@ public static class ToolCommandDispatcher
             {
                 "asset-search" or "asset-index" or "asset-read" => ExecuteAssetCommand(request),
                 "decompile-export" => new DecompileExportService().Execute(request),
+                "verify-references" => new ReferenceVerificationService().Execute(request),
                 _ => new InspectionCommandService().Execute(request),
             };
         }
         catch (ToolCommandException error)
         {
             return Failure(error.Message, error.Code, error.ExitCode);
+        }
+
+        if (response is ReferenceVerificationResponse verification)
+        {
+            return new ToolCommandResult(
+                VerificationExitCode(verification.Status),
+                request.Json ? SerializeJson(verification) : SerializeVerificationHuman(verification));
         }
 
         return request.Json || request.Command is "asset-search" or "asset-index" or "asset-read" or "decompile-export"
@@ -48,7 +56,7 @@ public static class ToolCommandDispatcher
     private static InspectionCommandRequest ParseRequest(string[] args)
     {
         var command = args[0];
-        if (command is not ("locate" or "describe" or "decompile" or "refs" or "derived" or "hooks" or "hook-info" or "scene-search" or "scene-tree" or "scene-node" or "asset-search" or "asset-index" or "asset-read" or "decompile-export"))
+        if (command is not ("locate" or "describe" or "decompile" or "refs" or "derived" or "hooks" or "hook-info" or "verify-references" or "scene-search" or "scene-tree" or "scene-node" or "asset-search" or "asset-index" or "asset-read" or "decompile-export"))
         {
             throw new ToolCommandException(2, "usage_error", $"unknown command '{command}'");
         }
@@ -78,6 +86,7 @@ public static class ToolCommandDispatcher
             case "scene-search":
             case "scene-tree":
             case "hook-info":
+            case "verify-references":
             case "asset-search":
             case "decompile-export":
                 if (args.Length < 2)
@@ -124,6 +133,7 @@ public static class ToolCommandDispatcher
 
         var json = false;
         string? assembliesDir = null;
+        string? controlAssembliesDir = null;
         string? resourcesDir = null;
         string? modsDir = null;
         string? excludeDir = null;
@@ -149,6 +159,14 @@ public static class ToolCommandDispatcher
                     break;
                 case "--assemblies-dir":
                     assembliesDir = ReadOptionValue(args, ref index, "--assemblies-dir");
+                    break;
+                case "--control-assemblies-dir":
+                    if (command != "verify-references")
+                    {
+                        throw new ToolCommandException(2, "usage_error", "--control-assemblies-dir is only supported for verify-references");
+                    }
+
+                    controlAssembliesDir = ReadOptionValue(args, ref index, "--control-assemblies-dir");
                     break;
                 case "--resources-dir":
                     resourcesDir = ReadOptionValue(args, ref index, "--resources-dir");
@@ -205,7 +223,7 @@ public static class ToolCommandDispatcher
             }
         }
 
-        if (command is "locate" or "describe" or "decompile" or "refs" or "derived" or "hooks" or "hook-info" or "decompile-export"
+        if (command is "locate" or "describe" or "decompile" or "refs" or "derived" or "hooks" or "hook-info" or "verify-references" or "decompile-export"
             && string.IsNullOrWhiteSpace(assembliesDir))
         {
             throw new ToolCommandException(2, "usage_error", "missing required --assemblies-dir option");
@@ -253,6 +271,7 @@ public static class ToolCommandDispatcher
             SecondaryQuery: secondaryQuery,
             ContainerPath: containerPath,
             AssembliesDir: assembliesDir,
+            ControlAssembliesDir: controlAssembliesDir,
             ResourcesDir: resourcesDir,
             ModsDir: modsDir,
             ExcludeDir: excludeDir,
@@ -293,6 +312,93 @@ public static class ToolCommandDispatcher
             "asset-read" => service.ReadPacked(request),
             _ => throw new ToolCommandException(2, "usage_error", $"unknown command '{request.Command}'"),
         };
+    }
+
+    /// <summary>
+    /// A clean run exits 0, a candidate build that broke bindings exits 3 (the same code every
+    /// other resolution failure uses), and a control build that could not resolve its own bindings
+    /// exits 2, because that is an input problem that makes the whole run unreadable.
+    /// </summary>
+    private static int VerificationExitCode(string status)
+    {
+        return status switch
+        {
+            "ok" => 0,
+            "control-dirty" => 2,
+            _ => 3,
+        };
+    }
+
+    private static string SerializeVerificationHuman(ReferenceVerificationResponse response)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"command: {response.Command}");
+        builder.AppendLine($"status: {response.Status}");
+        builder.AppendLine($"consumers: {string.Join(", ", response.Consumers.Select(consumer => consumer.Assembly))}");
+        builder.AppendLine($"assembliesDir: {response.AssembliesDir}");
+        if (response.ControlAssembliesDir is not null)
+        {
+            builder.AppendLine($"controlAssembliesDir: {response.ControlAssembliesDir}");
+        }
+        builder.AppendLine($"gameAssemblies: {string.Join(", ", response.GameAssemblies)}");
+        builder.AppendLine($"typeReferenceCount: {response.TypeReferenceCount}");
+        builder.AppendLine($"memberReferenceCount: {response.MemberReferenceCount}");
+        builder.AppendLine($"breakCount: {response.BreakCount}");
+
+        if (response.Control is { } control)
+        {
+            builder.AppendLine($"control: {control.Status} ({control.UnresolvedCount} unresolved)");
+            AppendMissingTypes(builder, "control: missing types", control.MissingTypes);
+            AppendMissingMembers(builder, "control: missing members (owner type missing)", control.MissingMembersWithMissingOwner);
+            AppendMissingMembers(builder, "control: missing members", control.MissingMembers);
+        }
+
+        AppendMissingTypes(builder, "missing types", response.MissingTypes);
+        AppendMissingMembers(builder, "missing members (owner type missing)", response.MissingMembersWithMissingOwner);
+        AppendMissingMembers(builder, "missing members", response.MissingMembers);
+
+        builder.AppendLine($"changed signatures: {response.ChangedSignatures.Count}");
+        foreach (var change in response.ChangedSignatures)
+        {
+            builder.AppendLine($"  - {change.Assembly}  {change.Type}::{change.Member}   [{string.Join(" ", change.Consumers)}]");
+            builder.AppendLine($"      control:   {change.ControlSignature}");
+            builder.AppendLine($"      candidate: {change.CandidateSignature}");
+        }
+
+        builder.AppendLine("notes:");
+        foreach (var note in response.Notes)
+        {
+            builder.AppendLine($"  - {note}");
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendMissingTypes(
+        StringBuilder builder,
+        string label,
+        IReadOnlyList<ReferenceMissingType> rows)
+    {
+        builder.AppendLine($"{label}: {rows.Count}");
+        foreach (var row in rows)
+        {
+            builder.AppendLine($"  - {row.Assembly}  {row.Type}   [{string.Join(" ", row.Consumers)}]");
+        }
+    }
+
+    private static void AppendMissingMembers(
+        StringBuilder builder,
+        string label,
+        IReadOnlyList<ReferenceMissingMember> rows)
+    {
+        builder.AppendLine($"{label}: {rows.Count}");
+        foreach (var row in rows)
+        {
+            var shape = row.ParameterCount is { } parameterCount
+                ? $"{row.MemberKind}/{parameterCount}"
+                : row.MemberKind;
+            builder.AppendLine($"  - {row.Assembly}  {row.Type}::{row.Member} ({shape})   [{string.Join(" ", row.Consumers)}]");
+        }
     }
 
     private static ToolCommandResult Failure(string message, string code = "usage_error", int exitCode = 2)
