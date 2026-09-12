@@ -2274,6 +2274,8 @@ pub enum CodeSubcommand {
     Hooks(CodeHooksArgs),
     #[command(name = "hook-info")]
     HookInfo(CodeHookInfoArgs),
+    #[command(name = "verify-references")]
+    VerifyReferences(CodeVerifyReferencesArgs),
     #[command(name = "scene-search")]
     SceneSearch(CodeSceneSearchArgs),
     #[command(name = "scene-tree")]
@@ -2517,6 +2519,41 @@ pub struct CodeHookInfoArgs {
 
     #[command(flatten)]
     pub search_roots: CodeSearchRootArgs,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct CodeVerifyReferencesArgs {
+    #[arg(
+        help = "Built consumer assemblies to check, comma-separated. These are read as shipped binaries; no source or matching reference package is needed."
+    )]
+    pub assemblies: String,
+
+    #[arg(
+        long = "control-assemblies-dir",
+        help = "A game build the consumers are known to bind against. Required to report reshaped signatures, and the run fails if the control itself leaves a binding unresolved."
+    )]
+    pub control_assemblies_dir: Option<PathBuf>,
+
+    #[arg(long, help = "Override the detected Slay the Spire 2 install root.")]
+    pub game_path: Option<PathBuf>,
+
+    #[arg(
+        long,
+        help = "The candidate managed assemblies directory to resolve the consumers' game bindings against."
+    )]
+    pub assemblies_dir: Option<PathBuf>,
+}
+
+impl CodeVerifyReferencesArgs {
+    /// Reference verification reads game assemblies straight out of one directory, so it takes only
+    /// the two roots that resolution actually uses rather than the whole shared search-root set.
+    pub(crate) fn search_roots(&self) -> CodeSearchRootArgs {
+        CodeSearchRootArgs {
+            game_path: self.game_path.clone(),
+            assemblies_dir: self.assemblies_dir.clone(),
+            ..CodeSearchRootArgs::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Args)]

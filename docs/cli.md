@@ -1154,6 +1154,10 @@ sts2 code describe method "MegaCrit.Sts2.CardState::CanPlay()"
 sts2 code decompile type MegaCrit.Sts2.CardState
 sts2 code decompile method "MegaCrit.Sts2.CardState::CanPlay()" --full
 
+# does a built mod still bind to a game build?
+sts2 code verify-references ./mods/example/Example.dll --assemblies-dir ./assemblies
+sts2 code verify-references ./mods/example/Example.dll,./mods/example/Example.Bridge.dll --assemblies-dir ./beta-assemblies --control-assemblies-dir ./assemblies
+
 # static scenes and resources
 sts2 code scene-search HandPanel --resources-dir ./game-project
 sts2 code scene-search StatusConfig --resources-dir ./game-project --assemblies-dir ./assemblies
@@ -1180,6 +1184,12 @@ sts2 code scene-node res://ui/shared/HandPanel.tscn /HandPanel/ConfirmButton --r
 `code hooks` is the paginated discovery-oriented catalog for likely managed hook targets and script callbacks. It returns stable method ids, advisory `hookForms`, reasons, reference counts, facets, and optional `scriptPath` / `scenePaths` hints when assemblies and resources expose enough static metadata. Omit the query to browse the installed catalog, and use `--limit`, `--offset`, `--source`, `--assembly`, `--form`, `--has-script`, and `--sort` to narrow large result sets.
 
 `code hook-info` resolves one exact managed method id or exact lookup signature into a hook-ready projection with ordered parameters, override/interface links, advisory hook forms, and suggested next commands.
+
+`code verify-references` answers the reverse question from the rest of `code`: instead of inspecting one game symbol you already suspect, it takes built consumer assemblies and asks which of the game types and members *they* bind to are missing or reshaped in a given assemblies directory. It reads the consumers' own `TypeRef`/`MemberRef` tables, keeps the bindings whose resolution scope is `sts2`, `GodotSharp`, or `0Harmony`, and resolves each one against `--assemblies-dir`. Two properties are the reason it exists: it works on a shipped binary with no source and no matching reference package, and it does not stop at the first broken project the way a cross-version build does.
+
+Pass `--control-assemblies-dir` with the game build the consumers were compiled against. That turns on the fourth and most valuable bucket — members that resolve on *both* sides with a different rendered signature, which is how an added parameter or a dropped return value shows up — and it makes the whole run trustworthy: if the control cannot resolve a binding either, the finding is about the probe rather than about the game, so the run reports `status: "control-dirty"` and fails without letting you read the candidate buckets as a verdict. Without a control, only unresolved types and members are reported.
+
+Attribution is per consumer assembly, not per call site. Once a break is named, `code refs` and `code describe` are the commands that take it to a line.
 
 `code scene-search` returns `scene`, `node`, and `resource` matches from static Godot text, binary, and packed assets.
 
@@ -1402,6 +1412,8 @@ Managed code commands accept:
 - `--include-mods`
 - `--limit <n>` for `locate`, `refs`, and `derived`
 
+`code verify-references` is the exception: it resolves game bindings straight out of one directory, so it takes only `--assemblies-dir`, `--game-path`, and its own `--control-assemblies-dir`. Mod roots and dependency visibility do not apply, because the assemblies it resolves against are named by the consumers' own references.
+
 Static scene/resource commands accept:
 
 - `--resources-dir <path>`
@@ -1461,6 +1473,22 @@ Follow-up IDs are stable for the current installed assemblies:
 - method: `method:<assembly>:<declaring-type>::<method>(<param-types>)`
 
 `describe`, `decompile`, `refs type`, `refs method`, and `derived type` return nonzero structured errors for `not_found` and `ambiguous_query`.
+
+`verify-references` reports a verdict rather than a match list, so its exit code carries meaning:
+
+- `0` with `status: "ok"` when every game binding still resolves unchanged
+- `3` with `status: "broken"` when the candidate build broke or reshaped at least one binding
+- `2` with `status: "control-dirty"` when `--control-assemblies-dir` itself left a binding unresolved, which voids the run
+- `2` for the usual usage errors, and `3` with `not_found` for a missing consumer assembly or assemblies directory
+
+The payload includes `consumers`, `gameAssemblies`, `assembliesDir`, `controlAssembliesDir`, `typeReferenceCount`, `memberReferenceCount`, `breakCount`, `notes`, an optional `control` block with its own `status` / `unresolvedCount`, and the four buckets:
+
+- `missingTypes`: a referenced game type that is gone
+- `missingMembersWithMissingOwner`: a referenced member whose owner type is gone
+- `missingMembers`: a referenced member missing from a type that survived
+- `changedSignatures`: a member that resolves on both sides, with `controlSignature` and `candidateSignature` showing the two shapes
+
+Every row names the `assembly`, the `type`, and the `consumers` it came from; member rows add `member`, `memberKind`, and `parameterCount` for methods. `changedSignatures` is empty unless a control build was supplied.
 
 `scene-search` also returns exit code `0` for both matches and `no-match`. The structured payload includes:
 

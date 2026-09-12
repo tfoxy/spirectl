@@ -10,6 +10,8 @@ See also: [known gaps](../known-gaps.md), [CLI](../cli.md), [architecture](../ar
 - `dotnet-tools/src/Spirectl.DotnetTools/Inspection/InspectionCommandService.cs`
 - `dotnet-tools/src/Spirectl.DotnetTools/Inspection/DecompileExportService.cs`
 - `dotnet-tools/src/Spirectl.DotnetTools/Inspection/MetadataCatalog.cs`
+- `dotnet-tools/src/Spirectl.DotnetTools/Inspection/ReferenceVerificationService.cs`
+- `dotnet-tools/src/Spirectl.DotnetTools/Inspection/GameAssemblySurface.cs`
 - `dotnet-tools/src/Spirectl.DotnetTools/Inspection/SceneInspectionCatalog.cs`
 - `dotnet-tools/src/Spirectl.DotnetTools/Inspection/GodotScriptCatalog.cs`
 
@@ -22,6 +24,7 @@ See also: [known gaps](../known-gaps.md), [CLI](../cli.md), [architecture](../ar
 ## Supported now
 
 - Managed metadata-first flow: `code locate`, `code describe`, `code refs`, `code derived`, `code hooks`, `code hook-info`, `code decompile`
+- Build-compatibility flow: `code verify-references` walks built consumer assemblies' own `TypeRef`/`MemberRef` tables and resolves every `sts2` / `GodotSharp` / `0Harmony` binding against a candidate assemblies dir, reporting missing types, members whose owner type is gone, members missing from a surviving type, and members whose rendered signature changed. It needs no source and no matching reference package, and with `--control-assemblies-dir` it refuses to report a verdict when the control build cannot resolve its own bindings.
 - Managed declaration workflows: `code locate`, `code describe`, and `code derived` use declarations-only metadata for symbol lookup, exact descriptions, and inheritance/interface navigation without requiring IL body reference scanning.
 - Reference-backed managed workflows: `code refs`, metadata-summary `code decompile`, `code hooks`, and `code hook-info` require the managed reference graph and may scan IL bodies to recover call/member references and hook intelligence.
 - Managed assembly selection is target-focused by default: game/product assemblies and explicitly included mod assemblies are indexed, while common framework and third-party dependency DLLs are excluded unless the caller passes `--include-dependencies`.
@@ -65,6 +68,7 @@ See also: [known gaps](../known-gaps.md), [CLI](../cli.md), [architecture](../ar
 - `composed://combat-background/<id>/image` and `composed://encounters/<id>/background/image` are DEPRECATED pre-flattened single-image queries (they pick the alphabetically-first layer per group, which is not what the seeded game shows). Prefer the `model://` keys above; the composed keys remain only until the layer-array combat render is validated.
 - `code decompile` stays metadata-based and summary-oriented by default; `--full` is the explicit exact-match ILSpy escape hatch, and broad IDE-style reconstruction remains a non-goal.
 - `code hooks` stays advisory and fuzzy; use `code hook-info` before treating a result as an exact hook target.
+- `code verify-references` attributes each break to a consumer assembly, not to a call site, and its signature-change bucket exists only when a control build is supplied. It reports what a shipped binary binds to, which is not the same question as what that binary's sources would compile to today.
 - Managed declaration loading is intentionally lighter than reference-backed loading: `locate`, `describe`, and `derived` should not depend on IL body scans, while `refs`, metadata decompile summaries, `hooks`, and `hook-info` may depend on those scans.
 - Dependency DLL visibility is explicit. Use `--include-dependencies` for broad framework or third-party dependency inspection; it does not imply `--include-mods`, and `--include-mods` does not imply dependency inspection.
 - `project recover --kind decompile` now owns a broader helper-generated ILSpy corpus under the managed toolchain root, but that export path is explicit and separate from the interactive `code decompile` surface.
@@ -81,6 +85,7 @@ See also: [known gaps](../known-gaps.md), [CLI](../cli.md), [architecture](../ar
 - Helper export orchestration in `Inspection/DecompileExportService.cs`
 - Internal asset catalog/read helpers in `Inspection/AssetCatalogService.cs`
 - Managed metadata indexing/navigation in `MetadataCatalog.cs`
+- Reference verification in `Inspection/ReferenceVerificationService.cs`, with loader-shaped resolution in `Inspection/GameAssemblySurface.cs` and reflection-style signature rendering in `Inspection/SimpleTypeNameProvider.cs`
 - Hook ranking/signature shaping in `Inspection/HookIntelligenceCatalog.cs`
 - Managed metadata mode selection: keep declarations-only paths for `locate`, `describe`, and `derived`, and reserve reference-backed IL body scanning for `refs`, metadata decompile summaries, `hooks`, and `hook-info`
 - Scene/resource parsing in `SceneInspectionCatalog.cs` and script enrichment in `GodotScriptCatalog.cs`

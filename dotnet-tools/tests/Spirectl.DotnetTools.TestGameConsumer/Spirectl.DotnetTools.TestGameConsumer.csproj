@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Built against the control game surface, exactly like a mod shipped for one game build. -->
+    <ProjectReference Include="..\Spirectl.DotnetTools.TestGameSymbols\Spirectl.DotnetTools.TestGameSymbols.csproj" />
+  </ItemGroup>
+</Project>

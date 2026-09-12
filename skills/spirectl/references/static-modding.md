@@ -31,6 +31,20 @@ Use `code decompile --full` only after exact metadata views are insufficient.
 
 `hooks` is advisory, fuzzy, and browseable when the query is omitted. Resolve one exact method `id` or lookup signature through `hook-info` before writing docs, patches, or Harmony hook code.
 
+## Does A Built Mod Still Bind To A Game Build?
+
+```bash
+"${STS2_BIN[@]}" --json code verify-references ./mods/example/Example.dll,./mods/example/Example.Bridge.dll \
+  --assemblies-dir /path/to/other/data_sts2_linuxbsd_x86_64 \
+  --control-assemblies-dir /path/to/current/data_sts2_linuxbsd_x86_64
+```
+
+Ask this on a game update, on a beta branch, and before trusting an archived release. It reads the built assemblies' own reference tables, so no source and no matching reference package are needed, and it reports every break rather than stopping where a compile would. Do not substitute a cross-version build for it: the compiler's error list is a lower bound, because declaration failures in one project mask every method body and every project downstream.
+
+Always pass `--control-assemblies-dir`. It is what turns on the reshaped-signature bucket — an added parameter or a dropped return value resolves fine as a name and is invisible without it — and a `control-dirty` result means the probe's inputs are wrong, not the game.
+
+Exit code `0` means clean, `3` means the candidate build broke bindings, `2` means the run was refused. Once a break is named, take it to `code describe` / `code refs`; verification attributes breaks to a consumer assembly, not to a call site.
+
 ## Static Scenes And Resources
 
 ```bash

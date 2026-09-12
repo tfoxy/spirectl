@@ -358,6 +358,7 @@ Rust:
 - structured action-argument, richer combat-state coverage, and shared bridge-version coverage for the mock contract
 - real `code` command coverage against a deterministic .NET fixture assembly, including helper-error passthrough plus `refs` / `derived`
 - real `code scene-*` coverage against deterministic text, binary, and packed Godot fixture assets, including provenance fields, duplicate-collapse notes, and helper-error passthrough for malformed binary files
+- real `code verify-references` coverage against a synthetic control/candidate game-assembly pair plus a consumer compiled against the control, exercising the clean verdict, the broken verdict with all four buckets, and the nonzero exit codes
 
 Node:
 

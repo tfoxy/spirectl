@@ -7,6 +7,7 @@ internal sealed record InspectionCommandRequest(
     string? SecondaryQuery,
     string? ContainerPath,
     string? AssembliesDir,
+    string? ControlAssembliesDir,
     string? ResourcesDir,
     string? ModsDir,
     string? ExcludeDir,
