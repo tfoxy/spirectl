@@ -5,9 +5,10 @@ namespace Spirectl.Sts2;
 
 // Run-player connectedness for the state snapshot: is each run player's ENet peer currently connected?
 //
-// The lobby already answers this from RunLobby.ConnectedPlayerIds (see Sts2StateProvider.ResolvePlayerConnected,
-// mirroring NRemoteLobbyPlayer._isConnected). Once the run starts that lobby is gone, so the run path reads the
-// HOST net service's live peer registry instead:
+// The lobby already answers this from the in-run lobby's roster of ids — GameApiNames.LobbyPlayerIds, which
+// names the member per game build (see Sts2StateProvider.ResolvePlayerConnected, mirroring
+// NRemoteLobbyPlayer._isConnected). Once the run starts that lobby is gone, so the run path reads the HOST net
+// service's live peer registry instead:
 //
 //     INetHostGameService.ConnectedPeers -> IReadOnlyList<NetClientData>   (NetClientData.peerId == netId)
 //

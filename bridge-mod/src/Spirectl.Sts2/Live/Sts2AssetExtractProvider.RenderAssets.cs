@@ -13,6 +13,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -862,7 +863,7 @@ public sealed partial class Sts2AssetExtractProvider
 
         var sprite = new MegaSprite(spineNode);
         var animationState = sprite.GetAnimationState();
-        var trackEntry = animationState.SetAnimation(animationName, loop: false);
+        var trackEntry = GameApiSpine.SetAnimation(animationState, animationName, loop: false);
         if (trackEntry is null)
         {
             return false;
@@ -1756,7 +1757,7 @@ public sealed partial class Sts2AssetExtractProvider
         }
 
         var animationState = sprite.GetAnimationState();
-        var trackEntry = animationState.SetAnimation(animationName, loop: false);
+        var trackEntry = GameApiSpine.SetAnimation(animationState, animationName, loop: false);
         if (trackEntry is null)
         {
             return false;

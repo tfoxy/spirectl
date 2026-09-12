@@ -23,6 +23,10 @@
     <SpirectlDetectedGodotSharpPath Condition="'$(SpirectlDetectedGodotSharpCount)' != '' and $(SpirectlDetectedGodotSharpCount) &gt; 0">$([System.IO.Directory]::GetFiles('$(SpirectlConfiguredGamePath)', 'GodotSharp.dll', System.IO.SearchOption.AllDirectories)[0])</SpirectlDetectedGodotSharpPath>
     <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == '' and '$(SpirectlDetectedGodotSharpPath)' != ''">$([System.IO.Path]::GetDirectoryName('$(SpirectlDetectedGodotSharpPath)'))</Sts2AssembliesDir>
   </PropertyGroup>
+
+  <!-- Which game-API lane the live-host sources compile against. Needs $(Sts2AssembliesDir), so it imports
+       after the block above resolves it. -->
+  <Import Project="$(MSBuildThisFileDirectory)Sts2GameApi.props" />
   <ItemGroup>
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
       <_Parameter1>SpirectlBridgeBuiltAtUtc</_Parameter1>

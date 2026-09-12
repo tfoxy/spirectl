@@ -1424,7 +1424,7 @@ public sealed partial class Sts2ActionHandler
         if (Sts2HostLocalSeatRegistry.FindSyntheticSeatByName(displayName, activeNetIds) is { } existingNetId)
         {
             var existingPlayer = lobbyContext.StartRunLobby.Players.FirstOrDefault(player => player.id == existingNetId);
-            if (!existingPlayer.Equals(default(LobbyPlayer)))
+            if (!existingPlayer.Equals(default(GameLobbyPlayer)))
             {
                 RefreshSyntheticStartRunLobbyPlayerUi(lobbyContext.ScreenObject, existingPlayer);
             }
@@ -1435,10 +1435,10 @@ public sealed partial class Sts2ActionHandler
                 message: $"Synthetic lobby player '{displayName}' already exists as p:{existingNetId}.");
         }
 
-        var localPlayer = lobbyContext.StartRunLobby.LocalPlayer is LobbyPlayer resolvedLocal
+        var localPlayer = lobbyContext.StartRunLobby.LocalPlayer is GameLobbyPlayer resolvedLocal
             ? resolvedLocal
             : lobbyContext.StartRunLobby.Players.FirstOrDefault(player => player.id == lobbyContext.StartRunLobby.NetService.NetId);
-        if (localPlayer.Equals(default(LobbyPlayer)))
+        if (localPlayer.Equals(default(GameLobbyPlayer)))
         {
             return LobbyRuntimeFailure(
                 request.Kind,
@@ -1459,7 +1459,7 @@ public sealed partial class Sts2ActionHandler
 
         var netId = NextSyntheticNetId(lobbyContext.StartRunLobby.Players);
         var slotId = NextLobbySlotId(lobbyContext.StartRunLobby.Players);
-        var syntheticPlayer = new LobbyPlayer
+        var syntheticPlayer = new GameLobbyPlayer
         {
             id = netId,
             slotId = slotId,

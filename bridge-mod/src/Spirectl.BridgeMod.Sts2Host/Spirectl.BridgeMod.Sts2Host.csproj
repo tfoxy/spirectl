@@ -52,7 +52,25 @@
       <HintPath>$(Sts2AssembliesDir)/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- Reference-CLOSURE only, never called from here. Constructing the game's host net service binds its
+         interfaces, one of which carries a connection-error record holding a Steamworks result, so the type
+         has to be resolvable. RAR does not follow a HintPath'd reference's own dependencies into the
+         assemblies dir, so it is named explicitly. -->
+    <Reference Include="Steamworks.NET">
+      <HintPath>$(Sts2AssembliesDir)/Steamworks.NET.dll</HintPath>
+      <Private Condition="'$(RunSts2LiveHostTests)' == 'true'">true</Private>
+      <Private Condition="'$(RunSts2LiveHostTests)' != 'true'">false</Private>
+    </Reference>
     <Compile Include="Live/ModEntry.cs" />
+  </ItemGroup>
+
+  <!-- `global using` aliases are per-compilation, so this assembly needs the same lane alias file
+       Spirectl.Sts2 compiles. The lane accessors themselves come across as internals (InternalsVisibleTo). -->
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v107'">
+    <Compile Include="..\Spirectl.Sts2\GameApi\V107\GameApiAliases.cs" Link="GameApi\GameApiAliases.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v111'">
+    <Compile Include="..\Spirectl.Sts2\GameApi\V111\GameApiAliases.cs" Link="GameApi\GameApiAliases.cs" />
   </ItemGroup>
 
   <Target Name="ValidateSts2LiveHostReferences" BeforeTargets="ResolveReferences" Condition="'$(EnableSts2LiveHost)' == 'true'">

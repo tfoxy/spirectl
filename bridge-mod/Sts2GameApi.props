@@ -1,0 +1,96 @@
+<Project>
+  <!--
+    THE STS2 API LANE TABLE — one source of truth for "which game build needs which bridge sources".
+
+    A few of the game members the live-host bridge binds to were renamed or reshaped between game builds.
+    Rather than fork the bridge per build, the differences are isolated in
+    `src/Spirectl.Sts2/GameApi/<lane>/`, and exactly one lane's files are compiled. This file decides which.
+
+    Resolution order (never guess a lane):
+      1. an explicit `$(Sts2GameApi)` wins. Packaging and the declaration-only reference SDK build against
+         directories that carry no `release_info.json`, so they must pass the lane.
+      2. otherwise detect it: read `$(Sts2AssembliesDir)/../release_info.json` and look its `version` up in
+         the table below.
+      3. otherwise fail the build (`ValidateSts2GameApiLane`), naming the version, this file, and the
+         `-p:Sts2GameApi=` escape hatch.
+
+    Outputs: `$(Sts2GameApi)` (the lane), `$(Sts2GameVersion)` (the detected game version, empty when
+    undetectable) and one of the `STS2_API_V107` / `STS2_API_V111` compile constants.
+
+    Adding a build: add its `version=lane` row to `Sts2GameApiLaneTable`. Adding a lane: add it to
+    `Sts2GameApiLanes`, create `src/Spirectl.Sts2/GameApi/<lane>/`, and add the lane's `ItemGroup`s to
+    `src/Spirectl.Sts2/Spirectl.Sts2.csproj` (plus the alias link in
+    `src/Spirectl.BridgeMod.Sts2Host/Spirectl.BridgeMod.Sts2Host.csproj`).
+
+    This file is also read by `cli/build.rs` and by the CouchCoop repo's root `Directory.Build.props`, so
+    keep it to plain MSBuild properties whose values are flat text.
+  -->
+  <PropertyGroup>
+    <Sts2GameApiTableFile>$(MSBuildThisFileFullPath)</Sts2GameApiTableFile>
+
+    <!-- Every lane that has a `src/Spirectl.Sts2/GameApi/<lane>/` directory, oldest first. -->
+    <Sts2GameApiLanes>v107;v111</Sts2GameApiLanes>
+
+    <!--
+      THE TABLE. One `<release_info.json version>=<lane>` row per supported game build, semicolon
+      delimited and semicolon fenced at both ends so a row lookup is an exact match on `;<version>=`.
+
+        v0.107.1 -> v107   the stable branch
+        v0.111.0 -> v111   the public-beta branch
+    -->
+    <Sts2GameApiLaneTable>;v0.107.1=v107;v0.111.0=v111;</Sts2GameApiLaneTable>
+  </PropertyGroup>
+
+  <!-- (2) Detect the lane from the install the bridge is being compiled against. -->
+  <PropertyGroup>
+    <Sts2GameApiReleaseInfoPath Condition="'$(Sts2GameApiReleaseInfoPath)' == '' and '$(Sts2AssembliesDir)' != ''">$([System.IO.Path]::GetFullPath('$(Sts2AssembliesDir)/../release_info.json'))</Sts2GameApiReleaseInfoPath>
+    <Sts2GameApiReleaseInfoText Condition="'$(Sts2GameApiReleaseInfoPath)' != '' and Exists('$(Sts2GameApiReleaseInfoPath)')">$([System.IO.File]::ReadAllText('$(Sts2GameApiReleaseInfoPath)'))</Sts2GameApiReleaseInfoText>
+    <Sts2GameVersion Condition="'$(Sts2GameVersion)' == '' and '$(Sts2GameApiReleaseInfoText)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiReleaseInfoText)', '"version"[ \t]*:[ \t]*"([^"]*)"').Groups[1].Value)</Sts2GameVersion>
+
+    <Sts2GameApiLanePattern Condition="'$(Sts2GameVersion)' != ''">;$([System.Text.RegularExpressions.Regex]::Escape('$(Sts2GameVersion)'))=([^;]+);</Sts2GameApiLanePattern>
+    <Sts2GameApiDetectedLane Condition="'$(Sts2GameApiLanePattern)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiLaneTable)', '$(Sts2GameApiLanePattern)').Groups[1].Value)</Sts2GameApiDetectedLane>
+
+    <!-- (1) beats (2): an explicit lane is only overridden by nothing. -->
+    <Sts2GameApi Condition="'$(Sts2GameApi)' == ''">$(Sts2GameApiDetectedLane)</Sts2GameApi>
+
+    <!--
+      A lane is REQUIRED whenever this build actually compiles the live-host sources. Mirrors the
+      `EnableSts2LiveHost` default the four bridge projects compute for themselves, so a bridge built with
+      no game assemblies (the offline leg) neither needs nor validates a lane.
+    -->
+    <Sts2GameApiRequired Condition="'$(Sts2GameApiRequired)' == '' and '$(EnableSts2LiveHost)' == 'false'">false</Sts2GameApiRequired>
+    <Sts2GameApiRequired Condition="'$(Sts2GameApiRequired)' == '' and '$(Sts2AssembliesDir)' != '' and Exists('$(Sts2AssembliesDir)/sts2.dll')">true</Sts2GameApiRequired>
+    <Sts2GameApiRequired Condition="'$(Sts2GameApiRequired)' == ''">false</Sts2GameApiRequired>
+
+    <!-- Fenced so a lane name can never match another lane's prefix. -->
+    <Sts2GameApiLaneFence>;$(Sts2GameApiLanes);</Sts2GameApiLaneFence>
+    <Sts2GameApiLaneIsKnown Condition="'$(Sts2GameApi)' != ''">$(Sts2GameApiLaneFence.Contains(';$(Sts2GameApi);'))</Sts2GameApiLaneIsKnown>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Sts2GameApi)' == 'v107'">
+    <DefineConstants>$(DefineConstants);STS2_API_V107</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Sts2GameApi)' == 'v111'">
+    <DefineConstants>$(DefineConstants);STS2_API_V111</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    (3) Refuse rather than guess. Four distinct failures, each with the one thing to change:
+    an unmapped game build, an unreadable/absent release_info.json, an unknown explicit lane, and an
+    explicit lane that contradicts the install it is being pointed at.
+  -->
+  <Target Name="ValidateSts2GameApiLane" BeforeTargets="ResolveReferences">
+    <Error
+      Condition="'$(Sts2GameApiRequired)' == 'true' and '$(Sts2GameApi)' == '' and '$(Sts2GameVersion)' != ''"
+      Text="STS2 game build '$(Sts2GameVersion)' has no API lane. Add a '$(Sts2GameVersion)=&lt;lane&gt;' row to Sts2GameApiLaneTable in $(Sts2GameApiTableFile) (known lanes: $(Sts2GameApiLanes)), or pass -p:Sts2GameApi=&lt;lane&gt; to pick one explicitly." />
+    <Error
+      Condition="'$(Sts2GameApiRequired)' == 'true' and '$(Sts2GameApi)' == '' and '$(Sts2GameVersion)' == ''"
+      Text="Cannot resolve an STS2 API lane: no readable 'version' in $(Sts2GameApiReleaseInfoPath) (from Sts2AssembliesDir=$(Sts2AssembliesDir)). Pass -p:Sts2GameApi=&lt;lane&gt; (known lanes: $(Sts2GameApiLanes)); the table is in $(Sts2GameApiTableFile)." />
+    <Error
+      Condition="'$(Sts2GameApi)' != '' and '$(Sts2GameApiLaneIsKnown)' != 'true'"
+      Text="Unknown STS2 API lane '$(Sts2GameApi)'. Known lanes: $(Sts2GameApiLanes) (see $(Sts2GameApiTableFile))." />
+    <Error
+      Condition="'$(Sts2GameApiAllowVersionMismatch)' != 'true' and '$(Sts2GameApiDetectedLane)' != '' and '$(Sts2GameApi)' != '' and '$(Sts2GameApi)' != '$(Sts2GameApiDetectedLane)'"
+      Text="STS2 API lane mismatch: -p:Sts2GameApi=$(Sts2GameApi) was requested, but $(Sts2GameApiReleaseInfoPath) reports game build '$(Sts2GameVersion)', which $(Sts2GameApiTableFile) maps to lane '$(Sts2GameApiDetectedLane)'. Drop the override, point Sts2AssembliesDir at the matching install, or pass -p:Sts2GameApiAllowVersionMismatch=true if you really mean it." />
+  </Target>
+</Project>
