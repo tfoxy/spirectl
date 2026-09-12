@@ -2,6 +2,7 @@ using Spirectl.Sts2.Core.Actions;
 using Spirectl.Sts2.Core.Logging;
 using Spirectl.Sts2.Core.Perspective;
 using Spirectl.Sts2.Core.State;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -30,6 +31,11 @@ internal static class Sts2ReusableLiveCompositionFactory
         {
             Sts2MainThreadDispatcher.Capture(Sts2GodotMainThreadPump.Install());
         }
+
+        // Before anything binds to the game: prove the members this build's API lane promises are really
+        // there. A miss throws, because every alternative is a bridge that starts and then reports wrong
+        // numbers — the by-name reader answers null, and the projection turns null into 0/false.
+        Sts2GameApiProbe.EnsureCompatible(logStream);
 
         Sts2MonoModNativeDependencies.EnsureLoaded(logStream);
         Sts2SyntheticLobbyNameHooks.Install(logStream);

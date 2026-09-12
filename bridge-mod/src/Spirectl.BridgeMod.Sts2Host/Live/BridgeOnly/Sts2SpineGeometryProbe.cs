@@ -8,6 +8,7 @@ using System.Text.Json;
 using Godot;
 using MegaCrit.Sts2.Core.Bindings.MegaSpine;
 using Spirectl.Sts2.Core.Logging;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -675,7 +676,7 @@ internal static class Sts2SpineGeometryProbe
             }
 
             var state = sprite.GetAnimationState();
-            var entry = state.SetAnimation(animation, loop: false);
+            var entry = GameApiSpine.SetAnimation(state, animation, loop: false);
             if (entry is null)
             {
                 return new ProbeLane

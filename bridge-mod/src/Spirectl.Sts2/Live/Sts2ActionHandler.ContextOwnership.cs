@@ -739,7 +739,7 @@ public sealed partial class Sts2ActionHandler
         if (Sts2SupportedScreenIds.IsStartRunLobbyScreen(screenObject)
             && Sts2LiveIntrospection.GetMemberValue(screenObject, "Lobby") is StartRunLobby startRunLobby)
         {
-            var localPlayerId = startRunLobby.LocalPlayer is LobbyPlayer localPlayer
+            var localPlayerId = startRunLobby.LocalPlayer is GameLobbyPlayer localPlayer
                 ? $"p:{localPlayer.id}"
                 : $"p:{startRunLobby.NetService.NetId}";
             var hostPlayerId = ResolveLobbyHostPlayerId(startRunLobby.NetService, localPlayerId);
@@ -1032,7 +1032,7 @@ public sealed partial class Sts2ActionHandler
         return null;
     }
 
-    private static CharacterModel? ResolveDefaultLobbyCharacter(object screenObject, LobbyPlayer localPlayer)
+    private static CharacterModel? ResolveDefaultLobbyCharacter(object screenObject, GameLobbyPlayer localPlayer)
     {
         if (localPlayer.character is not null)
         {
@@ -1068,7 +1068,7 @@ public sealed partial class Sts2ActionHandler
         return ModelDb.AllCharacters.FirstOrDefault();
     }
 
-    private static void RefreshSyntheticStartRunLobbyPlayerUi(object screenObject, LobbyPlayer player)
+    private static void RefreshSyntheticStartRunLobbyPlayerUi(object screenObject, GameLobbyPlayer player)
     {
         var remotePlayerContainer = Sts2LiveIntrospection.GetMemberValue(screenObject, "_remotePlayerContainer");
         if (RemotePlayerContainerHasPlayer(remotePlayerContainer, player.id))
@@ -1128,7 +1128,7 @@ public sealed partial class Sts2ActionHandler
         return false;
     }
 
-    private static ulong NextSyntheticNetId(IEnumerable<LobbyPlayer> players)
+    private static ulong NextSyntheticNetId(IEnumerable<GameLobbyPlayer> players)
     {
         var used = players.Select(player => player.id).ToHashSet();
         var candidate = used.Count == 0 ? 1uL : used.Max() + 1uL;
@@ -1140,7 +1140,7 @@ public sealed partial class Sts2ActionHandler
         return candidate;
     }
 
-    private static int NextLobbySlotId(IEnumerable<LobbyPlayer> players)
+    private static int NextLobbySlotId(IEnumerable<GameLobbyPlayer> players)
     {
         var used = players.Select(player => player.slotId).ToHashSet();
         var candidate = used.Count == 0 ? 0 : used.Max() + 1;

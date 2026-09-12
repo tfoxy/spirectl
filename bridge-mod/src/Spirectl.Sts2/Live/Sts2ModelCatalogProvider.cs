@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Rooms;
 using Spirectl.Sts2.Core.Models;
 using Spirectl.Sts2.Core.Protocol;
 using System.Text;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -185,6 +186,17 @@ public sealed class Sts2ModelCatalogProvider : IModelCatalogProvider
         var selected = SelectModels(request.Ids, all, model => model.Id.Entry, out var missing);
         List<ModelCatalogNoticeSnapshot> notices = [];
         var models = Sts2ModelCatalogProjection.ProjectSnapshots(selected, model => model.Id.Entry, model => TrySnapshot(model, ToEncounterSnapshot, MinimalEncounterSnapshot), notices);
+        if (!GameApiEncounter.IsDebugEncounterSupported && models.Count > 0)
+        {
+            // The flag has no successor on this game build. Report the substituted value rather than passing
+            // a constant off as game truth.
+            notices.Add(new ModelCatalogNoticeSnapshot(
+                "encounter-debug-flag-unavailable",
+                "warning",
+                "This game build has no debug-encounter flag; every encounter reports isDebugEncounter=false.",
+                "encounters[].isDebugEncounter"));
+        }
+
         return Success("encounters", models, missing, notices);
     }
 
@@ -1117,7 +1129,7 @@ public sealed class Sts2ModelCatalogProvider : IModelCatalogProvider
             // (which drops the camera + slot positions presentation needs).
             RoomType: TryStr(() => model.RoomType.ToString()),
             IsWeak: model.IsWeak,
-            IsDebugEncounter: model.IsDebugEncounter,
+            IsDebugEncounter: GameApiEncounter.IsDebugEncounter(model),
             MonsterIds: TryList(() => model.AllPossibleMonsters.Select(monster => monster.Id.Entry)),
             MonstersWithSlots: TryList(() => model.MonstersWithSlots.Select(entry => new EncounterMonsterSlotSnapshot(entry.Item1.Id.Entry, entry.Item2 ?? string.Empty))),
             Slots: TryList(() => model.Slots.AsEnumerable()),

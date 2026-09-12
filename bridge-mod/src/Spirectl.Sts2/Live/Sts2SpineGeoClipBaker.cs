@@ -7,6 +7,7 @@ using Godot;
 using MegaCrit.Sts2.Core.Bindings.MegaSpine;
 using Spirectl.Sts2.Core.Artifacts;
 using Spirectl.Sts2.Core.Logging;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -2214,7 +2215,7 @@ internal static class Sts2SpineGeoClipBaker
             }
 
             var state = sprite.GetAnimationState();
-            var entry = state.SetAnimation(animation, loop: false, trackId: 0);
+            var entry = GameApiSpine.SetAnimation(state, animation, loop: false, trackId: 0);
             if (entry is null)
             {
                 Log(logStream, $"skip {label}: setting the animation returned no track entry.");

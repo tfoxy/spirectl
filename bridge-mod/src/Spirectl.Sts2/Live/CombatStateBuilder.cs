@@ -20,6 +20,7 @@ using Spirectl.Sts2.Core.Models;
 using Spirectl.Sts2.Core.State;
 using Spirectl.Sts2.Core.Perspective;
 using System.Reflection;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -246,8 +247,8 @@ internal static class CombatStateBuilder
                 Combat: combat,
                 Overlays: overlays,
                 Potions: potions,
-                CanRemovePotions: Sts2LiveIntrospection.GetMemberValue(player, "CanRemovePotions") is not { } canRemovePotions
-                    || StateProjectionValues.ToBoolean(canRemovePotions),
+                CanRemovePotions: StateProjectionValues.ToBoolean(
+                    Sts2LiveIntrospection.GetMemberValue(player, GameApiNames.PlayerCanRemoveOrUsePotions)),
                 IsConnected: Sts2RunPlayerConnectivity.IsConnected(connectedNetIds, netId)));
             index++;
         }

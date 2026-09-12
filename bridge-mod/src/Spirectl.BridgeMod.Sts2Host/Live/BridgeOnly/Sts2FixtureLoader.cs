@@ -49,6 +49,7 @@ using Spirectl.Sts2.Core.Logging;
 using Spirectl.Sts2.Core.Perspective;
 using Spirectl.Sts2.Core.Protocol;
 using Spirectl.Sts2;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -1844,7 +1845,7 @@ public sealed partial class Sts2FixtureLoader : IFixtureLoader
             if (mainMenu is not null && IsUsableGodotObject(mainMenu))
             {
                 mainMenu.DisableBackstopInstantly();
-                if (mainMenu.BlurBackstop is CanvasItem backstop && IsUsableGodotObject(backstop))
+                if (GameApiMainMenu.BlurBackstop(mainMenu) is CanvasItem backstop && IsUsableGodotObject(backstop))
                 {
                     backstop.Visible = false;
                 }
@@ -2166,7 +2167,7 @@ public sealed partial class Sts2FixtureLoader : IFixtureLoader
 
         foreach (var remotePlayer in recipe.RemotePlayers)
         {
-            lobby.Players.Add(new LobbyPlayer
+            lobby.Players.Add(new GameLobbyPlayer
             {
                 id = remotePlayer.NetId,
                 slotId = remotePlayer.SlotId,
@@ -2325,7 +2326,7 @@ public sealed partial class Sts2FixtureLoader : IFixtureLoader
     }
 
     // Replicate NCharacterSelectScreen.OnEmbarkPressed's visible effects when a fixture marks the
-    // local player ready. ApplyStartRunLobbyRecipe already set LobbyPlayer.isReady (which drives the
+    // local player ready. ApplyStartRunLobbyRecipe already set the lobby player's isReady (which drives the
     // top-left player-list check), but the screen's button/overlay state is updated IMPERATIVELY by
     // the confirm-button handler, which the loader never ran — so the back/confirm buttons and the
     // "waiting for players" overlay stayed in their not-ready layout. We deliberately do NOT call

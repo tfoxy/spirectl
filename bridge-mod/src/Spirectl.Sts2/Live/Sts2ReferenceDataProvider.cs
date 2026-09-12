@@ -153,7 +153,7 @@ public sealed class Sts2ReferenceDataProvider(ILogStream logStream) : IReference
     // ReleaseInfoManager.Instance.ReleaseInfo, reached by reflection because the
     // ReleaseInfoManager/ReleaseInfo types are internal to sts2.dll. ModManager
     // (public) gives us a handle to the game assembly.
-    private static object? ResolveReleaseInfo()
+    internal static object? ResolveReleaseInfo()
     {
         var managerType = typeof(ModManager).Assembly
             .GetType("MegaCrit.Sts2.Core.Debug.ReleaseInfoManager");

@@ -25,6 +25,7 @@ using SpirectlModels = Spirectl.Sts2.Core.Models;
 using Spirectl.Sts2.Core.Protocol;
 using Spirectl.Sts2.Core.State;
 using Spirectl.Sts2.Live.EncounterVisuals;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -277,7 +278,7 @@ public sealed class Sts2RuntimeObservationProvider : IRuntimeObservationProvider
                         DrawPile: drawPile,
                         DiscardPile: discardPile,
                         ExhaustPile: exhaustPile,
-                        CanRemovePotions: SafeBool(() => (bool)player.CanRemovePotions, fallback: true)),
+                        CanRemovePotions: SafeBool(() => GameApiPlayer.CanRemoveOrUsePotions(player), fallback: true)),
                     creature,
                     player);
             })
@@ -1246,7 +1247,7 @@ public sealed class Sts2RuntimeObservationProvider : IRuntimeObservationProvider
         StartRunLobby lobby,
         List<StateNoticeSnapshot> notices)
     {
-        var localPlayerId = lobby.LocalPlayer is LobbyPlayer localPlayer
+        var localPlayerId = lobby.LocalPlayer is GameLobbyPlayer localPlayer
             ? LobbyPlayerId(localPlayer.id)
             : !string.IsNullOrWhiteSpace(lobby.NetService?.NetId.ToString())
                 ? LobbyPlayerId(lobby.NetService.NetId)
@@ -1429,7 +1430,7 @@ public sealed class Sts2RuntimeObservationProvider : IRuntimeObservationProvider
         => Sts2SavedRunSnapshotResolver.Resolve(savedRun);
 
     private static LobbyPlayerSnapshot SnapshotStartRunPlayer(
-        LobbyPlayer player,
+        GameLobbyPlayer player,
         string? localPlayerId,
         string? hostPlayerId,
         object? platform,

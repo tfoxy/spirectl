@@ -4,13 +4,15 @@ using MegaCrit.Sts2.Core.Multiplayer.Messages.Game;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves.Runs;
 using Spirectl.Sts2.Core.Logging;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
 /// <summary>
 /// Completes the game's combat-state sync barrier on behalf of synthetic host-local
 /// seats. <c>CombatStateSynchronizer.StartSync</c> waits for a <c>SyncPlayerDataMessage</c>
-/// from every id in <c>RunLobby.ConnectedPlayerIds</c>, but a synthetic seat has no
+/// from every id in the in-run lobby's roster (<see cref="GameApiLobby.ConnectedPlayerIds"/>), but a
+/// synthetic seat has no
 /// network peer, so the barrier never completes and the run hangs on the embark fade
 /// (and on every later room entry). The host's copy of the seat's player IS the
 /// authoritative state, so this watcher feeds the seat's own serialized player through
@@ -94,7 +96,7 @@ internal static class Sts2HostLocalSeatSyncWatcher
             return;
         }
 
-        foreach (var playerId in runLobby.ConnectedPlayerIds.ToArray())
+        foreach (var playerId in GameApiLobby.ConnectedPlayerIds(runLobby).ToArray())
         {
             if (syncData.ContainsKey(playerId) || !Sts2HostLocalSeatRegistry.IsSyntheticHostLocalSeat(playerId))
             {

@@ -49,6 +49,7 @@ using Spirectl.Sts2.Core.Logging;
 using Spirectl.Sts2.Core.Perspective;
 using Spirectl.Sts2.Core.Protocol;
 using Spirectl.Sts2;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -256,7 +257,7 @@ public sealed partial class Sts2FixtureLoader
 
         private (NetHostGameService? Host, object? Error) StartStartRunLobbyHost(FixtureLoadRequestSnapshot request)
         {
-            var netService = new NetHostGameService();
+            var netService = GameApiNetHost.Create();
             object? hostError = null;
             for (var portOffset = 0; portOffset < MaxStartRunHostPortAttempts; portOffset += 1)
             {
@@ -271,7 +272,7 @@ public sealed partial class Sts2FixtureLoader
 
                 if (portOffset + 1 < MaxStartRunHostPortAttempts)
                 {
-                    netService = new NetHostGameService();
+                    netService = GameApiNetHost.Create();
                 }
             }
 
@@ -309,7 +310,7 @@ public sealed partial class Sts2FixtureLoader
                     Sts2FixtureLobbyProgressScope.Clear();
                 }
 
-                var netService = new NetHostGameService();
+                var netService = GameApiNetHost.Create();
                 var hostError = netService.StartENetHost(33771, 4);
                 if (hostError is not null)
                 {

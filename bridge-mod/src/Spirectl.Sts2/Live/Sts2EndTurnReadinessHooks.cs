@@ -2,6 +2,7 @@ using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using Spirectl.Sts2.Core.Logging;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -46,12 +47,7 @@ internal static class Sts2EndTurnReadinessHooks
 
             Sts2MonoModNativeDependencies.EnsureLoaded(logStream);
 
-            var target = typeof(CombatManager).GetMethod(
-                nameof(CombatManager.AllPlayersReadyToEndTurn),
-                BindingFlags.Public | BindingFlags.Instance,
-                binder: null,
-                types: [],
-                modifiers: null);
+            var target = GameApiHooks.AllPlayersReadyToEndTurnTarget();
             var postfix = typeof(Sts2EndTurnReadinessHooks).GetMethod(
                 nameof(AllPlayersReadyToEndTurnPostfix),
                 BindingFlags.NonPublic | BindingFlags.Static);

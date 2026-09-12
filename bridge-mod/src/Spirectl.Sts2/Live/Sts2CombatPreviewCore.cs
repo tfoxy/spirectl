@@ -5,6 +5,7 @@ using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Models;
 using Spirectl.Sts2.Core.Combat;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -90,7 +91,7 @@ internal static class Sts2CombatPreviewCore
     private static int FunnelDamage(CardModel card, DynamicVar damageVar, Creature? target)
         => damageVar switch
         {
-            CalculatedDamageVar calc => (int)Hook.ModifyDamage(
+            CalculatedDamageVar calc => (int)GameApiHooks.ModifyDamage(
                 card.Owner.RunState,
                 card.CombatState ?? card.Owner.Creature.CombatState,
                 target,
@@ -99,9 +100,8 @@ internal static class Sts2CombatPreviewCore
                 calc.Props,
                 card,
                 ModifyDamageHookType.All,
-                CardPreviewMode.Normal,
-                out _),
-            DamageVar dmg => (int)Hook.ModifyDamage(
+                CardPreviewMode.Normal),
+            DamageVar dmg => (int)GameApiHooks.ModifyDamage(
                 card.Owner.RunState,
                 card.CombatState,
                 target,
@@ -110,8 +110,7 @@ internal static class Sts2CombatPreviewCore
                 dmg.Props,
                 card,
                 ModifyDamageHookType.All,
-                CardPreviewMode.Normal,
-                out _),
+                CardPreviewMode.Normal),
             _ => 0,
         };
 

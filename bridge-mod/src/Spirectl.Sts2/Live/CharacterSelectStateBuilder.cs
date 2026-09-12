@@ -20,6 +20,7 @@ using Spirectl.Sts2.Core.Models;
 using Spirectl.Sts2.Core.State;
 using Spirectl.Sts2.Core.Perspective;
 using System.Reflection;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -85,24 +86,28 @@ internal static class CharacterSelectStateBuilder
                 Sts2LiveIntrospection.GetMemberValue(lobby, "Players"),
                 platform,
                 nameNotices,
-                Sts2LiveIntrospection.GetMemberValue(lobby, "ConnectedPlayerIds"),
+                // The START-RUN lobby declares no roster-of-ids member on any supported build (only the
+                // in-run and saved-run lobbies do), so this resolves to null and every non-local seat reports
+                // "not connected" from here. Kept lane-pinned so it starts answering the day the lobby grows one.
+                Sts2LiveIntrospection.GetMemberValue(lobby, GameApiNames.LobbyPlayerIds),
                 localPlayerId),
             MaxPlayers: ResolveMaxPlayers(lobby));
     }
 
     /// <summary>
-    /// The start-run lobby's live player cap (<c>StartRunLobby.MaxPlayers</c>, which the lobby itself checks in
-    /// its join handler). Read fresh on every observation rather than cached: the multiplayer limit mods raise it
-    /// at different moments — "Unlimited" rewrites the argument the lobby is constructed with, so it is right from
-    /// the start, while "Multiplayer Limit Break" writes the field from its own join/connect hooks, so an early
-    /// read still sees the stock 4. Falls back to the stock cap when the member is absent (a game update renaming
-    /// it must degrade to vanilla behavior, never to "no seats").
+    /// The start-run lobby's live player cap (<see cref="GameApiNames.LobbyMaxPlayers"/>, which the lobby itself
+    /// checks in its join handler). Read fresh on every observation rather than cached: the multiplayer limit mods
+    /// raise it at different moments — "Unlimited" rewrites the argument the lobby is constructed with, so it is
+    /// right from the start, while "Multiplayer Limit Break" writes the field from its own join/connect hooks, so
+    /// an early read still sees the stock 4.
     /// </summary>
+    /// <remarks>
+    /// No rename fallback. The member is a startup requirement (<see cref="Sts2GameApiProbe"/>), so a build that
+    /// does not expose the cap refuses the bridge instead of quietly sizing every seat limit — admission caps,
+    /// free-slot checks, the host transport's lobby probe — off the stock constant.
+    /// </remarks>
     private static int ResolveMaxPlayers(object lobby)
-    {
-        var max = StateProjectionValues.ToInt32(Sts2LiveIntrospection.GetMemberValue(lobby, "MaxPlayers"));
-        return max > 0 ? max : StateCharacterSelectLobbyDefaults.MaxPlayers;
-    }
+        => StateProjectionValues.ToInt32(Sts2LiveIntrospection.GetMemberValue(lobby, GameApiNames.LobbyMaxPlayers));
 
     private static IReadOnlyList<StateCharacterSelectPlayerSnapshot> ResolvePlayers(
         object? playersObject,
@@ -137,7 +142,7 @@ internal static class CharacterSelectStateBuilder
     }
 
     // Mirrors NRemoteLobbyPlayer: the local player is always connected; a remote player is
-    // connected iff their net id is in the lobby's ConnectedPlayerIds (RunLobby.ConnectedPlayerIds).
+    // connected iff their net id is in the lobby's roster of ids (GameApiNames.LobbyPlayerIds).
     private static bool ResolvePlayerConnected(object? connectedPlayerIds, ulong? netId, string? playerId, string? localPlayerId)
     {
         if (!string.IsNullOrEmpty(playerId) && string.Equals(playerId, localPlayerId, StringComparison.Ordinal))
@@ -209,7 +214,7 @@ internal static class CharacterSelectStateBuilder
             return [];
         }
 
-        var connectedPlayerIds = Sts2LiveIntrospection.GetMemberValue(lobby, "ConnectedPlayerIds");
+        var connectedPlayerIds = Sts2LiveIntrospection.GetMemberValue(lobby, GameApiNames.LobbyPlayerIds);
         var result = new List<StateCharacterSelectPlayerSnapshot>();
         var index = 0;
         foreach (var player in players)
