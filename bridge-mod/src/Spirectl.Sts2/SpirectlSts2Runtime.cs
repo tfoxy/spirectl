@@ -19,10 +19,14 @@ public static class SpirectlSts2Runtime
     /// move for different reasons, and an embedder invalidating its cache on API version would throw away a
     /// warm cache for an unrelated RPC change.</para>
     ///
-    /// <para>Seeded at 13 to match the cache generation the first adopting embedder had already reached by
-    /// hand-counting spirectl's payload changes, so adopting the constant invalidates nothing. It is pinned by
-    /// <c>AssetPayloadShapesArePinnedToAssetPayloadVersion</c>, which fails when a payload shape changes without
-    /// this number moving.</para>
+    /// <para>Starts at 1, with the first public release. It briefly carried a much larger number, inherited from
+    /// a generation count the first adopting embedder had been keeping by hand before this constant existed; that
+    /// count described changes nobody outside this repository ever saw, so it was reset rather than published.
+    /// The number is only ever compared for equality against a value a cache stored, so where it starts does not
+    /// matter — only that it moves when the bytes do.</para>
+    ///
+    /// <para>It is pinned by <c>AssetPayloadShapesArePinnedToAssetPayloadVersion</c>, which fails when a payload
+    /// shape changes without this number moving.</para>
     /// </remarks>
-    public const int AssetPayloadVersion = 13;
+    public const int AssetPayloadVersion = 1;
 }
