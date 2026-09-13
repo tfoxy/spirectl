@@ -61,6 +61,7 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
             new("state", "Presentation runtime state envelope for browser scene evaluation.", true, _services.Provisional, null),
             new("state-subscriptions", "Reactive embedded semantic state subscriptions with callback and async-stream consumers.", true, _services.Provisional, null),
             new("state-watch", "Reactive state presentation envelope stream with duplicate suppression.", true, _services.Provisional, null),
+            new(EmbeddableCapabilityIds.MultiplayerConnection, "Ordered native multiplayer connection observations for embedded hosts.", _services.MultiplayerConnectionSupported, !_services.MultiplayerConnectionSupported || _services.Provisional, _services.MultiplayerConnectionSupported ? null : "The runtime does not expose native multiplayer connection hooks."),
             new("combat-events", "Ordered, non-deduplicated transient combat-event stream (floating damage numbers) with sequence-based resume.", true, _services.Provisional, null),
             new("animation-hints", "Lightweight Godot-tween timing hints (scene/node/property + duration/easing) for pre-arming CSS transitions; subscribing enables the producer's cheap lite capture path.", true, _services.Provisional, null),
             new("scene-watch", "Reactive live runtime scene-tree stream (full /root subtree with live properties and computed transforms) with duplicate suppression.", true, _services.Provisional, null),
@@ -124,6 +125,19 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
                     ex.Message),
                 health);
         }
+    }
+
+    public MultiplayerConnectionSnapshot? GetCurrentMultiplayerConnection()
+        => _services.MultiplayerConnectionSupported
+            ? EmbeddableMultiplayerConnectionHub.Shared.GetCurrent()
+            : null;
+
+    public IDisposable SubscribeMultiplayerConnection(Action<MultiplayerConnectionSnapshot> onEvent)
+    {
+        ArgumentNullException.ThrowIfNull(onEvent);
+        return _services.MultiplayerConnectionSupported
+            ? _subscriptions.Subscribe(() => EmbeddableMultiplayerConnectionHub.Shared.Subscribe(onEvent))
+            : NoopDisposable.Instance;
     }
 
     public IDisposable SubscribeCurrentState(

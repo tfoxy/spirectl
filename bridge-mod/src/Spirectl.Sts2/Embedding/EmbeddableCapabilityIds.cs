@@ -35,6 +35,9 @@ public static class EmbeddableCapabilityIds
     /// <summary>Reactive state presentation envelope stream with duplicate suppression.</summary>
     public const string StateWatch = "state-watch";
 
+    /// <summary>Ordered native multiplayer connection observations for embedded hosts.</summary>
+    public const string MultiplayerConnection = "multiplayer-connection";
+
     /// <summary>Ordered transient combat-event stream with sequence-based resume.</summary>
     public const string CombatEvents = "combat-events";
 
@@ -80,6 +83,7 @@ public static class EmbeddableCapabilityIds
         State,
         StateSubscriptions,
         StateWatch,
+        MultiplayerConnection,
         CombatEvents,
         AnimationHints,
         SceneWatch,

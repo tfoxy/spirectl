@@ -3,28 +3,9 @@ using Spirectl.Sts2.Live;
 
 namespace Spirectl.Sts2;
 
-// Run-player connectedness for the state snapshot: is each run player's ENet peer currently connected?
-//
-// The lobby already answers this from the in-run lobby's roster of ids — GameApiNames.LobbyPlayerIds, which
-// names the member per game build (see Sts2StateProvider.ResolvePlayerConnected, mirroring
-// NRemoteLobbyPlayer._isConnected). Once the run starts that lobby is gone, so the run path reads the HOST net
-// service's live peer registry instead:
-//
-//     INetHostGameService.ConnectedPeers -> IReadOnlyList<NetClientData>   (NetClientData.peerId == netId)
-//
-// NetHostGameService keeps that list exact — a peer is appended in OnPeerConnected and removed in
-// OnPeerDisconnected — so it is the authoritative "who is on the wire right now" set. If it is unreachable (older
-// build, a CLIENT net service, a reshaped member) we fall back to the transport's own NetHost.ConnectedPeerIds
-// (ENetHost/SteamHost expose IEnumerable<ulong>).
-//
-// SAFETY CONTRACT — never produce a FALSE "disconnected". A missing net service, a missing/unreadable peer
-// collection, or a player with no resolvable netId all yield "connected". Only an explicitly readable peer set that
-// demonstrably lacks a player's netId marks that player disconnected. The set is resolved ONCE per snapshot
-// (ResolveConnectedNetIds) and then queried per player (IsConnected) because ResolveRunPlayers is a hot path.
-//
-// Two netIds are unioned into the set because they legitimately never appear in ConnectedPeers:
-//   * the LOCAL player (INetGameService.NetId) — the host is not its own peer, but it is always connected;
-//   * synthetic host-local seats (Sts2HostLocalSeatRegistry) — fixture seats with no ENet peer at all.
+// Connection-state policy shared by state projections. A readable host peer set is authoritative.
+// Run snapshots fail open when that observation is unavailable, while lobby admission remains strict.
+
 internal static class Sts2RunPlayerConnectivity
 {
     // Resolve the connected-netId set once per snapshot. Returns null when connectedness is UNKNOWN, which callers
@@ -57,6 +38,10 @@ internal static class Sts2RunPlayerConnectivity
         return connectedNetIds.Contains(netId.Value)
                || Sts2HostLocalSeatRegistry.IsHostLocalSeat(netId.Value);
     }
+
+    // Lobby admission is strict: a remote player is ready only after host transport observation.
+    internal static bool IsHostObservedLobbyPlayerConnected(IReadOnlySet<ulong>? connectedNetIds, ulong? netId)
+        => connectedNetIds is not null && netId.HasValue && connectedNetIds.Contains(netId.Value);
 
     private static HashSet<ulong>? ReadPeerNetIds(object? netService)
     {

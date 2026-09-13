@@ -31,4 +31,5 @@ internal sealed record SpirectlRuntimeServices(
     bool Provisional = false,
     IDisposable? Lifetime = null,
     IReadOnlyList<Core.Actions.ActionDescriptorSnapshot>? SupportedActions = null,
-    Live.ISts2RuntimeInstrumentation? Instrumentation = null);
+    Live.ISts2RuntimeInstrumentation? Instrumentation = null,
+    bool MultiplayerConnectionSupported = false);

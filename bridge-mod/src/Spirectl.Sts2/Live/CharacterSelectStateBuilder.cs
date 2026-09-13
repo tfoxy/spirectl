@@ -68,6 +68,8 @@ internal static class CharacterSelectStateBuilder
         var localPlayer = Sts2LiveIntrospection.GetMemberValue(lobby, "LocalPlayer");
         var localPlayerId = StateProjectionValues.ResolvePlayerId(Sts2LiveIntrospection.GetMemberValue(localPlayer, "id"))
             ?? StateProjectionValues.ResolvePlayerId(Sts2LiveIntrospection.GetMemberValue(netService, "NetId"));
+        var localNetId = StateProjectionValues.ToUInt64(Sts2LiveIntrospection.GetMemberValue(localPlayer, "id"))
+            ?? StateProjectionValues.ToUInt64(Sts2LiveIntrospection.GetMemberValue(netService, "NetId"));
         var hostPlayerId = Sts2LobbyHostResolver.Resolve(netService, localPlayerId);
         var platform = Sts2LiveIntrospection.GetMemberValue(netService, "Platform");
         var nameNotices = new List<StateNoticeSnapshot>();
@@ -86,10 +88,8 @@ internal static class CharacterSelectStateBuilder
                 Sts2LiveIntrospection.GetMemberValue(lobby, "Players"),
                 platform,
                 nameNotices,
-                // The START-RUN lobby declares no roster-of-ids member on any supported build (only the
-                // in-run and saved-run lobbies do), so this resolves to null and every non-local seat reports
-                // "not connected" from here. Kept lane-pinned so it starts answering the day the lobby grows one.
-                Sts2LiveIntrospection.GetMemberValue(lobby, GameApiNames.LobbyPlayerIds),
+                // Use observed transport membership for lobby connectivity.
+                Sts2RunPlayerConnectivity.ResolveConnectedNetIds(netService, localNetId),
                 localPlayerId),
             MaxPlayers: ResolveMaxPlayers(lobby));
     }
@@ -141,13 +141,17 @@ internal static class CharacterSelectStateBuilder
         return result;
     }
 
-    // Mirrors NRemoteLobbyPlayer: the local player is always connected; a remote player is
-    // connected iff their net id is in the lobby's roster of ids (GameApiNames.LobbyPlayerIds).
+    // The local player is connected. Remote players require membership in the available observation source.
     private static bool ResolvePlayerConnected(object? connectedPlayerIds, ulong? netId, string? playerId, string? localPlayerId)
     {
         if (!string.IsNullOrEmpty(playerId) && string.Equals(playerId, localPlayerId, StringComparison.Ordinal))
         {
             return true;
+        }
+
+        if (connectedPlayerIds is IReadOnlySet<ulong> observedPeerIds)
+        {
+            return Sts2RunPlayerConnectivity.IsHostObservedLobbyPlayerConnected(observedPeerIds, netId);
         }
 
         return netId.HasValue && ContainsNetId(connectedPlayerIds, netId.Value);

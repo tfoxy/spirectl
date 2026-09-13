@@ -60,6 +60,23 @@ public sealed class Sts2RunPlayerConnectivityTests
     }
 
     [Fact]
+    public void StartRunLobbyUsesTheHostObservedPeerSet()
+    {
+        var netService = new HostNetServiceDouble
+        {
+            NetId = 1001,
+            ConnectedPeers = [new NetClientDataDouble(1002)],
+        };
+        var peers = Sts2RunPlayerConnectivity.ResolveConnectedNetIds(netService, localNetId: 1001);
+
+        Assert.NotNull(peers);
+        Assert.True(Sts2RunPlayerConnectivity.IsHostObservedLobbyPlayerConnected(peers, 1002));
+        Assert.False(Sts2RunPlayerConnectivity.IsHostObservedLobbyPlayerConnected(peers, 1003));
+        Assert.False(Sts2RunPlayerConnectivity.IsHostObservedLobbyPlayerConnected(null, 1002));
+        Assert.False(Sts2RunPlayerConnectivity.IsHostObservedLobbyPlayerConnected(peers, null));
+    }
+
+    [Fact]
     public void UnresolvableNetServiceLeavesEveryPlayerConnected()
     {
         // 1. no net service at all
