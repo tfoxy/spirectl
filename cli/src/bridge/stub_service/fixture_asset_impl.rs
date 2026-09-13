@@ -791,6 +791,9 @@ impl StubBridgeService {
                         commit: "mock".to_string(),
                         branch: "mock".to_string(),
                         main_assembly_hash: 0,
+                        steam_branch: String::new(),
+                        steam_build_id: 0,
+                        steam_branch_source: String::new(),
                         modding: Some(proto::ModdingSummary {
                             is_running_modded: true,
                             loaded_mod_count: 1,

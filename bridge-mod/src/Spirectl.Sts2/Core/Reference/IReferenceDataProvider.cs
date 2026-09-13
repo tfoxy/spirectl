@@ -87,13 +87,33 @@ public sealed record GameColorSnapshot(string Name, string Hex, float R, float G
 
 // --- topic: version ---
 
+/// <param name="Branch">
+/// The game's OWN <c>release_info.json</c> branch field, which is its release TAG — "v0.107.1", not a Steam
+/// branch name. Kept as the game reports it; see <paramref name="SteamBranch"/> for the other question.
+/// </param>
+/// <param name="SteamBranch">
+/// The Steam branch this install is MOUNTED on — "public", "public-beta" — or empty when it could not be
+/// determined (no Steam, or an install outside a Steam library). Nothing in the game's own release record answers
+/// this, and it is the field that separates two installs of the same product whose content differs; see
+/// <see cref="Spirectl.Sts2.Live.Sts2GameBuildIdentity"/>.
+/// </param>
+/// <param name="SteamBuildId">Steam's build id for the mounted branch, or 0 when undeterminable.</param>
+/// <param name="SteamBranchSource">
+/// WHICH rung of the ladder answered — "steamworks" (Steam itself, in-process), "appmanifest" (Steam's install
+/// manifest on disk), or "unknown". Reported because the rungs are not equally trustworthy and a silent
+/// demotion is otherwise invisible: they agree on an ordinary install, so the only way to find out that the
+/// primary one never fires is to ask which one did.
+/// </param>
 public sealed record GameVersionInfoSnapshot(
     string Version,
     string VersionDate,
     string Commit,
     string Branch,
     int MainAssemblyHash,
-    ModdingSummarySnapshot Modding) : ReferencePayloadSnapshot;
+    ModdingSummarySnapshot Modding,
+    string SteamBranch = "",
+    int SteamBuildId = 0,
+    string SteamBranchSource = "") : ReferencePayloadSnapshot;
 
 public sealed record ModdingSummarySnapshot(bool IsRunningModded, int LoadedModCount, int TotalModCount);
 
