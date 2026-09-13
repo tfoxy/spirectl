@@ -71,7 +71,7 @@ public sealed partial class Sts2ActionHandler
             // exact parameter types: a NetError enum value, a ulong netId, and a bool. Signature:
             // NetHostGameService.DisconnectClient(ulong peerId, NetError reason, bool now = false).
             var kicked = Enum.Parse(netErrorType, "Kicked");
-            Sts2LiveIntrospection.InvokeMethod(netService, "DisconnectClient", netId, kicked, true);
+            Sts2LiveIntrospection.InvokeMethod(netService, "DisconnectClient", netId, kicked, false);
 
             Console.Error.WriteLine($"[spirectl] disconnect-client evicted ENet peer netId={netId} (Kicked).");
             _logStream.Write(BridgeLogLevel.Info, "bridge.action", $"Force-disconnected ENet peer p:{netId}.");
