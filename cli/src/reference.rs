@@ -54,6 +54,18 @@ pub(crate) fn reference_response_json(response: &bridge::proto::ReferenceRespons
                 "mainAssemblyHash".to_string(),
                 json!(version.main_assembly_hash),
             );
+            // `branch` above is the game's own release TAG; these two are the Steam install identity,
+            // which is the pair that distinguishes two installs of the same product whose content
+            // differs. Null rather than "" when undeterminable, matching every other optional field here.
+            object.insert(
+                "steamBranch".to_string(),
+                empty_string_to_json(&version.steam_branch),
+            );
+            object.insert("steamBuildId".to_string(), json!(version.steam_build_id));
+            object.insert(
+                "steamBranchSource".to_string(),
+                empty_string_to_json(&version.steam_branch_source),
+            );
             object.insert(
                 "modding".to_string(),
                 version
@@ -144,6 +156,9 @@ mod tests {
                     commit: "abc123".to_string(),
                     branch: "main".to_string(),
                     main_assembly_hash: 42,
+                    steam_branch: "public-beta".to_string(),
+                    steam_build_id: 23811903,
+                    steam_branch_source: "steamworks".to_string(),
                     modding: Some(bridge::proto::ModdingSummary {
                         is_running_modded: true,
                         loaded_mod_count: 2,
@@ -251,6 +266,11 @@ mod tests {
         assert_eq!(value["versionDate"], "2026.04.16");
         assert_eq!(value["commit"], "abc123");
         assert_eq!(value["mainAssemblyHash"], 42);
+        // The release tag and the Steam install identity are separate answers and both ride the payload.
+        assert_eq!(value["branch"], "main");
+        assert_eq!(value["steamBranch"], "public-beta");
+        assert_eq!(value["steamBuildId"], 23811903);
+        assert_eq!(value["steamBranchSource"], "steamworks");
         assert_eq!(value["modding"]["isRunningModded"], true);
         assert_eq!(value["modding"]["loadedModCount"], 2);
         assert_eq!(value["modding"]["totalModCount"], 2);

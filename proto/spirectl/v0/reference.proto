@@ -88,9 +88,19 @@ message GameVersionInfo {
   string version = 1;       // e.g. "v0.103.2"
   string version_date = 2;  // e.g. "2026.04.16" (ReleaseInfo.Date, yyyy.MM.dd)
   string commit = 3;
+  // The game's own release TAG, e.g. "v0.107.1" — not a Steam branch. See steam_branch.
   string branch = 4;
   int32 main_assembly_hash = 5;
   ModdingSummary modding = 6;
+  // The Steam branch the install is MOUNTED on ("public", "public-beta"), or "" when undeterminable
+  // (no Steam, or an install outside a Steam library). Nothing in the game's release record answers
+  // this, and it is what separates two installs of the same product whose content differs.
+  string steam_branch = 7;
+  // Steam's build id for the mounted branch, or 0 when undeterminable.
+  int32 steam_build_id = 8;
+  // Which rung answered: "steamworks", "appmanifest", or "unknown". They agree on an ordinary
+  // install, so this is the only way to notice that the primary one never fires.
+  string steam_branch_source = 9;
 }
 
 message ModdingSummary {

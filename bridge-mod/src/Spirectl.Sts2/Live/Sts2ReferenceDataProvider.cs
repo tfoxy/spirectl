@@ -101,6 +101,12 @@ public sealed class Sts2ReferenceDataProvider(ILogStream logStream) : IReference
             LoadedModCount: ModManager.GetLoadedMods().Count(),
             TotalModCount: ModManager.Mods.Count);
 
+        // WHICH STEAM BRANCH is a question the game's own release record cannot answer — its `branch` is the
+        // release tag ("v0.107.1"), so two installs of the same product whose content differs report the same
+        // thing. Resolved separately, and never cached here: it is read from Steam when Steam is up, and a
+        // process that asked once before `SteamAPI_Init()` must not be stuck with the weaker answer for ever.
+        var steam = Sts2GameBuildIdentity.Resolve();
+
         // ReleaseInfoManager/ReleaseInfo are internal to sts2.dll, so resolve
         // them by reflection (mirroring how Sts2ModInspector reaches internals).
         var release = ResolveReleaseInfo();
@@ -117,7 +123,10 @@ public sealed class Sts2ReferenceDataProvider(ILogStream logStream) : IReference
                     Commit: string.Empty,
                     Branch: string.Empty,
                     MainAssemblyHash: 0,
-                    Modding: modding),
+                    Modding: modding,
+                    SteamBranch: steam.Branch,
+                    SteamBuildId: steam.BuildId,
+                    SteamBranchSource: steam.BranchSource),
                 missingKeys: [],
                 notices:
                 [
@@ -145,7 +154,10 @@ public sealed class Sts2ReferenceDataProvider(ILogStream logStream) : IReference
                 Commit: Sts2LiveIntrospection.GetMemberValue(release, "Commit") as string ?? string.Empty,
                 Branch: Sts2LiveIntrospection.GetMemberValue(release, "Branch") as string ?? string.Empty,
                 MainAssemblyHash: hash is int hashValue ? hashValue : 0,
-                Modding: modding),
+                Modding: modding,
+                SteamBranch: steam.Branch,
+                SteamBuildId: steam.BuildId,
+                SteamBranchSource: steam.BranchSource),
             missingKeys: [],
             notices: []);
     }

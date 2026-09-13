@@ -1895,6 +1895,9 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
                     Commit = version.Commit,
                     Branch = version.Branch,
                     MainAssemblyHash = version.MainAssemblyHash,
+                    SteamBranch = version.SteamBranch,
+                    SteamBuildId = version.SteamBuildId,
+                    SteamBranchSource = version.SteamBranchSource,
                     Modding = new ModdingSummary
                     {
                         IsRunningModded = version.Modding.IsRunningModded,
