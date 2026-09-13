@@ -559,9 +559,9 @@ public sealed class Sts2EmbeddableAssetProviderTests
     /// Pins the SHAPE of the asset payload to SpirectlSts2Runtime.AssetPayloadVersion.
     ///
     /// <para>Embedders cache asset bytes keyed by a generation number, and before this constant existed that
-    /// number was maintained by hand on the CONSUMER side — bumped 12 times by reading spirectl's commits. A
-    /// missed bump is not a build error anywhere: the consumer serves stale bytes of the previous shape
-    /// indefinitely, and the only symptom is a picture that is quietly wrong.</para>
+    /// number was maintained by hand on the CONSUMER side, bumped by reading spirectl's commits. A missed bump is
+    /// not a build error anywhere: the consumer serves stale bytes of the previous shape indefinitely, and the
+    /// only symptom is a picture that is quietly wrong.</para>
     ///
     /// <para>So the pin is here, on the producing side, and it is deliberately BROAD: one payload per artifact
     /// kind, asserted field-by-field, plus the reflected member list of every record on the payload graph. Any
@@ -652,7 +652,7 @@ public sealed class Sts2EmbeddableAssetProviderTests
         Assert.Equal(4, font.ByteLength);
 
         // The bump protocol. A change above without a change here is exactly the silent staleness this guards.
-        Assert.Equal(13, SpirectlSts2Runtime.AssetPayloadVersion);
+        Assert.Equal(1, SpirectlSts2Runtime.AssetPayloadVersion);
         Assert.Equal(
             SpirectlSts2Runtime.AssetPayloadVersion,
             new EmbeddableRuntimeCapabilities(
