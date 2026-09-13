@@ -43,6 +43,22 @@ internal static class GameApiEncounter
     internal static bool IsDebugEncounter(EncounterModel model) => model.IsDebugEncounter;
 }
 
+/// <summary>Combat-manager members that differ by lane.</summary>
+internal static class GameApiCombat
+{
+    /// <summary>
+    /// The players whose end-of-player-turn readiness action has already landed, as the game's own live set.
+    /// Populated only between the host's own readiness and the side switch, so an empty set — and a
+    /// <see langword="null"/> return, which callers must treat identically — means nothing is pending.
+    /// v107 keeps the set on the combat manager itself.
+    /// </summary>
+    internal static IReadOnlyCollection<Player>? PlayersReadyToBeginEnemyTurn(CombatManager combatManager)
+        => Sts2LiveIntrospection.GetMemberValue(
+                combatManager,
+                GameApiNames.CombatPlayersReadyToBeginEnemyTurn)
+            as IReadOnlyCollection<Player>;
+}
+
 /// <summary>
 /// Game member names the bridge reads BY NAME (through <see cref="Sts2LiveIntrospection"/>) rather than by
 /// binding. A rename here is invisible to the compiler, so the names are pinned per lane and checked at
@@ -50,6 +66,12 @@ internal static class GameApiEncounter
 /// </summary>
 internal static class GameApiNames
 {
+    /// <summary>
+    /// Backs <see cref="GameApiCombat.PlayersReadyToBeginEnemyTurn"/>. A private field on this build, read
+    /// straight off the combat manager.
+    /// </summary>
+    internal const string CombatPlayersReadyToBeginEnemyTurn = "_playersReadyToBeginEnemyTurn";
+
     /// <summary>The start-run lobby's own player cap.</summary>
     internal const string LobbyMaxPlayers = "MaxPlayers";
 

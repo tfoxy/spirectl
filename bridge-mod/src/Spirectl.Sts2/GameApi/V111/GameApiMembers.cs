@@ -50,6 +50,31 @@ internal static class GameApiEncounter
     }
 }
 
+/// <summary>Combat-manager members that differ by lane.</summary>
+internal static class GameApiCombat
+{
+    /// <summary>
+    /// The players whose end-of-player-turn readiness action has already landed, as the game's own live set.
+    /// Populated only between the host's own readiness and the side switch, so an empty set — and a
+    /// <see langword="null"/> return, which callers must treat identically — means nothing is pending.
+    /// </summary>
+    /// <remarks>
+    /// Two hops on this build: the set moved off the combat manager onto the turn state that owns one combat.
+    /// Both hops are by name, because the turn-state type is internal to the game assembly and cannot be named
+    /// from here. The manager carries no turn state outside a live combat, which reads as nothing pending.
+    /// </remarks>
+    internal static IReadOnlyCollection<Player>? PlayersReadyToBeginEnemyTurn(CombatManager combatManager)
+    {
+        var turnState = Sts2LiveIntrospection.GetMemberValue(combatManager, GameApiNames.CombatTurnState);
+        return turnState is null
+            ? null
+            : Sts2LiveIntrospection.GetMemberValue(
+                    turnState,
+                    GameApiNames.TurnStatePlayersReadyToBeginEnemyTurn)
+                as IReadOnlyCollection<Player>;
+    }
+}
+
 /// <summary>
 /// Game member names the bridge reads BY NAME (through <see cref="Sts2LiveIntrospection"/>) rather than by
 /// binding. A rename here is invisible to the compiler, so the names are pinned per lane and checked at
@@ -57,6 +82,18 @@ internal static class GameApiEncounter
 /// </summary>
 internal static class GameApiNames
 {
+    /// <summary>
+    /// The turn state the combat manager owns for the combat it is running; null between combats. First hop of
+    /// <see cref="GameApiCombat.PlayersReadyToBeginEnemyTurn"/>.
+    /// </summary>
+    internal const string CombatTurnState = "_turnState";
+
+    /// <summary>
+    /// The readiness set on that turn state. Second hop of
+    /// <see cref="GameApiCombat.PlayersReadyToBeginEnemyTurn"/>.
+    /// </summary>
+    internal const string TurnStatePlayersReadyToBeginEnemyTurn = "PlayersReadyToBeginEnemyTurn";
+
     /// <summary>The start-run lobby's own player cap. Private on this build; the reader searches NonPublic.</summary>
     internal const string LobbyMaxPlayers = "_maxPlayers";
 
