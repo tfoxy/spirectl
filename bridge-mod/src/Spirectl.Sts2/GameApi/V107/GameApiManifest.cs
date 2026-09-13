@@ -82,6 +82,11 @@ internal static class GameApiManifest
             [typeof(Player)],
             "per-seat readiness inside that postfix"),
 
+        // ── The enemy-turn readiness set a synthetic seat's own client would complete ─────────────────
+        new(typeof(CombatManager), GameApiNames.CombatPlayersReadyToBeginEnemyTurn, GameApiMemberKind.Value,
+            Note: "the set the host-local seat turn watcher completes for synthetic seats; without it the "
+                + "watcher goes silently inert and a synthetic seat's combat stalls at the enemy-turn barrier"),
+
         // ── Spine animation control (also a Harmony target pinned by parameter types) ────────────────
         new(typeof(MegaAnimationState), nameof(MegaAnimationState.SetAnimation), GameApiMemberKind.Method,
             [typeof(string), typeof(bool), typeof(int)],

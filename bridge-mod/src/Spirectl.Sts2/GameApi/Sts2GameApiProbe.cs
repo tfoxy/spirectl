@@ -1,4 +1,5 @@
 using System.Reflection;
+using MegaCrit.Sts2.Core.Modding;
 using Spirectl.Sts2.Core.Logging;
 
 namespace Spirectl.Sts2.Live.GameApi;
@@ -21,7 +22,10 @@ internal enum GameApiMemberKind
 /// it by name, or because a changed parameter list would silently turn an invocation into a no-op instead of
 /// a build error.
 /// </summary>
-/// <param name="Owner">The declaring game type. Strongly typed, so a type rename is a build error.</param>
+/// <param name="Owner">
+/// The declaring game type. Strongly typed, so a type rename is a build error. <see langword="null"/> only
+/// when the owner is internal to the game assembly and must ride <paramref name="OwnerTypeName"/> instead.
+/// </param>
 /// <param name="Member">The member name as the current lane expects it.</param>
 /// <param name="Kind">Property/field, or method.</param>
 /// <param name="ParameterTypes">For <see cref="GameApiMemberKind.Method"/>, the exact parameter list.</param>
@@ -30,21 +34,28 @@ internal enum GameApiMemberKind
 /// An alternative to <paramref name="ParameterTypes"/> for a method whose parameter types are internal to the
 /// game assembly and therefore cannot be named here: the parameter type <em>simple names</em>, in order.
 /// </param>
+/// <param name="OwnerTypeName">
+/// An alternative to <paramref name="Owner"/> for the same reason: the declaring type's simple or full name,
+/// resolved out of the loaded game assembly. Pass exactly one of the two — a requirement with neither
+/// resolves nothing and reports itself missing.
+/// </param>
 internal sealed record GameApiRequirement(
-    Type Owner,
+    Type? Owner,
     string Member,
     GameApiMemberKind Kind,
     Type[]? ParameterTypes = null,
     string? Note = null,
-    string[]? ParameterTypeNames = null)
+    string[]? ParameterTypeNames = null,
+    string? OwnerTypeName = null)
 {
     internal string Describe()
     {
         var parameters = ParameterTypeNames
             ?? (ParameterTypes ?? []).Select(type => type.Name).ToArray();
+        var owner = Owner?.FullName ?? OwnerTypeName ?? "<no declaring type>";
         var signature = Kind is GameApiMemberKind.Method or GameApiMemberKind.Constructor
-            ? $"{Owner.FullName}.{Member}({string.Join(", ", parameters)})"
-            : $"{Owner.FullName}.{Member}";
+            ? $"{owner}.{Member}({string.Join(", ", parameters)})"
+            : $"{owner}.{Member}";
         return Note is null ? signature : $"{signature} — {Note}";
     }
 }
@@ -105,10 +116,18 @@ internal static class Sts2GameApiProbe
             logStream?.Write(
                 BridgeLogLevel.Info,
                 "bridge.game-api",
-                $"Game API lane {GameApiLane.Name} verified against game build {gameVersion}: "
-                    + $"{requirements.Count} members resolved.");
+                DescribeVerdict(requirements.Count, gameVersion));
         }
     }
+
+    /// <summary>
+    /// The one line a clean probe leaves behind. Exposed so the per-install test leg prints the same verdict
+    /// the bridge logs at startup — the leg is where a maintainer checks a new game build, and the member count
+    /// is how they see that a lane still declares everything it reads.
+    /// </summary>
+    internal static string DescribeVerdict(int resolvedCount, string gameVersion)
+        => $"Game API lane {GameApiLane.Name} verified against game build {gameVersion}: "
+            + $"{resolvedCount} members resolved.";
 
     /// <summary>Every requirement that does not resolve, rendered for a human. Empty means compatible.</summary>
     internal static IReadOnlyList<string> FindMissing(IEnumerable<GameApiRequirement> requirements)
@@ -129,16 +148,22 @@ internal static class Sts2GameApiProbe
 
     private static bool Resolves(GameApiRequirement requirement)
     {
+        var owner = ResolveOwner(requirement);
+        if (owner is null)
+        {
+            return false;
+        }
+
         if (requirement.Kind == GameApiMemberKind.Constructor)
         {
-            return requirement.Owner.GetConstructor(
+            return owner.GetConstructor(
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
                 binder: null,
                 types: requirement.ParameterTypes ?? [],
                 modifiers: null) is not null;
         }
 
-        for (var type = requirement.Owner; type is not null; type = type.BaseType)
+        for (var type = owner; type is not null; type = type.BaseType)
         {
             if (requirement.Kind == GameApiMemberKind.Method)
             {
@@ -176,6 +201,38 @@ internal static class Sts2GameApiProbe
         }
 
         return false;
+    }
+
+    // A requirement either names its owner as a Type — the normal case, where a rename is a build error — or,
+    // when the owner is internal to the game assembly and cannot be named from here, by string.
+    private static Type? ResolveOwner(GameApiRequirement requirement)
+        => requirement.Owner
+            ?? (requirement.OwnerTypeName is { } typeName ? FindGameType(typeName) : null);
+
+    // The game assembly is reached through ModManager, the public type the reference-data provider uses as its
+    // handle on sts2.dll, rather than an assembly-qualified Type.GetType string. Full name first (a direct
+    // lookup); then the simple name, which is how the lane files already spell inaccessible game types.
+    private static Type? FindGameType(string typeName)
+    {
+        var assembly = typeof(ModManager).Assembly;
+        if (assembly.GetType(typeName, throwOnError: false) is { } exact)
+        {
+            return exact;
+        }
+
+        Type?[] types;
+        try
+        {
+            types = assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            // One unloadable type must not blind the probe to the rest.
+            types = ex.Types;
+        }
+
+        return types.FirstOrDefault(type =>
+            type is not null && string.Equals(type.Name, typeName, StringComparison.Ordinal));
     }
 
     /// <summary>The refusal text for a set of missing members. Exposed so its shape is testable.</summary>

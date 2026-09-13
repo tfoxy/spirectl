@@ -82,6 +82,19 @@ internal static class GameApiManifest
             [typeof(Player)],
             "per-seat readiness inside that postfix"),
 
+        // ── The enemy-turn readiness set a synthetic seat's own client would complete ─────────────────
+        // Two hops on this build, so both are required: the manager's turn state, then the set on it. The
+        // second hop's owner is internal to the game assembly, so it is named by string.
+        new(typeof(CombatManager), GameApiNames.CombatTurnState, GameApiMemberKind.Value,
+            Note: "the combat's turn state, which this build moved the enemy-turn readiness set onto"),
+        new GameApiRequirement(
+            Owner: null,
+            Member: GameApiNames.TurnStatePlayersReadyToBeginEnemyTurn,
+            Kind: GameApiMemberKind.Value,
+            OwnerTypeName: GameApiHooks.TurnStateTypeName,
+            Note: "the set the host-local seat turn watcher completes for synthetic seats; without it the "
+                + "watcher goes silently inert and a synthetic seat's combat stalls at the enemy-turn barrier"),
+
         // ── Spine animation control (also a Harmony target pinned by parameter types) ────────────────
         new(typeof(MegaAnimationState), nameof(MegaAnimationState.SetAnimation), GameApiMemberKind.Method,
             [typeof(string), typeof(bool), typeof(int)],
