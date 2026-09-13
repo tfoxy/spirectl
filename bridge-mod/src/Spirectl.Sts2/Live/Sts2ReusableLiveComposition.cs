@@ -38,6 +38,7 @@ internal static class Sts2ReusableLiveCompositionFactory
         Sts2GameApiProbe.EnsureCompatible(logStream);
 
         Sts2MonoModNativeDependencies.EnsureLoaded(logStream);
+        Sts2MultiplayerConnectionHooks.Install(logStream);
         Sts2SyntheticLobbyNameHooks.Install(logStream);
         Sts2ChooseACardOverlayHooks.Install(logStream);
         Sts2RewardsCaptureHooks.Install(logStream);

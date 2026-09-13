@@ -19,6 +19,23 @@ public sealed record CurrentStateResult(
     EmbeddableRuntimeError? Error,
     EmbeddableRuntimeHealthSnapshot? Health = null);
 
+/// <summary>A short-lived native multiplayer connection observation for an embedded host.</summary>
+public sealed record MultiplayerConnectionSnapshot(
+    ulong Sequence,
+    DateTimeOffset ObservedAtUtc,
+    MultiplayerConnectionPhase Phase,
+    MultiplayerConnectionError? Error = null);
+
+public enum MultiplayerConnectionPhase
+{
+    Connecting,
+    Failed,
+    Disconnected,
+}
+
+/// <summary><see cref="Code"/> is stable for consumers; <see cref="NativeDetail"/> is diagnostic text.</summary>
+public sealed record MultiplayerConnectionError(string Code, string? NativeDetail);
+
 /// <summary>
 /// A semantic state subscription. <paramref name="MinCaptureInterval"/> is the FLOOR (the fastest the hub will
 /// re-walk state for this subscriber, default 50 ms); <paramref name="MaxIdleInterval"/> and
@@ -319,6 +336,7 @@ public interface ISpirectlRuntime :
     IRuntimeCapabilitySource,
     IRuntimeAssetSource,
     IRuntimeStateSource,
+    IRuntimeMultiplayerConnectionSource,
     ICombatEventSource,
     IAnimationHintSource,
     IRuntimeSceneDeltaSource,

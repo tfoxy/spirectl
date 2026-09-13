@@ -25,6 +25,15 @@ public interface IRuntimeStateSource
     IAsyncEnumerable<CurrentStateWatchEvent> WatchCurrentStateAsync(CurrentStateSubscriptionRequest request, CancellationToken cancellationToken = default);
 }
 
+public interface IRuntimeMultiplayerConnectionSource
+{
+    /// <summary>Returns the latest native connection observation, or null when no connection has been observed.</summary>
+    MultiplayerConnectionSnapshot? GetCurrentMultiplayerConnection();
+
+    /// <summary>Callbacks run synchronously on the publishing thread and must not block.</summary>
+    IDisposable SubscribeMultiplayerConnection(Action<MultiplayerConnectionSnapshot> onEvent);
+}
+
 public interface ICombatEventSource
 {
     /// <summary>Callbacks may run on the game thread and must not block; resume is bounded by SinceSequence retention.</summary>

@@ -143,3 +143,19 @@ parts of it are published as referenceable API rather than left to be copied by 
 - Tests in `cli/tests/cli_snapshots.rs`, `cli/tests/dev_workflows.rs`, `bridge-mod/tests/Spirectl.BridgeMod.Tests/RuntimeStateMapperTests.cs`, and related bridge tests
 - Embedded-runtime unit coverage in `bridge-mod/tests/Spirectl.BridgeMod.Tests/EmbeddableRuntimeFacadeTests.cs`
 - npm wrapper types/tests in `npm-wrapper/src/index.d.ts` and `npm-wrapper/test/client.test.js` when JSON fields become public to embedded or JS consumers
+
+## Embedded connection diagnostics
+
+`IRuntimeMultiplayerConnectionSource` exposes the latest native multiplayer connection snapshot and
+a subscription for connecting, native failure, and disconnection. The owned DTO includes a sequence,
+UTC observation time, phase, and stable error code with native diagnostic text. Callbacks must not block.
+The `multiplayer-connection` capability is available only when the live observation hooks installed.
+Failure observation precedes product-specific native dialog suppression.
+
+`Core/Logging/GodotLogReader` reads bounded Godot log slices without exclusive access. Its checkpoint
+tracks the byte boundary and file samples to detect rotation or replacement. Error entries retain
+indented multiline context; results explicitly report unavailable, rotated, or truncated input.
+Use `ReadTail` for a bounded recent excerpt and run file reads away from the game thread.
+
+Focused coverage: `GodotLogReaderTests`, `EmbeddableMultiplayerConnectionHubTests`, and
+`Sts2MultiplayerConnectionHookTargetTests` (the latter requires the live-host test leg for each game lane).

@@ -22,7 +22,8 @@ public static class Sts2RuntimeFactory
             shared.Assets, shared.Assets, shared.Assets, shared.Assets, shared.Assets,
             shared.Models, shared.Reference, shared.SceneWatcher, shared.StateProvider,
             Lifetime: shared.SceneWatcher,
-            Instrumentation: Sts2RuntimeInstrumentation.None),
+            Instrumentation: Sts2RuntimeInstrumentation.None,
+            MultiplayerConnectionSupported: Sts2MultiplayerConnectionHooks.IsInstalled),
             new EmbeddableRuntimeOptions(true, null),
             new Sts2EmbeddableAssetProvider(shared.Assets, shared.Assets),
             Sts2RuntimeSceneWatchControls.Instance);
