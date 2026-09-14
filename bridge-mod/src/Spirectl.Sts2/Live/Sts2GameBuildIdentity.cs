@@ -21,13 +21,27 @@ namespace Spirectl.Sts2.Live;
 //
 //   1. STEAMWORKS, in-process — `Steamworks.SteamApps`, the only source that is authoritative rather than
 //      circumstantial. It needs Steam initialized, so it is unavailable to a caller that runs before the game's
-//      own `SteamAPI_Init()` and to a non-Steam launch; `GetAppBuildId()` is how that is detected.
+//      own `SteamAPI_Init()` and to a non-Steam launch; `GetAppBuildId()` is how that is detected. It answers
+//      about the install STEAM HAS MOUNTED, which is not necessarily the one this assembly was loaded from — see
+//      the note on rung 2 for why that distinction decides whether the answer is usable at all.
 //   2. STEAM'S INSTALL MANIFEST on disk — `<install>/../../appmanifest_<appid>.acf`, whose `MountedConfig.BetaKey`
 //      is what is actually mounted (as against `UserConfig.BetaKey`, which is what the user last selected and may
 //      be a branch still downloading). Same layout on Windows and Linux and in every Steam library, because the
 //      manifest always sits two levels above the install directory.
 //   3. NOTHING. A copied install outside `steamapps` launched without Steam satisfies neither, and gets an empty
 //      branch. Callers decide what to do with that; this type never guesses.
+//
+// RUNG 1 IS GATED ON RUNG 2 FINDING US, and that is the one non-obvious thing here. Steamworks is a question
+// about an APP, not about a directory: a second copy of the game launched from outside the Steam library, with
+// Steam running, gets a confident `GetCurrentBetaName()` describing the OTHER install — the one Steam mounted.
+// MEASURED: a public-beta build run that way reports branch "public". So the Steamworks answer is used only when
+// the manifest walk positively identifies the install we loaded from as the mounted one (it refuses any manifest
+// whose `installdir` names a different folder). When it does not, this falls through to an empty branch, and a
+// caller that needs a separator gets a better one from its own knowledge than from a confidently wrong branch.
+//
+// The cost is one false negative: a genuine Steam install whose manifest is unreadable (permissions, a partial
+// library move) loses the Steamworks answer too and reports no branch. That is a coarser answer, never a wrong
+// one, which is the direction this whole ladder is built to fail in.
 //
 // The build identity (`Version`, `MainAssemblyHash`) always comes from `release_info.json`, which ships with the
 // game and is present whatever the launch route.
@@ -68,6 +82,8 @@ public sealed record Sts2GameBuildIdentity(
     /// cannot be found at all yields <see cref="Unknown"/>. Cheap enough to call at startup — one reflection
     /// probe and at most two small file reads — but callers that need it repeatedly should cache the result,
     /// since it cannot change while the process lives.
+    /// <para>The Steamworks rung answers only for an install Steam itself mounted; see the ladder note at the
+    /// top of this file for why that is checked before its answer is believed.</para>
     /// </remarks>
     public static Sts2GameBuildIdentity Resolve(string? installRoot = null)
     {
@@ -75,24 +91,30 @@ public sealed record Sts2GameBuildIdentity(
 
         var (version, mainAssemblyHash) = ReadReleaseInfo(root);
 
+        // Read FIRST, because it decides both rungs: a non-null answer is proof that the install we resolved is
+        // the one Steam has mounted for this app, which is the precondition for Steamworks describing US.
+        var manifest = TryReadAppManifest(root);
+
         // Rung 1. The reflection probe is isolated so a missing/renamed Steamworks assembly is a fall-through
         // rather than a crash — see TryReadSteamworks for why the catch has to live out here.
-        try
+        if (manifest is not null)
         {
-            var steam = TryReadSteamworks();
-            if (steam is { } live && live.Branch.Length > 0)
+            try
             {
-                return new Sts2GameBuildIdentity(
-                    live.Branch, SteamworksSource, live.BuildId, version, mainAssemblyHash);
+                var steam = TryReadSteamworks();
+                if (steam is { } live && live.Branch.Length > 0)
+                {
+                    return new Sts2GameBuildIdentity(
+                        live.Branch, SteamworksSource, live.BuildId, version, mainAssemblyHash);
+                }
             }
-        }
-        catch
-        {
-            // Steam not initialized, or no Steamworks assembly in this process. Fall through.
+            catch
+            {
+                // Steam not initialized, or no Steamworks assembly in this process. Fall through.
+            }
         }
 
         // Rung 2.
-        var manifest = TryReadAppManifest(root);
         if (manifest is { } mounted && mounted.Branch.Length > 0)
         {
             return new Sts2GameBuildIdentity(
