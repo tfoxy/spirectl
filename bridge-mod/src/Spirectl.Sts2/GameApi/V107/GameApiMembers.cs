@@ -1,4 +1,5 @@
 using System.Reflection;
+using MegaCrit.Sts2.Core.Animation;
 using MegaCrit.Sts2.Core.Bindings.MegaSpine;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -140,6 +141,33 @@ internal static class GameApiSpine
         bool loop = true,
         int trackId = 0)
         => state.SetAnimation(animationName, loop, trackId);
+
+    /// <summary>
+    /// The state this build's <c>CreatureAnimator</c> queues behind <paramref name="state"/>, or
+    /// <see langword="null"/> when it queues nothing. One step of the walk the mirror's schedule hook flattens
+    /// (<c>Sts2SpineDefaults.FlattenQueuedChain</c>); on this build that is the single <c>NextState</c> link.
+    /// </summary>
+    internal static AnimState? QueuedNextState(AnimState state) => state.NextState;
+
+    /// <summary>
+    /// Every <see cref="MegaAnimationState"/> method this build's animator queues a clip through, paired with
+    /// the label the Harmony installer logs. The mirror's schedule hook patches each one so a queued return
+    /// reaches the producer even for nodes the creature animator never drives. This build has exactly one.
+    /// </summary>
+    internal static IReadOnlyList<(string Description, MethodInfo? Target)> QueueAnimationTargets() =>
+    [
+        ("MegaAnimationState.AddAnimation", FindQueueMethod(nameof(MegaAnimationState.AddAnimation))),
+    ];
+
+    // Every queue overload the hook cares about takes (name, delay, loop, track); the return type differs and
+    // is irrelevant to a postfix that reads only the arguments.
+    private static MethodInfo? FindQueueMethod(string name)
+        => typeof(MegaAnimationState).GetMethod(
+            name,
+            BindingFlags.Instance | BindingFlags.Public,
+            binder: null,
+            types: [typeof(string), typeof(float), typeof(bool), typeof(int)],
+            modifiers: null);
 }
 
 /// <summary>Main-menu members whose visibility differs by lane.</summary>

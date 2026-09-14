@@ -5,6 +5,7 @@ using MegaCrit.Sts2.Core.Animation;
 using MegaCrit.Sts2.Core.Bindings.MegaSpine;
 using Spirectl.Sts2.Core.Logging;
 using Spirectl.Sts2.Embedding;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -21,10 +22,12 @@ namespace Spirectl.Sts2.Live;
 /// It is the spine analog of <see cref="Sts2ParticleRestartHooks"/>.</para>
 ///
 /// <para><c>SetNextState(AnimState)</c> is the sole track-0 choke point: it calls
-/// <c>SetAnimation(state.Id, state.IsLooping)</c> and, for a one-shot, pre-queues the return via
-/// <c>AddAnimation(state.NextState.Id, …)</c>. The postfix reads the driven node from the private
-/// <c>_spineController</c> (<c>MegaSprite.BoundObject</c>), the sequence from <c>state</c> + its
-/// <c>NextState</c> chain, and the one-shot's duration from the just-created track entry
+/// <c>SetAnimation(state.Id, state.IsLooping)</c> and, for a one-shot, pre-queues the return through one of the
+/// lane's queue entry points (<c>GameApiSpine.QueueAnimationTargets</c>). The postfix reads the driven node from
+/// the private
+/// <c>_spineController</c> (<c>MegaSprite.BoundObject</c>), the sequence from <c>state</c> + the queued chain
+/// behind it (walked through the API lane, since the accessor differs by game build), and the one-shot's
+/// duration from the just-created track entry
 /// (<c>GetAnimationState().GetCurrent(0).GetAnimationEnd()</c> — the same call the game makes in this method),
 /// falling back to the clip's STATIC skeleton-data duration when that live read comes back 0 on a frozen node (so a
 /// one-shot with a queued return is never handed off IMMEDIATELY, which would drop the attack clip entirely),
@@ -209,7 +212,9 @@ internal static class Sts2SpineAnimationHooks
     //   * MegaAnimationState.SetAnimation(name, loop, track) → the clip + REAL loop flag the game just played.
     //     This is what makes the bite overlay's one-shot reach the wire as `spineLooping:false` inside its
     //     START message, so no end/"animation finished" message is needed at all.
-    //   * MegaAnimationState.AddAnimation(name, delay, loop, track) → the clip queued behind it.
+    //   * every queue entry point the lane declares (GameApiSpine.QueueAnimationTargets) → the clip queued
+    //     behind it. Which method a build queues through is build-specific, and a build that queues a LOOPING
+    //     return through a different entry point than a one-shot needs both patched or the return is invisible.
     // Each is patched independently so one failure never costs the others. No-op when the escape hatch is off.
     private static void TryInstallDirectAnimationHooks(Harmony harmony, ILogStream logStream)
     {
@@ -245,19 +250,18 @@ internal static class Sts2SpineAnimationHooks
             "MegaAnimationState.SetAnimation")
             ? 1
             : 0;
-        installed += TryPatch(
-            harmony,
-            logStream,
-            typeof(MegaAnimationState).GetMethod(
-                nameof(MegaAnimationState.AddAnimation),
-                BindingFlags.Instance | BindingFlags.Public,
-                binder: null,
-                types: new[] { typeof(string), typeof(float), typeof(bool), typeof(int) },
-                modifiers: null),
-            nameof(DirectAddAnimationPostfix),
-            "MegaAnimationState.AddAnimation")
-            ? 1
-            : 0;
+        // Every queue entry point THIS game build routes a queued clip through (see
+        // GameApiSpine.QueueAnimationTargets). One on v107; v111 splits tracked/untracked and sends a looping
+        // return — the idle a one-shot hands back to — through the tracked one, so patching a single overload
+        // there would miss exactly the transition this hook exists to observe.
+        var queueTargets = GameApiSpine.QueueAnimationTargets();
+        foreach (var (description, target) in queueTargets)
+        {
+            installed += TryPatch(harmony, logStream, target, nameof(DirectAddAnimationPostfix), description)
+                ? 1
+                : 0;
+        }
+
         installed += TryPatch(
             harmony,
             logStream,
@@ -272,14 +276,17 @@ internal static class Sts2SpineAnimationHooks
             ? 1
             : 0;
 
+        // 3 fixed targets (owner map, SetAnimation, SetTimeScale) plus this lane's queue entry points.
+        var expected = 3 + queueTargets.Count;
         if (installed > 0)
         {
             logStream.Write(
                 BridgeLogLevel.Info,
                 "bridge.mirror.spine-anim",
-                $"Installed {installed}/4 direct spine-anim hook(s); direct MegaAnimationState sets "
-                + "(one-shot VFX overlays, chest, boss map node, merchant) now reach the mirror with their real loop "
-                + "flag, and a paused track (SetTimeScale(0)) stops the replay walking off its clip.");
+                $"Installed {installed}/{expected} direct spine-anim hook(s) on lane {GameApiLane.Name}; direct "
+                + "MegaAnimationState sets (one-shot VFX overlays, chest, boss map node, merchant) now reach the "
+                + "mirror with their real loop flag, every queued clip reaches it as a return, and a paused track "
+                + "(SetTimeScale(0)) stops the replay walking off its clip.");
         }
     }
 
@@ -383,11 +390,12 @@ internal static class Sts2SpineAnimationHooks
         }
     }
 
-    // Harmony postfix on MegaAnimationState.AddAnimation(string, float, bool, int). The queued companion of the
-    // set above: a one-shot's return loop (CreatureAnimator, NTreasureRoom's "shine_fade") or — when the game
-    // queues onto an empty track, which NBossMapPoint._Ready does — the clip that will actually play. `delay` is
-    // deliberately ignored: the schedule replays a single head→return handoff, and every track-0 call site in
-    // the game passes 0.
+    // Harmony postfix on every queue entry point the lane declares — MegaAnimationState.AddAnimation and, where
+    // the build has one, its tracked sibling; the argument list is identical, so one postfix serves both. The
+    // queued companion of the set above: a one-shot's return loop (CreatureAnimator, NTreasureRoom's
+    // "shine_fade") or — when the game queues onto an empty track, which NBossMapPoint._Ready does — the clip
+    // that will actually play. `delay` is deliberately ignored: the schedule replays a single head→return
+    // handoff, and every track-0 call site in the game passes 0.
     private static void DirectAddAnimationPostfix(MegaAnimationState __instance, string animationName, float delay, bool loop, int trackId)
     {
         try
@@ -548,14 +556,16 @@ internal static class Sts2SpineAnimationHooks
                 return;
             }
 
-            // The pre-queued return: walk AnimState.NextState (the game's AddAnimation chain) to the first
-            // looping state (the terminal idle_loop) so a one-shot hands back to the loop the game queued.
-            // Flattened first so the HasAnimation gate below is pure/offline-testable.
-            var queuedChain = new List<(string Id, bool IsLooping)>();
-            for (var next = state.NextState; next is not null; next = next.NextState)
-            {
-                queuedChain.Add((next.Id, next.IsLooping));
-            }
+            // The pre-queued return: walk the queued chain to the first looping state (the terminal idle_loop)
+            // so a one-shot hands back to the loop the game queued. HOW the next link is reached differs by
+            // game build and lives behind the API lane (GameApiSpine.QueuedNextState) — this postfix runs one
+            // instruction after the animator resolved and queued the same link, on the same state object, so a
+            // build that decides its return per call decides it identically here. Flattened through pure core
+            // so both the walk and the HasAnimation gate below are offline-testable.
+            var queuedChain = Sts2SpineDefaults.FlattenQueuedChain(
+                GameApiSpine.QueuedNextState(state),
+                GameApiSpine.QueuedNextState,
+                static queued => (queued.Id, queued.IsLooping));
 
             // HasAnimation GATE: SetNextState/AddNextState log a warning and RETURN when the clip is absent from
             // the skeleton, leaving the track untouched — this postfix used to record it anyway, so a creature

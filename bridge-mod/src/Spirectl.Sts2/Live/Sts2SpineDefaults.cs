@@ -46,6 +46,14 @@ internal static class Sts2SpineDefaults
     private const string LoopSuffix = "_loop";
 
     /// <summary>
+    /// How many queued links <see cref="FlattenQueuedChain{TState}"/> will walk before it stops. A real queue is
+    /// one or two links (a one-shot and the idle it hands back to), so this is not a content limit — it is the
+    /// guard that keeps a self-referential or condition-driven chain from spinning inside a Harmony postfix on
+    /// the game's main thread.
+    /// </summary>
+    public const int MaxQueuedChainLinks = 8;
+
+    /// <summary>
     /// A STABLE default animation to present for a Spine node the producer has not yet seen a real animation
     /// for, picked from the static animation list. Preference order:
     /// <list type="number">
@@ -149,9 +157,71 @@ internal static class Sts2SpineDefaults
     }
 
     /// <summary>
+    /// Flatten the chain of animation states the game queued behind a head clip into the ordered
+    /// <c>(id, looping)</c> pairs <see cref="ResolveRecordableSequence"/> consumes.
+    ///
+    /// <para>Generic over the state type so it stays Godot-free and offline-testable: the caller supplies
+    /// <paramref name="head"/> (the FIRST queued link, already resolved), the successor step
+    /// <paramref name="nextOf"/>, and the <paramref name="describe"/> projection. HOW a build reaches the next
+    /// link differs per game build and so lives behind the API lane (<c>GameApiSpine.QueuedNextState</c>); the
+    /// walk itself does not, and lives here.</para>
+    ///
+    /// <para>Bounded two ways — <see cref="MaxQueuedChainLinks"/> and a reference-identity visited check — so a
+    /// chain that leads back to a link it already yielded stops instead of spinning. That matters because the
+    /// successor step can be a per-call decision rather than a fixed field, and this runs on the game's main
+    /// thread inside a Harmony postfix, where a spin is a hang.</para>
+    /// </summary>
+    public static IReadOnlyList<(string Id, bool IsLooping)> FlattenQueuedChain<TState>(
+        TState? head,
+        Func<TState, TState?> nextOf,
+        Func<TState, (string Id, bool IsLooping)> describe,
+        int maxLinks = MaxQueuedChainLinks)
+        where TState : class
+    {
+        ArgumentNullException.ThrowIfNull(nextOf);
+        ArgumentNullException.ThrowIfNull(describe);
+
+        if (head is null || maxLinks <= 0)
+        {
+            return [];
+        }
+
+        var chain = new List<(string Id, bool IsLooping)>();
+        // Reference identity, scanned linearly: the cap keeps this at a handful of entries, and a set with a
+        // reference comparer would cost more than the scan it replaces.
+        var visited = new List<TState>();
+        for (var link = head; link is not null && chain.Count < maxLinks; link = nextOf(link))
+        {
+            if (AlreadyVisited(visited, link))
+            {
+                break;
+            }
+
+            visited.Add(link);
+            chain.Add(describe(link));
+        }
+
+        return chain;
+    }
+
+    private static bool AlreadyVisited<TState>(List<TState> visited, TState link)
+        where TState : class
+    {
+        foreach (var seen in visited)
+        {
+            if (ReferenceEquals(seen, link))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// The sequence the game ACTUALLY queued for a <c>CreatureAnimator.SetNextState(state)</c> call, given the
-    /// state's id/loop flag, its <c>NextState</c> chain flattened in order, and the sprite's
-    /// <c>MegaSprite.HasAnimation</c> predicate.
+    /// state's id/loop flag, its queued chain flattened in order (see <see cref="FlattenQueuedChain{TState}"/>),
+    /// and the sprite's <c>MegaSprite.HasAnimation</c> predicate.
     ///
     /// <para>This mirrors the game's own gates: <c>SetNextState</c> logs a warning and RETURNS without touching
     /// the track when the head clip is missing from the skeleton, and <c>AddNextState</c> does the same, which
