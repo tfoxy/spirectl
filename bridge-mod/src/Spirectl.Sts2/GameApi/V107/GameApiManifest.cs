@@ -1,3 +1,4 @@
+using MegaCrit.Sts2.Core.Animation;
 using MegaCrit.Sts2.Core.Bindings.MegaSpine;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -87,10 +88,21 @@ internal static class GameApiManifest
             Note: "the set the host-local seat turn watcher completes for synthetic seats; without it the "
                 + "watcher goes silently inert and a synthetic seat's combat stalls at the enemy-turn barrier"),
 
-        // ── Spine animation control (also a Harmony target pinned by parameter types) ────────────────
+        // ── Spine animation control (also Harmony targets pinned by parameter types) ─────────────────
         new(typeof(MegaAnimationState), nameof(MegaAnimationState.SetAnimation), GameApiMemberKind.Method,
             [typeof(string), typeof(bool), typeof(int)],
             "pins a deterministic pose for clip/geometry extraction and reports played clips to the mirror"),
+
+        // ── The queued-return transition a frozen spine node can only get from the mirror's replay ───
+        // The lane counterpart of v111's AnimState.GetNextState + AddAnimationTracked. A released payload for
+        // this lane is compiled once and loaded into whatever build is installed, so the compiler is not the
+        // backstop here — this is.
+        new(typeof(AnimState), nameof(AnimState.NextState), GameApiMemberKind.Value,
+            Note: "the clip this build queues behind a one-shot, so a played animation ends on the idle the "
+                + "game chose instead of holding the one-shot's last frame forever"),
+        new(typeof(MegaAnimationState), nameof(MegaAnimationState.AddAnimation), GameApiMemberKind.Method,
+            [typeof(string), typeof(float), typeof(bool), typeof(int)],
+            "reports a queued clip — including the idle a one-shot hands back to — to the mirror"),
 
         // ── Fixture scaffolding: the main-menu overlay and the host net service ──────────────────────
         new(typeof(NMainMenu), GameApiNames.MainMenuBlurBackstop, GameApiMemberKind.Value,

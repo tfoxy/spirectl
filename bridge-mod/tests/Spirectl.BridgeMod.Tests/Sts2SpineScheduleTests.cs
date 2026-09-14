@@ -220,4 +220,74 @@ public sealed class Sts2SpineScheduleTests
         Assert.Equal("idle_loop", after.Anim);
         Assert.True(after.Looping);
     }
+
+    // ── A played animation must END on the idle the game queued (creatures stuck mid-pose) ────────────────
+
+    // The whole revert mechanism on a seat, end to end: a frozen spine node never advances its own track queue,
+    // so the ONLY thing that ever takes a creature off a one-shot is this replay of the recorded schedule. That
+    // makes the recorded return load-bearing — and a game build whose queued link the walk cannot see hands the
+    // gate an EMPTY chain, which is indistinguishable from "the game queued nothing".
+    //
+    // Both halves are asserted here because only the contrast shows the defect: the same head clip, the same
+    // duration, the same elapsed time, and the only difference is whether the successor step found the return.
+    [Fact]
+    public void PlayedOneShot_WithAResolvedReturn_EndsOnTheIdle_WithoutOne_SticksForever()
+    {
+        const double attackMsec = 500;
+
+        // The successor step found nothing (the shape the walk produced on a build whose queued link it could
+        // not reach): no return is recorded, and the creature reports the attack for the rest of the combat.
+        var stuckSequence = Sts2SpineDefaults.ResolveRecordableSequence(
+            "attack", headLooping: false, queuedChain: [], hasAnimation: _ => true);
+        Assert.NotNull(stuckSequence);
+        var (stuckHead, stuckHeadLooping, stuckNext, stuckNextLooping) = stuckSequence.Value;
+        Assert.Null(stuckNext);
+
+        foreach (var elapsed in new double[] { attackMsec, attackMsec + 1, 30_000, 600_000 })
+        {
+            var (heldAnim, _, _, _) = Sts2SpineSchedule.ResolveScheduledAnim(
+                stuckHead, stuckHeadLooping, attackMsec, stuckNext, stuckNextLooping, elapsed);
+            Assert.Equal("attack", heldAnim);
+        }
+
+        // The successor step resolved the queued return: the attack plays its window, then the creature is back
+        // on its idle — one wire delta and, on the client, one still swap back to an already-cached image.
+        var revertSequence = Sts2SpineDefaults.ResolveRecordableSequence(
+            "attack", headLooping: false, queuedChain: [("idle_loop", true)], hasAnimation: _ => true);
+        Assert.NotNull(revertSequence);
+        var (head, headLooping, next, nextLooping) = revertSequence.Value;
+
+        var (duringAnim, _, _, _) = Sts2SpineSchedule.ResolveScheduledAnim(
+            head, headLooping, attackMsec, next, nextLooping, attackMsec - 1);
+        Assert.Equal("attack", duringAnim);
+
+        foreach (var elapsed in new double[] { attackMsec, attackMsec + 1, 30_000, 600_000 })
+        {
+            var (revertedAnim, _, revertedLooping, revertedPaused) = Sts2SpineSchedule.ResolveScheduledAnim(
+                head, headLooping, attackMsec, next, nextLooping, elapsed);
+            Assert.Equal("idle_loop", revertedAnim);
+            Assert.True(revertedLooping);
+            Assert.False(revertedPaused);
+        }
+    }
+
+    // A build that picks its queued return from several candidates: whichever the successor step resolved is
+    // the one the creature ends on, and it is reported as the LOOPING clip it is. A second candidate costs one
+    // extra still bake per spine node that ever rests on it — the consumer's still cache keys on the clip name,
+    // so a return the node has already rested on is a cache hit.
+    [Fact]
+    public void PlayedOneShot_EndsOnWhicheverReturnTheStepResolved()
+    {
+        foreach (var idle in new[] { "idle_loop", "low_health_loop" })
+        {
+            var sequence = Sts2SpineDefaults.ResolveRecordableSequence(
+                "attack", headLooping: false, queuedChain: [(idle, true)], hasAnimation: _ => true);
+            Assert.NotNull(sequence);
+            var (head, headLooping, next, nextLooping) = sequence.Value;
+            Assert.Equal(idle, next);
+
+            var after = Sts2SpineSchedule.ResolveScheduledAnim(head, headLooping, 500, next, nextLooping, 900);
+            Assert.Equal((idle, 0.4, true, false), after);
+        }
+    }
 }

@@ -3,6 +3,32 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
+/// <summary>
+/// A stand-in for one link of a queued animation chain.
+/// <see cref="Sts2SpineDefaults.FlattenQueuedChain{TState}"/> is generic precisely so the walk can be exercised
+/// with no game assembly present: the caller supplies the successor step and the projection.
+/// </summary>
+internal sealed class SpineQueuedStateDouble(string id, bool isLooping)
+{
+    public string Id { get; } = id;
+
+    public bool IsLooping { get; } = isLooping;
+
+    /// <summary>The successor a fixed-link build would hand back. Null models "nothing queued".</summary>
+    public SpineQueuedStateDouble? Next { get; set; }
+
+    /// <summary>How many times this link has been asked for its successor. Cycle/cap tests assert on it.</summary>
+    public int SuccessorReads { get; private set; }
+
+    public SpineQueuedStateDouble? ReadNext()
+    {
+        SuccessorReads++;
+        return Next;
+    }
+
+    public (string Id, bool IsLooping) Describe() => (Id, IsLooping);
+}
+
 // Round-8 items 10/11 (spine animation semantics). Pure, Godot-free core of:
 //   * which clip the producer presents for a spine node it has not yet observed a real animation for,
 //   * whether that GUESS should be reported as looping (the wire's `spineLooping`, which both clients honour
@@ -246,4 +272,117 @@ public sealed class Sts2SpineDefaultsTests
         Assert.Equal("bite", legacy);
         Assert.False(Sts2SpineDefaults.DefaultAnimationLoops(legacy));
     }
+
+    // ── Flattening the queued chain (the walk the SetNextState postfix hands to the gate above) ───────────
+
+    private static IReadOnlyList<(string Id, bool IsLooping)> Flatten(
+        SpineQueuedStateDouble? head,
+        int maxLinks = Sts2SpineDefaults.MaxQueuedChainLinks)
+        => Sts2SpineDefaults.FlattenQueuedChain(
+            head,
+            static link => link.ReadNext(),
+            static link => link.Describe(),
+            maxLinks);
+
+    // The ordinary shape: a one-shot's queued return, then whatever that queues, in queue order.
+    [Fact]
+    public void FlattenQueuedChain_WalksEveryLinkInQueueOrder()
+    {
+        var recover = new SpineQueuedStateDouble("recover", isLooping: false);
+        var idle = new SpineQueuedStateDouble("idle_loop", isLooping: true);
+        recover.Next = idle;
+
+        Assert.Equal([("recover", false), ("idle_loop", true)], Flatten(recover));
+    }
+
+    // Nothing queued behind the head: an empty chain, which ResolveRecordableSequence turns into "no return".
+    [Fact]
+    public void FlattenQueuedChain_NoHead_IsEmpty()
+    {
+        Assert.Empty(Flatten(null));
+        Assert.Empty(Flatten(new SpineQueuedStateDouble("idle_loop", isLooping: true), maxLinks: 0));
+    }
+
+    // THE POINT of routing the successor through the API lane rather than a field: a build may DECIDE its
+    // queued return at call time, so the walk must ask, and must ask on every link. Here the same chain answers
+    // with a different idle depending on a condition the step reads — the postfix runs one instruction after the
+    // game asked the same question, so it gets the same answer.
+    [Fact]
+    public void FlattenQueuedChain_AsksTheSuccessorStepPerCall()
+    {
+        var attack = new SpineQueuedStateDouble("attack", isLooping: false);
+        var idle = new SpineQueuedStateDouble("idle_loop", isLooping: true);
+        var lowHealthIdle = new SpineQueuedStateDouble("low_health_loop", isLooping: true);
+
+        var lowHealth = false;
+        IReadOnlyList<(string Id, bool IsLooping)> WalkFrom(SpineQueuedStateDouble head) =>
+            Sts2SpineDefaults.FlattenQueuedChain(
+                head,
+                link => ReferenceEquals(link, attack) ? (lowHealth ? lowHealthIdle : idle) : null,
+                static link => link.Describe());
+
+        Assert.Equal([("attack", false), ("idle_loop", true)], WalkFrom(attack));
+
+        lowHealth = true;
+        Assert.Equal([("attack", false), ("low_health_loop", true)], WalkFrom(attack));
+    }
+
+    // A chain that leads back to a link it already yielded must STOP. A per-call successor can produce one, and
+    // this walk runs on the game's main thread inside a Harmony postfix, where a spin is a hang.
+    [Fact]
+    public void FlattenQueuedChain_StopsOnACycle()
+    {
+        var selfLink = new SpineQueuedStateDouble("idle_loop", isLooping: true);
+        selfLink.Next = selfLink;
+        Assert.Equal([("idle_loop", true)], Flatten(selfLink));
+
+        var first = new SpineQueuedStateDouble("attack", isLooping: false);
+        var second = new SpineQueuedStateDouble("recover", isLooping: false);
+        first.Next = second;
+        second.Next = first;
+        Assert.Equal([("attack", false), ("recover", false)], Flatten(first));
+    }
+
+    // …and a chain that never repeats a link still stops at the cap, so an unbounded generator cannot spin it.
+    [Fact]
+    public void FlattenQueuedChain_StopsAtTheLinkCap()
+    {
+        var minted = 0;
+        var endless = Sts2SpineDefaults.FlattenQueuedChain(
+            new SpineQueuedStateDouble("attack", isLooping: false),
+            _ => new SpineQueuedStateDouble($"filler{minted++}", isLooping: false),
+            static link => link.Describe());
+
+        Assert.Equal(Sts2SpineDefaults.MaxQueuedChainLinks, endless.Count);
+        Assert.Equal("attack", endless[0].Id);
+
+        var capped = Sts2SpineDefaults.FlattenQueuedChain(
+            new SpineQueuedStateDouble("attack", isLooping: false),
+            _ => new SpineQueuedStateDouble("filler", isLooping: false),
+            static link => link.Describe(),
+            maxLinks: 2);
+        Assert.Equal(2, capped.Count);
+    }
+
+    // The composition the postfix actually performs: walk the chain, then gate it on the skeleton. A resolved
+    // return is what lets a played one-shot END — without it the mirror reports the one-shot forever, because a
+    // frozen spine node never advances its own track queue.
+    [Fact]
+    public void FlattenQueuedChain_FeedsTheRecordableSequence()
+    {
+        var attack = new SpineQueuedStateDouble("attack", isLooping: false);
+        var idle = new SpineQueuedStateDouble("idle_loop", isLooping: true);
+        attack.Next = idle;
+
+        var resolved = Sts2SpineDefaults.ResolveRecordableSequence(
+            "attack", headLooping: false, Flatten(attack.Next), _ => true);
+        Assert.Equal(("attack", false, "idle_loop", true), resolved);
+
+        // THE BETA DEFECT, in the only shape the core can see it: a successor step that answers "nothing"
+        // leaves the one-shot with no return at all.
+        var unqueued = Sts2SpineDefaults.ResolveRecordableSequence(
+            "attack", headLooping: false, Flatten(null), _ => true);
+        Assert.Equal(("attack", false, (string?)null, false), unqueued);
+    }
+
 }

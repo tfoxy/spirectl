@@ -1,4 +1,5 @@
 using System.Reflection;
+using MegaCrit.Sts2.Core.Animation;
 using MegaCrit.Sts2.Core.Bindings.MegaSpine;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -181,6 +182,52 @@ internal static class GameApiSpine
         state.SetAnimation(animationName, loop, trackId);
         return state.GetCurrent(trackId);
     }
+
+    /// <summary>
+    /// The state this build's <c>CreatureAnimator</c> queues behind <paramref name="state"/>, or
+    /// <see langword="null"/> when it queues nothing. One step of the walk the mirror's schedule hook flattens
+    /// (<c>Sts2SpineDefaults.FlattenQueuedChain</c>).
+    /// </summary>
+    /// <remarks>
+    /// This build picks the successor through <see cref="AnimState.GetNextState"/> rather than the plain
+    /// <c>NextState</c> link, and the answer can differ per call: a queued return may be chosen from several
+    /// candidates. Reading the same accessor is what makes the mirror's recorded return MATCH the clip the game
+    /// queued, and the mirror's schedule replay is the only thing that ever ends a one-shot on a seat, since the
+    /// couch CPU saver freezes spine nodes so the native track queue never advances on its own. The bridge's
+    /// caller is a postfix on the animator's own setter, so this runs one instruction after the game made the
+    /// same call, on the same object, in the same frame.
+    ///
+    /// <para><c>NextState</c> still exists here and is still the answer for anything that sets it, but a build
+    /// that populates only the newer chain would degrade to "nothing queued" if it were read directly — which
+    /// is why <see cref="GameApiManifest"/> requires the accessor at startup.</para>
+    /// </remarks>
+    internal static AnimState? QueuedNextState(AnimState state) => state.GetNextState();
+
+    /// <summary>
+    /// Every <see cref="MegaAnimationState"/> method this build's animator queues a clip through, paired with
+    /// the label the Harmony installer logs. The mirror's schedule hook patches each one so a queued return
+    /// reaches the producer even for nodes the creature animator never drives.
+    /// </summary>
+    /// <remarks>
+    /// This build queues through two entry points, split by whether the caller wants the resulting track entry
+    /// back, and its animator uses the tracked one for a LOOPING return — an idle handed back to after a
+    /// one-shot. Patching only the untracked overload here would leave exactly that transition unobserved.
+    /// </remarks>
+    internal static IReadOnlyList<(string Description, MethodInfo? Target)> QueueAnimationTargets() =>
+    [
+        ("MegaAnimationState.AddAnimation", FindQueueMethod(nameof(MegaAnimationState.AddAnimation))),
+        ("MegaAnimationState.AddAnimationTracked", FindQueueMethod(nameof(MegaAnimationState.AddAnimationTracked))),
+    ];
+
+    // Every queue overload the hook cares about takes (name, delay, loop, track); the return type differs and
+    // is irrelevant to a postfix that reads only the arguments.
+    private static MethodInfo? FindQueueMethod(string name)
+        => typeof(MegaAnimationState).GetMethod(
+            name,
+            BindingFlags.Instance | BindingFlags.Public,
+            binder: null,
+            types: [typeof(string), typeof(float), typeof(bool), typeof(int)],
+            modifiers: null);
 }
 
 /// <summary>Main-menu members whose visibility differs by lane.</summary>

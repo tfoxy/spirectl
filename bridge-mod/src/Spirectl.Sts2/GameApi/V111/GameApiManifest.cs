@@ -1,3 +1,4 @@
+using MegaCrit.Sts2.Core.Animation;
 using MegaCrit.Sts2.Core.Bindings.MegaSpine;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -95,13 +96,28 @@ internal static class GameApiManifest
             Note: "the set the host-local seat turn watcher completes for synthetic seats; without it the "
                 + "watcher goes silently inert and a synthetic seat's combat stalls at the enemy-turn barrier"),
 
-        // ── Spine animation control (also a Harmony target pinned by parameter types) ────────────────
+        // ── Spine animation control (also Harmony targets pinned by parameter types) ─────────────────
         new(typeof(MegaAnimationState), nameof(MegaAnimationState.SetAnimation), GameApiMemberKind.Method,
             [typeof(string), typeof(bool), typeof(int)],
             "pins a deterministic pose for clip/geometry extraction and reports played clips to the mirror"),
         new(typeof(MegaAnimationState), nameof(MegaAnimationState.GetCurrent), GameApiMemberKind.Method,
             [typeof(int)],
             "reaches the track entry this build's animation setter no longer returns"),
+
+        // ── The queued-return transition a frozen spine node can only get from the mirror's replay ───
+        // Both of these went missing in practice as a CALL, not as a member: the game kept declaring them and
+        // stopped routing the character animator through them, and the mirror silently reported the last
+        // one-shot forever. A member that disappears must refuse instead of degrading the same way again.
+        new(typeof(AnimState), nameof(AnimState.GetNextState), GameApiMemberKind.Method,
+            [],
+            "resolves which clip this build queued behind a one-shot, so a played animation ends on the "
+                + "idle the game chose instead of holding the one-shot's last frame forever"),
+        new(typeof(MegaAnimationState), nameof(MegaAnimationState.AddAnimation), GameApiMemberKind.Method,
+            [typeof(string), typeof(float), typeof(bool), typeof(int)],
+            "reports a queued non-looping clip to the mirror"),
+        new(typeof(MegaAnimationState), nameof(MegaAnimationState.AddAnimationTracked), GameApiMemberKind.Method,
+            [typeof(string), typeof(float), typeof(bool), typeof(int)],
+            "reports a queued LOOPING clip — the idle a one-shot hands back to — to the mirror"),
 
         // ── Fixture scaffolding: the main-menu overlay and the host net service ──────────────────────
         new(typeof(NMainMenu), GameApiNames.MainMenuBlurBackstop, GameApiMemberKind.Value,
