@@ -1,0 +1,61 @@
+schemaVersion: spirectl.fixture/v0
+name: rewards-potion-full-belt
+description: >-
+  Two-seat couch-coop rewards screen where BOTH seats are offered a potion they
+  have no room for: each belt is already full, so claiming that row makes the game
+  refuse the reward. Gold and a 3-card choice sit either side of the potion as rows
+  a focus/tap test can move between, and as the control — those two always succeed.
+  p:1 is the local "me" seat (native NRewardsScreen, retired via RewardCollectedFrom);
+  p:2 is the host-local browser-only seat (captured RewardsSet, retired via the
+  bridge's capture registry), so one load covers both retire paths.
+#
+# Why this fixture exists: the refusing case is otherwise only reachable by hand
+# (dev-console commands into a live run), which leaves the one reward outcome that
+# is not "you got it" with no repeatable setup. Reward.SelectUnsynchronized answers
+# whether the reward was RECEIVED, and the potion is the only immediate reward that
+# can answer no — gold, relic and special-card rewards always succeed. A claim path
+# that ignores that answer retires the row anyway and the player loses the potion.
+#
+# TWO SEATS IS LOAD-BEARING, not just coverage. Authored `players[].potions` is only
+# applied on the multi-seat (LoadCoopRewardsAsync) path, which resolves seats through
+# ResolveHostLocalFixturePlayers -> ApplyAuthoredPlayerPotions. The single-player
+# rewards recipe validates the potion ids and reports them, then never puts them in
+# the belt, so a one-player version of this fixture loads clean and silently leaves
+# every slot empty — the exact opposite of what it is for. Seat ids must be in the
+# p:<net-id> form for that path (TryResolveLobbyPlayerId).
+#
+# The belt must be authored at EXACTLY the character's slot count. The loader's
+# ApplyAuthoredPlayerPotions raises MaxPotionCount to fit an over-long authored
+# list, so asking for more potions than the character has slots grows the belt
+# instead of overfilling it, and the refusal never happens. Ironclad ships 3 slots,
+# hence 3 potions.
+run:
+  seed: fixture-rewards-potion-full-belt
+  actFloor: 8
+  players:
+    - id: "p:1"
+      isLocal: true
+      isHostLocalSeat: false
+      creature: { currentHp: 58, maxHp: 80 }
+      # Full belt: 3 potions in 3 slots, no free slot for the potion reward below.
+      potions:
+        - modelId: FIRE_POTION
+        - modelId: ENERGY_POTION
+        - modelId: ATTACK_POTION
+      overlays:
+        - rewards:
+            roomType: elite
+            items:
+              - gold: 30                                        # control: always received
+              - potion: { modelId: FOUL_POTION }                # REFUSED: the belt is full
+              - card: { modelIds: [BASH, ANGER, DEMON_FORM] }   # control: 3-card choice
+    - id: "p:2"
+      isLocal: true
+      isHostLocalSeat: true
+      creature: { currentHp: 50, maxHp: 70 }
+      # Same full belt on the browser-only seat: every local/host-local seat receives
+      # its own copy of the authored reward spec, so p:2 is offered the same potion.
+      potions:
+        - modelId: FIRE_POTION
+        - modelId: ENERGY_POTION
+        - modelId: ATTACK_POTION
