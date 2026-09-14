@@ -203,6 +203,33 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
         Assert.Equal(0, content.MainAssemblyHash);
     }
 
+    // THE WORKSHOP SHAPE. A mod installed from the Steam Workshop lives at
+    // steamapps/workshop/content/<appid>/<item>/ — a sibling branch of the tree that is never an ancestor of the
+    // game — so the walk from the assembly can only ever fail there. That is the install shape every real player
+    // has, and with no root there is no version and no content hash for an embedder to tell two builds apart.
+    [Fact]
+    public void TheWalkCannotReachTheInstallFromAWorkshopItem()
+    {
+        var install = SeedInstall("Slay the Spire 2", Manifest("Slay the Spire 2", "23811903", mounted: "public"));
+        var workshopItem = Path.Combine(_root, "steamapps", "workshop", "content", "2868840", "3799476240");
+        Directory.CreateDirectory(workshopItem);
+
+        Assert.Null(Sts2GameBuildIdentity.TryWalkToInstallRoot(workshopItem));
+        // …while the executable's own directory, which is the install, resolves immediately. That is why it is
+        // the fallback starting point.
+        Assert.Equal(install, Sts2GameBuildIdentity.TryWalkToInstallRoot(install));
+    }
+
+    [Fact]
+    public void TheWalkFindsTheInstallFromAModsDeploy()
+    {
+        var install = SeedInstall("Slay the Spire 2", manifest: null);
+        var modDir = Path.Combine(install, "mods", "couchcoop");
+        Directory.CreateDirectory(modDir);
+
+        Assert.Equal(install, Sts2GameBuildIdentity.TryWalkToInstallRoot(modDir));
+    }
+
     [Fact]
     public void AnUnreadableInstallRootIsUnknownRatherThanAThrow()
     {

@@ -152,26 +152,39 @@ public sealed record Sts2GameBuildIdentity(
     /// The game install directory this assembly was loaded from, or <see langword="null"/>.
     /// </summary>
     /// <remarks>
-    /// Walks up from the assembly's own location looking for <c>release_info.json</c>. A bridge or mod assembly
-    /// lives at <c>&lt;install&gt;/mods/&lt;mod&gt;/</c>, so the file is two levels up, but the walk is bounded
-    /// rather than fixed-depth so a differently nested deployment still resolves.
-    /// <para>The assembly location is used rather than the process executable deliberately: Godot resolves its
-    /// executable through <c>/proc/self/exe</c>, which follows symlinks, so a symlinked game binary reports the
-    /// install it points AT rather than the one it was launched from.</para>
+    /// <para>
+    /// TWO STARTING POINTS, tried in order, each walked upwards looking for <c>release_info.json</c>.
+    /// </para>
+    /// <para>
+    /// 1. THE ASSEMBLY'S OWN DIRECTORY. A bridge or mod assembly deployed into the install lives at
+    /// <c>&lt;install&gt;/mods/&lt;mod&gt;/</c>, so the file is two levels up. Preferred over the executable
+    /// because Godot resolves its executable through <c>/proc/self/exe</c>, which follows symlinks — a symlinked
+    /// game binary reports the install it points AT rather than the one it was launched from, and an assembly
+    /// sitting inside the real install is the more specific answer.
+    /// </para>
+    /// <para>
+    /// 2. THE PROCESS EXECUTABLE'S DIRECTORY, when the first finds nothing. A mod installed from the STEAM
+    /// WORKSHOP does not live under the install at all — it sits at
+    /// <c>steamapps/workshop/content/&lt;appid&gt;/&lt;item&gt;/</c>, a sibling branch of the tree that is never
+    /// an ancestor of the game — so walking up from it can only fail. MEASURED: it walks
+    /// item → appid → content → workshop → steamapps and gives up. That is the shape every real player has, and
+    /// with no root there is no version and no content hash, which leaves an embedder unable to tell two game
+    /// builds apart. The symlink caveat above is why this is the FALLBACK and not the primary; as an answer of
+    /// last resort it is strictly better than none.
+    /// </para>
     /// </remarks>
     public static string? TryResolveInstallRoot()
-    {
-        string? directory;
-        try
-        {
-            var location = typeof(Sts2GameBuildIdentity).Assembly.Location;
-            directory = string.IsNullOrWhiteSpace(location) ? null : Path.GetDirectoryName(location);
-        }
-        catch (Exception exception) when (IsIoFailure(exception))
-        {
-            return null;
-        }
+        => TryWalkToInstallRoot(DirectoryOf(SafeAssemblyLocation()))
+           ?? TryWalkToInstallRoot(DirectoryOf(SafeProcessPath()));
 
+    /// <summary>Walk up from <paramref name="startDirectory"/> looking for <c>release_info.json</c>.</summary>
+    /// <remarks>
+    /// Bounded rather than fixed-depth so a differently nested deployment still resolves. Internal so the two
+    /// starting points above can be exercised without a process to place them in.
+    /// </remarks>
+    internal static string? TryWalkToInstallRoot(string? startDirectory)
+    {
+        var directory = startDirectory;
         for (var depth = 0; depth < 5 && !string.IsNullOrWhiteSpace(directory); depth++)
         {
             try
@@ -189,6 +202,30 @@ public sealed record Sts2GameBuildIdentity(
         }
 
         return null;
+    }
+
+    private static string? SafeAssemblyLocation()
+    {
+        try { return typeof(Sts2GameBuildIdentity).Assembly.Location; }
+        catch (Exception exception) when (IsIoFailure(exception)) { return null; }
+    }
+
+    private static string? SafeProcessPath()
+    {
+        try { return Environment.ProcessPath; }
+        catch (Exception exception) when (IsIoFailure(exception)) { return null; }
+    }
+
+    private static string? DirectoryOf(string? filePath)
+    {
+        try
+        {
+            return string.IsNullOrWhiteSpace(filePath) ? null : Path.GetDirectoryName(filePath);
+        }
+        catch (Exception exception) when (IsIoFailure(exception))
+        {
+            return null;
+        }
     }
 
     private const string ReleaseInfoFileName = "release_info.json";
