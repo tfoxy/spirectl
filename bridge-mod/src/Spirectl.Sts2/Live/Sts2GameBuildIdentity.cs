@@ -89,6 +89,8 @@ public sealed record Sts2GameBuildIdentity(
     {
         var root = string.IsNullOrWhiteSpace(installRoot) ? TryResolveInstallRoot() : installRoot;
 
+        // Directly, not through ResolveContent: `root` is already resolved here, and routing through the public
+        // overload would walk for it a second time whenever it came back null.
         var (version, mainAssemblyHash) = ReadReleaseInfo(root);
 
         // Read FIRST, because it decides both rungs: a non-null answer is proof that the install we resolved is
@@ -124,6 +126,27 @@ public sealed record Sts2GameBuildIdentity(
         // Rung 3: no branch, but the build identity may still have been readable.
         return new Sts2GameBuildIdentity(string.Empty, UnknownSource, 0, version, mainAssemblyHash);
     }
+
+    /// <summary>
+    /// What the install DECLARES ABOUT ITSELF — its version and content hash, read from
+    /// <c>release_info.json</c> — with no Steam, no manifest and no reflection anywhere in the call.
+    /// </summary>
+    /// <param name="installRoot">The install to read, or <see langword="null"/> to resolve this assembly's own.</param>
+    /// <remarks>
+    /// <para>
+    /// Split out of <see cref="Resolve"/> because these two facts answer a different question from the branch,
+    /// and an embedder keying a cache on content wants only these. They ship with the install, so they are the
+    /// same on every launch of it: no Steam client, no library layout, nothing that can be up or down. The
+    /// branch, by contrast, is circumstantial — which makes it the wrong thing to make a cache's LAYOUT depend
+    /// on, and the reason this overload exists.
+    /// </para>
+    /// <para>
+    /// A version of <see cref="string.Empty"/> and a hash of 0 mean "this install would not say", never
+    /// "matches anything" — the same convention the rest of this type uses.
+    /// </para>
+    /// </remarks>
+    public static (string Version, int MainAssemblyHash) ResolveContent(string? installRoot = null)
+        => ReadReleaseInfo(string.IsNullOrWhiteSpace(installRoot) ? TryResolveInstallRoot() : installRoot);
 
     /// <summary>
     /// The game install directory this assembly was loaded from, or <see langword="null"/>.
