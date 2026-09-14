@@ -111,6 +111,11 @@ public sealed partial class Sts2ActionHandler
     // PotionCmd.TryToProcure, keyed on Reward.Player) plus AfterRewardTaken + ParentRewardSet pruning,
     // none of which touch LocalContext or a screen. Undoable kinds (which would open a screen) are
     // rejected — they commit via select-card / confirm-selection instead.
+    //
+    // That obtain is allowed to REFUSE, and the bool SelectUnsynchronized returns is the only thing that says
+    // so, so the row's retire has to wait on it — see ClaimImmediateRewardThenRetire. The synchronous result
+    // below is NOT that answer: it reports only that the command was valid and dispatched, which is settled
+    // here and now. Whether the seat ends up holding the reward is decided later, on the game's terms.
     private ActionExecutionResult ExecuteRewardSeatClaimCommit(SemanticActionRequest request, string rewardId)
     {
         if (!TryResolveRewardCommit(request, rewardId, out var commit, out var failure))
@@ -123,27 +128,54 @@ public sealed partial class Sts2ActionHandler
             return RewardCommitFailure(request, "reward_id", rewardId, "Undoable rewards (card choice / removal) commit via select-card / confirm-selection, not claim-reward.", ActionFailureCode.InvalidAction);
         }
 
-        // SelectUnsynchronized already runs AfterRewardTaken + ParentRewardSet pruning, so only drop the
-        // reward from the surfaced overlay (do NOT call FinalizeRewardCommit — it would double those).
-        // SpecialCardReward.SelectUnsynchronized adds a card to the deck, so refresh the badge too (no-op for
-        // gold/relic/potion).
-        TaskHelper.RunSafely(CommitPileOpThenRefreshDeck(((Reward)commit.Reward).SelectUnsynchronized(), commit.Player, added: true));
+        TaskHelper.RunSafely(ClaimImmediateRewardThenRetire(commit, rewardId));
+        return ActionExecutionResult.Success(
+            actionInstanceId: $"action:claim-reward:{request.RequestId}",
+            kind: request.Kind,
+            message: $"Committed reward for {commit.PlayerId}.");
+    }
+
+    // Select an immediate reward, then retire its row ONLY if the game says the seat actually received it.
+    //
+    // A reward can be REFUSED. Taking a potion with no free belt slot is the case that happens in practice, and
+    // on screen the refusal is plain: the potion bar plays its no-room animation and the row stays, still
+    // claimable once a slot frees up. Reward.SelectUnsynchronized's bool is the only thing that tells this code
+    // which of the two outcomes it got, so on false we touch neither the native row nor the captured overlay
+    // and the browser lands where a mouse click on the same row lands.
+    //
+    // Deliberately NOT a capacity pre-check here. Whether an obtain succeeds is a game rule that hooks and
+    // relics take part in, so re-deciding it in the bridge would be a second copy of that rule, free to drift.
+    // The return value is the authority.
+    //
+    // Cleanup split, unchanged: SelectUnsynchronized already ran AfterRewardTaken + ParentRewardSet pruning on
+    // its own success branch, so FinalizeRewardCommit must NOT be called here — it would double both. Only the
+    // row lifecycle and the deck badge are ours.
+    private async Task ClaimImmediateRewardThenRetire(RewardCommit commit, string rewardId)
+    {
+        var received = await commit.Reward.SelectUnsynchronized();
+        if (!received)
+        {
+            _logStream.Write(BridgeLogLevel.Info, "bridge.action", $"The game refused immediate reward '{rewardId}' for seat {commit.PlayerId} (in practice: a potion with no free belt slot); leaving the row claimable.");
+            return;
+        }
+
+        // SpecialCardReward.SelectUnsynchronized adds a card to the deck, and this headless commit skips the
+        // card-fly VFX that normally raises the pile's add-finished signal, so re-raise it for the deck-count
+        // badge (no-op for gold/relic/potion). See CommitPileOpThenRefreshDeck.
+        RefreshDeckBadge(commit.Player, added: true);
         if (commit.Button is { } button && commit.ScreenObject is { } screen)
         {
             // The direct host-local commit bypassed the button's normal synchronization callback, so retire the
-            // row explicitly after the reward has been selected. SelectUnsynchronized already performed reward
-            // cleanup; this call is only the live screen's row lifecycle.
+            // row explicitly now that the reward has been received. SelectUnsynchronized already performed
+            // reward cleanup; this call is only the live screen's row lifecycle.
             Sts2LiveIntrospection.TryInvokeMethod(screen, "RewardCollectedFrom", button);
         }
         else
         {
             Sts2RewardCaptureRegistry.Consume(commit.PlayerId, commit.Reward);
         }
+
         _logStream.Write(BridgeLogLevel.Info, "bridge.action", $"Committed immediate reward '{rewardId}' for seat {commit.PlayerId}.");
-        return ActionExecutionResult.Success(
-            actionInstanceId: $"action:claim-reward:{request.RequestId}",
-            kind: request.Kind,
-            message: $"Committed reward for {commit.PlayerId}.");
     }
 
     private bool IsImmediateLiveReward(string rewardId)
@@ -231,7 +263,11 @@ public sealed partial class Sts2ActionHandler
     // game's deck-count badge (NTopBarDeckButton.OnPileContentsChanged) listens to. Re-raise it once the
     // pile op completes so the game UI reacts (the deck-icon count) without us forcing any reward overlay
     // open. CardAddFinished and CardRemoveFinished route to the same handler, so re-raising is just an
-    // idempotent re-read; harmless for non-card immediate rewards (gold/relic/potion).
+    // idempotent re-read.
+    //
+    // The two undoable commits (choice / removal) use this; the immediate claim does not, because it has to
+    // read the bool its own op returns rather than discard it into this Task parameter — it awaits and calls
+    // RefreshDeckBadge itself. See ClaimImmediateRewardThenRetire.
     private static async Task CommitPileOpThenRefreshDeck(Task pileOp, Player player, bool added)
     {
         await pileOp;
