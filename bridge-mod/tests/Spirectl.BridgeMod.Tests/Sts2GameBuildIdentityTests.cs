@@ -10,6 +10,13 @@ namespace Spirectl.BridgeMod.Tests;
 // process, so it is proved by the couch-coop live leg (which logs which rung answered) rather than here — what
 // IS covered here is that its absence falls through cleanly instead of throwing, which is the half that would
 // otherwise only fail in front of a player.
+//
+// The manifest rung carries a SECOND job beyond its own answer: it is the test of whether the install we
+// resolved is the one Steam mounted, and so whether the Steamworks rung is describing US at all. A second copy
+// of the game launched from outside the Steam library, with Steam running, otherwise gets a confident branch for
+// the OTHER install. That gate is not directly reachable without a Steam client, but its consequence is: the
+// cases below pin that an install the manifest walk cannot identify reports NO branch — which is what the gate
+// leaves behind once Steamworks is refused, and is a strictly better answer than a confident wrong one.
 public sealed class Sts2GameBuildIdentityTests : IDisposable
 {
     private readonly string _root = Path.Combine(
@@ -135,6 +142,32 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
         Assert.False(identity.HasBranch);
         Assert.Equal(Sts2GameBuildIdentity.UnknownSource, identity.BranchSource);
         Assert.Equal(0, identity.BuildId);
+    }
+
+    // The shape that started all this: a second copy of the game kept outside the Steam library and launched
+    // directly, while Steam is running with the OTHER copy mounted. The manifest walk refuses to identify this
+    // tree — there is a manifest two levels up, but it names a different install directory — and so neither rung
+    // may speak for it. An empty branch is the honest answer; "public" (which is what the mounted install is on)
+    // would key this build's caches to the other build's.
+    [Fact]
+    public void AnInstallTheManifestDoesNotNameReportsNoBranch()
+    {
+        var install = SeedInstall(
+            "Slay the Spire 2 (beta copy)",
+            Manifest("Slay the Spire 2", "23811903", mounted: "public"),
+            version: "v0.111.0",
+            hash: 1579942752);
+
+        var identity = Sts2GameBuildIdentity.Resolve(install);
+
+        Assert.False(identity.HasBranch);
+        Assert.Equal(Sts2GameBuildIdentity.UnknownSource, identity.BranchSource);
+        Assert.Equal(0, identity.BuildId);
+        // …and the BUILD is still read, from this copy's own release_info.json. That is what keeps a cache
+        // keyed on the identity correct even when the branch is unknown — and why the browser asset token
+        // moved between these two installs all along.
+        Assert.Equal("v0.111.0", identity.Version);
+        Assert.Equal(1579942752, identity.MainAssemblyHash);
     }
 
     [Fact]
