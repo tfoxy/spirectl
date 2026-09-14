@@ -170,6 +170,39 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
         Assert.Equal(1579942752, identity.MainAssemblyHash);
     }
 
+    // The content-only overload exists so an embedder keying a cache on the BUILD never has to ask Steam for it.
+    // What it must guarantee is that it answers the same thing the full ladder does, for an install the ladder
+    // can fully identify and for one it cannot — otherwise a cache keyed on it and a diagnostic reading the full
+    // identity would disagree about which build this is.
+    [Fact]
+    public void ResolveContentAgreesWithTheFullLadderAndNeedsNoBranch()
+    {
+        var steam = SeedInstall("Slay the Spire 2", Manifest("Slay the Spire 2", "23811903", mounted: "public"));
+        var copied = SeedInstall("beta copy", manifest: null, version: "v0.111.0", hash: 1579942752);
+
+        foreach (var install in new[] { steam, copied })
+        {
+            var full = Sts2GameBuildIdentity.Resolve(install);
+            var content = Sts2GameBuildIdentity.ResolveContent(install);
+
+            Assert.Equal(full.Version, content.Version);
+            Assert.Equal(full.MainAssemblyHash, content.MainAssemblyHash);
+        }
+
+        // …and it is genuinely the install's own declaration, not a branch answer in disguise.
+        Assert.Equal("v0.111.0", Sts2GameBuildIdentity.ResolveContent(copied).Version);
+        Assert.Equal(1579942752, Sts2GameBuildIdentity.ResolveContent(copied).MainAssemblyHash);
+    }
+
+    [Fact]
+    public void ResolveContentIsUnknownRatherThanAThrowForAnUnreadableRoot()
+    {
+        var content = Sts2GameBuildIdentity.ResolveContent(Path.Combine(_root, "does-not-exist"));
+
+        Assert.Equal(string.Empty, content.Version);
+        Assert.Equal(0, content.MainAssemblyHash);
+    }
+
     [Fact]
     public void AnUnreadableInstallRootIsUnknownRatherThanAThrow()
     {
