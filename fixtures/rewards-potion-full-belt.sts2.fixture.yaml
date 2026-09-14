@@ -16,6 +16,16 @@ description: >-
 # can answer no — gold, relic and special-card rewards always succeed. A claim path
 # that ignores that answer retires the row anyway and the player loses the potion.
 #
+# SCOPE — what this fixture can and cannot prove. It sets up the BRIDGE claim path
+# (Sts2ActionHandler's ExecuteRewardSeatClaimCommit, which selects the reward directly),
+# and that is the path the refusal bug lived on. It can NOT exercise the game's own
+# reward button: a fixture generates its set without offering it, so the game never has
+# the seat viewing a reward set and pressing the row in-game errors out instead. The
+# failure is easy to misread — the row is disabled before the error and simply stays
+# put, which looks exactly like a refusal. For anything that goes through the game's own
+# button (or through replayed input, which lands on the same button), use a real
+# post-combat reward screen instead: `dev console room Monster` then `dev console win`.
+#
 # TWO SEATS IS LOAD-BEARING, not just coverage. Authored `players[].potions` is only
 # applied on the multi-seat (LoadCoopRewardsAsync) path, which resolves seats through
 # ResolveHostLocalFixturePlayers -> ApplyAuthoredPlayerPotions. The single-player
