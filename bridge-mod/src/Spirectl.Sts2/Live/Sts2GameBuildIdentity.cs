@@ -172,27 +172,57 @@ public sealed record Sts2GameBuildIdentity(
     /// builds apart. The symlink caveat above is why this is the FALLBACK and not the primary; as an answer of
     /// last resort it is strictly better than none.
     /// </para>
+    /// <para>
+    /// BOTH WALKS ALSO LOOK SIDEWAYS ONCE, inside a macOS <c>.app</c>, where what they are looking for is a
+    /// sibling rather than an ancestor of either starting point — see <see cref="BundleResourceDirectory"/>.
+    /// The directory this hands back is then the bundle's resource directory, which is the install root in the
+    /// only sense anything here uses it: the directory <c>release_info.json</c> is in.
+    /// </para>
     /// </remarks>
     public static string? TryResolveInstallRoot()
         => TryWalkToInstallRoot(DirectoryOf(SafeAssemblyLocation()))
            ?? TryWalkToInstallRoot(DirectoryOf(SafeProcessPath()));
 
+    /// <summary>
+    /// How far up from a starting point to look, counting the starting directory itself.
+    /// </summary>
+    /// <remarks>
+    /// Bounded rather than fixed-depth so a differently nested deployment still resolves, and a pathological
+    /// link loop still terminates. The number is set by the deepest real start: a mod inside a macOS
+    /// <c>.app</c> sits at <c>&lt;app&gt;.app/Contents/MacOS/mods/&lt;mod&gt;/</c>, four steps below the
+    /// bundle's <c>Contents/</c>, and the game's mod scan is recursive — so a payload may nest itself further
+    /// under <c>mods/</c> and must still resolve. Each extra step is one <c>File.Exists</c>.
+    /// </remarks>
+    private const int MaxWalkDepth = 8;
+
     /// <summary>Walk up from <paramref name="startDirectory"/> looking for <c>release_info.json</c>.</summary>
     /// <remarks>
-    /// Bounded rather than fixed-depth so a differently nested deployment still resolves. Internal so the two
-    /// starting points above can be exercised without a process to place them in.
+    /// <para>Internal so the two starting points above can be exercised without a process to place them in.</para>
+    /// <para>
+    /// NOT PURELY UPWARD, because on macOS the file is not above either starting point. See
+    /// <see cref="BundleResourceDirectory"/>.
+    /// </para>
     /// </remarks>
     internal static string? TryWalkToInstallRoot(string? startDirectory)
     {
         var directory = startDirectory;
-        for (var depth = 0; depth < 5 && !string.IsNullOrWhiteSpace(directory); depth++)
+        for (var depth = 0; depth < MaxWalkDepth && !string.IsNullOrWhiteSpace(directory); depth++)
         {
             try
             {
+                // The directory itself first, at every level. Where both shapes exist, the tree the caller is
+                // actually sitting in is the more specific answer.
                 if (File.Exists(Path.Combine(directory, ReleaseInfoFileName)))
                 {
                     return directory;
                 }
+
+                if (BundleResourceDirectory(directory) is { } resources
+                    && File.Exists(Path.Combine(resources, ReleaseInfoFileName)))
+                {
+                    return resources;
+                }
+
                 directory = Path.GetDirectoryName(directory);
             }
             catch (Exception exception) when (IsIoFailure(exception))
@@ -203,6 +233,50 @@ public sealed record Sts2GameBuildIdentity(
 
         return null;
     }
+
+    /// <summary>
+    /// <c>&lt;name&gt;.app/Contents/Resources</c>, when <paramref name="directory"/> is that bundle's
+    /// <c>Contents</c>; otherwise <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// WHY A WALK UPWARD IS NOT ENOUGH ON macOS. A <c>.app</c> is not a flat install directory: the executable
+    /// lives in <c>Contents/MacOS/</c> and the shipped data — <c>release_info.json</c> among it — in
+    /// <c>Contents/Resources/</c>. Those two are SIBLINGS, so the file is not an ancestor of the binary, nor of
+    /// a mod deployed beside it under <c>Contents/MacOS/mods/</c>. No walk depth reaches a sibling; a Mac
+    /// install therefore reported no version and no content hash at all, which leaves an embedder keying a
+    /// cache on the build unable to tell two builds apart — and so unable to keep a cache.
+    /// </para>
+    /// <para>
+    /// Keyed on the <c>Contents</c> directory rather than on <c>MacOS</c>, so the walk finds the resource
+    /// directory whichever sibling it came up through, and gated on the <c>.app</c> suffix so an ordinary
+    /// directory that happens to be named <c>Contents</c> is not mistaken for a bundle. Deliberately NOT gated
+    /// on <see cref="OperatingSystem.IsMacOS"/>: the shape is unambiguous on its own, and an OS gate would make
+    /// the one platform this exists for the one platform it cannot be tested on.
+    /// </para>
+    /// <para>
+    /// The branch rungs are unaffected and stay unanswered here — <see cref="TryReadAppManifest"/> looks two
+    /// levels above what this returns, which inside a bundle is not <c>steamapps</c>. That is unchanged from
+    /// before (nothing resolved at all), and no cache keyed on CONTENT depends on the branch.
+    /// </para>
+    /// </remarks>
+    private static string? BundleResourceDirectory(string directory)
+    {
+        var trimmed = Path.TrimEndingDirectorySeparator(directory);
+        if (!string.Equals(Path.GetFileName(trimmed), BundleContentsDirectoryName, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var bundle = Path.GetFileName(Path.GetDirectoryName(trimmed));
+        return !string.IsNullOrEmpty(bundle) && bundle.EndsWith(BundleSuffix, StringComparison.OrdinalIgnoreCase)
+            ? Path.Combine(trimmed, BundleResourcesDirectoryName)
+            : null;
+    }
+
+    private const string BundleSuffix = ".app";
+    private const string BundleContentsDirectoryName = "Contents";
+    private const string BundleResourcesDirectoryName = "Resources";
 
     private static string? SafeAssemblyLocation()
     {

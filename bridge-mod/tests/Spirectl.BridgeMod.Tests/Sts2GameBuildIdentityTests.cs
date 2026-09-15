@@ -230,6 +230,67 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
         Assert.Equal(install, Sts2GameBuildIdentity.TryWalkToInstallRoot(modDir));
     }
 
+    // THE macOS BUNDLE SHAPE, and the reason a bigger walk depth is not the fix. A .app keeps its executable in
+    // Contents/MacOS/ and its shipped data in Contents/Resources/ — SIBLINGS — so release_info.json is not an
+    // ancestor of the binary, nor of a mod deployed beside it, and no number of upward steps reaches it. A Mac
+    // install therefore reported no version and no content hash at all, which for an embedder keying a cache on
+    // the build means no cache: every asset re-rendered on the game's main thread, every session.
+    [Fact]
+    public void TheWalkFindsTheInstallInsideAMacOsAppBundle()
+    {
+        var contents = Path.Combine(
+            _root, "steamapps", "common", "Slay the Spire 2", "SlayTheSpire2.app", "Contents");
+        var resources = Path.Combine(contents, "Resources");
+        Directory.CreateDirectory(resources);
+        WriteReleaseInfo(resources, "v0.107.1", 1692500715);
+        var modDirectory = Path.Combine(contents, "MacOS", "mods", "couchcoop");
+        Directory.CreateDirectory(modDirectory);
+
+        // From a mod deployed beside the binary — the primary starting point.
+        Assert.Equal(resources, Sts2GameBuildIdentity.TryWalkToInstallRoot(modDirectory));
+        // …and from the binary's own directory, which is the rung a Workshop install falls through to.
+        Assert.Equal(resources, Sts2GameBuildIdentity.TryWalkToInstallRoot(Path.Combine(contents, "MacOS")));
+        // …and what comes back is genuinely readable, which is the whole point of resolving it.
+        Assert.Equal("v0.107.1", Sts2GameBuildIdentity.ResolveContent(resources).Version);
+        Assert.Equal(1692500715, Sts2GameBuildIdentity.ResolveContent(resources).MainAssemblyHash);
+    }
+
+    // The bundle has a second, flatter shape with the file beside the binary instead. An ordinary upward walk
+    // already reaches that one, and it has to keep winning where it exists: the tree the mod is actually sitting
+    // in is the more specific answer than a sibling directory of one of its ancestors.
+    [Fact]
+    public void AVersionFileBesideTheMacOsBinaryIsPreferredToTheBundleResources()
+    {
+        var contents = Path.Combine(_root, "Slay the Spire 2", "SlayTheSpire2.app", "Contents");
+        var macOs = Path.Combine(contents, "MacOS");
+        var resources = Path.Combine(contents, "Resources");
+        Directory.CreateDirectory(macOs);
+        Directory.CreateDirectory(resources);
+        WriteReleaseInfo(macOs, "v0.107.1", 1692500715);
+        WriteReleaseInfo(resources, "v0.111.0", 1579942752);
+
+        var modDirectory = Path.Combine(macOs, "mods", "couchcoop");
+        Directory.CreateDirectory(modDirectory);
+
+        Assert.Equal(macOs, Sts2GameBuildIdentity.TryWalkToInstallRoot(modDirectory));
+    }
+
+    // The sideways step is gated on the `.app` suffix, so an ordinary tree that happens to contain a directory
+    // called `Contents` is not treated as a bundle. Reading a stranger's release_info.json is exactly the
+    // confidently-wrong answer this whole type is built to avoid.
+    [Fact]
+    public void AnOrdinaryDirectoryNamedContentsIsNotABundle()
+    {
+        var contents = Path.Combine(_root, "some", "project", "Contents");
+        var resources = Path.Combine(contents, "Resources");
+        Directory.CreateDirectory(resources);
+        WriteReleaseInfo(resources, "v9.9.9", 1);
+        var start = Path.Combine(contents, "MacOS");
+        Directory.CreateDirectory(start);
+
+        Assert.Null(Sts2GameBuildIdentity.TryWalkToInstallRoot(start));
+    }
+
     [Fact]
     public void AnUnreadableInstallRootIsUnknownRatherThanAThrow()
     {
@@ -266,17 +327,7 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
         var steamApps = Path.Combine(_root, "steamapps");
         var install = Path.Combine(steamApps, "common", installDir);
         Directory.CreateDirectory(install);
-        File.WriteAllText(
-            Path.Combine(install, "release_info.json"),
-            $$"""
-            {
-              "commit": "59260271",
-              "version": "{{version}}",
-              "date": "2026-06-18T15:43:56-07:00",
-              "branch": "{{version}}",
-              "main_assembly_hash": {{hash}}
-            }
-            """);
+        WriteReleaseInfo(install, version, hash);
 
         if (manifest is not null)
         {
@@ -286,6 +337,20 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
 
         return install;
     }
+
+    /// <summary>The install's own declaration, in the shape the game ships it.</summary>
+    private static void WriteReleaseInfo(string directory, string version, int hash) =>
+        File.WriteAllText(
+            Path.Combine(directory, "release_info.json"),
+            $$"""
+            {
+              "commit": "59260271",
+              "version": "{{version}}",
+              "date": "2026-06-18T15:43:56-07:00",
+              "branch": "{{version}}",
+              "main_assembly_hash": {{hash}}
+            }
+            """);
 
     private static string Manifest(string installDir, string buildId, string? mounted, string? user = null)
         => $$"""
