@@ -104,7 +104,27 @@ internal static class Sts2GameApiProbe
             }
 
             _ran = true;
-            var requirements = GameApiManifest.Requirements;
+
+            IReadOnlyList<GameApiRequirement> requirements;
+            try
+            {
+                requirements = GameApiManifest.Requirements;
+            }
+            catch (Exception exception) when (exception is TypeLoadException or TypeInitializationException)
+            {
+                // THE MANIFEST ITSELF DID NOT LOAD, which is a WORSE mismatch than a missing member and has
+                // to be reported here rather than escaping raw. The manifest names game types directly —
+                // `typeof(StartRunLobby)`, an aliased `GameLobbyPlayer` in a parameter list — so when this
+                // build's lane was compiled for a different game build, the CLR fails the type load while
+                // JITting the initialiser and never reaches a single requirement. What escapes is a
+                // TypeLoadException naming a GAME type, which reads as "the game is broken" and names
+                // neither the lane nor either build. Everything needed to say it properly is already here.
+                _failure = new InvalidOperationException(
+                    BuildLaneLoadRefusal(exception, DescribeGameVersion()),
+                    exception);
+                throw _failure;
+            }
+
             var missing = FindMissing(requirements);
             var gameVersion = DescribeGameVersion();
             if (missing.Count > 0)
@@ -235,6 +255,33 @@ internal static class Sts2GameApiProbe
             type is not null && string.Equals(type.Name, typeName, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// The refusal text for a lane whose manifest could not be loaded at all. Exposed so its shape is
+    /// testable — the failing path itself needs a mismatched game install to reproduce.
+    /// </summary>
+    /// <remarks>
+    /// Says which build this payload IS before it says which build is installed, because that is the fact
+    /// the reader does not have. <see cref="BridgeBuildInfo"/> reads it off this assembly's own metadata
+    /// and touches nothing in the game, so it is answerable even though the manifest is not.
+    /// </remarks>
+    internal static string BuildLaneLoadRefusal(Exception exception, string gameVersion)
+    {
+        var compiledFor = string.IsNullOrWhiteSpace(BridgeBuildInfo.BuiltAgainstGameVersion)
+            ? "<a build it does not record>"
+            : BridgeBuildInfo.BuiltAgainstGameVersion;
+
+        return $"The spirectl live bridge refuses to start: its '{GameApiLane.Name}' API lane cannot be "
+            + $"loaded against the game that is running. This bridge was compiled for game build "
+            + $"{compiledFor}; the loaded game is {gameVersion}. The lane names game types directly, and one "
+            + $"of them is not in this build's assembly — {exception.GetType().Name}: {exception.Message}"
+            + Environment.NewLine
+            + "Rebuild the bridge against this install (`sts2 game install-bridge`), or install the payload "
+            + $"built for this game build. The version-to-lane table is {Sts2GameApiTableFile}.";
+    }
+
+    /// <summary>Where the lane table lives, named by every refusal so a reader never has to hunt for it.</summary>
+    private const string Sts2GameApiTableFile = "bridge-mod/Sts2GameApi.props";
+
     /// <summary>The refusal text for a set of missing members. Exposed so its shape is testable.</summary>
     internal static string BuildRefusal(IReadOnlyList<string> missing, string gameVersion)
     {
@@ -245,7 +292,7 @@ internal static class Sts2GameApiProbe
             + lines
             + Environment.NewLine
             + "Either this game build moved under the lane it is mapped to, or the wrong lane was compiled. "
-            + "The version-to-lane table is bridge-mod/Sts2GameApi.props; the members are declared in "
+            + $"The version-to-lane table is {Sts2GameApiTableFile}; the members are declared in "
             + $"bridge-mod/src/Spirectl.Sts2/GameApi/{GameApiLane.Name.ToUpperInvariant()}/GameApiManifest.cs.";
     }
 
