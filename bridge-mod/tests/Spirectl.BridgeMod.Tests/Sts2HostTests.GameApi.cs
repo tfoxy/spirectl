@@ -1,3 +1,4 @@
+using Spirectl.Sts2;
 using Spirectl.Sts2.Live.GameApi;
 using Xunit;
 using Xunit.Abstractions;
@@ -56,6 +57,41 @@ public sealed partial class Sts2HostTests(ITestOutputHelper output)
         Assert.Contains("v9.99.9", refusal);
         Assert.Contains("Some.Game.Type.SomeMember", refusal);
         Assert.Contains("Sts2GameApi.props", refusal);
+    }
+
+    /// <summary>
+    /// The refusal for the worse failure: the lane's manifest cannot be loaded at all.
+    /// </summary>
+    /// <remarks>
+    /// Seen for real on Sep 15 2026, on an install switched from stable to the public beta while a bridge
+    /// compiled for v0.107.1 was still deployed. The v107 lane aliases a per-player lobby record that the
+    /// beta removed, so the CLR failed the type load while JITting the manifest's initialiser — before a
+    /// single requirement was evaluated, which is why <see cref="Sts2GameApiProbe.BuildRefusal"/> could not
+    /// fire. What escaped was a bare `Could not load type '…LobbyPlayer'` naming a GAME type, in a stack
+    /// that mentioned neither the lane nor either build. This is that message, said properly.
+    /// </remarks>
+    [Fact]
+    public void GameApiProbeRefusesALaneItCannotEvenLoadAndNamesBothBuilds()
+    {
+        var refusal = Sts2GameApiProbe.BuildLaneLoadRefusal(
+            new TypeLoadException("Could not load type 'A.Game.Type' from assembly 'sts2'."),
+            "v9.99.9");
+
+        Assert.Contains("refuses to start", refusal);
+        Assert.Contains(GameApiLane.Name, refusal);
+        Assert.Contains("v9.99.9", refusal);
+        Assert.Contains("A.Game.Type", refusal);
+        Assert.Contains(nameof(TypeLoadException), refusal);
+        Assert.Contains("install-bridge", refusal);
+        Assert.Contains("Sts2GameApi.props", refusal);
+
+        // The build this payload IS. A source build stamps it; a reference-SDK build cannot, and then the
+        // refusal has to say so rather than print an empty version and read as "compiled for nothing".
+        Assert.Contains(
+            string.IsNullOrWhiteSpace(BridgeBuildInfo.BuiltAgainstGameVersion)
+                ? "a build it does not record"
+                : BridgeBuildInfo.BuiltAgainstGameVersion,
+            refusal);
     }
 
     [Fact]
