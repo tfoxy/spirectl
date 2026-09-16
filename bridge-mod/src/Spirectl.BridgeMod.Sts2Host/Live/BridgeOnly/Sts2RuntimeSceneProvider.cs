@@ -15,6 +15,16 @@ namespace Spirectl.Sts2.Live;
 public sealed class Sts2RuntimeSceneProvider : IRuntimeSceneProvider
 {
     private const string HoverTipPanelTexture = "res://images/ui/hover_tip.png";
+
+    // Nested scroll containers take one pass each, and an inner one may have to settle before the
+    // outer one can aim at the moved control. Six is well past any nesting the game's UI has, and
+    // bounds a request that would otherwise loop on a container that never converges.
+    private const int EnsureVisibleMaxPasses = 6;
+
+    // Long enough to clear the frame the scroll was queued on at 60fps. The pass loop re-measures
+    // either way, so this only affects how many passes convergence takes, never correctness.
+    private const int EnsureVisibleSettleMs = 24;
+
     private readonly Sts2ScreenLocator _screenLocator;
     private readonly ILogStream _logStream;
 
@@ -95,8 +105,17 @@ public sealed class Sts2RuntimeSceneProvider : IRuntimeSceneProvider
         RuntimeSceneVector2Snapshot? hoverPosition = null;
         try
         {
+            // Scrolling happens BEFORE the hover, in its own main-thread passes: a ScrollContainer
+            // applies a new offset by queueing a child sort, so the child's rect is still the old one
+            // for the rest of the frame that moved it. Each pass therefore scrolls at most one
+            // container and then yields, and the next pass re-measures.
+            IReadOnlyList<RuntimeSceneHoverScrollSnapshot> scrolled = request.EnsureVisible
+                ? RunEnsureVisiblePasses(request.NodePath)
+                : [];
+
             return Sts2MainThreadDispatcher.Invoke(() => HoverControlOnMainThread(
                 request,
+                scrolled,
                 (path, position) =>
                 {
                     if (!string.IsNullOrWhiteSpace(path))
@@ -383,6 +402,7 @@ public sealed class Sts2RuntimeSceneProvider : IRuntimeSceneProvider
 
     private RuntimeSceneControlHoverResult HoverControlOnMainThread(
         RuntimeSceneControlHoverRequestSnapshot request,
+        IReadOnlyList<RuntimeSceneHoverScrollSnapshot> scrolled,
         Action<string?, RuntimeSceneVector2Snapshot?>? recordProgress = null)
     {
         var screen = _screenLocator.Locate();
@@ -453,7 +473,25 @@ public sealed class Sts2RuntimeSceneProvider : IRuntimeSceneProvider
                 ]);
         }
 
-        var hoverPosition = rect.Position + rect.Size / 2;
+        // A node path resolves regardless of where the node has been scrolled to, so the old
+        // "centre of the global rect" rule happily produced a coordinate outside the viewport, or
+        // inside a scroll container but beyond its clip. Warping there hovers whatever IS painted
+        // at that coordinate, and the caller has no way to tell. Decide reachability first.
+        var plan = RuntimeSceneHoverGeometry.Plan(ToSnapshot(rect), CollectHoverClips(control), scrolled);
+        if (!plan.Reachable && !request.AllowOffscreen)
+        {
+            return RuntimeSceneControlHoverResult.Failure(
+                source: DataSourceKind.Live,
+                provisional: false,
+                code: RuntimeSceneFailureCode.InvalidNodePath,
+                message: RuntimeSceneHoverGeometry.DescribeRefusal(normalizedNodePath, plan),
+                details: RuntimeSceneHoverGeometry.RefusalDetails(normalizedNodePath, plan));
+        }
+
+        var notes = DescribeHoverVisibilityNotes(plan, request.AllowOffscreen);
+        var hoverPosition = plan.HoverPosition is { } resolved
+            ? new Vector2((float)resolved.X, (float)resolved.Y)
+            : rect.Position + rect.Size / 2;
         recordProgress?.Invoke(normalizedNodePath, ToSnapshot(hoverPosition));
         Input.WarpMouse(hoverPosition);
         Input.ParseInputEvent(new InputEventMouseMotion
@@ -495,7 +533,163 @@ public sealed class Sts2RuntimeSceneProvider : IRuntimeSceneProvider
             hovered: true,
             hoverPosition: ToSnapshot(hoverPosition),
             hoverTip: hoverTip,
-            notes: []);
+            notes: notes,
+            visibility: plan.Visibility);
+    }
+
+    // One ensure-visible pass: measure, and if the target is not inside every clip that governs it,
+    // scroll the innermost ancestor scroll container that still has somewhere to go. Returns the
+    // container it moved, or null when there was nothing left to move (settled, or unscrollable).
+    private static RuntimeSceneHoverScrollSnapshot? EnsureVisibleOnMainThread(string requestedNodePath)
+    {
+        var root = ResolveRootNode();
+        if (root.Error is not null)
+        {
+            return null;
+        }
+
+        var target = ResolveTargetNode(root.Node!, NormalizeRequestedNodePath(requestedNodePath));
+        // Every real failure (bad path, non-Control, hidden) is reported by the hover itself, with
+        // its own message. A pass that cannot measure simply has nothing to scroll.
+        if (target.Error is not null || target.Node is not Control control || !control.IsVisibleInTree())
+        {
+            return null;
+        }
+
+        var clips = CollectHoverClips(control);
+        if (RuntimeSceneHoverGeometry.IsFullyVisible(ToSnapshot(control.GetGlobalRect()), clips))
+        {
+            return null;
+        }
+
+        for (Node? node = control.GetParent(); node is not null; node = node.GetParent())
+        {
+            if (node is not ScrollContainer container)
+            {
+                continue;
+            }
+
+            var previousHorizontal = container.ScrollHorizontal;
+            var previousVertical = container.ScrollVertical;
+            container.EnsureControlVisible(control);
+            if (container.ScrollHorizontal == previousHorizontal
+                && container.ScrollVertical == previousVertical)
+            {
+                // Already showing as much of the target as it can; try the next container out.
+                continue;
+            }
+
+            return new RuntimeSceneHoverScrollSnapshot(
+                NodePath: container.GetPath().ToString(),
+                PreviousHorizontal: previousHorizontal,
+                PreviousVertical: previousVertical,
+                Horizontal: container.ScrollHorizontal,
+                Vertical: container.ScrollVertical);
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<RuntimeSceneHoverScrollSnapshot> RunEnsureVisiblePasses(string requestedNodePath)
+    {
+        var scrolled = new List<RuntimeSceneHoverScrollSnapshot>();
+        for (var pass = 0; pass < EnsureVisibleMaxPasses; pass++)
+        {
+            var step = Sts2MainThreadDispatcher.Invoke(() => EnsureVisibleOnMainThread(requestedNodePath));
+            if (step is null)
+            {
+                break;
+            }
+
+            scrolled.Add(step);
+
+            // Yield the frame the scroll was queued on, so the next pass measures the moved rect
+            // rather than the stale one.
+            Thread.Sleep(EnsureVisibleSettleMs);
+        }
+
+        return scrolled;
+    }
+
+    // Every rectangle the target has to survive to be reachable by a click: each ancestor that
+    // clips its children, then the viewport. Ancestors are innermost-first so the reported
+    // "clipped by" list reads from the nearest container outwards.
+    private static IReadOnlyList<RuntimeSceneHoverClipSnapshot> CollectHoverClips(Control control)
+    {
+        var clips = new List<RuntimeSceneHoverClipSnapshot>();
+        var sceneRoot = (Engine.GetMainLoop() as SceneTree)?.Root;
+        var isInRootViewport = false;
+        for (Node? node = control.GetParent(); node is not null; node = node.GetParent())
+        {
+            if (node is Viewport viewport)
+            {
+                // A control inside a SubViewport measures in that viewport's own space, which the
+                // root window's visible rect cannot be compared against. Stop, and leave the
+                // viewport clip off rather than refusing a target on a bogus comparison.
+                isInRootViewport = ReferenceEquals(viewport, sceneRoot);
+                break;
+            }
+
+            if (node is not Control ancestor)
+            {
+                continue;
+            }
+
+            var isScrollContainer = ancestor is ScrollContainer;
+            if (!isScrollContainer && !ancestor.ClipContents)
+            {
+                continue;
+            }
+
+            clips.Add(new RuntimeSceneHoverClipSnapshot(
+                NodePath: ancestor.GetPath().ToString(),
+                NodeType: ancestor.GetType().FullName ?? ancestor.GetType().Name,
+                Reason: isScrollContainer
+                    ? RuntimeSceneHoverClipReasons.ScrollContainer
+                    : RuntimeSceneHoverClipReasons.ClipContents,
+                Rect: ToSnapshot(ancestor.GetGlobalRect())));
+        }
+
+        if (isInRootViewport && sceneRoot is not null)
+        {
+            clips.Add(new RuntimeSceneHoverClipSnapshot(
+                NodePath: sceneRoot.GetPath().ToString(),
+                NodeType: sceneRoot.GetType().FullName ?? sceneRoot.GetType().Name,
+                Reason: RuntimeSceneHoverClipReasons.Viewport,
+                Rect: ToSnapshot(sceneRoot.GetVisibleRect())));
+        }
+
+        return clips;
+    }
+
+    private static IReadOnlyList<string> DescribeHoverVisibilityNotes(
+        RuntimeSceneHoverPlan plan,
+        bool allowOffscreen)
+    {
+        var notes = new List<string>();
+        foreach (var scroll in plan.Visibility.Scrolled)
+        {
+            notes.Add(
+                $"ensure-visible scrolled '{scroll.NodePath}' from ({scroll.PreviousHorizontal:0}, "
+                + $"{scroll.PreviousVertical:0}) to ({scroll.Horizontal:0}, {scroll.Vertical:0}).");
+        }
+
+        if (!plan.Reachable && allowOffscreen)
+        {
+            notes.Add(
+                "Hovered an unreachable target because --allow-offscreen was set: the position is "
+                + "outside every clip, so the pointer landed on whatever else is painted there.");
+        }
+        else if (!plan.Visibility.FullyVisible)
+        {
+            var by = string.Join(
+                ", ",
+                plan.Visibility.ClippedBy.Select(clip => $"'{clip.NodePath}' ({clip.Reason})"));
+            notes.Add(
+                $"Target is only partly visible, clipped by {by}; hovered the centre of the visible part.");
+        }
+
+        return notes;
     }
 
     // Inverse of HoverControlOnMainThread: move the pointer to a neutral point (so Godot's own mouse

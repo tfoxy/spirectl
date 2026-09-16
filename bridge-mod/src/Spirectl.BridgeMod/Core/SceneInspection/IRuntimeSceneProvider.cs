@@ -39,7 +39,12 @@ public sealed record RuntimeSceneControlHoverRequestSnapshot(
     string NodePath,
     string? PresentationElementId = null,
     bool IncludeHoverTip = true,
-    uint SettleMs = 0);
+    uint SettleMs = 0,
+    // Scroll the target's ancestor scroll containers until it is inside every clip that governs it,
+    // before resolving the hover position. Opt-in, because it moves the game's own UI.
+    bool EnsureVisible = false,
+    // Hover a target that no click can reach anyway, instead of refusing it.
+    bool AllowOffscreen = false);
 
 // Both target fields are optional; empty NodePath/PresentationElementId means a global clear
 // (move the pointer to a neutral point) without invoking a specific control's unfocus hook.
@@ -217,7 +222,8 @@ public sealed record RuntimeSceneControlHoverResult(
     RuntimeSceneVector2Snapshot? HoverPosition,
     RuntimeSceneHoverTipSnapshot? HoverTip,
     IReadOnlyList<string> Notes,
-    RuntimeSceneFailure? Error)
+    RuntimeSceneFailure? Error,
+    RuntimeSceneHoverVisibilitySnapshot? Visibility = null)
 {
     public static RuntimeSceneControlHoverResult Success(
         DataSourceKind source,
@@ -231,7 +237,8 @@ public sealed record RuntimeSceneControlHoverResult(
         bool hovered,
         RuntimeSceneVector2Snapshot hoverPosition,
         RuntimeSceneHoverTipSnapshot? hoverTip,
-        IReadOnlyList<string> notes)
+        IReadOnlyList<string> notes,
+        RuntimeSceneHoverVisibilitySnapshot? visibility = null)
         => new(
             Source: source,
             Provisional: provisional,
@@ -245,7 +252,8 @@ public sealed record RuntimeSceneControlHoverResult(
             HoverPosition: hoverPosition,
             HoverTip: hoverTip,
             Notes: notes,
-            Error: null);
+            Error: null,
+            Visibility: visibility);
 
     public static RuntimeSceneControlHoverResult Failure(
         DataSourceKind source,

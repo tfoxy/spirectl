@@ -795,7 +795,9 @@ public sealed partial class GrpcBridgeService(BridgeRuntime runtime) : BridgeSer
             request.NodePath,
             string.IsNullOrWhiteSpace(request.PresentationElementId) ? null : request.PresentationElementId,
             request.IncludeHoverTip,
-            request.SettleMs));
+            request.SettleMs,
+            request.EnsureVisible,
+            request.AllowOffscreen));
         if (result.Error is not null)
         {
             return new Spirectl.Proto.V0.RuntimeSceneControlHoverResult
@@ -820,6 +822,7 @@ public sealed partial class GrpcBridgeService(BridgeRuntime runtime) : BridgeSer
             Hovered = result.Hovered,
             HoverPosition = ToProtoRuntimeSceneVector2(result.HoverPosition),
             HoverTip = ToProtoRuntimeSceneHoverTip(result.HoverTip),
+            Visibility = ToProtoRuntimeSceneHoverVisibility(result.Visibility),
         };
         response.Notes.Add(result.Notes);
 

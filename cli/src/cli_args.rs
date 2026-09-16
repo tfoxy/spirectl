@@ -1986,6 +1986,18 @@ pub struct DevSceneHoverArgs {
     #[arg(long = "settle-ms", default_value_t = 0)]
     pub settle_ms: u32,
 
+    #[arg(
+        long = "ensure-visible",
+        help = "Scroll the target's ancestor scroll containers until it is inside every clip that governs it, before resolving the hover position. Moves the game's own UI, so it is opt-in"
+    )]
+    pub ensure_visible: bool,
+
+    #[arg(
+        long = "allow-offscreen",
+        help = "Hover a target that is outside the viewport or clipped away anyway, instead of refusing it. The returned position is one no click can reach, so the pointer lands on whatever is painted there"
+    )]
+    pub allow_offscreen: bool,
+
     #[arg(long = "rpc-timeout-ms", default_value_t = DEFAULT_BRIDGE_RPC_TIMEOUT_MS)]
     pub rpc_timeout_ms: u64,
 }
