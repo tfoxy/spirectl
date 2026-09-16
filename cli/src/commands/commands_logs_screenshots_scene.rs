@@ -546,6 +546,8 @@ pub(crate) fn execute_runtime_scene_hover_json(
             presentation_element_id: args.element_id.unwrap_or_default(),
             include_hover_tip: args.hover_tip,
             settle_ms: args.settle_ms,
+            ensure_visible: args.ensure_visible,
+            allow_offscreen: args.allow_offscreen,
         })
         .map_err(AppError::bridge)?;
     let screen = response.screen.as_ref();
@@ -564,8 +566,36 @@ pub(crate) fn execute_runtime_scene_hover_json(
         "hovered": response.hovered,
         "hoverPosition": response.hover_position.as_ref().map(runtime_scene_vector2_json).unwrap_or(Value::Null),
         "hoverTip": response.hover_tip.as_ref().map(runtime_scene_hover_tip_json).unwrap_or(Value::Null),
+        "visibility": response.visibility.as_ref().map(runtime_scene_hover_visibility_json).unwrap_or(Value::Null),
         "notes": response.notes,
     }))
+}
+
+pub(crate) fn runtime_scene_hover_visibility_json(
+    visibility: &bridge::proto::RuntimeSceneHoverVisibility,
+) -> Value {
+    json!({
+        "fullyVisible": visibility.fully_visible,
+        "controlRect": visibility.control_rect.as_ref().map(runtime_scene_rect2_json).unwrap_or(Value::Null),
+        "visibleRect": visibility.visible_rect.as_ref().map(runtime_scene_rect2_json).unwrap_or(Value::Null),
+        "clippedBy": visibility.clipped_by.iter().map(|clip| {
+            json!({
+                "nodePath": empty_string_to_json(&clip.node_path),
+                "nodeType": empty_string_to_json(&clip.node_type),
+                "reason": empty_string_to_json(&clip.reason),
+                "rect": clip.rect.as_ref().map(runtime_scene_rect2_json).unwrap_or(Value::Null),
+            })
+        }).collect::<Vec<_>>(),
+        "scrolled": visibility.scrolled.iter().map(|scroll| {
+            json!({
+                "nodePath": empty_string_to_json(&scroll.node_path),
+                "previousHorizontal": scroll.previous_horizontal,
+                "previousVertical": scroll.previous_vertical,
+                "horizontal": scroll.horizontal,
+                "vertical": scroll.vertical,
+            })
+        }).collect::<Vec<_>>(),
+    })
 }
 
 pub(crate) fn execute_runtime_scene_unhover_json(

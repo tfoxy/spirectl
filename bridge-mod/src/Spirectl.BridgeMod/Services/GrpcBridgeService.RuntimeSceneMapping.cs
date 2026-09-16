@@ -709,6 +709,47 @@ public sealed partial class GrpcBridgeService
     private static RuntimeSceneVector2? ToProtoRuntimeSceneVector2(RuntimeSceneVector2Snapshot? vector)
         => vector is null ? null : new RuntimeSceneVector2 { X = vector.X, Y = vector.Y };
 
+    private static RuntimeSceneHoverVisibility? ToProtoRuntimeSceneHoverVisibility(
+        RuntimeSceneHoverVisibilitySnapshot? visibility)
+    {
+        if (visibility is null)
+        {
+            return null;
+        }
+
+        var response = new RuntimeSceneHoverVisibility
+        {
+            FullyVisible = visibility.FullyVisible,
+            ControlRect = ToProtoRuntimeSceneRect2(visibility.ControlRect),
+            VisibleRect = ToProtoRuntimeSceneRect2(visibility.VisibleRect),
+        };
+
+        foreach (var clip in visibility.ClippedBy)
+        {
+            response.ClippedBy.Add(new RuntimeSceneHoverClip
+            {
+                NodePath = clip.NodePath,
+                NodeType = clip.NodeType,
+                Reason = clip.Reason,
+                Rect = ToProtoRuntimeSceneRect2(clip.Rect),
+            });
+        }
+
+        foreach (var scroll in visibility.Scrolled)
+        {
+            response.Scrolled.Add(new RuntimeSceneHoverScroll
+            {
+                NodePath = scroll.NodePath,
+                PreviousHorizontal = scroll.PreviousHorizontal,
+                PreviousVertical = scroll.PreviousVertical,
+                Horizontal = scroll.Horizontal,
+                Vertical = scroll.Vertical,
+            });
+        }
+
+        return response;
+    }
+
     private static RuntimeSceneColor? ToProtoRuntimeSceneColor(RuntimeSceneColorSnapshot? color)
         => color is null ? null : new RuntimeSceneColor
         {

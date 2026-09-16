@@ -784,12 +784,13 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
     },
     CommandInfo {
         name: "dev scene hover",
-        summary: "Hover one live Godot Control by normalized /root path or current presentation element id and optionally return visible HoverTip text.",
+        summary: "Hover one live Godot Control by normalized /root path or current presentation element id and optionally return visible HoverTip text. Refuses a target that is scrolled or clipped out of view instead of returning a position that would click something else; --ensure-visible scrolls it into range first.",
         status: "implemented",
         read_only: false,
         examples: &[
             "sts2 --json dev scene hover --path /root/CharacterSelect/DEFECT_button --hover-tip",
             "sts2 --json dev scene hover --element-id character:defect:tile --hover-tip --settle-ms 100",
+            "sts2 --json dev scene hover --path /root/QrDialog/ConnectionPanel/List/Row7 --ensure-visible",
         ],
     },
     CommandInfo {

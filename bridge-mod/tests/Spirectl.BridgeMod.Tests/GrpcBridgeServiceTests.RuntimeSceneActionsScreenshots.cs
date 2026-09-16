@@ -361,6 +361,8 @@ public sealed partial class GrpcBridgeServiceTests
             PresentationElementId = "combat-root",
             IncludeHoverTip = true,
             SettleMs = 25,
+            EnsureVisible = true,
+            AllowOffscreen = true,
         });
 
         Assert.NotNull(result.Success);
@@ -374,6 +376,67 @@ public sealed partial class GrpcBridgeServiceTests
         Assert.Equal("Defect", result.Success.HoverTip.Title);
         Assert.Equal("Locked.", result.Success.HoverTip.Text);
         Assert.Equal(2, result.Success.HoverTip.Labels.Count);
+
+        // Both reachability switches have to survive the proto -> snapshot hop: silently dropping
+        // ensure_visible turns a working QA command into a refusal the caller cannot explain.
+        Assert.NotNull(provider.LastHoverRequest);
+        Assert.True(provider.LastHoverRequest.EnsureVisible);
+        Assert.True(provider.LastHoverRequest.AllowOffscreen);
+
+        Assert.NotNull(result.Success.Visibility);
+        Assert.False(result.Success.Visibility.FullyVisible);
+        Assert.Equal(160, result.Success.Visibility.ControlRect.Size.Y);
+        Assert.Equal(60, result.Success.Visibility.VisibleRect.Size.Y);
+        var clip = Assert.Single(result.Success.Visibility.ClippedBy);
+        Assert.Equal("/root/CombatScreen/Scroll", clip.NodePath);
+        Assert.Equal("scroll-container", clip.Reason);
+        Assert.Equal(160, clip.Rect.Size.Y);
+        var scroll = Assert.Single(result.Success.Visibility.Scrolled);
+        Assert.Equal(240, scroll.PreviousVertical);
+        Assert.Equal(80, scroll.Vertical);
+    }
+
+    [Fact]
+    public void RuntimeSceneHoverOmitsVisibilityWhenTheProviderDoesNotReportIt()
+    {
+        var runtime = BridgeRuntime.Create(new BridgeRuntimeOptions
+        {
+            StateExtractor = new FixedSnapshotExtractor(
+                new GameStateSnapshot(
+                    SchemaVersion: "spirectl/v0",
+                    GameVersion: "sts2-live",
+                    BridgeVersion: BridgeBuildInfo.BridgeVersion,
+                    Source: DataSourceKind.Live,
+                    Provisional: false,
+                    ScreenType: "combat",
+                    ScreenTitle: "Combat",
+                    ScreenInstanceId: "screen:combat:live",
+                    ResolvedPerspective: new PlayerPerspective(PlayerScope.Local, null, UsesDefault: true),
+                    Menu: null,
+                    Lobby: null,
+                    Run: null,
+                    Combat: null,
+                    Choices: [],
+                    AvailableActions: [],
+                    Notices: [],
+                    Debug: null)),
+            ActionHandler = new PlaceholderActionHandler(),
+            LogStream = new InMemoryLogStream(),
+            PerspectiveProvider = new DefaultPerspectiveProvider(),
+            RuntimeSceneProvider = new FixedRuntimeSceneProvider { ReportVisibility = false },
+            BridgeHost = new FixedBridgeHost(new BridgeHostStatus("ipc", true, "Live IPC host running.")),
+        });
+        var service = new GrpcBridgeService(runtime);
+
+        var result = service.HandleHoverRuntimeSceneControl(new RuntimeSceneControlHoverRequest
+        {
+            NodePath = "/root/CombatScreen",
+            IncludeHoverTip = false,
+        });
+
+        Assert.NotNull(result.Success);
+        Assert.True(result.Success.Hovered);
+        Assert.Null(result.Success.Visibility);
     }
 
     [Fact]

@@ -1517,6 +1517,8 @@ fn parses_dev_scene_hover_targets() {
                 assert!(args.hover_tip);
                 assert_eq!(args.settle_ms, 100);
                 assert_eq!(args.rpc_timeout_ms, 750);
+                assert!(!args.ensure_visible);
+                assert!(!args.allow_offscreen);
             }
             _ => panic!("unexpected dev scene command"),
         },
@@ -1540,6 +1542,33 @@ fn parses_dev_scene_hover_targets() {
                 assert_eq!(args.node_path, None);
                 assert_eq!(args.element_id.as_deref(), Some("character:defect:tile"));
                 assert!(!args.hover_tip);
+            }
+            _ => panic!("unexpected dev scene command"),
+        },
+        _ => panic!("unexpected command shape"),
+    }
+}
+
+#[test]
+fn parses_dev_scene_hover_reachability_flags() {
+    let cli = Cli::try_parse_from([
+        "sts2",
+        "dev",
+        "scene",
+        "hover",
+        "--path",
+        "/root/QrDialog/ConnectionPanel/List/Row0",
+        "--ensure-visible",
+        "--allow-offscreen",
+    ])
+    .expect("expected dev scene hover reachability flags to parse");
+    match cli.command {
+        Commands::Dev(DevCommand {
+            command: DevSubcommand::Scene(command),
+        }) => match command.command {
+            DevSceneSubcommand::Hover(args) => {
+                assert!(args.ensure_visible);
+                assert!(args.allow_offscreen);
             }
             _ => panic!("unexpected dev scene command"),
         },

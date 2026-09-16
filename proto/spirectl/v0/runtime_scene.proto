@@ -30,6 +30,14 @@ message RuntimeSceneControlHoverRequest {
   string presentation_element_id = 2;
   bool include_hover_tip = 3;
   uint32 settle_ms = 4;
+  // Scroll the target's ancestor scroll containers until it is inside every
+  // clip that governs it, before resolving the hover position. Opt-in, because
+  // it moves the game's own UI.
+  bool ensure_visible = 5;
+  // Hover a target that is outside the viewport or clipped away anyway. Off by
+  // default: the returned position would be a coordinate no click can reach,
+  // so hovering it silently lands on whatever is painted there instead.
+  bool allow_offscreen = 6;
 }
 
 // Reverts a prior hover: moves the pointer to a neutral point (clearing any
@@ -368,6 +376,38 @@ message RuntimeSceneHoverTip {
   repeated string notes = 6;
 }
 
+// One rectangle that governs whether the hover target is actually on screen: an
+// ancestor with clip_contents (a ScrollContainer's own clip is this), or the
+// viewport itself. `reason` is one of "viewport", "clip-contents",
+// "scroll-container".
+message RuntimeSceneHoverClip {
+  string node_path = 1;
+  string node_type = 2;
+  string reason = 3;
+  RuntimeSceneRect2 rect = 4;
+}
+
+// A scroll container that ensure_visible moved, with the offsets it held before
+// and after. Both axes are reported even when only one moved.
+message RuntimeSceneHoverScroll {
+  string node_path = 1;
+  double previous_horizontal = 2;
+  double previous_vertical = 3;
+  double horizontal = 4;
+  double vertical = 5;
+}
+
+message RuntimeSceneHoverVisibility {
+  bool fully_visible = 1;
+  RuntimeSceneRect2 control_rect = 2;
+  // The part of control_rect that survives every clip. Absent when nothing of
+  // the control is on screen.
+  RuntimeSceneRect2 visible_rect = 3;
+  // Only the clips that actually cut the control, innermost first.
+  repeated RuntimeSceneHoverClip clipped_by = 4;
+  repeated RuntimeSceneHoverScroll scrolled = 5;
+}
+
 message RuntimeSceneControlHoverResponse {
   DataSource source = 1;
   bool provisional = 2;
@@ -379,6 +419,7 @@ message RuntimeSceneControlHoverResponse {
   RuntimeSceneVector2 hover_position = 8;
   RuntimeSceneHoverTip hover_tip = 9;
   repeated string notes = 10;
+  RuntimeSceneHoverVisibility visibility = 11;
 }
 
 message RuntimeSceneControlUnhoverResponse {

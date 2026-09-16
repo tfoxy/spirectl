@@ -793,12 +793,18 @@ public sealed partial class GrpcBridgeServiceTests
                 notes: []);
         }
 
+        public RuntimeSceneControlHoverRequestSnapshot? LastHoverRequest { get; private set; }
+
+        /// <summary>Set false to stand in for a provider that reports no hover visibility at all.</summary>
+        public bool ReportVisibility { get; init; } = true;
+
         public Spirectl.Sts2.Core.SceneInspection.RuntimeSceneControlHoverResult HoverControl(RuntimeSceneControlHoverRequestSnapshot request)
         {
             LastQuery = new RuntimeSceneQuery(
                 request.NodePath,
                 IncludeProperties: true,
                 IncludeComputedTransform: true);
+            LastHoverRequest = request;
             return Spirectl.Sts2.Core.SceneInspection.RuntimeSceneControlHoverResult.Success(
                 source: DataSourceKind.Live,
                 provisional: false,
@@ -823,8 +829,29 @@ public sealed partial class GrpcBridgeServiceTests
                         ],
                         Notes: [])
                     : null,
-                notes: []);
+                notes: [],
+                visibility: !ReportVisibility ? null : new RuntimeSceneHoverVisibilitySnapshot(
+                    FullyVisible: false,
+                    ControlRect: Rect(0, 100, 640, 160),
+                    VisibleRect: Rect(0, 100, 640, 60),
+                    ClippedBy:
+                    [
+                        new RuntimeSceneHoverClipSnapshot(
+                            "/root/CombatScreen/Scroll",
+                            "Godot.ScrollContainer",
+                            RuntimeSceneHoverClipReasons.ScrollContainer,
+                            Rect(0, 0, 640, 160)),
+                    ],
+                    Scrolled:
+                    [
+                        new RuntimeSceneHoverScrollSnapshot("/root/CombatScreen/Scroll", 0, 240, 0, 80),
+                    ]));
         }
+
+        private static RuntimeSceneRect2Snapshot Rect(double x, double y, double width, double height)
+            => new(
+                new RuntimeSceneVector2Snapshot(x, y),
+                new RuntimeSceneVector2Snapshot(width, height));
 
         public Spirectl.Sts2.Core.SceneInspection.RuntimeSceneControlUnhoverResult UnhoverControl(RuntimeSceneControlUnhoverRequestSnapshot request)
         {
