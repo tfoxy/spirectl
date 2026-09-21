@@ -516,10 +516,14 @@ public sealed class EmbeddableRuntimeFacadeTests
     [Fact]
     public void GetCurrentStateFailureReturnsStructuredErrorAndHealth()
     {
+        // The observation comes from the state PROVIDER, so that is what has to throw to exercise this path.
+        // The extractor is left throwing as a negative control: if it were still on the observation path the
+        // message assertion below would read "state extractor failed" instead.
         var runtime = FacadeWith(
             stateExtractor: new ThrowingStateExtractor(),
             actionHandler: new PlaceholderActionHandler(),
-            assetExtractProvider: new ThrowingAssetExtractProvider());
+            assetExtractProvider: new ThrowingAssetExtractProvider(),
+            stateProvider: new ThrowingStateProvider());
 
         var result = runtime.GetCurrentState(new CurrentStateRequest());
 
@@ -527,7 +531,7 @@ public sealed class EmbeddableRuntimeFacadeTests
         Assert.Null(result.State);
         Assert.NotNull(result.Error);
         Assert.Equal("runtime-state-failed", result.Error.Code);
-        Assert.Contains("state extractor failed", result.Error.Message, StringComparison.Ordinal);
+        Assert.Contains("state provider failed", result.Error.Message, StringComparison.Ordinal);
         Assert.NotNull(result.Health);
         Assert.Equal(Environment.CurrentManagedThreadId, result.Health.CurrentThreadId);
     }
@@ -609,13 +613,34 @@ public sealed class EmbeddableRuntimeFacadeTests
         var runtime = FacadeWith(
             stateExtractor: new NullStateExtractor(),
             actionHandler: new PlaceholderActionHandler(),
-            assetExtractProvider: new ThrowingAssetExtractProvider());
+            assetExtractProvider: new ThrowingAssetExtractProvider(),
+            stateProvider: new NullStateProvider());
 
         var result = runtime.GetCurrentState(new CurrentStateRequest());
 
         Assert.False(result.Success);
         Assert.Null(result.State);
-        Assert.Equal("runtime-state-failed", result.Error?.Code);
+        Assert.Equal("state-unavailable", result.Error?.Code);
+        Assert.NotNull(result.Health);
+    }
+
+    [Fact]
+    public void GetCurrentStateWithoutAStateProviderReportsUnavailableInsteadOfAMainMenu()
+    {
+        // A runtime composed without a state provider cannot observe anything. It used to answer with a
+        // FABRICATED snapshot — root scene "screens/main_menu", no character select, no run — which is
+        // byte-identical to what a live provider reports at a real title screen, so a composition failure was
+        // indistinguishable from an idle game. Consumers concluded "not in a lobby, not in a run" for ever.
+        var runtime = FacadeWith(
+            stateExtractor: new FixedSnapshotExtractor(MainMenuSnapshot()),
+            actionHandler: new PlaceholderActionHandler(),
+            assetExtractProvider: new PlaceholderAssetExtractProvider());
+
+        var result = runtime.GetCurrentState(new CurrentStateRequest());
+
+        Assert.False(result.Success);
+        Assert.Null(result.State);
+        Assert.Equal("state-unavailable", result.Error?.Code);
         Assert.NotNull(result.Health);
     }
 
@@ -623,14 +648,14 @@ public sealed class EmbeddableRuntimeFacadeTests
     [Fact]
     public async Task SubscribeCurrentStateEmitsInitialAndChangedEventsFromDispatcherTicks()
     {
-        // The unit-test runtime has no live StateProvider, so GetState derives a
-        // minimal envelope from GetState whose fingerprint varies with the snapshot
-        // Language. Driving Language is enough to exercise the dedup/change path.
-        var extractor = new MutableSnapshotExtractor(MainMenuSnapshotWithActions() with { Language = "eng" });
+        // The watch hub dedups on the observed snapshot's fingerprint, which varies with its Language, so
+        // driving the provider's Language is enough to exercise the initial/changed path.
+        var provider = new MutableStateProvider(MainMenuStateSnapshot("eng"));
         var runtime = FacadeWith(
-            stateExtractor: extractor,
+            stateExtractor: new FixedSnapshotExtractor(MainMenuSnapshotWithActions()),
             actionHandler: new PlaceholderActionHandler(),
-            assetExtractProvider: new ThrowingAssetExtractProvider());
+            assetExtractProvider: new ThrowingAssetExtractProvider(),
+            stateProvider: provider);
         var events = new List<CurrentStateWatchEvent>();
         var initial = new TaskCompletionSource<CurrentStateWatchEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         var changed = new TaskCompletionSource<CurrentStateWatchEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -655,7 +680,7 @@ public sealed class EmbeddableRuntimeFacadeTests
             });
 
         var initialEvent = await initial.Task.WaitAsync(TimeSpan.FromSeconds(1));
-        extractor.Snapshot = extractor.Snapshot with { Language = "esp" };
+        provider.Snapshot = provider.Snapshot with { Language = "esp" };
         Sts2MainThreadDispatcher.NotifyMainThreadTick();
         var changedEvent = await changed.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
@@ -669,7 +694,7 @@ public sealed class EmbeddableRuntimeFacadeTests
         Assert.NotEqual(initialEvent.SemanticFingerprint, changedEvent.SemanticFingerprint);
 
         subscription.Dispose();
-        extractor.Snapshot = extractor.Snapshot with { Language = "fra" };
+        provider.Snapshot = provider.Snapshot with { Language = "fra" };
         Sts2MainThreadDispatcher.NotifyMainThreadTick();
         await Task.Delay(100);
         lock (events)
@@ -681,14 +706,15 @@ public sealed class EmbeddableRuntimeFacadeTests
     [Fact]
     public async Task SubscribeCurrentStatePassesRequestedPerspectiveToObservation()
     {
-        // The watch capture must observe through the subscription's perspective, matching the
-        // one-shot GetState path. The unit runtime has no live StateProvider, so GetState routes
-        // through the GameStateQuery extractor; assert the requested perspective reaches it.
-        var extractor = new FixedSnapshotExtractor(MainMenuSnapshot());
+        // The watch capture must observe through the subscription's perspective, matching the one-shot
+        // GetCurrentState path. The state provider is the only thing that observes, so assert the requested
+        // perspective reaches IT — resolved, not the raw selection.
+        var provider = new MutableStateProvider(MainMenuStateSnapshot());
         var runtime = FacadeWith(
-            stateExtractor: extractor,
+            stateExtractor: new FixedSnapshotExtractor(MainMenuSnapshot()),
             actionHandler: new PlaceholderActionHandler(),
-            assetExtractProvider: new ThrowingAssetExtractProvider());
+            assetExtractProvider: new ThrowingAssetExtractProvider(),
+            stateProvider: provider);
         var initial = new TaskCompletionSource<CurrentStateWatchEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         using var subscription = runtime.SubscribeCurrentState(
@@ -705,18 +731,20 @@ public sealed class EmbeddableRuntimeFacadeTests
 
         await initial.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
-        Assert.Equal("p2", extractor.LastQuery?.RequestedPerspective?.PlayerId);
-        Assert.Equal(PlayerScope.Local, extractor.LastQuery?.RequestedPerspective?.Scope);
+        Assert.Equal("p2", provider.LastPerspective?.PlayerId);
+        Assert.Equal(PlayerScope.Local, provider.LastPerspective?.Scope);
+        Assert.False(provider.LastPerspective?.UsesDefault);
     }
 
     [Fact]
     public async Task WatchCurrentStateAsyncYieldsSubscriptionEvents()
     {
-        var extractor = new MutableSnapshotExtractor(MainMenuSnapshotWithActions() with { Language = "eng" });
+        var provider = new MutableStateProvider(MainMenuStateSnapshot("eng"));
         var runtime = FacadeWith(
-            stateExtractor: extractor,
+            stateExtractor: new FixedSnapshotExtractor(MainMenuSnapshotWithActions()),
             actionHandler: new PlaceholderActionHandler(),
-            assetExtractProvider: new ThrowingAssetExtractProvider());
+            assetExtractProvider: new ThrowingAssetExtractProvider(),
+            stateProvider: provider);
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         await using var watcher = runtime
             .WatchCurrentStateAsync(
@@ -726,7 +754,7 @@ public sealed class EmbeddableRuntimeFacadeTests
 
         Assert.True(await watcher.MoveNextAsync());
         var initial = watcher.Current;
-        extractor.Snapshot = extractor.Snapshot with { Language = "esp" };
+        provider.Snapshot = provider.Snapshot with { Language = "esp" };
         Sts2MainThreadDispatcher.NotifyMainThreadTick();
         Assert.True(await watcher.MoveNextAsync());
         var changed = watcher.Current;
@@ -740,22 +768,22 @@ public sealed class EmbeddableRuntimeFacadeTests
     [Fact]
     public async Task SubscribeCurrentStateCanSuppressInitialButStillBaselineChanges()
     {
-        // The unit-test runtime has no live StateProvider, so the derived envelope
-        // fingerprint varies with the snapshot Language. Driving Language exercises
-        // the baseline-change path without an initial emission.
-        var extractor = new MutableSnapshotExtractor(MainMenuSnapshotWithActions() with { Language = "eng" });
+        // The observed snapshot's fingerprint varies with its Language, so driving the provider's Language
+        // exercises the baseline-change path without an initial emission.
+        var provider = new MutableStateProvider(MainMenuStateSnapshot("eng"));
         var runtime = FacadeWith(
-            stateExtractor: extractor,
+            stateExtractor: new FixedSnapshotExtractor(MainMenuSnapshotWithActions()),
             actionHandler: new PlaceholderActionHandler(),
-            assetExtractProvider: new ThrowingAssetExtractProvider());
+            assetExtractProvider: new ThrowingAssetExtractProvider(),
+            stateProvider: provider);
         var changed = new TaskCompletionSource<CurrentStateWatchEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         using var subscription = runtime.SubscribeCurrentState(
             new CurrentStateSubscriptionRequest(EmitInitial: false, MinCaptureInterval: TimeSpan.Zero),
             evt => changed.TrySetResult(evt));
 
-        await WaitForConditionAsync(() => extractor.CallCount > 0, TimeSpan.FromSeconds(1));
-        extractor.Snapshot = extractor.Snapshot with { Language = "esp" };
+        await WaitForConditionAsync(() => provider.ObserveCount > 0, TimeSpan.FromSeconds(1));
+        provider.Snapshot = provider.Snapshot with { Language = "esp" };
         Sts2MainThreadDispatcher.NotifyMainThreadTick();
         var changedEvent = await changed.Task.WaitAsync(TimeSpan.FromSeconds(1));
 
@@ -768,14 +796,14 @@ public sealed class EmbeddableRuntimeFacadeTests
     [Fact]
     public async Task SubscribeCurrentStateRefreshesAfterAcceptedActionsOnly()
     {
-        // The unit-test runtime has no live StateProvider, so the derived envelope
-        // fingerprint varies with the snapshot Language. Driving Language exercises
-        // the post-action refresh path.
-        var extractor = new MutableSnapshotExtractor(MainMenuSnapshotWithActions() with { Language = "eng" });
+        // The observed snapshot's fingerprint varies with its Language, so driving the provider's Language
+        // exercises the post-action refresh path.
+        var provider = new MutableStateProvider(MainMenuStateSnapshot("eng"));
         var runtime = FacadeWith(
-            stateExtractor: extractor,
+            stateExtractor: new FixedSnapshotExtractor(MainMenuSnapshotWithActions()),
             actionHandler: new CapturingActionHandler(),
-            assetExtractProvider: new ThrowingAssetExtractProvider());
+            assetExtractProvider: new ThrowingAssetExtractProvider(),
+            stateProvider: provider);
         var initial = new TaskCompletionSource<CurrentStateWatchEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         var changed = new TaskCompletionSource<CurrentStateWatchEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -794,7 +822,7 @@ public sealed class EmbeddableRuntimeFacadeTests
             });
 
         await initial.Task.WaitAsync(TimeSpan.FromSeconds(1));
-        extractor.Snapshot = extractor.Snapshot with { Language = "esp" };
+        provider.Snapshot = provider.Snapshot with { Language = "esp" };
         var failed = runtime.ExecuteAction(new EmbeddableActionRequest("invalid", SemanticActionKind.Choose));
         await Task.Delay(100);
         Assert.False(failed.Success);
@@ -1008,7 +1036,8 @@ public sealed class EmbeddableRuntimeFacadeTests
         IActionHandler actionHandler,
         IAssetExtractProvider assetExtractProvider,
         IModelCatalogProvider? modelCatalogProvider = null,
-        IReferenceDataProvider? referenceDataProvider = null)
+        IReferenceDataProvider? referenceDataProvider = null,
+        IStateProvider? stateProvider = null)
     {
         return SpirectlRuntimeFacade.FromFactory(
             stateExtractor,
@@ -1022,7 +1051,11 @@ public sealed class EmbeddableRuntimeFacadeTests
             assetExtractProvider,
             modelCatalogProvider ?? new PlaceholderModelCatalogProvider(),
             referenceDataProvider ?? new PlaceholderReferenceDataProvider(),
-            new PlaceholderRuntimeSceneWatcher());
+            new PlaceholderRuntimeSceneWatcher(),
+            // Left null by default: a facade with no state provider is a composition that cannot observe the
+            // game, and GetCurrentState must say so rather than invent an answer. Tests that need an observation
+            // pass one explicitly.
+            stateProvider);
     }
 
     private static BridgeRuntime RuntimeWith(
@@ -1050,6 +1083,10 @@ public sealed class EmbeddableRuntimeFacadeTests
             ModelCatalogProvider = modelCatalogProvider,
             ReferenceDataProvider = referenceDataProvider,
         });
+
+    /// <summary>A live provider's reading of a main menu — the observation the facade now only ever RELAYS.</summary>
+    private static StateSnapshot MainMenuStateSnapshot(string? language = "eng")
+        => new(StateSnapshot.CurrentSchemaVersion, language, "screens/main_menu", null, null);
 
     private static GameStateSnapshot MainMenuSnapshot()
         => new(
@@ -1407,20 +1444,6 @@ public sealed class EmbeddableRuntimeFacadeTests
         }
     }
 
-    private sealed class MutableSnapshotExtractor(GameStateSnapshot snapshot) : IGameStateExtractor
-    {
-        public GameStateSnapshot Snapshot { get; set; } = snapshot;
-
-        public int CallCount { get; private set; }
-
-        public GameStateSnapshot Extract(GameStateQuery query, PlayerPerspective perspective)
-        {
-            _ = query;
-            CallCount++;
-            return Snapshot with { ResolvedPerspective = perspective };
-        }
-    }
-
     private sealed class ThrowingStateExtractor : IGameStateExtractor
     {
         public GameStateSnapshot Extract(GameStateQuery query, PlayerPerspective perspective)
@@ -1440,6 +1463,41 @@ public sealed class EmbeddableRuntimeFacadeTests
             _ = query;
             _ = perspective;
             CallCount++;
+            return null!;
+        }
+    }
+
+    /// <summary>The observation the facade reads; its Language is what the watch hub's fingerprint varies with.</summary>
+    private sealed class MutableStateProvider(StateSnapshot snapshot) : IStateProvider
+    {
+        public StateSnapshot Snapshot { get; set; } = snapshot;
+
+        public PlayerPerspective? LastPerspective { get; private set; }
+
+        public int ObserveCount { get; private set; }
+
+        public StateSnapshot Observe(PlayerPerspective perspective)
+        {
+            LastPerspective = perspective;
+            ObserveCount++;
+            return Snapshot;
+        }
+    }
+
+    private sealed class ThrowingStateProvider : IStateProvider
+    {
+        public StateSnapshot Observe(PlayerPerspective perspective)
+        {
+            _ = perspective;
+            throw new InvalidOperationException("state provider failed");
+        }
+    }
+
+    private sealed class NullStateProvider : IStateProvider
+    {
+        public StateSnapshot Observe(PlayerPerspective perspective)
+        {
+            _ = perspective;
             return null!;
         }
     }

@@ -10,6 +10,14 @@ internal static class Sts2LiveIntrospection
     private const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     private const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
 
+    /// <summary>
+    /// Assembly-qualified name of the game's active-screen context — the object that knows which screen is
+    /// currently on top. Named here once so the resolver below and <see cref="Sts2ScreenContext"/>'s event
+    /// subscription cannot drift onto different types.
+    /// </summary>
+    internal const string ActiveScreenContextTypeName =
+        "MegaCrit.Sts2.Core.Nodes.Screens.ScreenContext.ActiveScreenContext, sts2";
+
     public static bool IsType(object? target, string fullTypeName)
     {
         for (var current = target?.GetType(); current is not null; current = current.BaseType)
@@ -27,7 +35,7 @@ internal static class Sts2LiveIntrospection
     {
         try
         {
-            var contextType = Type.GetType("MegaCrit.Sts2.Core.Nodes.Screens.ScreenContext.ActiveScreenContext, sts2");
+            var contextType = Type.GetType(ActiveScreenContextTypeName);
             if (contextType is null)
             {
                 return null;

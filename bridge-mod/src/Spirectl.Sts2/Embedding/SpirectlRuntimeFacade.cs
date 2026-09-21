@@ -94,10 +94,12 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         try
         {
             var resolvedPerspective = _services.PerspectiveProvider.Resolve(request.Perspective);
-            var state = _services.StateProvider?.Observe(resolvedPerspective)
-                ?? new StateSnapshot(StateSnapshot.CurrentSchemaVersion, _services.StateExtractor.Extract(
-                    new GameStateQuery(request.Perspective, IncludeDebug: false), resolvedPerspective).Language,
-                    "screens/main_menu", null, null);
+            // A runtime composed without a state provider cannot observe the game, and says so below. It used to
+            // fabricate a snapshot instead — root scene "screens/main_menu", no character select, no run — which
+            // is byte-identical to what the live provider emits at a REAL main menu, so a composition failure was
+            // indistinguishable from a game sitting at its title screen. A consumer that trusted it concluded
+            // "not in a lobby, not in a run" forever; the only honest answer is the state-unavailable failure.
+            var state = _services.StateProvider?.Observe(resolvedPerspective);
             var health = CaptureRuntimeHealth();
             if (state is null)
             {
