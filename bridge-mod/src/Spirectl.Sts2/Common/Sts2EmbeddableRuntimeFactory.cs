@@ -12,18 +12,12 @@ namespace Spirectl.Sts2;
 
 public static class Sts2EmbeddableRuntimeFactory
 {
-    private const string LiveHostBuildOutsideGodotReason =
-        "This live-host build is not running inside an initialized STS2/Godot process.";
-
-    private const string NonLiveHostBuildReason =
-        "This build was compiled without live STS2 host references.";
-
     public static ISpirectlRuntime Create(bool captureMainThreadDispatcher = true)
     {
 #if ENABLE_STS2_LIVE_HOST
-        if (!IsLikelyRunningInsideSts2GodotProcess())
+        if (!Sts2GameProcessProbe.IsInsideGameProcess())
         {
-            return CreateUnsupportedEmbeddedRuntime(LiveHostBuildOutsideGodotReason);
+            return CreateUnsupportedEmbeddedRuntime(LiveSts2HostUnsupportedReasons.OutsideGameProcess);
         }
 
         if (!captureMainThreadDispatcher)
@@ -42,7 +36,7 @@ public static class Sts2EmbeddableRuntimeFactory
 
         return Live.Sts2RuntimeFactory.CreateEmbeddableRuntime(captureMainThreadDispatcher: captureMainThreadDispatcher);
 #else
-        return CreateUnsupportedEmbeddedRuntime(NonLiveHostBuildReason);
+        return CreateUnsupportedEmbeddedRuntime(LiveSts2HostUnsupportedReasons.NonLiveHostBuild);
 #endif
     }
 
@@ -72,11 +66,4 @@ public static class Sts2EmbeddableRuntimeFactory
             new EmbeddableRuntimeOptions(
                 LiveSts2HostSupported: false,
                 LiveSts2HostUnsupportedReason: liveHostUnsupportedReason));
-
-    private static bool IsLikelyRunningInsideSts2GodotProcess()
-    {
-        var processName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
-        return processName.Contains("SlayTheSpire", StringComparison.OrdinalIgnoreCase)
-            || processName.Contains("Godot", StringComparison.OrdinalIgnoreCase);
-    }
 }
