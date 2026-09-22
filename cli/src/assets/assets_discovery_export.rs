@@ -33,6 +33,10 @@ fn discover_assets(
         return Ok(vec![candidate]);
     }
 
+    if let Some(candidate) = try_parse_scene_subtree_query(query) {
+        return Ok(vec![candidate]);
+    }
+
     if let Some(parsed) = try_parse_model_character_visual_query(query) {
         let source_path = canonical_model_character_key(&parsed.character_id, &parsed.variant);
         return Ok(vec![AssetCandidate {

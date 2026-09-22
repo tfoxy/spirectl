@@ -71,7 +71,60 @@ public sealed record AssetExtractRequestSnapshot(
     // Scene-SUBTREE still: render ONLY the node at this scene-relative path (detached from a never-tree-entered
     // instantiation of the scene, so no _Ready/_EnterTree script runs — the merchant-room crash class cannot
     // fire). Set by the scene-subtree://<scene>?node=<relPath> key rewrite; null => whole-scene behaviour.
-    string? SceneSubtreeNodePath = null);
+    // "." addresses the scene's OWN root, which an effect scene whose root IS the effect needs.
+    string? SceneSubtreeNodePath = null,
+    // The POSING knobs the same key rewrite may carry past `node` — a node-local capture rect, shader-uniform
+    // and modulate overrides, live particles. See Sts2SceneSubtreeStillKey for what each one exists for. Built
+    // from the key STRING, never a wire field: the key already travels end to end, so nothing in the generated
+    // protocol has to know these exist. Null => the lane renders exactly as it always did.
+    SceneSubtreeStillOptions? SceneSubtreeStillOptions = null);
+
+/// <summary>
+/// The POSING knobs a <c>scene-subtree://</c> still carries past its <c>node</c> selector — see
+/// <c>Sts2SceneSubtreeStillKey</c>, which parses them out of the key, for what each one exists for. Every field
+/// is optional, and an absent one leaves the render byte-identical to a key that never mentioned it.
+/// </summary>
+public sealed record SceneSubtreeStillOptions
+{
+    /// <summary>
+    /// The NODE-LOCAL rect to capture, one unit per output pixel — so a consumer's placement box is literally the
+    /// numbers the bake asked for, with no framing arithmetic to re-derive or get wrong. Null keeps the lane's
+    /// default framing (the caller's probed live frame, or identity, ½Δ-centered into the requested viewport).
+    /// </summary>
+    public SceneSubtreeRect? NodeLocalRect { get; init; }
+
+    /// <summary>Float uniform overrides applied to the addressed node's ShaderMaterial. Null when none.</summary>
+    public IReadOnlyDictionary<string, float>? ShaderParameters { get; init; }
+
+    /// <summary>RGBA modulate to pin on the addressed node, four channels. Null keeps the authored/live value.</summary>
+    public IReadOnlyList<float>? Modulate { get; init; }
+
+    /// <summary>
+    /// Keep particle emitters SIMULATING through the capture. The lane otherwise silences and hides every
+    /// <c>Particles2D</c>, because a backdrop still that lives forever under an immutable URL must not depend on
+    /// where each emitter happened to be — but a still OF an emitter has nothing left to render once it is
+    /// silenced.
+    /// </summary>
+    public bool LiveParticles { get; init; }
+
+    /// <summary>
+    /// Capture over an OPAQUE BLACK backdrop instead of a transparent one — the only faithful way to still an
+    /// ADDITIVE effect (see <c>Sts2SceneSubtreeStillKey</c> for the full reasoning).
+    /// </summary>
+    public bool BlackBackdrop { get; init; }
+
+    /// <summary>True when nothing was asked for, i.e. the render is the one this lane always did.</summary>
+    public bool IsDefault
+        => NodeLocalRect is null
+            && (ShaderParameters is null || ShaderParameters.Count == 0)
+            && Modulate is null
+            && !LiveParticles
+            && !BlackBackdrop;
+}
+
+/// <summary>A node-local rectangle, in the addressed node's own coordinates (Godot-free, so it is parseable and
+/// testable without the engine; the live branch converts it to Godot types at the point of use).</summary>
+public readonly record struct SceneSubtreeRect(float X, float Y, float Width, float Height);
 
 public sealed record AssetExplainRequestSnapshot(
     string RequestId,

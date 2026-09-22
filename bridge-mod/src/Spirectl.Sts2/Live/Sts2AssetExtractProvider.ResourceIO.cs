@@ -551,58 +551,30 @@ public sealed partial class Sts2AssetExtractProvider
         return true;
     }
 
-    // scene-subtree://<res-scene>?node=<sceneRelativePath> -> render ONLY the addressed subtree of the scene
-    // (couch-coop's room-backdrop still: the merchant shop's SceneContainer/BgContainer). The scene path keeps
-    // its res:// prefix (the key names a scene, not a spine alias); `node` is required and case-preserving.
-    // The parse REWRITES the request onto the ordinary res:// PackedScene path with the node path riding the
-    // snapshot — ExtractPackedSceneAsync then detaches that subtree from a never-tree-entered instantiation.
+    // scene-subtree://<res-scene>?node=<sceneRelativePath>[&posing knobs] -> render ONLY the addressed subtree of
+    // the scene (couch-coop's room-backdrop still: the merchant shop's SceneContainer/BgContainer; and its
+    // effect-still lane, which addresses a card's highlight or a rarity-glow emitter). The grammar, and why each
+    // optional knob exists, live in the Godot-free `Sts2SceneSubtreeStillKey` so they are unit-testable without
+    // the game. The parse REWRITES the request onto the ordinary res:// PackedScene path with the node path and
+    // the options riding the snapshot — ExtractPackedSceneAsync then detaches that subtree from a
+    // never-tree-entered instantiation.
     private static bool TryParseSceneSubtreeRequest(
         AssetExtractRequestSnapshot request,
         out AssetExtractRequestSnapshot rewritten)
     {
         rewritten = null!;
-        var raw = (!string.IsNullOrWhiteSpace(request.LoadPath)
-            ? request.LoadPath
-            : request.SourcePath).Replace('\\', '/').Trim();
-        const string prefix = "scene-subtree://";
-        if (!raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        var rest = raw[prefix.Length..];
-        var queryStart = rest.IndexOf('?');
-        if (queryStart <= 0)
-        {
-            return false;
-        }
-
-        var scenePath = rest[..queryStart];
-        if (!scenePath.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        string? nodePath = null;
-        foreach (var pair in rest[(queryStart + 1)..].Split('&', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var equalsIndex = pair.IndexOf('=');
-            if (equalsIndex > 0 && pair[..equalsIndex] == "node")
-            {
-                nodePath = Uri.UnescapeDataString(pair[(equalsIndex + 1)..]);
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(nodePath))
+        var raw = !string.IsNullOrWhiteSpace(request.LoadPath) ? request.LoadPath : request.SourcePath;
+        if (Sts2SceneSubtreeStillKey.TryParse(raw) is not { } parsed)
         {
             return false;
         }
 
         rewritten = request with
         {
-            SourcePath = scenePath,
-            LoadPath = scenePath,
-            SceneSubtreeNodePath = nodePath,
+            SourcePath = parsed.ScenePath,
+            LoadPath = parsed.ScenePath,
+            SceneSubtreeNodePath = parsed.NodePath,
+            SceneSubtreeStillOptions = parsed.Options.IsDefault ? null : parsed.Options,
         };
         return true;
     }

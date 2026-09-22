@@ -94,6 +94,11 @@
          compositions are offline-unit-testable and can never drift apart. The Godot-typed wrapper
          (Sts2AssetExtractProvider.TryResolveEventBackgroundFrame) stays in the live-host glob below. -->
     <Compile Include="Live/Sts2EventBackgroundFrameMath.cs" />
+    <!-- Godot-free SCENE-SUBTREE KEY parse (the node selector plus the posing knobs an effect still needs — a
+         node-local capture rect, shader-uniform and modulate overrides, live particles): always compiled (no
+         Godot dependency) so the grammar and its malformation rules are offline-unit-testable. The Godot-typed
+         half that applies the parsed options to real nodes stays in the live-host glob below. -->
+    <Compile Include="Live/Sts2SceneSubtreeStillKey.cs" />
     <!-- Godot-free PROCESS-GLOBAL single-arm claim shared by the two env-gated one-shots above (and the tween
          recorder): always compiled (no Godot dependency) so the arming truth table is offline-unit-testable, and
          because the claim has to exist even in a copy built without a live host. The Godot-typed subsystems it

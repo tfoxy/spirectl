@@ -2632,6 +2632,7 @@ public sealed partial class Sts2AssetExtractProvider
         var disableProcessDuringCapture = true;
         SceneRenderFrame? frameOverride = null;
         Action? afterAttach = null;
+        Action? beforeCapture = null;
 
         var textureResult = await TryExtractSceneRootTextureAsync(instantiated, request);
         if (textureResult is not null)
@@ -2660,27 +2661,59 @@ public sealed partial class Sts2AssetExtractProvider
                     $"The scene has no node at '{subtreeNodePath}'.");
             }
 
-            subtree.GetParent()?.RemoveChild(subtree);
-            instantiated.Free();
-            instantiated = subtree;
+            // `node=.` addresses the scene's OWN ROOT — which an effect scene whose root IS the effect (a rarity
+            // glow is a single GPUParticles2D) has no other way to name. The detach-and-free below must then be
+            // skipped ENTIRELY, not just guarded on the parent: `instantiated.Free()` would destroy the very node
+            // that was kept, and the render would run on a freed object.
+            if (!ReferenceEquals(subtree, instantiated))
+            {
+                subtree.GetParent()?.RemoveChild(subtree);
+                instantiated.Free();
+                instantiated = subtree;
+            }
 
-            var subtreeViewport = ResolveRequestedViewportSize(request);
-            var subtreeViewportSize = new Vector2I(Math.Max(1, subtreeViewport.X), Math.Max(1, subtreeViewport.Y));
-            var subtreeFrame = Sts2EventBackgroundFrameMath.CenterFrame(
-                Sts2EventBackgroundFrameMath.TryParseFrameSpec(request.EventBackgroundFrame)
-                    ?? new Sts2EventBackgroundFrameMath.EventFrame(0f, 0f, 1f),
-                subtreeViewportSize.X,
-                subtreeViewportSize.Y);
+            var still = request.SceneSubtreeStillOptions;
             renderMode = "flattened-scene-subtree-backdrop";
             warmupFrames = 3;
-            frameOverride = new SceneRenderFrame(
-                subtreeViewportSize,
-                new Vector2(subtreeFrame.PositionX, subtreeFrame.PositionY),
-                new Vector2(subtreeFrame.Scale, subtreeFrame.Scale),
-                Vector2.Zero,
-                new Vector2(subtreeViewportSize.X, subtreeViewportSize.Y));
+
+            if (still?.NodeLocalRect is { } rect)
+            {
+                // NODE-LOCAL CAPTURE (`rect=x,y,w,h`): one node-local unit per output pixel, at the node's own
+                // identity scale. Both halves matter to a consumer that composites the still back under the live
+                // node's transform — the mirror streams that transform (a rarity glow carries a 1.35 y-scale, a
+                // card highlight its placement) and applies it to the element the still is painted in, so a still
+                // baked at anything other than identity would have that scale applied twice.
+                PinControlToNodeLocalRect(instantiated, rect);
+                frameOverride = new SceneRenderFrame(
+                    new Vector2I(Math.Max(1, Mathf.RoundToInt(rect.Width)), Math.Max(1, Mathf.RoundToInt(rect.Height))),
+                    new Vector2(-rect.X, -rect.Y),
+                    Vector2.One,
+                    Vector2.Zero,
+                    new Vector2(rect.Width, rect.Height));
+                notes.Add(
+                    $"Captured the node-local rect ({rect.X}, {rect.Y}, {rect.Width}, {rect.Height}) at identity scale, one unit per pixel.");
+            }
+            else
+            {
+                var subtreeViewport = ResolveRequestedViewportSize(request);
+                var subtreeViewportSize = new Vector2I(Math.Max(1, subtreeViewport.X), Math.Max(1, subtreeViewport.Y));
+                var subtreeFrame = Sts2EventBackgroundFrameMath.CenterFrame(
+                    Sts2EventBackgroundFrameMath.TryParseFrameSpec(request.EventBackgroundFrame)
+                        ?? new Sts2EventBackgroundFrameMath.EventFrame(0f, 0f, 1f),
+                    subtreeViewportSize.X,
+                    subtreeViewportSize.Y);
+                frameOverride = new SceneRenderFrame(
+                    subtreeViewportSize,
+                    new Vector2(subtreeFrame.PositionX, subtreeFrame.PositionY),
+                    new Vector2(subtreeFrame.Scale, subtreeFrame.Scale),
+                    Vector2.Zero,
+                    new Vector2(subtreeViewportSize.X, subtreeViewportSize.Y));
+            }
+
             notes.Add($"Rendered only the '{subtreeNodePath}' subtree, detached before any tree entry.");
-            notes.AddRange(StabilizeBackgroundParticles(instantiated, "scene subtree backdrop"));
+            notes.AddRange(still is { LiveParticles: true }
+                ? ConfigureLiveParticles(instantiated)
+                : StabilizeBackgroundParticles(instantiated, "scene subtree backdrop"));
             if (TryConfigureSpineFirstFramePreview(instantiated, out var subtreeAnimation))
             {
                 notes.Add($"Selected deterministic Spine preview animation '{subtreeAnimation}' for the subtree backdrop.");
@@ -2689,11 +2722,38 @@ public sealed partial class Sts2AssetExtractProvider
             notes.Add("Allowed the subtree backdrop to process during render warmup.");
             disableProcessDuringCapture = false;
             var subtreeRoot = instantiated;
+            var subtreeFrameOverride = frameOverride;
             afterAttach = () =>
             {
+                if (still is not null)
+                {
+                    ApplySceneSubtreeStillOverrides(subtreeRoot, still);
+                }
+
                 TryConfigureSpineFirstFramePreview(subtreeRoot, out _);
                 QueueRedrawCanvasItems(subtreeRoot);
             };
+            if (still is not null)
+            {
+                notes.AddRange(Sts2SceneSubtreeStillKey.Describe(still));
+                // THE SECOND APPLICATION, and why it is not belt-and-braces. Attaching the subtree runs its
+                // scripts' `_Ready`, and both rarity-glow scripts start a tween there (`modulate:a` 1.0 → 0.9,
+                // plus a delayed `scale` × 0.92 on the rare one). Processing is enabled through warmup, so those
+                // tweens ADVANCE between `afterAttach` and the capture. Re-posing here — after the last warmup
+                // frame, immediately before `ForceDraw` — is what makes the still the authored state rather than
+                // however far a tween happened to get.
+                beforeCapture = () =>
+                {
+                    ApplySceneSubtreeStillOverrides(subtreeRoot, still);
+                    if (subtreeFrameOverride is { } pinned)
+                    {
+                        PositionCanvasItem(subtreeRoot, pinned);
+                    }
+
+                    QueueRedrawCanvasItems(subtreeRoot);
+                };
+            }
+
             subtreeConfigured = true;
         }
 
@@ -2815,7 +2875,9 @@ public sealed partial class Sts2AssetExtractProvider
             normalizePreviewAlpha,
             frameOverride,
             afterAttach: afterAttach,
-            disableProcessDuringCapture: disableProcessDuringCapture);
+            beforeCapture: beforeCapture,
+            disableProcessDuringCapture: disableProcessDuringCapture,
+            blackBackdrop: request.SceneSubtreeStillOptions is { BlackBackdrop: true });
     }
 
     private async Task<AssetExtractOperationResult> ExtractCharacterSelectBgSpineStillAsync(
@@ -3635,7 +3697,11 @@ public sealed partial class Sts2AssetExtractProvider
         // actually covers — the transparent-trim rect when trimming is on, the whole image otherwise. A lane
         // that expresses its still as a node-local placement rect needs this, because with trimming the raster
         // is NOT the capture rect. Never invoked on a failure path.
-        Action<Rect2I>? reportCaptureRegion = null)
+        Action<Rect2I>? reportCaptureRegion = null,
+        // Fill the capture viewport with opaque black BEFORE the node draws, instead of leaving it transparent.
+        // The one lane that asks for it is the additive effect still — see `SceneSubtreeStillOptions.BlackBackdrop`
+        // for why a transparent capture cannot represent an additive effect faithfully.
+        bool blackBackdrop = false)
     {
         var rootViewport = (Engine.GetMainLoop() as SceneTree)?.Root;
         if (rootViewport is null)
@@ -3684,6 +3750,20 @@ public sealed partial class Sts2AssetExtractProvider
             {
                 rootViewport.AddChild(viewport);
                 encounterDiagnostics?.AddTimingNote("SubViewport attached to root viewport.");
+                if (blackBackdrop)
+                {
+                    // A plain ColorRect added FIRST, so it draws under everything the node draws. Deliberately
+                    // not `TransparentBg = false`: a viewport's clear colour in Godot is a RENDERING-SERVER
+                    // GLOBAL, and reaching for it during a capture would repaint the running game's own frame.
+                    viewport.AddChild(new ColorRect
+                    {
+                        Name = "SpirectlStillBackdrop",
+                        Color = Colors.Black,
+                        Position = Vector2.Zero,
+                        Size = frame.ViewportSize,
+                    });
+                }
+
                 viewport.AddChild(node);
                 encounterDiagnostics?.AddTimingNote("Render node attached to SubViewport.");
                 afterAttach?.Invoke();
@@ -3737,10 +3817,15 @@ public sealed partial class Sts2AssetExtractProvider
             postProcessImage?.Invoke(image);
             encounterDiagnostics?.SetPixelEvidence(image, beforeAlphaNormalization: false);
 
+            // THE BLANK-CAPTURE GATE, and why the black-backdrop lane needs its own question. Alpha is the
+            // normal evidence that something was drawn — but a backdrop makes every pixel opaque, so
+            // `HasVisiblePixels` would answer "visible" for a capture that rendered nothing at all, silently
+            // turning a refusal into an all-black artifact. There the equivalent question is whether anything
+            // LIT the backdrop.
             bool anyVisiblePixels;
             using (Sts2RenderPhaseProfile.Measure(Sts2RenderPhaseProfile.Phase.VisibleScan))
             {
-                anyVisiblePixels = HasVisiblePixels(image);
+                anyVisiblePixels = blackBackdrop ? HasNonBlackPixels(image) : HasVisiblePixels(image);
             }
 
             if (!anyVisiblePixels)
@@ -3750,7 +3835,9 @@ public sealed partial class Sts2AssetExtractProvider
                     request,
                     "scene",
                     request.SourcePath,
-                    "The live bridge rendered only fully transparent pixels while flattening the scene.",
+                    blackBackdrop
+                        ? "The live bridge rendered nothing onto the black backdrop while flattening the scene."
+                        : "The live bridge rendered only fully transparent pixels while flattening the scene.",
                     notes,
                     encounterDiagnostics?.Build().ToDictionary());
             }
