@@ -127,6 +127,59 @@ public sealed partial class Sts2ActionHandler
             provisional: true);
     }
 
+    // Replay one of the game's own ABSTRACT CONTROLLER INPUTS. Unlike the key/pointer paths this injects an
+    // InputEventAction, which is how the game's controller strategies feed the input bus themselves: the event
+    // carries the action NAME, so it reaches the game's UI without consulting the input map's bindings. That is
+    // the whole point for an embedder running isolated seats — a seat whose joypad BINDINGS were erased so a
+    // controller at the host machine cannot steer it still accepts its own browser client's pad.
+    private ActionExecutionResult ExecuteControllerInput(SemanticActionRequest request)
+    {
+        if (!Sts2BrowserPadMap.TryMap(request.ControllerInput, out var action))
+        {
+            // Two very different failures, and the message has to say which: an unknown TOKEN is a client bug,
+            // while a known token none of whose candidate names this build registers means the game renamed its
+            // controller actions again and Sts2BrowserPadMap needs the new spelling.
+            var reason = Sts2BrowserPadMap.TryMapCandidates(request.ControllerInput, out var candidates)
+                ? $"maps to [{string.Join(", ", candidates)}], none of which this game build registers as an input action"
+                : "has no controller-action mapping";
+            return ActionExecutionResult.Failure(
+                kind: request.Kind,
+                code: ActionFailureCode.InvalidAction,
+                message: $"controller-input '{request.ControllerInput}' {reason}.");
+        }
+
+        void Send(bool pressed)
+        {
+            Input.ParseInputEvent(new InputEventAction
+            {
+                Action = action,
+                Pressed = pressed,
+            });
+        }
+
+        // Honor an explicit press/release; otherwise inject a full press+release (a "tap"). Held inputs are the
+        // normal case for a pad — the game's UI reads both edges (a d-pad repeat, a charge-up) — so a client
+        // streaming real button state sends the edges and never relies on the tap.
+        if (request.KeyPressed is bool pressed)
+        {
+            Send(pressed);
+        }
+        else
+        {
+            Send(true);
+            Send(false);
+        }
+
+        var message = $"Injected controller input '{request.ControllerInput}' → '{action}' "
+            + $"(pressed={request.KeyPressed?.ToString().ToLowerInvariant() ?? "tap"}).";
+        _logStream.Write(BridgeLogLevel.Info, "bridge.action", message);
+        return ActionExecutionResult.Success(
+            actionInstanceId: $"action:controller-input:{request.RequestId}",
+            kind: request.Kind,
+            message: message,
+            provisional: true);
+    }
+
     // Resolve a stable node instance id (GetInstanceId, the same id Sts2RuntimeSceneWatcher streams to the
     // mirror) to a viewport point: a Control's global rect (offset within it, centered by default), or a
     // CanvasItem's global canvas origin. `node` is the resolved node (for hover OnFocus); null on failure.

@@ -384,7 +384,8 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
                 Key: request.Key,
                 KeyModifiers: request.KeyModifiers,
                 KeyPressed: request.KeyPressed,
-                MousePressed: request.MousePressed));
+                MousePressed: request.MousePressed,
+                ControllerInput: request.ControllerInput));
             // HoverElement is a high-frequency cursor move (continuous targeting) that changes no committed
             // game state — refreshing the state hub on every hover would be a per-frame broadcast storm. The
             // live SCENE watcher still streams the resulting visual deltas (targeting arrow, tooltips), so the
@@ -392,9 +393,13 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
             // set-scroll-offset joins hover-element in the no-refresh set for the same reason: a client that leads
             // a scroll locally sends one per gesture frame, and a state-hub broadcast per frame is the storm this
             // exclusion exists to prevent. The scene watcher still streams the moved container.
+            // controller-input joins them for the same reason, and more sharply: a HELD d-pad is a repeat stream
+            // for as long as the player leans on it, so a state-hub broadcast per edge would be the storm this
+            // exclusion exists to prevent. The scene watcher still streams the focus ring the game moves.
             if (result.Accepted
                 && request.Kind != SemanticActionKind.HoverElement
-                && request.Kind != SemanticActionKind.SetScrollOffset)
+                && request.Kind != SemanticActionKind.SetScrollOffset
+                && request.Kind != SemanticActionKind.ControllerInput)
             {
                 _stateSubscriptionHub?.RequestRefresh(force: true);
             }

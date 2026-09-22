@@ -73,12 +73,13 @@ public sealed class Sts2ScrollOffsetMathTests
     }
 
     [Fact]
-    public void TheActionKindStaysLastInTheEnum()
+    public void TheActionKindKeepsItsWireCode()
     {
-        // The wire `kind` code IS the enum ordinal, so a kind appended anywhere but the end renumbers every later
-        // action. This is the guard the enum's own comments ask for.
-        var values = Enum.GetValues<SemanticActionKind>();
-        Assert.Equal(SemanticActionKind.SetScrollOffset, values[^1]);
+        // The wire `kind` code IS the enum ordinal, so a kind inserted anywhere but the end renumbers every later
+        // action. This is the guard the enum's own comments ask for. It pins THIS kind's ordinal rather than
+        // asserting it is still last: "last" moves to each newly appended kind (and is asserted there), while the
+        // ordinal is the thing a client has already encoded and that must never move again.
+        Assert.Equal(73, (int)SemanticActionKind.SetScrollOffset);
     }
 
     [Fact]

@@ -114,6 +114,16 @@ public enum SemanticActionKind
     // a leading client can reconcile when the game refuses the full travel. Appended at the end on purpose — the
     // wire `kind` code equals the enum ordinal, so new kinds must stay last.
     SetScrollOffset,
+    // ABSTRACT CONTROLLER INPUT. Replays one of the game's own controller inputs as an `InputEventAction`, which
+    // is the mechanism the game's controller strategies already feed the input bus with. `controllerInput` is a
+    // device-neutral browser token (faceSouth, dpadUp, leftBumper, …) that Sts2BrowserPadMap resolves to the
+    // action name THIS game build registers, and `keyPressed` carries the edge (true=down, false=up, null=a full
+    // press+release) — reused rather than adding a second "pressed" field, since a request is one or the other.
+    // Deliberately bypasses the InputMap: the game's UI consumes these by action NAME, so an embedder that has
+    // stripped a seat's joypad BINDINGS (couch-coop's headless seats) keeps that isolation while its browser
+    // client can still drive the seat's controller mode. Appended at the end on purpose — the wire `kind` code
+    // equals the enum ordinal, so new kinds must stay last.
+    ControllerInput,
 }
 
 public enum RawMouseButtonKind
@@ -312,7 +322,13 @@ public sealed record SemanticActionRequest(
     // Mouse press state for mouse-click: true=button DOWN only (hold, starts a drag), false=button UP only
     // (release), null=a full click (down+up). While a button is held, the hover/move stream is injected as
     // drag-motion (the button mask is applied to the motion events).
-    bool? MousePressed = null);
+    bool? MousePressed = null,
+    // Abstract controller input (controller-input): a device-neutral browser pad token ("faceSouth", "dpadUp",
+    // "leftBumper", …) that Sts2BrowserPadMap resolves to the action name this game build registers. The EDGE
+    // rides on KeyPressed above rather than a field of its own (true=down, false=up, null=a full press+release):
+    // a request is a key OR a pad input, never both, so a second "pressed" field would only create a way for the
+    // two to disagree.
+    string? ControllerInput = null);
 
 public sealed record ActionExecutionResult(
     bool Accepted,
