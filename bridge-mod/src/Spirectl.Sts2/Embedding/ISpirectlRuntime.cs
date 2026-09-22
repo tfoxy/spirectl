@@ -314,7 +314,12 @@ public sealed record EmbeddableActionRequest(
     // Mouse press state for mouse-click (drag support): true=button DOWN only (hold), false=button UP only
     // (release), null=a full click (down+up, the default). A held button turns the subsequent hover/move stream
     // into a drag. Maps to SemanticActionRequest.MousePressed.
-    bool? MousePressed = null);
+    bool? MousePressed = null,
+    // Abstract controller input (controller-input): a device-neutral browser pad token ("faceSouth", "dpadUp",
+    // "leftBumper", …); the host names the game action. The EDGE reuses KeyPressed above (true=down, false=up,
+    // null=full press+release) — a request is a key OR a pad input, never both. Maps to
+    // SemanticActionRequest.ControllerInput.
+    string? ControllerInput = null);
 
 public sealed record EmbeddableActionResult(
     bool Success,

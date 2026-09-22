@@ -115,6 +115,7 @@ public sealed partial class Sts2ActionHandler : IActionHandler
                 SemanticActionKind.MouseClick => ExecuteMouseClick(request),
                 SemanticActionKind.HoverElement => ExecuteHoverElement(request),
                 SemanticActionKind.KeyInput => ExecuteKeyInput(request),
+                SemanticActionKind.ControllerInput => ExecuteControllerInput(request),
                 SemanticActionKind.SetScrollOffset => ExecuteSetScrollOffset(request),
                 _ => ActionExecutionResult.Failure(
                     kind: request.Kind,
