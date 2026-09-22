@@ -25,9 +25,10 @@ public sealed class Sts2AssetKeyResolver(Sts2AssetProviderCatalog catalog)
             return ResolveResult.Success("spine", trimmed, trimmed);
         }
 
-        // scene-subtree://<res-scene>?node=<relPath>: render ONLY the addressed subtree of a scene (couch-coop's
-        // room-backdrop still). Pass the key through unchanged; the live extractor parses it
-        // (TryParseSceneSubtreeRequest) and rewrites onto the ordinary PackedScene path.
+        // scene-subtree://<res-scene>?node=<relPath>[&rect=…][&shaderParam.<name>=…][&modulate=…][&particles=live]:
+        // render ONLY the addressed subtree of a scene (couch-coop's room-backdrop still, and its effect-still
+        // bake). Pass the key through unchanged; the live extractor parses it (TryParseSceneSubtreeRequest ->
+        // Sts2SceneSubtreeStillKey) and rewrites onto the ordinary PackedScene path.
         if (trimmed.StartsWith("scene-subtree://", StringComparison.OrdinalIgnoreCase))
         {
             return ResolveResult.Success("scene-subtree", trimmed, trimmed);

@@ -1089,6 +1089,137 @@ public sealed partial class Sts2AssetExtractProvider
             rect.Size.Y);
     }
 
+    // ---- SCENE-SUBTREE STILL POSING ------------------------------------------------------------------------
+    //
+    // The Godot-typed half of `Sts2SceneSubtreeStillKey` (which owns the grammar and the reasons each knob
+    // exists). Three things a still of an EFFECT node needs that a still of a backdrop never did:
+    //
+    //   1. A uniform / modulate the authored scene does not carry, because the authored value is the RESTING
+    //      state the game tweens away from — an un-posed card highlight renders a degenerate, fully transparent
+    //      shader and is refused downstream.
+    //   2. A pose that survives `_Ready`. The subtree is attached to a real SubViewport to be rendered, so its
+    //      scripts DO run and the glow scripts start a `modulate:a` (and, for rare, a `scale`) tween on entry.
+    //      `ApplySceneSubtreeStillOverrides` is therefore idempotent and called TWICE — once after attach, once
+    //      immediately before the capture — so nothing a script started during warmup can have moved it.
+    //   3. Live emitters. The lane's default is to silence every `Particles2D`, which is right for a backdrop
+    //      whose still must not depend on emitter phase and useless for a still OF an emitter.
+
+    /// <summary>
+    /// Pin the addressed node's shader uniforms and modulate to the values the key asked for. Idempotent, and
+    /// safe to call while the node is in the tree.
+    /// </summary>
+    private static void ApplySceneSubtreeStillOverrides(Node node, SceneSubtreeStillOptions options)
+    {
+        if (node is not CanvasItem canvasItem)
+        {
+            return;
+        }
+
+        if (options.ShaderParameters is { Count: > 0 } parameters
+            && TryResolveOwnShaderMaterial(canvasItem) is { } material)
+        {
+            foreach (var (name, value) in parameters)
+            {
+                material.SetShaderParameter(name, value);
+            }
+        }
+
+        if (options.Modulate is { Count: 4 } modulate)
+        {
+            canvasItem.Modulate = new Color(modulate[0], modulate[1], modulate[2], modulate[3]);
+        }
+    }
+
+    /// <summary>
+    /// The node's ShaderMaterial, guaranteed NOT to be shared with the running game.
+    ///
+    /// <para>A card's ripple material declares <c>resource_local_to_scene</c>, so instantiation already handed
+    /// this subtree its own copy and writing a uniform cannot reach a live card. That is a property of one
+    /// authored scene, though, not a rule — so rather than trust it, a material that is NOT scene-local is
+    /// duplicated here before it is written. Shallow (<c>Duplicate(false)</c>): the parameter table becomes ours,
+    /// the Shader resource stays shared, which is what keeps the render identical.</para>
+    /// </summary>
+    private static ShaderMaterial? TryResolveOwnShaderMaterial(CanvasItem canvasItem)
+    {
+        if (canvasItem.Material is not ShaderMaterial material)
+        {
+            return null;
+        }
+
+        if (material.ResourceLocalToScene)
+        {
+            return material;
+        }
+
+        if (material.Duplicate() is not ShaderMaterial owned)
+        {
+            return null;
+        }
+
+        canvasItem.Material = owned;
+        return owned;
+    }
+
+    /// <summary>
+    /// Re-arm every emitter under <paramref name="root"/> so the capture sees a full, deterministic field.
+    ///
+    /// <para><c>Restart()</c> rather than merely <c>Emitting = true</c>: STS2's glow emitters carry a
+    /// <c>preprocess</c> (2.0s / 1.0s), and a restart is what makes the engine replay it, so the first drawn
+    /// frame already shows the settled field instead of an emitter that has only just begun.</para>
+    /// </summary>
+    private static IReadOnlyList<string> ConfigureLiveParticles(Node root)
+    {
+        var count = 0;
+        foreach (var node in EnumerateNodes(root))
+        {
+            switch (node)
+            {
+                case GpuParticles2D gpu:
+                    gpu.Visible = true;
+                    gpu.Emitting = true;
+                    gpu.Restart();
+                    count += 1;
+                    break;
+                case CpuParticles2D cpu:
+                    cpu.Visible = true;
+                    cpu.Emitting = true;
+                    cpu.Restart();
+                    count += 1;
+                    break;
+            }
+        }
+
+        return count > 0
+            ? [$"Kept {count} particle emitter(s) simulating for the still instead of silencing them."]
+            : ["The key asked for live particles, but the addressed subtree has no emitter."];
+    }
+
+    /// <summary>
+    /// Make the addressed node's own box exactly the requested node-local rect, with anchors neutralised.
+    ///
+    /// <para>The anchors are the load-bearing part. A card highlight is authored center-anchored (preset 8), and
+    /// this node has just been detached from the parent those anchors were resolved against and re-parented to a
+    /// SubViewport of an unrelated size — so leaving them in place would let the viewport's own dimensions drift
+    /// the node's position out from under the frame. Zeroing all four leaves offsets (i.e. position + size) as
+    /// the only inputs, which is what makes the capture rect mean exactly what the key said.</para>
+    ///
+    /// <para>Written as four explicit anchor assignments rather than <c>SetAnchorsPreset</c>, which also rewrites
+    /// offsets and has bitten this codebase before.</para>
+    /// </summary>
+    private static void PinControlToNodeLocalRect(Node node, SceneSubtreeRect rect)
+    {
+        if (node is not Control control)
+        {
+            return;
+        }
+
+        control.AnchorLeft = 0f;
+        control.AnchorTop = 0f;
+        control.AnchorRight = 0f;
+        control.AnchorBottom = 0f;
+        control.Size = new Vector2(rect.Width, rect.Height);
+    }
+
     private static bool TryConfigureVfxPreview(Node node)
     {
         var configured = false;
@@ -2399,6 +2530,26 @@ public sealed partial class Sts2AssetExtractProvider
         var inspected = EnsureRgba8(image);
 
         return HasVisiblePixels(inspected.GetData());
+    }
+
+    /// <summary>
+    /// The BLACK-BACKDROP lane's blank-capture test: did anything light the backdrop?
+    ///
+    /// <para>Alpha cannot answer it there — a backdrop makes every pixel opaque, including the pixels of a
+    /// capture that drew nothing — so the question becomes whether any channel rose off black.</para>
+    /// </summary>
+    private static bool HasNonBlackPixels(Image image)
+    {
+        var bytes = EnsureRgba8(image).GetData();
+        for (var index = 0; index + 2 < bytes.Length; index += 4)
+        {
+            if (bytes[index] != 0 || bytes[index + 1] != 0 || bytes[index + 2] != 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static Image EnsureRgba8(Image image)

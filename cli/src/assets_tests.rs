@@ -624,3 +624,53 @@ fn export_stage_ms_excludes_live_setup_delta() {
     assert_eq!(export_stage_ms(300, 125, &timing), 175);
     assert_eq!(export_stage_ms(100, 250, &timing), 100);
 }
+
+// `scene-subtree://` was a bridge-only key until the effect-still bake needed it from the CLI: nothing
+// forwarded it, so `assets extract` answered `no-match` for a key the live host would have rendered.
+#[test]
+fn scene_subtree_query_passes_the_key_through_verbatim() {
+    let key = "scene-subtree://res://scenes/cards/card.tscn?node=CardContainer%2FHighlight\
+               &rect=0,0,759,951&shaderParam.width=0.075&backdrop=black";
+    let candidate = super::try_parse_scene_subtree_query(key).expect("key should resolve");
+
+    // The bridge owns this grammar, so the CLI must not re-order, re-spell or case-fold any of it.
+    assert_eq!(candidate.load_path, key);
+    assert_eq!(candidate.source_root, "scene-subtree");
+    assert!(!candidate.offline_readable);
+}
+
+#[test]
+fn scene_subtree_query_preserves_case_through_normalization() {
+    // The regression this pins: lower-casing the key turns `CardContainer/Highlight` into a node path the
+    // live extractor cannot find, and the failure reads as if the caller's key were wrong.
+    let key = "scene-subtree://res://scenes/cards/card.tscn?node=CardContainer%2FHighlight";
+    assert_eq!(super::normalize_query(key), key);
+}
+
+#[test]
+fn scene_subtree_query_requires_a_scene_and_a_node() {
+    for key in [
+        "scene-subtree://scenes/cards/card.tscn?node=X", // not a res:// resource
+        "scene-subtree://res://scenes/cards/card.tscn",  // no query
+        "scene-subtree://res://scenes/cards/card.tscn?rect=0,0,8,8", // no node selector
+    ] {
+        assert!(
+            super::try_parse_scene_subtree_query(key).is_none(),
+            "expected {key} to be refused"
+        );
+    }
+}
+
+#[test]
+fn pose_variant_segments_are_distinct_and_carry_no_dots() {
+    // Dots are what made two poses collide: the export layout treats the last dot-segment as an extension
+    // and replaces it, so `..._modulate_1_1_1_0.98-<hash>` and `..._0.5_particles_live-<hash>` both landed
+    // on disk as `..._0.png`.
+    let a = super::pose_variant_segment(&["modulate=1,1,1,0.98"]);
+    let b = super::pose_variant_segment(&["modulate=1,1,1,0.5"]);
+
+    assert!(!a.contains('.'), "{a} must not contain a dot");
+    assert!(!b.contains('.'), "{b} must not contain a dot");
+    assert_ne!(a, b);
+    assert_eq!(super::pose_variant_segment(&[]), "default");
+}

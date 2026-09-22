@@ -686,13 +686,21 @@ fn live_unavailable_notes(source_path: &str, error: &AppError) -> Vec<String> {
     ]
 }
 
+/// Key schemes whose QUERY SELECTORS are case-sensitive, so the whole key must reach the bridge verbatim.
+///
+/// `spine://` names Godot nodes and Spine animations; `scene-subtree://` names a Godot node path and (for an
+/// effect still) shader uniform names. Folding either to lower case turns a valid key into one the live
+/// extractor cannot resolve — it reports "the scene has no node at 'cardcontainer/highlight'" and a caller has
+/// to work out that the CLI, not their key, lost the capitals. The extractor matches the STRUCTURAL segments
+/// case-insensitively itself, so preserving case here costs nothing.
+const CASE_PRESERVING_KEY_SCHEMES: [&str; 2] = ["spine://", "scene-subtree://"];
+
 fn normalize_query(query: &str) -> String {
-    // spine:// keys carry case-sensitive selectors: Godot node names (?node=) and Spine animation names
-    // (?anim=) are case-sensitive, as is the scene path. Preserve case verbatim (only normalize slashes +
-    // trim); the live extractor matches the structural segments case-insensitively itself.
     let slashed = query.replace('\\', "/");
     let trimmed = slashed.trim();
-    if trimmed.len() >= "spine://".len() && trimmed[.."spine://".len()].eq_ignore_ascii_case("spine://") {
+    if CASE_PRESERVING_KEY_SCHEMES.iter().any(|scheme| {
+        trimmed.len() >= scheme.len() && trimmed[..scheme.len()].eq_ignore_ascii_case(scheme)
+    }) {
         return trimmed.to_string();
     }
 
@@ -754,6 +762,92 @@ fn canonical_model_character_key(character_id: &str, variant: &str) -> String {
 // (Timeline of frames) addressed by its scene + scene-relative node path. The scene path, node, and
 // anim are case-PRESERVED (scene paths and Spine names are case-sensitive). The key is passed through
 // unchanged as the bridge load_path; the live extractor parses the scene/node/anim selectors.
+/// `scene-subtree://<res-scene>?node=<relPath>[&posing knobs]` — render only the addressed subtree of a scene.
+///
+/// The bridge has understood this key for as long as couch-coop's room-backdrop still has existed, but only
+/// in-process: nothing forwarded it from the CLI, so `assets extract` answered `no-match` for a key the live
+/// host would happily have rendered. This is the same pass-through `try_parse_spine_clip_query` above does for
+/// `spine://`, and for the same reason — the query string IS the key, and the bridge owns its grammar.
+///
+/// The key therefore rides through VERBATIM as `load_path`; nothing here re-orders or re-spells it. Only the
+/// artifact's on-disk layout is derived, and it folds in the posing knobs, because two different POSES of one
+/// node are two different images and must not overwrite each other.
+fn try_parse_scene_subtree_query(query: &str) -> Option<AssetCandidate> {
+    const PREFIX: &str = "scene-subtree://";
+    let trimmed = query.trim().replace('\\', "/");
+    if trimmed.len() < PREFIX.len() || !trimmed[..PREFIX.len()].eq_ignore_ascii_case(PREFIX) {
+        return None;
+    }
+
+    let rest = &trimmed[PREFIX.len()..];
+    let (scene_part, query_part) = rest.split_once('?')?;
+    if !scene_part.to_ascii_lowercase().starts_with("res://") || query_part.is_empty() {
+        return None;
+    }
+
+    // `node` is required by the bridge's own parse; refusing here too keeps a malformed key a CLI-side
+    // `no-match` rather than a round trip that fails at the far end.
+    let mut node: Option<String> = None;
+    let mut pose = Vec::new();
+    for pair in query_part.split('&').filter(|p| !p.is_empty()) {
+        match pair.split_once('=') {
+            Some(("node", value)) if !value.is_empty() => node = Some(value.to_string()),
+            _ => pose.push(pair),
+        }
+    }
+    let node = node?;
+
+    let scene_stem = scene_part["res://".len()..].to_string();
+    let mut relative = PathBuf::from("scene-subtree")
+        .join(&scene_stem)
+        .join(node.replace(['/', '%'], "_"));
+    relative = relative.join(pose_variant_segment(&pose));
+
+    Some(AssetCandidate {
+        source_root: "scene-subtree".to_string(),
+        logical_path: trimmed.clone(),
+        source_path: trimmed.clone(),
+        relative_path: relative,
+        asset_kind: AssetKind::Scene,
+        storage_kind: "scene-subtree".to_string(),
+        load_path: trimmed,
+        file_path: None,
+        container_path: None,
+        offline_readable: false,
+        resource_type: Some("SceneSubtree".to_string()),
+    })
+}
+
+/// A filesystem-safe, self-describing, collision-free directory name for one POSE.
+///
+/// Readable prefix so a bake's output can be recognised without decoding it, plus an unconditional hash of the
+/// full pose so two poses that sanitize or truncate to the same prefix still land in different directories. FNV-1a
+/// rather than `DefaultHasher`, which is explicitly not stable across Rust releases — an artifact path that moved
+/// on a toolchain upgrade would silently re-bake instead of reusing.
+fn pose_variant_segment(pose: &[&str]) -> String {
+    if pose.is_empty() {
+        return "default".to_string();
+    }
+
+    // NO DOTS. The export layout treats the last dot-segment of a name as its extension and REPLACES it, so a
+    // slug carrying `0.075` lands on disk as `..._0.png` — and two poses that differ only past their first dot
+    // (`modulate=1,1,1,0.98` vs `1,1,1,0.5`) would overwrite each other's artifact. Observed, not theorised.
+    let joined = pose.join("&");
+    let mut readable: String = joined
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' { ch } else { '_' })
+        .collect();
+    readable.truncate(64);
+
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in joined.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+
+    format!("{readable}-{:08x}", (hash >> 32) as u32)
+}
+
 fn try_parse_spine_clip_query(query: &str) -> Option<AssetCandidate> {
     let trimmed = query.trim().replace('\\', "/");
     if trimmed.len() < "spine://".len() || !trimmed[.."spine://".len()].eq_ignore_ascii_case("spine://")
