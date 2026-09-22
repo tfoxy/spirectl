@@ -17,6 +17,16 @@ export type {
 // The STS2 custom BBCode tag table (color aliases + effect tags) used when laying out rich text.
 export { DEFAULT_BBCODE_TAGS } from "./bbcodeTags";
 
+// The CSS behind the three animated tags that table names, plus the attribute a host writes to honour
+// the game's Settings -> Text Effects toggle.
+export {
+  ensureRichTextEffectStyles,
+  RICH_FX_JITTER,
+  RICH_FX_SINE,
+  RICH_FX_THINKY_DOTS,
+  RICH_TEXT_EFFECTS_ATTRIBUTE,
+} from "./richTextEffects";
+
 // The "a dragged card is in the play zone" predicate, so a host that owns its own pointer handling
 // draws the same line from the pointer Y as the rendered targeting layer does.
 export { playZoneThreshold } from "./playZone";
