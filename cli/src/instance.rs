@@ -26,7 +26,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Reserved instance names that cannot be used explicitly.
 const RESERVED_NAMES: &[&str] = &["auto", "all"];
-const MAX_NAME_LEN: usize = 64;
+pub(crate) const MAX_NAME_LEN: usize = 64;
 
 /// Resolved per-instance layout, threaded through `AppContext` for the few
 /// commands that need the instance identity (launch/install/close/instances).
@@ -35,8 +35,16 @@ pub(crate) struct InstanceContext {
     pub(crate) name: String,
     pub(crate) isolated: bool,
     /// Unix domain socket path (also the value written into the overlaid
-    /// `transport.ipcPath`).
+    /// `transport.ipcPath`). Bindable on this platform — see
+    /// [`socket_shortened`](Self::socket_shortened).
     pub(crate) socket: String,
+    /// Set when the name-derived path was too long for this platform's
+    /// `sun_path` and a short one was substituted. Carried so launch can say so:
+    /// the operator would otherwise look for a socket under `.sts2/ipc/` that
+    /// deliberately is not there.
+    pub(crate) socket_shortened: bool,
+    /// The path the derivation asked for, kept only when it was replaced.
+    pub(crate) derived_socket: Option<String>,
     /// Godot `--user-dir` target.
     pub(crate) user_dir: PathBuf,
     /// `<instances-dir>/<name>`.
@@ -94,10 +102,14 @@ impl InstanceContext {
             (game_root.join("mods"), game_root.join("game"))
         };
 
+        let socket = bridge::resolve_instance_ipc_path(&name);
+
         Ok(Some(Self {
             name: name.clone(),
             isolated,
-            socket: bridge::instance_ipc_path(&name),
+            socket: socket.path,
+            socket_shortened: socket.shortened,
+            derived_socket: socket.shortened.then_some(socket.derived),
             user_dir: instance_dir.join("user"),
             registry_path: instance_dir.join("instance.json"),
             game_root,
@@ -248,6 +260,13 @@ pub(crate) struct InstanceRecord {
     pub(crate) name: String,
     pub(crate) mode: String,
     pub(crate) socket: String,
+    /// Present only when the derived socket path did not fit and a short one was
+    /// used, so a reader of the registry can see the substitution rather than
+    /// wonder why `socket` is not under `.sts2/ipc/`.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub(crate) socket_shortened: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub(crate) derived_socket: Option<String>,
     pub(crate) user_dir: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub(crate) game_root: Option<String>,
@@ -315,6 +334,8 @@ impl InstanceContext {
             name: self.name.clone(),
             mode: self.mode_label().to_string(),
             socket: self.socket.clone(),
+            socket_shortened: self.socket_shortened,
+            derived_socket: self.derived_socket.clone(),
             user_dir: self.user_dir.display().to_string(),
             game_root: self.isolated.then(|| self.game_root.display().to_string()),
             mods_dir: self.isolated.then(|| self.mods_dir.display().to_string()),
@@ -604,6 +625,27 @@ mod tests {
     }
 
     #[test]
+    fn the_resolved_socket_is_always_bindable() {
+        // The derivation hangs off the working directory, so from a deep enough
+        // one it would otherwise exceed sun_path and the bridge could never
+        // listen — a game that launches, looks healthy, and has no transport.
+        let config = ipc_config();
+        let ctx = InstanceContext::resolve(Some("alpha"), false, &config)
+            .unwrap()
+            .unwrap();
+
+        assert!(
+            crate::host_paths::unix_socket_path_fits(&ctx.socket),
+            "resolved socket must fit the platform limit: {}",
+            ctx.socket
+        );
+        // From the crate directory nothing needs substituting, so the registry
+        // stays free of the extra fields.
+        assert!(!ctx.socket_shortened);
+        assert!(ctx.derived_socket.is_none());
+    }
+
+    #[test]
     fn auto_allocates_distinct_names() {
         let config = ipc_config();
         let a = InstanceContext::resolve(Some("auto"), false, &config)
@@ -689,6 +731,8 @@ mod tests {
             name: "rt".to_string(),
             isolated: false,
             socket: "/tmp/rt.sock".to_string(),
+            socket_shortened: false,
+            derived_socket: None,
             user_dir: dir.join("rt/user"),
             instance_dir: dir.join("rt"),
             registry_path: dir.join("rt/instance.json"),

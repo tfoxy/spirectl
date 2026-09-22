@@ -539,16 +539,7 @@ pub(crate) struct RecentRelevantLog {
 }
 
 pub(crate) fn latest_recent_relevant_log() -> Option<RecentRelevantLog> {
-    let mut files = godot_log_files();
-    files.extend(sts2_log_files());
-    files.sort_by(|left, right| {
-        file_modified(right)
-            .cmp(&file_modified(left))
-            .then_with(|| left.cmp(right))
-    });
-    files.dedup();
-
-    for path in files {
+    for path in candidate_log_files() {
         if !log_is_recent(&path) {
             continue;
         }
@@ -712,10 +703,30 @@ fn steam_initialization_failure_since_in_files(
     None
 }
 
+/// Every log file worth reading for a recent `[spirectl]` line, newest first.
+///
+/// BOTH FAMILIES, and that is the point. The engine writes
+/// `<data-root>/godot/app_userdata/<project>/logs` before the game's custom user
+/// dir takes over, and the game then writes `<data-root>/SlayTheSpire2/logs` —
+/// and the bridge's own bootstrap failure lands in the SECOND. Scanning only the
+/// engine family silently loses it, which is how a bridge that said exactly why
+/// it failed still surfaced as a bare missing socket.
+fn candidate_log_files() -> Vec<PathBuf> {
+    let mut files = godot_log_files();
+    files.extend(sts2_log_files());
+    files.sort_by(|left, right| {
+        file_modified(right)
+            .cmp(&file_modified(left))
+            .then_with(|| left.cmp(right))
+    });
+    files.dedup();
+    files
+}
+
 fn recent_godot_log_line(
     parse_line: for<'a> fn(&'a str) -> Option<&'a str>,
 ) -> Option<(PathBuf, String)> {
-    for path in godot_log_files() {
+    for path in candidate_log_files() {
         if !log_is_recent(&path) {
             continue;
         }
@@ -732,11 +743,13 @@ fn recent_godot_log_line(
 }
 
 fn sts2_log_files() -> Vec<PathBuf> {
-    log_files(crate::host_paths::sts2_log_dirs())
+    let extra = super::live_log_data_root();
+    log_files(crate::host_paths::sts2_log_dirs(extra.as_deref()))
 }
 
 fn godot_log_files() -> Vec<PathBuf> {
-    log_files(crate::host_paths::godot_log_dirs())
+    let extra = super::live_log_data_root();
+    log_files(crate::host_paths::godot_log_dirs(extra.as_deref()))
 }
 
 fn log_files(log_dirs: Vec<PathBuf>) -> Vec<PathBuf> {

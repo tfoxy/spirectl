@@ -397,6 +397,17 @@ fn resolve_instance_and_config(
     if let Some(ctx) = &instance_ctx {
         ctx.apply_overlay(&mut effective_config);
     }
+    // Point the bridge's failure-log scans at THIS run's game user dir — the
+    // instance's, or one the config names — before any bridge call can fail.
+    // Both `run_cli` and `run_cli_streaming` come through here, so this is the
+    // one place that sees the effective config for every command.
+    bridge::set_live_log_data_root(
+        effective_config
+            .game
+            .user_dir
+            .as_deref()
+            .map(std::path::PathBuf::from),
+    );
     Ok((loaded_config, effective_config, instance_ctx))
 }
 

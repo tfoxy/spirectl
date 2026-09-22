@@ -2189,6 +2189,26 @@ impl InvalidBridgeClient {
         transport_misconfigured_error(self.transport_kind, &self.endpoint, &self.note)
     }
 }
+/// The refusal note for an unbindable IPC socket path, or `None` when it fits.
+///
+/// Kept separate so the wording — which is the entire value of the check — is
+/// testable without building a client.
+#[cfg(unix)]
+fn unix_socket_path_length_note(path: &str) -> Option<String> {
+    if crate::host_paths::unix_socket_path_fits(path) {
+        return None;
+    }
+
+    Some(format!(
+        "transport.ipcPath is {} bytes; this platform can bind at most {} \
+         (sockaddr_un.sun_path). The bridge cannot listen on it, so the game would start with no \
+         transport. Point transport.ipcPath or SPIRECTL_BRIDGE_SOCKET_PATH at a shorter path, or \
+         run from a shorter working directory.",
+        path.len(),
+        crate::host_paths::max_unix_socket_path_len()
+    ))
+}
+
 fn resolve_ipc_bridge_client(config: &TransportConfig) -> BridgeClientKind {
     if config.ipc_path.is_some() && config.pipe_name.is_some() {
         return BridgeClientKind::Invalid(InvalidBridgeClient::new(
@@ -2212,10 +2232,21 @@ fn resolve_ipc_bridge_client(config: &TransportConfig) -> BridgeClientKind {
             ));
         }
 
-        BridgeClientKind::Ipc(IpcBridgeClient::new(
-            config.ipc_path.clone().unwrap_or_else(default_ipc_path),
-            config.rpc_timeout_ms,
-        ))
+        let ipc_path = config.ipc_path.clone().unwrap_or_else(default_ipc_path);
+        // A path longer than the platform's sun_path cannot be bound, so the
+        // bridge would start, fail, and leave the game looking healthy with no
+        // transport. Refuse it here instead, where the endpoint is still
+        // attributable to what configured it. Instance-derived paths never reach
+        // this branch over-limit: they are shortened at resolution.
+        if let Some(note) = unix_socket_path_length_note(&ipc_path) {
+            return BridgeClientKind::Invalid(InvalidBridgeClient::new(
+                proto::TransportKind::Ipc,
+                ipc_path,
+                note,
+            ));
+        }
+
+        BridgeClientKind::Ipc(IpcBridgeClient::new(ipc_path, config.rpc_timeout_ms))
     }
 
     #[cfg(windows)]
@@ -2417,4 +2448,41 @@ fn is_timeout_error(source: &std::io::Error) -> bool {
         source.kind(),
         std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
     )
+}
+
+#[cfg(all(test, unix))]
+mod ipc_socket_path_length_tests {
+    use super::*;
+
+    #[test]
+    fn a_path_within_the_platform_limit_is_accepted() {
+        assert!(unix_socket_path_length_note("/tmp/spirectl-bridge.sock").is_none());
+    }
+
+    #[test]
+    fn an_overlong_configured_path_is_refused_with_both_remedies() {
+        let path = format!("/tmp/{}/bridge.sock", "d".repeat(160));
+        let note = unix_socket_path_length_note(&path).expect("over-limit path must be refused");
+
+        // The note is the whole value of the check: it has to say how long the
+        // path is, what the ceiling is, and what to do about it.
+        assert!(note.contains(&path.len().to_string()));
+        assert!(note.contains(&crate::host_paths::max_unix_socket_path_len().to_string()));
+        assert!(note.contains("SPIRECTL_BRIDGE_SOCKET_PATH"));
+        assert!(note.contains("transport.ipcPath"));
+    }
+
+    #[test]
+    fn an_overlong_configured_path_yields_an_invalid_client_not_a_connection_attempt() {
+        let config = TransportConfig {
+            kind: ConfigTransportKind::Ipc,
+            ipc_path: Some(format!("/tmp/{}/bridge.sock", "d".repeat(160))),
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            resolve_ipc_bridge_client(&config),
+            BridgeClientKind::Invalid(_)
+        ));
+    }
 }

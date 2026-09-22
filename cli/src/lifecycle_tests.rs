@@ -1320,6 +1320,8 @@ fn launch_output_dir_is_per_instance_when_an_instance_is_active() {
         name: "alpha".to_string(),
         isolated: false,
         socket: "/tmp/alpha.sock".to_string(),
+        socket_shortened: false,
+        derived_socket: None,
         user_dir: tmp.join("instances/alpha/user"),
         instance_dir: tmp.join("instances/alpha"),
         registry_path: tmp.join("instances/alpha/instance.json"),

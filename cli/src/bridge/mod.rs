@@ -69,6 +69,33 @@ thread_local! {
     static MOCK_LOADED_HOST_LOCAL_SEATS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     static MOCK_LOADED_LOCKED_CHARACTERS: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     static MOCK_PRESERVE_LOADED_FIXTURE_ON_NEXT_RUN: RefCell<bool> = const { RefCell::new(false) };
+
+    /// The game's resolved `--user-dir`, when this run has one. Read by the log
+    /// scans behind the bridge's own error reporting.
+    static LIVE_LOG_DATA_ROOT: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+}
+
+/// Point the bridge's log scans at the game's user dir for this CLI run.
+///
+/// The scans exist to turn "the bridge is not reachable" into the bridge's OWN
+/// failure line, which the game writes under its user dir. With `--instance`
+/// (or any config setting `game.userDir`) that is NOT where this process's
+/// environment resolves to, so without this the scan reads the operator's
+/// default directory, finds nothing, and every instance bootstrap failure is
+/// reported as a bare missing socket instead of the reason it is missing.
+///
+/// Set once per run from the already-resolved effective config, alongside the
+/// other run-scoped state above, rather than threaded through
+/// `RuntimeBridgeClient::from_config` — that takes only a `TransportConfig` and
+/// so cannot see `game.userDir`.
+pub(crate) fn set_live_log_data_root(root: Option<PathBuf>) {
+    LIVE_LOG_DATA_ROOT.with(|slot| {
+        *slot.borrow_mut() = root;
+    });
+}
+
+pub(crate) fn live_log_data_root() -> Option<PathBuf> {
+    LIVE_LOG_DATA_ROOT.with(|slot| slot.borrow().clone())
 }
 
 pub(crate) fn reset_mock_loaded_fixture_scenario() {
@@ -87,6 +114,7 @@ pub(crate) fn reset_mock_loaded_fixture_scenario() {
     MOCK_LOADED_LOCKED_CHARACTERS.with(|loaded| {
         loaded.borrow_mut().clear();
     });
+    set_live_log_data_root(None);
 }
 
 #[doc(hidden)]
@@ -152,12 +180,87 @@ pub fn default_ipc_path() -> String {
 /// CLI invocation with the same `--instance <name>` re-derives the same path
 /// without shared runtime state. Unlike [`default_ipc_path`], this does NOT
 /// consult `SPIRECTL_BRIDGE_SOCKET_PATH`: the instance name owns the path.
+///
+/// This is the derivation alone, and it can exceed what the platform will bind —
+/// callers that need a usable path want [`resolve_instance_ipc_path`].
 pub fn instance_ipc_path(name: &str) -> String {
     default_ipc_root()
         .join(".sts2/ipc")
         .join(format!("{name}.sock"))
         .display()
         .to_string()
+}
+
+/// A per-instance socket path that this platform can actually bind.
+///
+/// `shortened` records whether the derived path had to be replaced, so the
+/// caller can say so rather than leaving the operator to wonder why nothing
+/// appeared under `.sts2/ipc/`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedInstanceSocket {
+    pub path: String,
+    pub derived: String,
+    pub shortened: bool,
+}
+
+/// Resolve the per-instance socket path, falling back to a short one when the
+/// derived path is too long for this platform's `sun_path`.
+///
+/// WHY THIS FALLBACK EXISTS. `instance_ipc_path` hangs off the repo root, and
+/// `default_ipc_root` returns the working directory unchanged when there is no
+/// `.git` above it — so running from a deep directory (an agent scratch dir, a
+/// nested worktree) derives a path the kernel refuses to bind. The game then
+/// launches, looks healthy, and has no bridge; the CLI reports only that the
+/// socket is missing. Shortening keeps `--instance` usable from anywhere.
+///
+/// DETERMINISM IS PRESERVED, which is the whole contract of the derivation: the
+/// fallback is a digest of the derived path, so the same `--instance <name>` in
+/// the same directory re-derives the same socket in a later invocation, with no
+/// shared runtime state. The digest is SHA-256 rather than a `Hash` impl on
+/// purpose — `DefaultHasher`'s output is not promised to be stable across Rust
+/// versions, and an upgrade that silently moved the path would orphan the socket
+/// of an instance that is still running.
+pub fn resolve_instance_ipc_path(name: &str) -> ResolvedInstanceSocket {
+    let derived = instance_ipc_path(name);
+    if crate::host_paths::unix_socket_path_fits(&derived) {
+        return ResolvedInstanceSocket {
+            path: derived.clone(),
+            derived,
+            shortened: false,
+        };
+    }
+
+    ResolvedInstanceSocket {
+        path: shortened_instance_ipc_path(name, &derived),
+        derived,
+        shortened: true,
+    }
+}
+
+/// `<short-runtime-dir>/spirectl-<name>-<digest>.sock`, trimming the name until
+/// it fits. The digest is what keeps two instances of the same name in different
+/// directories apart, so it is never the part that gets trimmed.
+fn shortened_instance_ipc_path(name: &str, derived: &str) -> String {
+    let digest = &crate::dev_probes::hex_sha256(derived.as_bytes())[..8];
+    let dir = crate::host_paths::short_runtime_dir();
+    let limit = crate::host_paths::max_unix_socket_path_len();
+
+    let mut trimmed = name.to_string();
+    loop {
+        let stem = if trimmed.is_empty() {
+            format!("spirectl-{digest}.sock")
+        } else {
+            format!("spirectl-{trimmed}-{digest}.sock")
+        };
+        let candidate = dir.join(&stem).display().to_string();
+        if candidate.len() <= limit || trimmed.is_empty() {
+            // Even the nameless form can overflow if the runtime dir is itself
+            // pathological. Returning it anyway keeps this total; the bind then
+            // fails with the platform's own message, which is the honest report.
+            return candidate;
+        }
+        trimmed.pop();
+    }
 }
 
 /// Deterministic per-instance Windows named pipe: `spirectl-<name>`.
@@ -586,3 +689,72 @@ impl UnavailableBridgeClient {
 
 mod stub_service;
 pub use stub_service::{StubBridgeGrpcService, StubBridgeService};
+
+#[cfg(test)]
+mod instance_socket_path_tests {
+    use super::*;
+
+    /// A derived path long enough to be unbindable on any platform here.
+    fn overlong_derived(name: &str) -> String {
+        format!("/tmp/{}/.sts2/ipc/{name}.sock", "d".repeat(160))
+    }
+
+    #[test]
+    fn a_short_derived_path_is_used_unchanged() {
+        // The crate directory is short, so the ordinary derivation stands and
+        // the documented `.sts2/ipc/<name>.sock` shape is preserved.
+        let resolved = resolve_instance_ipc_path("alpha");
+        assert!(!resolved.shortened);
+        assert_eq!(resolved.path, resolved.derived);
+        assert!(resolved.path.ends_with("/.sts2/ipc/alpha.sock"));
+    }
+
+    #[test]
+    fn an_overlong_derived_path_is_shortened_to_something_bindable() {
+        let derived = overlong_derived("alpha");
+        assert!(!crate::host_paths::unix_socket_path_fits(&derived));
+
+        let shortened = shortened_instance_ipc_path("alpha", &derived);
+        assert!(
+            crate::host_paths::unix_socket_path_fits(&shortened),
+            "fallback must fit: {shortened}"
+        );
+        assert!(shortened.ends_with(".sock"));
+        assert!(shortened.contains("alpha"));
+    }
+
+    #[test]
+    fn the_fallback_is_stable_across_calls() {
+        // The whole point of deriving rather than storing: a later invocation
+        // must land on the same socket without any shared runtime state.
+        let derived = overlong_derived("alpha");
+        assert_eq!(
+            shortened_instance_ipc_path("alpha", &derived),
+            shortened_instance_ipc_path("alpha", &derived)
+        );
+    }
+
+    #[test]
+    fn instances_of_the_same_name_in_different_directories_stay_apart() {
+        let here = shortened_instance_ipc_path("alpha", &overlong_derived("alpha"));
+        let elsewhere = shortened_instance_ipc_path(
+            "alpha",
+            &format!("/tmp/{}/.sts2/ipc/alpha.sock", "e".repeat(160)),
+        );
+        assert_ne!(
+            here, elsewhere,
+            "the digest is what keeps two same-named instances from colliding"
+        );
+    }
+
+    #[test]
+    fn a_name_too_long_for_the_runtime_dir_is_trimmed_not_abandoned() {
+        let name = "n".repeat(crate::instance::MAX_NAME_LEN);
+        let shortened = shortened_instance_ipc_path(&name, &overlong_derived(&name));
+        assert!(
+            crate::host_paths::unix_socket_path_fits(&shortened),
+            "even a maximal instance name must produce a bindable path: {shortened}"
+        );
+        assert!(shortened.ends_with(".sock"));
+    }
+}
