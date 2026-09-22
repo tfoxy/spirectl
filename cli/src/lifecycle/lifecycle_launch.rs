@@ -547,6 +547,13 @@ fn execute_game_launch_attempt_json(
     let instance_logs_dir = context
         .instance
         .map(|instance| launch_output_dir(context.config, Some(instance)));
+    // Same reason: report a socket path that had to be shortened to stay
+    // bindable, so nobody goes looking under `.sts2/ipc/` for a socket that was
+    // deliberately put somewhere else.
+    let derived_socket_path = context
+        .instance
+        .filter(|instance| instance.socket_shortened)
+        .and_then(|instance| instance.derived_socket.clone());
     let rpc_context = context_with_rpc_timeout(context, args.rpc_timeout_ms);
     let context = rpc_context.as_app_context(context.json_output);
     ensure_live_transport(context.config, "game launch")?;
@@ -795,6 +802,8 @@ fn execute_game_launch_attempt_json(
             "workingDir": launch.working_dir.display().to_string(),
             "endpoint": endpoint_json(&layout.endpoint),
             "socketPath": layout.endpoint.socket_path(),
+            "socketPathShortened": derived_socket_path.is_some(),
+            "derivedSocketPath": derived_socket_path,
             "pipeName": layout.endpoint.pipe_name(),
             "tcpAddress": layout.endpoint.tcp_address(),
             "pid": pid,
@@ -976,6 +985,18 @@ fn compact_game_launch_json(result: Value) -> Value {
         && let Some(object) = compact.as_object_mut()
     {
         object.insert("quiescence".to_string(), quiescence.clone());
+    }
+    // Only when it actually happened: a socket that sits where the derivation
+    // said it would needs no explaining, and two always-null keys on every
+    // launch would be noise.
+    if launch["socketPathShortened"] == Value::Bool(true)
+        && let Some(launch_object) = compact.get_mut("launch").and_then(Value::as_object_mut)
+    {
+        launch_object.insert("socketPathShortened".to_string(), Value::Bool(true));
+        launch_object.insert(
+            "derivedSocketPath".to_string(),
+            launch["derivedSocketPath"].clone(),
+        );
     }
     if let Some(observed) = launch.get("gameProcessObserved")
         && let Some(launch_object) = compact.get_mut("launch").and_then(Value::as_object_mut)

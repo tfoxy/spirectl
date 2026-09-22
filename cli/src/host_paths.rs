@@ -50,18 +50,83 @@ pub(crate) fn sts2_user_data_root() -> Option<PathBuf> {
 }
 
 /// Directories holding the game's own `godot*.log` files.
-pub(crate) fn sts2_log_dirs() -> Vec<PathBuf> {
-    sts2_user_data_root()
-        .map(|root| vec![root.join("logs")])
-        .unwrap_or_default()
+///
+/// `extra_data_root` is a second data root to search alongside the one this
+/// process's environment resolves to — the game's `--user-dir` when one is in
+/// play. A `--user-dir` occupies exactly the position of the platform data root
+/// (`user://` = `<root>/SlayTheSpire2`), so the same derivation applies to both.
+/// Without it an instance's logs are invisible: the CLI resolves the root from
+/// its OWN environment, while the game wrote under the instance's user dir, so
+/// every log scan reads the operator's default directory instead. See
+/// [`sts2_log_dirs_for`].
+pub(crate) fn sts2_log_dirs(extra_data_root: Option<&std::path::Path>) -> Vec<PathBuf> {
+    data_roots(extra_data_root)
+        .iter()
+        .map(|root| sts2_log_dirs_for(root))
+        .collect()
 }
 
 /// Directories holding the engine-level `app_userdata` logs, written before the
 /// game's custom user dir takes over.
-pub(crate) fn godot_log_dirs() -> Vec<PathBuf> {
-    user_data_root()
-        .map(|root| godot_log_dirs_for(current_host_platform(), &root))
-        .unwrap_or_default()
+pub(crate) fn godot_log_dirs(extra_data_root: Option<&std::path::Path>) -> Vec<PathBuf> {
+    data_roots(extra_data_root)
+        .iter()
+        .flat_map(|root| godot_log_dirs_for(current_host_platform(), root))
+        .collect()
+}
+
+/// The game's own log directory under one data root.
+pub(crate) fn sts2_log_dirs_for(data_root: &std::path::Path) -> PathBuf {
+    data_root.join(STS2_USER_DATA_DIR_NAME).join("logs")
+}
+
+/// Every data root worth scanning: the caller's extra root first (it is the more
+/// specific answer), then this process's own. Deduplicated so passing the
+/// operator's default user dir explicitly does not scan it twice.
+fn data_roots(extra_data_root: Option<&std::path::Path>) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Some(extra) = extra_data_root {
+        roots.push(extra.to_path_buf());
+    }
+    if let Some(own) = user_data_root()
+        && !roots.contains(&own)
+    {
+        roots.push(own);
+    }
+    roots
+}
+
+/// Longest Unix domain socket path this platform can bind.
+///
+/// A kernel ABI limit, not a preference: `sockaddr_un.sun_path` is a fixed
+/// char array and the path must fit with its NUL terminator — 108 bytes on
+/// Linux, 104 on the BSD-derived macOS. Exceeding it does not truncate, it
+/// fails the bind outright, so a path derived from a deep working directory
+/// produces a game whose bridge never comes up.
+pub(crate) fn max_unix_socket_path_len_for(platform: HostPlatform) -> usize {
+    match platform {
+        HostPlatform::MacOs => 103,
+        // Named pipes have no such limit; the value is unused on Windows.
+        HostPlatform::Linux | HostPlatform::Windows => 107,
+    }
+}
+
+pub(crate) fn max_unix_socket_path_len() -> usize {
+    max_unix_socket_path_len_for(current_host_platform())
+}
+
+/// Whether `path` can actually be bound as a Unix domain socket here.
+pub(crate) fn unix_socket_path_fits(path: &str) -> bool {
+    path.len() <= max_unix_socket_path_len()
+}
+
+/// A short directory to fall back to when a derived socket path cannot fit.
+/// `XDG_RUNTIME_DIR` first (`/run/user/<uid>`, the shortest real option and the
+/// correct home for runtime sockets), then the platform temp dir.
+pub(crate) fn short_runtime_dir() -> PathBuf {
+    env_path("XDG_RUNTIME_DIR")
+        .filter(|dir| dir.is_absolute())
+        .unwrap_or_else(std::env::temp_dir)
 }
 
 /// Godot's data path per platform:
@@ -195,18 +260,61 @@ mod tests {
     fn log_dirs_hang_off_the_platform_data_root() {
         let Some(root) = user_data_root() else {
             // A host with neither HOME nor APPDATA reports no directories.
-            assert!(sts2_log_dirs().is_empty());
-            assert!(godot_log_dirs().is_empty());
+            assert!(sts2_log_dirs(None).is_empty());
+            assert!(godot_log_dirs(None).is_empty());
             return;
         };
 
         assert_eq!(
-            sts2_log_dirs(),
+            sts2_log_dirs(None),
             vec![root.join(STS2_USER_DATA_DIR_NAME).join("logs")]
         );
         assert_eq!(
-            godot_log_dirs(),
+            godot_log_dirs(None),
             godot_log_dirs_for(current_host_platform(), &root)
         );
+    }
+
+    #[test]
+    fn an_extra_data_root_is_scanned_first_and_does_not_replace_the_process_root() {
+        let extra = PathBuf::from("/tmp/instances/segvqa/user");
+
+        let sts2 = sts2_log_dirs(Some(&extra));
+        assert_eq!(sts2.first(), Some(&sts2_log_dirs_for(&extra)));
+        assert_eq!(
+            sts2.len(),
+            1 + sts2_log_dirs(None).len(),
+            "the process's own root must still be scanned"
+        );
+
+        let godot = godot_log_dirs(Some(&extra));
+        assert_eq!(
+            godot.first(),
+            godot_log_dirs_for(current_host_platform(), &extra).first()
+        );
+    }
+
+    #[test]
+    fn an_extra_root_equal_to_the_process_root_is_not_scanned_twice() {
+        let Some(root) = user_data_root() else {
+            return;
+        };
+        assert_eq!(sts2_log_dirs(Some(&root)), sts2_log_dirs(None));
+        assert_eq!(godot_log_dirs(Some(&root)), godot_log_dirs(None));
+    }
+
+    #[test]
+    fn the_unix_socket_limit_is_the_platform_sun_path_size() {
+        // Linux sockaddr_un.sun_path is 108 bytes, macOS 104 — both including
+        // the NUL terminator, hence one less usable character.
+        assert_eq!(max_unix_socket_path_len_for(HostPlatform::Linux), 107);
+        assert_eq!(max_unix_socket_path_len_for(HostPlatform::MacOs), 103);
+    }
+
+    #[test]
+    fn unix_socket_path_fits_at_the_boundary() {
+        let limit = max_unix_socket_path_len();
+        assert!(unix_socket_path_fits(&"a".repeat(limit)));
+        assert!(!unix_socket_path_fits(&"a".repeat(limit + 1)));
     }
 }

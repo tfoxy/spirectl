@@ -672,7 +672,10 @@ fn resolve_absolute_path(path: &Path) -> PathBuf {
     }
 }
 
-fn hex_sha256(bytes: &[u8]) -> String {
+/// Hex SHA-256. Also the crate's stable short-digest source — see
+/// `bridge::resolve_instance_ipc_path`, which needs a digest whose value does
+/// not drift between builds.
+pub(crate) fn hex_sha256(bytes: &[u8]) -> String {
     let mut digest = Sha256::new();
     digest.update(bytes);
     format!("{:x}", digest.finalize())
