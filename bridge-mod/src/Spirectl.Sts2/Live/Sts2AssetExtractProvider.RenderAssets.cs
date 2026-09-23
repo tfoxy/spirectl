@@ -2725,6 +2725,17 @@ public sealed partial class Sts2AssetExtractProvider
             var subtreeFrameOverride = frameOverride;
             afterAttach = () =>
             {
+                // RE-POSE ON ATTACH. The frame is first applied while the subtree is detached, when its parent
+                // rect is zero, so a Control root stores the frame position as raw offsets. Tree entry then
+                // re-resolves those offsets against the capture SubViewport through the root's anchors: a
+                // centre-anchored root (anchors 0.5, e.g. a room's `BgContainer`) lands shifted by half the
+                // viewport, off the frame. Re-applying now, before the first warmup frame, computes the offsets
+                // against the real parent rect. A top-left-anchored root resolves to the same place either way.
+                if (subtreeFrameOverride is { } attachedFrame)
+                {
+                    PositionCanvasItem(subtreeRoot, attachedFrame);
+                }
+
                 if (still is not null)
                 {
                     ApplySceneSubtreeStillOverrides(subtreeRoot, still);
