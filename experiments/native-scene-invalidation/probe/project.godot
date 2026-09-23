@@ -1,0 +1,6 @@
+[application]
+config/name="spirectl-native-observer-load-probe"
+run/main_scene=""
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
