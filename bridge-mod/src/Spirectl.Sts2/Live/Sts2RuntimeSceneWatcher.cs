@@ -43,7 +43,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     private static readonly Dictionary<Type, TextureProbe> TextureProbeByType = new();
 
     private readonly object _subscriberGate = new();
-    private readonly List<Action<RuntimeSceneDelta>> _subscribers = [];
+    private readonly List<SubscriberEntry> _subscribers = [];
+    private SubscriberEntry[] _subscriberSnapshot = [];
+    private long _subscriberGeneration;
+    private long _fullRequestVersion;
+    private long _acceptedFullRequestVersion;
     private readonly Dictionary<ulong, Tracked> _registry = [];
     private readonly List<Tracked> _ordered = [];
     // Every prefix-producing SubViewport found by the last Reconcile, in pre-order DFS (outer viewports first).
@@ -397,11 +401,15 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         ArgumentNullException.ThrowIfNull(onDelta);
         // Tell the bridge-owned instrumentation whether windows are coming at all.
         _instrumentation.MarkProducerProfilingEnabled(_instrumentation.ProducerProfilingEnabled);
+        var subscriber = new SubscriberEntry(onDelta);
         lock (_subscriberGate)
         {
             ObjectDisposedException.ThrowIf(_disposed != 0, this);
-            _subscribers.Add(onDelta);
-            _needsFull = true; // a late subscriber gets a fresh keyframe on the next tick
+            if (_subscribers.Count == 0) _subscriberGeneration++;
+            _subscribers.Add(subscriber);
+            _subscriberSnapshot = [.. _subscribers];
+            // An in-flight capture cannot acknowledge a later subscriber's keyframe request.
+            _fullRequestVersion++;
             if (!_tickHooked)
             {
                 Sts2MainThreadDispatcher.MainThreadTick += OnTick;
@@ -409,7 +417,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             }
         }
 
-        return new Subscription(this, onDelta);
+        return new Subscription(this, subscriber);
     }
 
     public void Dispose()
@@ -417,7 +425,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         lock (_subscriberGate)
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            foreach (var subscriber in _subscribers) subscriber.Deactivate();
             _subscribers.Clear();
+            _subscriberSnapshot = [];
+            _subscriberGeneration++;
             if (_tickHooked)
             {
                 Sts2MainThreadDispatcher.MainThreadTick -= OnTick;
@@ -447,16 +458,53 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         });
     }
 
-    private void Unsubscribe(Action<RuntimeSceneDelta> onDelta)
+    private void Unsubscribe(SubscriberEntry subscriber)
     {
         lock (_subscriberGate)
         {
-            _subscribers.Remove(onDelta);
+            if (_subscribers.Remove(subscriber))
+            {
+                subscriber.Deactivate();
+                _subscriberSnapshot = [.. _subscribers];
+            }
             if (_subscribers.Count == 0 && _tickHooked)
             {
+                _subscriberGeneration++;
                 Sts2MainThreadDispatcher.MainThreadTick -= OnTick;
                 _tickHooked = false;
             }
+        }
+    }
+
+    internal readonly record struct CaptureAdmission(
+        long Generation,
+        long FullRequestVersion,
+        bool NeedsFull,
+        SubscriberEntry[] Subscribers);
+
+    internal CaptureAdmission? AdmitCapture()
+    {
+        lock (_subscriberGate)
+        {
+            if (_disposed != 0 || _subscriberSnapshot.Length == 0) return null;
+            var version = _fullRequestVersion;
+            return new CaptureAdmission(
+                _subscriberGeneration, version,
+                version != _acceptedFullRequestVersion,
+                _subscriberSnapshot);
+        }
+    }
+
+    internal bool TryAcceptCapture(CaptureAdmission admission, RuntimeSceneDelta? delta)
+    {
+        lock (_subscriberGate)
+        {
+            if (_disposed != 0 || _subscriberGeneration != admission.Generation || _subscriberSnapshot.Length == 0)
+                return false;
+            // Only an accepted full capture acknowledges requests present at its admission.
+            if (delta is { Full: true })
+                _acceptedFullRequestVersion = Math.Max(_acceptedFullRequestVersion, admission.FullRequestVersion);
+            return true;
         }
     }
 
@@ -471,6 +519,8 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             {
                 return;
             }
+            var admission = AdmitCapture();
+            if (admission is null) return;
             _lastCaptureMs = now;
 
             EnsureSignalsHooked();
@@ -479,14 +529,16 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             if (_instrumentation.ProducerProfilingEnabled)
             {
                 _captureStopwatch.Restart();
-                delta = Capture();
+                delta = Capture(admission.Value.NeedsFull);
                 _captureStopwatch.Stop();
                 RecordCaptureProfile(now, _captureStopwatch.Elapsed.TotalMilliseconds, delta is not null);
             }
             else
             {
-                delta = Capture();
+                delta = Capture(admission.Value.NeedsFull);
             }
+
+            if (!TryAcceptCapture(admission.Value, delta)) return;
 
             if (delta is null)
             {
@@ -496,7 +548,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             }
 
             _captureIntervalMs = MinEmitIntervalMs; // activity → capture at the full active rate
-            Dispatch(delta);
+            _ = Dispatch(delta, admission.Value);
         }
         catch
         {
@@ -580,7 +632,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         _captureIntervalMs = MinEmitIntervalMs;
     }
 
-    private RuntimeSceneDelta? Capture()
+    private RuntimeSceneDelta? Capture(bool subscriberFullRequested)
     {
         var root = ResolveRoot();
         if (root is null || !GodotObject.IsInstanceValid(root))
@@ -592,7 +644,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // tween endpoint resolved on this thread stay internally consistent even if an embedder flips the knob.
         var localMode = Sts2SceneWatchRuntimeSettings.EmitLocalTransforms;
         var rootId = root.GetInstanceId();
-        var full = _needsFull;
+        var full = _needsFull || subscriberFullRequested;
         if (rootId != _rootId)
         {
             // The watched scene root changed (run start/end, screen swap): rebuild from scratch + keyframe.
@@ -3611,26 +3663,15 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             : null;
     }
 
-    private void Dispatch(RuntimeSceneDelta delta)
-    {
-        Action<RuntimeSceneDelta>[] subscribers;
-        lock (_subscriberGate)
+    internal Task Dispatch(RuntimeSceneDelta delta, CaptureAdmission admission)
+        => Task.Run(() =>
         {
-            if (_subscribers.Count == 0)
-            {
-                return;
-            }
-
-            subscribers = [.. _subscribers];
-        }
-
-        _ = Task.Run(() =>
-        {
-            foreach (var subscriber in subscribers)
+            foreach (var subscriber in admission.Subscribers)
             {
                 try
                 {
-                    if (Volatile.Read(ref _disposed) == 0) subscriber(delta);
+                    if (Volatile.Read(ref _disposed) == 0 && subscriber.IsActive)
+                        subscriber.Callback(delta);
                 }
                 catch
                 {
@@ -3638,9 +3679,16 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 }
             }
         });
+
+    internal sealed class SubscriberEntry(Action<RuntimeSceneDelta> callback)
+    {
+        private int _active = 1;
+        internal Action<RuntimeSceneDelta> Callback { get; } = callback;
+        internal bool IsActive => Volatile.Read(ref _active) != 0;
+        internal void Deactivate() => Volatile.Write(ref _active, 0);
     }
 
-    private sealed class Subscription(Sts2RuntimeSceneWatcher watcher, Action<RuntimeSceneDelta> onDelta) : IDisposable
+    private sealed class Subscription(Sts2RuntimeSceneWatcher watcher, SubscriberEntry subscriber) : IDisposable
     {
         private int _disposed;
 
@@ -3648,7 +3696,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         {
             if (Interlocked.Exchange(ref _disposed, 1) == 0)
             {
-                watcher.Unsubscribe(onDelta);
+                watcher.Unsubscribe(subscriber);
             }
         }
     }
