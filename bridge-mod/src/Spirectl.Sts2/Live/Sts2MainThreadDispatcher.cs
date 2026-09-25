@@ -4,10 +4,36 @@ namespace Spirectl.Sts2.Live;
 
 public static class Sts2MainThreadDispatcher
 {
+    private static readonly object TickDemandGate = new();
     private static SynchronizationContext? _gameContext;
     private static int? _gameThreadId;
+    private static int _tickLeaseCount;
+    private static long _tickLeaseGeneration;
 
     internal static event Action? MainThreadTick;
+    internal static event Action? MainThreadTickDemandChanged;
+
+    internal static bool HasMainThreadTickDemand
+    {
+        get
+        {
+            lock (TickDemandGate)
+            {
+                return _tickLeaseCount > 0;
+            }
+        }
+    }
+
+    internal static int MainThreadTickLeaseCount
+    {
+        get
+        {
+            lock (TickDemandGate)
+            {
+                return _tickLeaseCount;
+            }
+        }
+    }
 
     public static void Capture()
     {
@@ -164,10 +190,66 @@ public static class Sts2MainThreadDispatcher
         _gameContext = null;
         _gameThreadId = null;
         MainThreadTick = null;
+        lock (TickDemandGate)
+        {
+            _tickLeaseCount = 0;
+            _tickLeaseGeneration++;
+        }
+        MainThreadTickDemandChanged = null;
+    }
+
+    internal static IDisposable AcquireMainThreadTickLease()
+    {
+        long generation;
+        var changed = false;
+        lock (TickDemandGate)
+        {
+            generation = _tickLeaseGeneration;
+            changed = _tickLeaseCount++ == 0;
+        }
+
+        if (changed)
+        {
+            MainThreadTickDemandChanged?.Invoke();
+        }
+
+        return new MainThreadTickLease(generation);
     }
 
     internal static void NotifyMainThreadTick()
         => MainThreadTick?.Invoke();
+
+    private static void ReleaseMainThreadTickLease(long generation)
+    {
+        var changed = false;
+        lock (TickDemandGate)
+        {
+            if (generation != _tickLeaseGeneration || _tickLeaseCount == 0)
+            {
+                return;
+            }
+
+            changed = --_tickLeaseCount == 0;
+        }
+
+        if (changed)
+        {
+            MainThreadTickDemandChanged?.Invoke();
+        }
+    }
+
+    private sealed class MainThreadTickLease(long generation) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                ReleaseMainThreadTickLease(generation);
+            }
+        }
+    }
 
     private static bool IsOnCapturedThread()
         => _gameThreadId == Environment.CurrentManagedThreadId

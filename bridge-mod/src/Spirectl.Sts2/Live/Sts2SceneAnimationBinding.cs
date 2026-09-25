@@ -14,6 +14,7 @@ internal sealed class Sts2SceneAnimationBinding : IDisposable
     private readonly Func<Sts2CardFlightResolveRequest, CardFlightHint?> _shuffle;
     private readonly Func<Sts2DiscardFlightResolveRequest, CardFlightHint?> _discard;
     private readonly Func<ulong, bool> _hasWindow;
+    private int _active;
     private int _disposed;
 
     public Sts2SceneAnimationBinding(
@@ -21,13 +22,31 @@ internal sealed class Sts2SceneAnimationBinding : IDisposable
         Action<IReadOnlyCollection<ulong>, bool> cancel,
         Func<Sts2CardFlightResolveRequest, CardFlightHint?> shuffle,
         Func<Sts2DiscardFlightResolveRequest, CardFlightHint?> discard,
-        Func<ulong, bool> hasWindow)
+        Func<ulong, bool> hasWindow,
+        bool activate = true)
     {
-        _endpoint = (id, change, duration) => IsDisposed ? null : endpoint(id, change, duration);
-        _cancel = (ids, opacity) => { if (!IsDisposed) cancel(ids, opacity); };
-        _shuffle = request => IsDisposed ? null : shuffle(request);
-        _discard = request => IsDisposed ? null : discard(request);
-        _hasWindow = id => !IsDisposed && hasWindow(id);
+        _endpoint = (id, change, duration) => IsActive ? endpoint(id, change, duration) : null;
+        _cancel = (ids, opacity) => { if (IsActive) cancel(ids, opacity); };
+        _shuffle = request => IsActive ? shuffle(request) : null;
+        _discard = request => IsActive ? discard(request) : null;
+        _hasWindow = id => IsActive && hasWindow(id);
+
+        if (activate)
+        {
+            Activate();
+        }
+    }
+
+    private bool IsActive => Volatile.Read(ref _active) != 0 && Volatile.Read(ref _disposed) == 0;
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
+    public void Activate()
+    {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        if (Interlocked.Exchange(ref _active, 1) != 0)
+        {
+            return;
+        }
 
         Sts2SceneAnimationCallbacks.TweenEndpointResolver = _endpoint;
         Sts2SceneAnimationCallbacks.TweenWindowCanceller = _cancel;
@@ -38,11 +57,13 @@ internal sealed class Sts2SceneAnimationBinding : IDisposable
         Sts2SceneAnimationCallbacks.HasOpenWindow = _hasWindow;
     }
 
-    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
-
-    public void Dispose()
+    public void Deactivate()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        if (Interlocked.Exchange(ref _active, 0) == 0)
+        {
+            return;
+        }
+
         // CompareExchange is identity-based, so even an in-flight replacement is retained.
         Interlocked.CompareExchange(ref Sts2SceneAnimationCallbacks.TweenEndpointResolver, null, _endpoint);
         Interlocked.CompareExchange(ref Sts2SceneAnimationCallbacks.TweenWindowCanceller, null, _cancel);
@@ -51,5 +72,11 @@ internal sealed class Sts2SceneAnimationBinding : IDisposable
         Interlocked.CompareExchange(ref Sts2SceneAnimationCallbacks.HandEndpointResolver, null, _endpoint);
         Interlocked.CompareExchange(ref Sts2SceneAnimationCallbacks.HandWindowCanceller, null, _cancel);
         Interlocked.CompareExchange(ref Sts2SceneAnimationCallbacks.HasOpenWindow, null, _hasWindow);
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        Deactivate();
     }
 }

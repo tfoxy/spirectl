@@ -11,6 +11,44 @@ public sealed class Sts2RuntimeSceneWatcherLifecycleTests : IDisposable
     public Sts2RuntimeSceneWatcherLifecycleTests()
     {
         Sts2MainThreadDispatcher.ResetForTests();
+        Sts2SceneAnimationCallbacks.ResetForTests();
+    }
+
+    [Fact]
+    public async Task StaleSuspendCannotDismantleAResubscribedGeneration()
+    {
+        var scheduled = new ConcurrentQueue<Action>();
+        using var wake = new ManualResetEventSlim();
+        Sts2GodotSynchronizationContext? context = null;
+        context = new Sts2GodotSynchronizationContext(() =>
+        {
+            scheduled.Enqueue(context.Drain);
+            wake.Set();
+        });
+        Sts2MainThreadDispatcher.Capture(context);
+        using var watcher = new Sts2RuntimeSceneWatcher();
+        var first = watcher.Subscribe(_ => { });
+
+        Assert.Equal(1, Sts2MainThreadDispatcher.MainThreadTickLeaseCount);
+        Assert.NotNull(Sts2SceneAnimationCallbacks.HasOpenWindow);
+
+        var oldCleanup = Task.Run(first.Dispose);
+        Assert.True(wake.Wait(TimeSpan.FromSeconds(2)), "last-unsubscribe cleanup was queued");
+
+        var resumed = watcher.Subscribe(_ => { });
+        Assert.Equal(1, Sts2MainThreadDispatcher.MainThreadTickLeaseCount);
+        while (scheduled.TryDequeue(out var drain))
+        {
+            drain();
+        }
+        await oldCleanup.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(1, Sts2MainThreadDispatcher.MainThreadTickLeaseCount);
+        Assert.NotNull(Sts2SceneAnimationCallbacks.HasOpenWindow);
+
+        resumed.Dispose();
+        Assert.Equal(0, Sts2MainThreadDispatcher.MainThreadTickLeaseCount);
+        Assert.Null(Sts2SceneAnimationCallbacks.HasOpenWindow);
     }
 
     [Fact]
@@ -114,6 +152,7 @@ public sealed class Sts2RuntimeSceneWatcherLifecycleTests : IDisposable
 
     public void Dispose()
     {
+        Sts2SceneAnimationCallbacks.ResetForTests();
         Sts2MainThreadDispatcher.ResetForTests();
     }
 }

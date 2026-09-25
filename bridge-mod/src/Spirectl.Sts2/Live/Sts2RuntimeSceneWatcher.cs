@@ -76,12 +76,14 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 request.CardInstanceId, request.TrailInstanceId, request.TrailStrokeInstanceIds,
                 request.StartGlobal, request.EndGlobal, request.ControlGlobal,
                 request.Speed0, request.Accel, request.Duration),
-            _animations.HasOpenTransformWindow);
+            _animations.HasOpenTransformWindow,
+            activate: false);
         _animations.ShuffleFlightPublisher = Sts2CardFlightHooks.PublishResolvedHint;
         _animations.DiscardFlightPublisher = Sts2DiscardFlightHooks.PublishResolvedHint;
     }
 
     private bool _tickHooked;
+    private IDisposable? _tickLease;
     private bool _signalsHooked;
     private SceneTree? _tree;
     private ulong _rootId;
@@ -412,7 +414,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             _fullRequestVersion++;
             if (!_tickHooked)
             {
+                _captureIntervalMs = MinEmitIntervalMs;
+                _lastCaptureMs = 0;
+                _animationBinding.Activate();
                 Sts2MainThreadDispatcher.MainThreadTick += OnTick;
+                _tickLease = Sts2MainThreadDispatcher.AcquireMainThreadTickLease();
                 _tickHooked = true;
             }
         }
@@ -422,6 +428,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
     public void Dispose()
     {
+        IDisposable? tickLease;
         lock (_subscriberGate)
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
@@ -434,32 +441,26 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 Sts2MainThreadDispatcher.MainThreadTick -= OnTick;
                 _tickHooked = false;
             }
+            tickLease = _tickLease;
+            _tickLease = null;
         }
 
         // Disable callbacks immediately; release Godot subscriptions on their owning thread.
         _animationBinding.Dispose();
+        tickLease?.Dispose();
         Sts2MainThreadDispatcher.Invoke(() =>
         {
-            if (_signalsHooked && _tree is not null && GodotObject.IsInstanceValid(_tree))
-            {
-                _tree.NodeAdded -= OnNodeStructureChanged;
-                _tree.NodeRemoved -= OnNodeStructureChanged;
-                _tree.TreeChanged -= OnTreeChanged;
-            }
-            _signalsHooked = false;
-            _tree = null;
-            _animations.Reset();
+            SuspendOnMainThread();
             _animations.ShuffleFlightPublisher = null;
             _animations.DiscardFlightPublisher = null;
-            _registry.Clear();
-            _ordered.Clear();
-            _prefixChains.Clear();
             return true;
         });
     }
 
     private void Unsubscribe(SubscriberEntry subscriber)
     {
+        IDisposable? tickLease = null;
+        long dormantGeneration = 0;
         lock (_subscriberGate)
         {
             if (_subscribers.Remove(subscriber))
@@ -470,9 +471,28 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             if (_subscribers.Count == 0 && _tickHooked)
             {
                 _subscriberGeneration++;
+                dormantGeneration = _subscriberGeneration;
+                _animationBinding.Deactivate();
                 Sts2MainThreadDispatcher.MainThreadTick -= OnTick;
                 _tickHooked = false;
+                tickLease = _tickLease;
+                _tickLease = null;
             }
+        }
+
+        tickLease?.Dispose();
+        if (dormantGeneration != 0)
+        {
+            Sts2MainThreadDispatcher.Invoke(() =>
+            {
+                lock (_subscriberGate)
+                {
+                    // A queued teardown must not dismantle a newly resubscribed watcher.
+                    if (_subscribers.Count == 0 && _subscriberGeneration == dormantGeneration)
+                        SuspendOnMainThread();
+                }
+                return true;
+            });
         }
     }
 
@@ -555,6 +575,29 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // A capture failure must never take down the game tick; the next tick retries.
             _structureDirty = true;
         }
+    }
+
+    private void SuspendOnMainThread()
+    {
+        if (_signalsHooked && _tree is not null && GodotObject.IsInstanceValid(_tree))
+        {
+            _tree.NodeAdded -= OnNodeStructureChanged;
+            _tree.NodeRemoved -= OnNodeStructureChanged;
+            _tree.TreeChanged -= OnTreeChanged;
+        }
+
+        _signalsHooked = false;
+        _tree = null;
+        _rootId = 0;
+        _structureDirty = true;
+        _needsFull = true;
+        _lastCaptureMs = 0;
+        _captureIntervalMs = MinEmitIntervalMs;
+        _animations.Reset();
+        _registry.Clear();
+        _ordered.Clear();
+        _prefixChains.Clear();
+        _emittedGlobalByDepth.Clear();
     }
 
     // Accumulate per-capture timing and log one summary per ~second. producer_busy% is the fraction of

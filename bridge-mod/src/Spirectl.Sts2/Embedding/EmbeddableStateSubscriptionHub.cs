@@ -82,6 +82,7 @@ internal sealed class EmbeddableStateSubscriptionHub<TSnapshot, TEvent>(
     private readonly Dictionary<ulong, StateSubscriber> _subscribers = [];
     private ulong _nextSubscriberId;
     private bool _dispatcherTickSubscribed;
+    private IDisposable? _dispatcherTickLease;
     private bool _refreshScheduled;
     private bool _refreshRequested;
     private bool _forceRequested;
@@ -478,11 +479,13 @@ internal sealed class EmbeddableStateSubscriptionHub<TSnapshot, TEvent>(
         // Adopt the current revision rather than 0, so attaching does not read as "something changed".
         Volatile.Write(ref _lastObservedRevision, Sts2SemanticStateRevision.Current);
         Sts2MainThreadDispatcher.MainThreadTick += OnMainThreadTick;
+        _dispatcherTickLease = Sts2MainThreadDispatcher.AcquireMainThreadTickLease();
         _dispatcherTickSubscribed = true;
     }
 
     private void Dispose(ulong subscriberId)
     {
+        IDisposable? tickLease = null;
         lock (_gate)
         {
             if (_subscribers.Remove(subscriberId, out var subscriber))
@@ -494,10 +497,14 @@ internal sealed class EmbeddableStateSubscriptionHub<TSnapshot, TEvent>(
             {
                 Sts2MainThreadDispatcher.MainThreadTick -= OnMainThreadTick;
                 _dispatcherTickSubscribed = false;
+                tickLease = _dispatcherTickLease;
+                _dispatcherTickLease = null;
             }
 
             RecomputeNextDueLocked();
         }
+
+        tickLease?.Dispose();
     }
 
     private sealed class Subscription(EmbeddableStateSubscriptionHub<TSnapshot, TEvent> hub, ulong subscriberId) : IDisposable

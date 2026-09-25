@@ -123,6 +123,30 @@ public sealed class Sts2RunPlayerConnectivityTests
         }
     }
 
+    [Fact]
+    public void SyntheticSeatDemandChangesOnlyAtZeroOneBoundaries()
+    {
+        var transitions = new List<bool>();
+        void Observe(bool active, long _) => transitions.Add(active);
+        Sts2HostLocalSeatRegistry.SyntheticSeatDemandChanged += Observe;
+        try
+        {
+            Sts2HostLocalSeatRegistry.RegisterSyntheticSeat(91, "First");
+            Sts2HostLocalSeatRegistry.RegisterSyntheticSeat(92, "Second");
+            Sts2HostLocalSeatRegistry.UnregisterSyntheticSeat(91);
+            Sts2HostLocalSeatRegistry.UnregisterSyntheticSeat(92);
+
+            Assert.Equal([true, false], transitions);
+            Assert.False(Sts2HostLocalSeatRegistry.DescribeSyntheticSeatDemand().Active);
+        }
+        finally
+        {
+            Sts2HostLocalSeatRegistry.SyntheticSeatDemandChanged -= Observe;
+            Sts2HostLocalSeatRegistry.UnregisterSyntheticSeat(91);
+            Sts2HostLocalSeatRegistry.UnregisterSyntheticSeat(92);
+        }
+    }
+
     private static StateRunPlayerSnapshot RunPlayer(bool? isConnected = null)
     {
         var player = new StateRunPlayerSnapshot(

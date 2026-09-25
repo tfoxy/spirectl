@@ -60,6 +60,35 @@ public sealed class Sts2SceneAnimationBindingTests
         Assert.False(window(1));
     }
 
+    [Fact]
+    public void DormantBindingDetachesAndCanResumeWithoutRevivingAnOldOwner()
+    {
+        using var binding = new Sts2SceneAnimationBinding(
+            (_, _, _) => new TweenEndpoint(),
+            (_, _) => { },
+            _ => null,
+            _ => null,
+            _ => true,
+            activate: false);
+
+        Assert.Null(Sts2SceneAnimationCallbacks.TweenEndpointResolver);
+        binding.Activate();
+        var activeResolver = Sts2SceneAnimationCallbacks.TweenEndpointResolver;
+        Assert.NotNull(activeResolver);
+
+        binding.Deactivate();
+        Assert.Null(Sts2SceneAnimationCallbacks.TweenEndpointResolver);
+        Assert.Null(activeResolver!(1, default, 1));
+
+        binding.Activate();
+        Assert.Same(activeResolver, Sts2SceneAnimationCallbacks.TweenEndpointResolver);
+        Assert.NotNull(activeResolver(1, default, 1));
+
+        using var replacement = Create();
+        binding.Deactivate();
+        Assert.NotSame(activeResolver, Sts2SceneAnimationCallbacks.TweenEndpointResolver);
+    }
+
     private static Sts2SceneAnimationBinding Create() => new(
         (_, _, _) => null, (_, _) => { }, _ => null, _ => null, _ => true);
 }

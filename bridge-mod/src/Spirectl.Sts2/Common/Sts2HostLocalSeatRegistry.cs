@@ -12,37 +12,78 @@ internal static class Sts2HostLocalSeatRegistry
     // ResolveSyntheticName, which now returns an override when no synthetic seat owns the netId. Not pruned by
     // ReplaceHostLocalSeats (those are fixture-only host-local seats; real client names persist until cleared).
     private static readonly Dictionary<ulong, string> ClientNameOverridesByNetId = new();
+    private static long _syntheticDemandGeneration;
 
-    public static void ReplaceHostLocalSeats(IEnumerable<ulong> netIds)
+    internal static event Action<bool, long>? SyntheticSeatDemandChanged;
+
+    internal static (bool Active, long Generation) DescribeSyntheticSeatDemand()
     {
         lock (Sync)
         {
+            return (SyntheticNamesByNetId.Count > 0, _syntheticDemandGeneration);
+        }
+    }
+
+    public static void ReplaceHostLocalSeats(IEnumerable<ulong> netIds)
+    {
+        bool? active = null;
+        long generation = 0;
+        lock (Sync)
+        {
+            var wasActive = SyntheticNamesByNetId.Count > 0;
             _hostLocalSeatNetIds = netIds.ToHashSet();
             foreach (var netId in SyntheticNamesByNetId.Keys.Where(netId => !_hostLocalSeatNetIds.Contains(netId)).ToArray())
             {
                 SyntheticNamesByNetId.Remove(netId);
             }
+            if (wasActive != (SyntheticNamesByNetId.Count > 0))
+            {
+                active = !wasActive;
+                generation = ++_syntheticDemandGeneration;
+            }
         }
+
+        PublishSyntheticSeatDemand(active, generation);
     }
 
     public static void RegisterSyntheticSeat(ulong netId, string displayName)
     {
         var name = NormalizeName(displayName)
             ?? throw new ArgumentException("Synthetic lobby seats require a non-empty display name.", nameof(displayName));
+        var becameActive = false;
+        long generation = 0;
         lock (Sync)
         {
+            var wasActive = SyntheticNamesByNetId.Count > 0;
             _hostLocalSeatNetIds.Add(netId);
             SyntheticNamesByNetId[netId] = name;
+            if (!wasActive)
+            {
+                becameActive = true;
+                generation = ++_syntheticDemandGeneration;
+            }
         }
+
+        PublishSyntheticSeatDemand(becameActive ? true : null, generation);
     }
 
     public static void UnregisterSyntheticSeat(ulong netId)
     {
+        var becameDormant = false;
+        long generation = 0;
         lock (Sync)
         {
+            var wasActive = SyntheticNamesByNetId.Count > 0;
             SyntheticNamesByNetId.Remove(netId);
             _hostLocalSeatNetIds.Remove(netId);
+            if (wasActive && SyntheticNamesByNetId.Count == 0)
+            {
+                becameDormant = true;
+                generation = ++_syntheticDemandGeneration;
+            }
         }
+
+        PublishSyntheticSeatDemand(becameDormant ? false : null, generation);
     }
 
     public static bool IsHostLocalSeat(ulong netId)
@@ -118,4 +159,17 @@ internal static class Sts2HostLocalSeatRegistry
 
     private static string? NormalizeName(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static void PublishSyntheticSeatDemand(bool? active, long generation)
+    {
+        if (active is not { } value)
+        {
+            return;
+        }
+
+        foreach (Action<bool, long> listener in SyntheticSeatDemandChanged?.GetInvocationList() ?? [])
+        {
+            listener(value, generation);
+        }
+    }
 }
