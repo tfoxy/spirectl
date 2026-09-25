@@ -13,4 +13,15 @@ internal static class Sts2SceneAnimationCallbacks
     internal static Func<ulong, TweenTargetChange, double, TweenEndpoint?>? HandEndpointResolver;
     internal static Action<IReadOnlyCollection<ulong>, bool>? HandWindowCanceller;
     internal static Func<ulong, bool>? HasOpenWindow;
+
+    internal static void ResetForTests()
+    {
+        TweenEndpointResolver = null;
+        TweenWindowCanceller = null;
+        ShuffleResolver = null;
+        DiscardResolver = null;
+        HandEndpointResolver = null;
+        HandWindowCanceller = null;
+        HasOpenWindow = null;
+    }
 }

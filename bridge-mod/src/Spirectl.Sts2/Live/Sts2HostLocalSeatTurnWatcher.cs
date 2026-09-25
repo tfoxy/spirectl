@@ -27,6 +27,9 @@ internal static class Sts2HostLocalSeatTurnWatcher
 {
     private static readonly object Sync = new();
     private static bool _installed;
+    private static bool _tickArmed;
+    private static long _demandGeneration = -1;
+    private static IDisposable? _tickLease;
     private static bool _faultLogged;
     private static ILogStream? _logStream;
 
@@ -40,13 +43,52 @@ internal static class Sts2HostLocalSeatTurnWatcher
             }
 
             _logStream = logStream;
-            Sts2MainThreadDispatcher.MainThreadTick += OnMainThreadTick;
+            Sts2HostLocalSeatRegistry.SyntheticSeatDemandChanged += OnSyntheticSeatDemandChanged;
             _installed = true;
+            var demand = Sts2HostLocalSeatRegistry.DescribeSyntheticSeatDemand();
+            ApplySyntheticSeatDemandLocked(demand.Active, demand.Generation);
             logStream.Write(
                 BridgeLogLevel.Info,
                 "bridge.host-local-seat-turn",
-                "Installed host-local seat turn watcher on the main-thread dispatcher tick.");
+                "Installed demand-gated host-local seat turn watcher.");
         }
+    }
+
+    private static void OnSyntheticSeatDemandChanged(bool active, long generation)
+    {
+        IDisposable? release = null;
+        lock (Sync)
+        {
+            release = ApplySyntheticSeatDemandLocked(active, generation);
+        }
+        release?.Dispose();
+    }
+
+    private static IDisposable? ApplySyntheticSeatDemandLocked(bool active, long generation)
+    {
+        if (generation < _demandGeneration)
+        {
+            return null;
+        }
+
+        _demandGeneration = generation;
+        if (active == _tickArmed)
+        {
+            return null;
+        }
+
+        _tickArmed = active;
+        if (active)
+        {
+            Sts2MainThreadDispatcher.MainThreadTick += OnMainThreadTick;
+            _tickLease = Sts2MainThreadDispatcher.AcquireMainThreadTickLease();
+            return null;
+        }
+
+        Sts2MainThreadDispatcher.MainThreadTick -= OnMainThreadTick;
+        var release = _tickLease;
+        _tickLease = null;
+        return release;
     }
 
     private static void OnMainThreadTick()

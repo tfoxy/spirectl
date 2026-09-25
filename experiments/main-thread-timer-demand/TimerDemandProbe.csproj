@@ -1,0 +1,16 @@
+<Project Sdk="Godot.NET.Sdk/4.5.1">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The product class has a nested Godot node; the standalone SDK analyzer asks that its outer class be partial. -->
+    <NoWarn>GD0002</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Probe.cs" />
+    <Compile Include="LogStub.cs" />
+    <Compile Include="$(SpiPumpSource)" Link="Sts2GodotSynchronizationContext.cs" />
+    <Compile Include="$(SpiDispatcherSource)" Link="Sts2MainThreadDispatcher.cs" />
+  </ItemGroup>
+</Project>
