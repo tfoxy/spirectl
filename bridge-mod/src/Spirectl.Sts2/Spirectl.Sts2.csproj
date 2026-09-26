@@ -483,12 +483,14 @@
        copy only when nothing the embedder can reach calls it; Sts2CompileProfileTests pins this list, and the
        embedder's own boundary test proves the built assembly. Removing the lines below is the whole rollback. -->
   <ItemGroup Condition="'$(Sts2Profile)' == 'Embedded'">
-    <!-- Stand-ins: the embedded composition, and the one refusal helper that named an excluded file. -->
+    <!-- Stand-ins: the embedded composition, the dispatcher with its route table, the action-descriptor catalog
+         that lists that table, and the one refusal helper that named an excluded file. -->
     <Compile Include="Profiles/Embedded/**/*.cs" />
     <Sts2EmbeddedExcluded Include="Live/Sts2RuntimeFactory.cs" />
     <Sts2EmbeddedExcluded Include="Live/Sts2ReusableLiveComposition.cs" />
     <Sts2EmbeddedExcluded Include="GameApi/Sts2GameApiProbe.GameVersion.cs" />
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.Dispatch.cs" />
+    <Sts2EmbeddedExcluded Include="Common/Sts2ActionDescriptorCatalog.cs" />
 
     <!-- The legacy state-extractor lane. The embedded facade reads state through Sts2StateProvider and never
          calls an IGameStateExtractor, so the profile's runtime services have no extractor slot at all
