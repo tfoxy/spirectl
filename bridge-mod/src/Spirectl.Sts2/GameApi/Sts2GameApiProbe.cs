@@ -76,7 +76,7 @@ internal sealed record GameApiRequirement(
 /// bridge, naming the member, the lane, and the game build.
 /// </para>
 /// </summary>
-internal static class Sts2GameApiProbe
+internal static partial class Sts2GameApiProbe
 {
     private const BindingFlags MemberFlags =
         BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
@@ -294,22 +294,5 @@ internal static class Sts2GameApiProbe
             + "Either this game build moved under the lane it is mapped to, or the wrong lane was compiled. "
             + $"The version-to-lane table is {Sts2GameApiTableFile}; the members are declared in "
             + $"bridge-mod/src/Spirectl.Sts2/GameApi/{GameApiLane.Name.ToUpperInvariant()}/GameApiManifest.cs.";
-    }
-
-    // The game's own release record, reached the same way the reference-data provider reaches it. Only
-    // meaningful inside a running game, so failures degrade to "<unknown>" rather than masking the refusal.
-    private static string DescribeGameVersion()
-    {
-        try
-        {
-            var version = Sts2ReferenceDataProvider.ResolveReleaseInfo() is { } release
-                ? Sts2LiveIntrospection.GetMemberValue(release, "Version") as string
-                : null;
-            return string.IsNullOrWhiteSpace(version) ? "<unknown>" : version;
-        }
-        catch
-        {
-            return "<unknown>";
-        }
     }
 }
