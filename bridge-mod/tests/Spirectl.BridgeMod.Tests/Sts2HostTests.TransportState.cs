@@ -710,8 +710,13 @@ public sealed partial class Sts2HostTests
         Assert.False(actions[0].Provisional);
     }
 
-    [Fact]
-    public void LobbyChoicesExposeVisibleReadyAndCharacterSelectionForLocalPlayer()
+    /// <summary>A host lobby mid-selection: the local player has not readied, one remote player has.</summary>
+    private static (
+        LobbyStateSnapshot Lobby,
+        LobbyPlayerSnapshot Local,
+        LobbyPlayerSnapshot Remote,
+        LobbyCharacterSnapshot Ironclad,
+        LobbyCharacterSnapshot Silent) SelectingLobbyWithReadyRemotePlayer()
     {
         var localPlayer = new LobbyPlayerSnapshot(
             "p:100",
@@ -754,6 +759,14 @@ public sealed partial class Sts2HostTests
                 [silent.Id] = silent,
             });
 
+        return (lobby, localPlayer, remotePlayer, ironclad, silent);
+    }
+
+    [Fact]
+    public void LobbyChoicesExposeVisibleReadyAndCharacterSelectionForLocalPlayer()
+    {
+        var (lobby, localPlayer, _, _, _) = SelectingLobbyWithReadyRemotePlayer();
+
         var choices = Sts2ActionCatalog.LobbyChoices(lobby, includeCharacterChoices: true);
 
         Assert.Equal(3, choices.Count);
@@ -780,8 +793,17 @@ public sealed partial class Sts2HostTests
                 Assert.Equal("lobby-character", choice.Kind);
                 Assert.Equal(localPlayer.Id, choice.OwnerPlayerId);
             });
+    }
 
 #if ENABLE_STS2_LIVE_HOST
+    // The geometry half of the lobby-choices test, split out because it builds real Godot controls and so needs a
+    // process that hosts a Godot engine; see RequiresGodotEngineFactAttribute for what that costs otherwise.
+    [RequiresGodotEngineFact]
+    [Trait("Category", RequiresGodotEngineFactAttribute.Category)]
+    public void LobbyPresentationGeometryResolvesCharacterTilesPlayerRowsAndControlsForLocalPlayer()
+    {
+        var (lobby, _, _, ironclad, silent) = SelectingLobbyWithReadyRemotePlayer();
+
         var screen = new TestLobbyPresentationScreen();
         var geometry = Sts2LobbyPresentationGeometryResolver.Resolve(
             screen,
@@ -823,8 +845,8 @@ public sealed partial class Sts2HostTests
         AssertGeometry(geometry, "action:action:lobby:select-character:ironclad", 100, 400, 80, 90, "_charButtonContainer/*[ironclad]");
         AssertGeometry(geometry, "action:action:lobby:select-character:silent", 190, 400, 80, 90, "_charButtonContainer/*[silent]");
         Assert.DoesNotContain(geometry.RectsByKey.Keys, key => key.Contains("Qr", StringComparison.OrdinalIgnoreCase));
-#endif
     }
+#endif
 
     [Fact]
     public void LobbyChoicesOmitCharacterSelectionWhenLocalPlayerIsReady()

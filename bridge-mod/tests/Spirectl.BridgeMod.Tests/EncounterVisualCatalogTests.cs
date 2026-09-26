@@ -383,7 +383,8 @@ public sealed class EncounterVisualCatalogTests
         Assert.Contains(scalingOverrides, encounter => IdContains(encounter, "queen"));
     }
 
-    [Fact]
+    [RequiresHarmonyRuntimeFact]
+    [Trait("Category", RequiresHarmonyRuntimeFactAttribute.Category)]
     public void KaiserHookInstallationRecordsRepresentativeTargetTransitions()
     {
         var store = new Sts2EncounterVisualEventStore(capacity: 16);
