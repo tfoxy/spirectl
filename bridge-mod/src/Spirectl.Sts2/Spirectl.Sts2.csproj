@@ -556,6 +556,44 @@
     <Sts2EmbeddedExcluded Include="Common/Sts2PartialChoiceNotice.cs" />
     <Sts2EmbeddedExcluded Include="Core/Map/Sts2MapDrawingTransform.cs" />
 
+    <!-- Full semantic state is a bridge/CLI surface. The embedded host uses scene and asset streams. -->
+    <Sts2EmbeddedExcluded Include="Core/State/StateSnapshot.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2StateProvider.cs" />
+    <Sts2EmbeddedExcluded Include="Live/CharacterSelectStateBuilder.cs" />
+    <Sts2EmbeddedExcluded Include="Live/CombatStateBuilder.cs" />
+    <Sts2EmbeddedExcluded Include="Live/MapStateBuilder.cs" />
+    <Sts2EmbeddedExcluded Include="Live/RoomStateBuilder.cs" />
+    <Sts2EmbeddedExcluded Include="Live/RunShellStateBuilder.cs" />
+    <Sts2EmbeddedExcluded Include="Live/StateProjectionValues.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CardStateSnapshotFactory.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2RewardsOverlayInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CardSelectionScreenInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CrystalSphereOverlayInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2DeckCardSelectionOverlayHooks.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2EventRoomScreenInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2RestSiteScreenInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2TreasureRoomScreenInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CombatPreviewCore.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2DamageEventHooks.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CardUpgradeEventHooks.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CombatEventCapture.cs" />
+    <Sts2EmbeddedExcluded Include="Embedding/EmbeddableCombatEventHub.cs" />
+    <Sts2EmbeddedExcluded Include="Embedding/EmbeddableStateSubscriptionHub.cs" />
+    <Sts2EmbeddedExcluded Include="Embedding/EmbeddableStateFingerprint.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2StateWatchRuntimeSettings.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2SemanticStateRevision.cs" />
+
+    <Sts2EmbeddedExcluded Include="Common/Sts2RunOverlayRegistry.cs" />
+    <Sts2EmbeddedExcluded Include="Core/State/CardDescriptionTemplate.cs" />
+    <Sts2EmbeddedExcluded Include="Core/State/StateDeckViewSortNormalizer.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CardDescriptionTemplateFactory.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2HoverTipProjection.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CardHostValueResolver.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2AuthoredTransientEffectsRegistry.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ChooseACardOverlayHooks.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2HandSelectionHooks.cs" />
+    <Sts2EmbeddedExcluded Include="Live/MarkerDynamicVar.cs" />
+
     <Compile Remove="@(Sts2EmbeddedExcluded)" />
   </ItemGroup>
 

@@ -9,6 +9,7 @@ using Spirectl.Sts2.Core.State;
 
 namespace Spirectl.Sts2.Embedding;
 
+#if !SPIRECTL_PROFILE_EMBEDDED
 public sealed record CurrentStateRequest(
     TimeSpan? Timeout = null,
     PerspectiveSelection? Perspective = null);
@@ -19,6 +20,7 @@ public sealed record CurrentStateResult(
     EmbeddableRuntimeError? Error,
     EmbeddableRuntimeHealthSnapshot? Health = null);
 
+#endif
 /// <summary>A short-lived native multiplayer connection observation for an embedded host.</summary>
 public sealed record MultiplayerConnectionSnapshot(
     ulong Sequence,
@@ -36,6 +38,7 @@ public enum MultiplayerConnectionPhase
 /// <summary><see cref="Code"/> is stable for consumers; <see cref="NativeDetail"/> is diagnostic text.</summary>
 public sealed record MultiplayerConnectionError(string Code, string? NativeDetail);
 
+#if !SPIRECTL_PROFILE_EMBEDDED
 /// <summary>
 /// A semantic state subscription. <paramref name="MinCaptureInterval"/> is the FLOOR (the fastest the hub will
 /// re-walk state for this subscriber, default 50 ms); <paramref name="MaxIdleInterval"/> and
@@ -80,6 +83,8 @@ public enum CurrentStateWatchEventType
     Error,
 }
 
+#endif
+#if !SPIRECTL_PROFILE_EMBEDDED
 public sealed record CombatEventSubscriptionRequest(
     ulong SinceSequence = 0,
     ulong MaxEvents = 0,
@@ -120,6 +125,7 @@ public sealed record CombatWatchEvent(
     CombatCardUpgradePayload? CardUpgrade = null,
     CombatVfxPayload? Vfx = null);
 
+#endif
 public sealed record AnimationHintSubscriptionRequest(int BufferCapacity = 256);
 
 /// <summary>
@@ -340,9 +346,11 @@ public sealed record EmbeddableRuntimeError(
 public interface ISpirectlRuntime :
     IRuntimeCapabilitySource,
     IRuntimeAssetSource,
+#if !SPIRECTL_PROFILE_EMBEDDED
     IRuntimeStateSource,
-    IRuntimeMultiplayerConnectionSource,
     ICombatEventSource,
+#endif
+    IRuntimeMultiplayerConnectionSource,
     IAnimationHintSource,
     IRuntimeSceneDeltaSource,
     IGameModelSource,

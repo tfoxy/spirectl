@@ -46,7 +46,9 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
     }
 
     private readonly EmbeddableRuntimeOptions _options;
+#if !SPIRECTL_PROFILE_EMBEDDED
     private EmbeddableStateSubscriptionHub<StateSnapshot, CurrentStateWatchEvent>? _stateSubscriptionHub;
+#endif
 
     public EmbeddableRuntimeCapabilities GetCapabilities()
     {
@@ -57,12 +59,16 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         var capabilities = new List<EmbeddableRuntimeCapability>
         {
             new("runtime-metadata", "Runtime metadata and capability discovery.", true, _services.Provisional, null),
+#if !SPIRECTL_PROFILE_EMBEDDED
             new("current-state", "Direct current semantic observation with timeout and runtime health metadata.", true, _services.Provisional, null),
             new("state", "Presentation runtime state envelope for browser scene evaluation.", true, _services.Provisional, null),
             new("state-subscriptions", "Reactive embedded semantic state subscriptions with callback and async-stream consumers.", true, _services.Provisional, null),
             new("state-watch", "Reactive state presentation envelope stream with duplicate suppression.", true, _services.Provisional, null),
+#endif
             new(EmbeddableCapabilityIds.MultiplayerConnection, "Ordered native multiplayer connection observations for embedded hosts.", _services.MultiplayerConnectionSupported, !_services.MultiplayerConnectionSupported || _services.Provisional, _services.MultiplayerConnectionSupported ? null : "The runtime does not expose native multiplayer connection hooks."),
+#if !SPIRECTL_PROFILE_EMBEDDED
             new("combat-events", "Ordered, non-deduplicated transient combat-event stream (floating damage numbers) with sequence-based resume.", true, _services.Provisional, null),
+#endif
             new("animation-hints", "Lightweight Godot-tween timing hints (scene/node/property + duration/easing) for pre-arming CSS transitions; subscribing enables the producer's cheap lite capture path.", true, _services.Provisional, null),
             new("scene-watch", "Reactive live runtime scene-tree stream (full /root subtree with live properties and computed transforms) with duplicate suppression.", true, _services.Provisional, null),
             new("scene-watch-controls", "Coupled controls for scene-stream replay optimizations.", SceneWatchControls is not UnsupportedRuntimeSceneWatchControls, SceneWatchControls is UnsupportedRuntimeSceneWatchControls || _services.Provisional, SceneWatchControls is UnsupportedRuntimeSceneWatchControls ? "The runtime does not expose live scene-watch controls." : null),
@@ -76,7 +82,11 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         };
 
         return new EmbeddableRuntimeCapabilities(
+            #if SPIRECTL_PROFILE_EMBEDDED
+            "",
+#else
             StateSnapshot.CurrentSchemaVersion,
+#endif
             string.Empty,
             BridgeBuildInfo.BridgeVersion,
             "embedded",
@@ -89,6 +99,7 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
                 : []);
     }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     public CurrentStateResult GetCurrentState(CurrentStateRequest request)
     {
         try
@@ -129,6 +140,7 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         }
     }
 
+#endif
     public MultiplayerConnectionSnapshot? GetCurrentMultiplayerConnection()
         => _services.MultiplayerConnectionSupported
             ? EmbeddableMultiplayerConnectionHub.Shared.GetCurrent()
@@ -142,6 +154,7 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
             : NoopDisposable.Instance;
     }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     public IDisposable SubscribeCurrentState(
         CurrentStateSubscriptionRequest request,
         Action<CurrentStateWatchEvent> onEvent,
@@ -187,6 +200,8 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         }
     }
 
+#endif
+#if !SPIRECTL_PROFILE_EMBEDDED
     public IDisposable SubscribeCombatEvents(
         CombatEventSubscriptionRequest request,
         Action<CombatWatchEvent> onEvent,
@@ -223,6 +238,7 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         }
     }
 
+#endif
     public IDisposable SubscribeAnimationHints(
         AnimationHintSubscriptionRequest request,
         Action<TweenAnimationHint> onHint,
@@ -401,7 +417,9 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
                 && request.Kind != SemanticActionKind.SetScrollOffset
                 && request.Kind != SemanticActionKind.ControllerInput)
             {
+#if !SPIRECTL_PROFILE_EMBEDDED
                 _stateSubscriptionHub?.RequestRefresh(force: true);
+#endif
             }
 
             return new EmbeddableActionResult(result.Accepted, result, result.Error is null ? null : new EmbeddableRuntimeError(result.Error.Code.ToString(), result.Error.Message));
@@ -593,6 +611,7 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
             _ => "The STS2 main-thread dispatcher is draining queued work."
         };
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     private EmbeddableStateSubscriptionHub<StateSnapshot, CurrentStateWatchEvent> StateSubscriptionHub
         => _stateSubscriptionHub ??= new EmbeddableStateSubscriptionHub<StateSnapshot, CurrentStateWatchEvent>(
             CaptureCurrentStateForSubscription,
@@ -628,6 +647,7 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
 
     private static readonly JsonSerializerOptions WatchJsonOptions = new(JsonSerializerDefaults.Web);
 
+#endif
     public static SpirectlRuntimeFacade FromFactory(
 #if !SPIRECTL_PROFILE_EMBEDDED
         Core.State.IGameStateExtractor stateExtractor,
@@ -666,7 +686,9 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         IModelCatalogProvider modelCatalogProvider,
         IReferenceDataProvider referenceDataProvider,
         IRuntimeSceneWatcher runtimeSceneWatcher,
+#if !SPIRECTL_PROFILE_EMBEDDED
         IStateProvider? stateProvider = null,
+#endif
         EmbeddableRuntimeOptions? options = null,
         bool provisional = false,
         ISts2RuntimeInstrumentation? instrumentation = null)
@@ -676,6 +698,10 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
 #endif
             actionHandler, logStream, perspectiveProvider,
             assetExtractor, assetExplainer, assetCatalogProvider, spineCatalogProvider, spineGeoClipBaker,
-            modelCatalogProvider, referenceDataProvider, runtimeSceneWatcher, stateProvider, provisional,
+            modelCatalogProvider, referenceDataProvider, runtimeSceneWatcher,
+#if !SPIRECTL_PROFILE_EMBEDDED
+            stateProvider,
+#endif
+            provisional,
             Instrumentation: instrumentation ?? Sts2RuntimeInstrumentation.Current), options);
 }

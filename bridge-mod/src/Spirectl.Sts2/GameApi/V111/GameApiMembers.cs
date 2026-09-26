@@ -21,6 +21,7 @@ internal static class GameApiLane
     internal const string Name = "v111";
 }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
 /// <summary>Per-player members that differ by lane.</summary>
 internal static class GameApiPlayer
 {
@@ -35,6 +36,7 @@ internal static class GameApiLobby
     internal static IEnumerable<ulong> ConnectedPlayerIds(RunLobby lobby) => lobby.PlayerIds;
 }
 
+#endif
 /// <summary>Encounter-model members that differ by lane.</summary>
 internal static class GameApiEncounter
 {
@@ -95,6 +97,7 @@ internal static class GameApiNames
     /// </summary>
     internal const string TurnStatePlayersReadyToBeginEnemyTurn = "PlayersReadyToBeginEnemyTurn";
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     /// <summary>The start-run lobby's own player cap. Private on this build; the reader searches NonPublic.</summary>
     internal const string LobbyMaxPlayers = "_maxPlayers";
 
@@ -104,13 +107,17 @@ internal static class GameApiNames
     /// <summary>Mirrors <see cref="GameApiPlayer.CanRemoveOrUsePotions"/> for the by-name read path.</summary>
     internal const string PlayerCanRemoveOrUsePotions = "CanUseOrRemovePotions";
 
-    /// <summary>Mirrors <see cref="GameApiMainMenu.BlurBackstop"/>.</summary>
+#endif
+#if !SPIRECTL_PROFILE_EMBEDDED
+    /// <summary>Fixture-only menu blur member.</summary>
     internal const string MainMenuBlurBackstop = "BlurBackstop";
+#endif
 }
 
 /// <summary>Game hook entry points whose parameter list differs by lane.</summary>
 internal static class GameApiHooks
 {
+#if !SPIRECTL_PROFILE_EMBEDDED
     /// <summary>
     /// The game's damage-modifier funnel with the bridge's stable argument list. The bridge only ever wants
     /// the returned number, so the funnel's <c>modifiers</c> out-parameter is discarded here.
@@ -144,6 +151,7 @@ internal static class GameApiHooks
             previewMode,
             out _);
 
+#endif
     /// <summary>
     /// The combat-manager predicate the end-turn readiness postfix attaches to: the member the game's own
     /// turn loop consults when deciding that every seat has ended its turn. On this build that is the
@@ -230,6 +238,7 @@ internal static class GameApiSpine
             modifiers: null);
 }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
 /// <summary>Main-menu members whose visibility differs by lane.</summary>
 internal static class GameApiMainMenu
 {
@@ -251,3 +260,4 @@ internal static class GameApiNetHost
     /// </summary>
     internal static NetHostGameService Create() => new(PeerVersionInfo.LocalDefault());
 }
+#endif
