@@ -541,6 +541,10 @@
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.ScreenIntents.Full.cs" />
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.ShopMapLobby.Full.cs" />
 
+    <!-- Most of the state-side action catalog (the AvailableAction builders): only the observation provider and
+         the action bodies above called them. The retained half keeps the two members a live arm still reads. -->
+    <Sts2EmbeddedExcluded Include="Common/Sts2ActionCatalog.Full.cs" />
+
     <!-- Left with no caller once the action bodies above are gone: only those bodies, the observation
          provider, the bridge or tests named them. -->
     <Sts2EmbeddedExcluded Include="Live/Sts2MainMenuStartRunHooks.cs" />

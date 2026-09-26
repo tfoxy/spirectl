@@ -64,7 +64,8 @@ embedder cannot reach, and does not construct or install it either:
 - the action bodies no embedded dispatch arm reaches. The embedded dispatcher
   (`Profiles/Embedded/Sts2ActionHandler.Dispatch.cs`) routes only the semantic action kinds an embedder sends and
   answers `InvalidAction` for the rest; the `SemanticActionKind` enum itself stays complete, so its wire values do
-  not move. Members of a mixed area that no arm reaches live in a matching `*.Full.cs` partial;
+  not move. Members of a mixed area that no arm reaches live in a matching `*.Full.cs` partial (the action
+  handler's, and `Sts2ActionCatalog`'s, whose state-side action builders only the legacy lane called);
 - the game-API manifest requirements that only those omitted lanes read (the lane manifests mark them with
   `#if !SPIRECTL_PROFILE_EMBEDDED`), so a game update that moves such a member cannot stop an embedder from starting.
 
