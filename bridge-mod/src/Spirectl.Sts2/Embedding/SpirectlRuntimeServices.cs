@@ -14,8 +14,15 @@ namespace Spirectl.Sts2.Embedding;
 /// reusable ports consumed by an in-process embedder; bridge transport, fixtures,
 /// diagnostics, screenshots, and lifecycle ownership stay in BridgeMod.
 /// </summary>
+/// <remarks>
+/// The <c>StateExtractor</c> slot belongs to the full profile only. The facade reads state through
+/// <see cref="IStateProvider"/> and never calls the extractor, so the embedded profile (see <c>Sts2Profile</c> in
+/// the project file) has no slot, and none of the legacy snapshot types only that port carries.
+/// </remarks>
 internal sealed record SpirectlRuntimeServices(
+#if !SPIRECTL_PROFILE_EMBEDDED
     IGameStateExtractor StateExtractor,
+#endif
     IActionHandler ActionHandler,
     ILogStream LogStream,
     IPerspectiveProvider PerspectiveProvider,

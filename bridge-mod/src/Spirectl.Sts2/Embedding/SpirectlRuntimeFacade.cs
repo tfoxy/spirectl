@@ -629,7 +629,9 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
     private static readonly JsonSerializerOptions WatchJsonOptions = new(JsonSerializerDefaults.Web);
 
     public static SpirectlRuntimeFacade FromFactory(
+#if !SPIRECTL_PROFILE_EMBEDDED
         Core.State.IGameStateExtractor stateExtractor,
+#endif
         IActionHandler actionHandler,
         Core.Logging.ILogStream logStream,
         Core.Perspective.IPerspectiveProvider perspectiveProvider,
@@ -637,7 +639,10 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         EmbeddableRuntimeOptions? options = null)
     {
         return new SpirectlRuntimeFacade(new SpirectlRuntimeServices(
-            stateExtractor, actionHandler, logStream, perspectiveProvider,
+#if !SPIRECTL_PROFILE_EMBEDDED
+            stateExtractor,
+#endif
+            actionHandler, logStream, perspectiveProvider,
             assetExtractProvider, assetExtractProvider, assetExtractProvider,
             assetExtractProvider, assetExtractProvider, new PlaceholderModelCatalogProvider(),
             new PlaceholderReferenceDataProvider(), new PlaceholderRuntimeSceneWatcher(),
@@ -647,7 +652,9 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
 
     /// <summary>Bridge-facing adapter path; callers supply only the reusable embedded ports.</summary>
     internal static SpirectlRuntimeFacade FromFactory(
+#if !SPIRECTL_PROFILE_EMBEDDED
         IGameStateExtractor stateExtractor,
+#endif
         IActionHandler actionHandler,
         ILogStream logStream,
         IPerspectiveProvider perspectiveProvider,
@@ -664,7 +671,10 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
         bool provisional = false,
         ISts2RuntimeInstrumentation? instrumentation = null)
         => new(new SpirectlRuntimeServices(
-            stateExtractor, actionHandler, logStream, perspectiveProvider,
+#if !SPIRECTL_PROFILE_EMBEDDED
+            stateExtractor,
+#endif
+            actionHandler, logStream, perspectiveProvider,
             assetExtractor, assetExplainer, assetCatalogProvider, spineCatalogProvider, spineGeoClipBaker,
             modelCatalogProvider, referenceDataProvider, runtimeSceneWatcher, stateProvider, provisional,
             Instrumentation: instrumentation ?? Sts2RuntimeInstrumentation.Current), options);
