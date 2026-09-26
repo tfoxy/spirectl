@@ -59,7 +59,9 @@ embedder cannot reach, and does not construct or install it either:
   facade reads state through the state provider), and the reference-data provider implementation (the
   `Core/Reference` DTOs and the reference port stay, because `ISpirectlRuntime` inherits them). The extractor
   port (`IGameStateExtractor`), its placeholder and scaffold are out too: the profile's `SpirectlRuntimeServices`
-  has no extractor slot, and `Sts2EmbeddableRuntimeFactory` has no overload that takes one;
+  has no extractor slot, and `Sts2EmbeddableRuntimeFactory` has no overload that takes one. So are the snapshot
+  types only that port carried (`GameStateSnapshot` and the DTOs only it names): `Core/State/GameStateSnapshot.cs`
+  keeps the types some retained file still names, and `GameStateSnapshot.Full.cs` holds the rest, verbatim;
 - the host-local seat watchers and the VFX-spawn hook;
 - the action bodies no embedded dispatch arm reaches. The embedded dispatcher
   (`Profiles/Embedded/Sts2ActionHandler.Dispatch.cs`) routes only the semantic action kinds an embedder sends and
