@@ -25,7 +25,7 @@ public sealed class Sts2MainMenuStartRunTests
             ["screen-method:StartRun", "button-member:StartRunButton", "button-method:StartRunButton.Pressed"],
             ReadStringList(result, "PresentCandidates"));
         Assert.Equal(
-            ["screen-method:StartRun", "screen-method:StartNewRun", "screen-method:OnStartRunPressed", "screen-method:OnStartPressed", "button-member:StartRunButton", "button-method:StartRunButton.Pressed", "button-method:StartRunButton.OnPressed", "button-method:StartRunButton.Press", "button-method:StartRunButton.EmitPressed", "button-member:PlayButton", "button-member:StartButton"],
+            ["screen-method:StartRun", "screen-method:StartNewRun", "screen-method:OnStartRunPressed", "screen-method:OnStartPressed", "button-member:StartRunButton", "button-method:StartRunButton.Pressed", "button-method:StartRunButton.OnPressed", "button-method:StartRunButton.Press", "button-method:StartRunButton.EmitPressed", "button-member:PlayButton", "button-member:StartButton", "screen-hook:singleplayer-character-select"],
             ReadStringList(result, "CheckedProbePaths"));
 
         Assert.True(TryInvoke(screen, result));
@@ -62,7 +62,7 @@ public sealed class Sts2MainMenuStartRunTests
             ["button-member:PlayButton"],
             ReadStringList(result, "PresentCandidates"));
         Assert.Equal(
-            ["screen-method:StartRun", "screen-method:StartNewRun", "screen-method:OnStartRunPressed", "screen-method:OnStartPressed", "button-member:StartRunButton", "button-member:PlayButton", "button-method:PlayButton.Pressed", "button-method:PlayButton.OnPressed", "button-method:PlayButton.Press", "button-method:PlayButton.EmitPressed", "button-member:StartButton"],
+            ["screen-method:StartRun", "screen-method:StartNewRun", "screen-method:OnStartRunPressed", "screen-method:OnStartPressed", "button-member:StartRunButton", "button-member:PlayButton", "button-method:PlayButton.Pressed", "button-method:PlayButton.OnPressed", "button-method:PlayButton.Press", "button-method:PlayButton.EmitPressed", "button-member:StartButton", "screen-hook:singleplayer-character-select"],
             ReadStringList(result, "CheckedProbePaths"));
     }
 
@@ -95,7 +95,7 @@ public sealed class Sts2MainMenuStartRunTests
         var result = ExecuteMainMenuChoice(screenObject);
         Assert.False(result.Accepted);
         Assert.NotNull(result.Error);
-        Assert.Equal(ActionFailureCode.RuntimeFailure, result.Error!.Code);
+        Assert.Equal(ActionFailureCode.MissingHook, result.Error!.Code);
         Assert.Equal(
             ["choice_id", "screen_class", "resolved_hook_path", "checked_probe_paths", "present_candidates"],
             result.Error.Details.Select(detail => detail.Field).ToArray());

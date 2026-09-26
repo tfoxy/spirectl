@@ -45,6 +45,7 @@ scripts/validate.sh cli-tests --json
 cargo test -p sts2 --test <relevant-test>
 cargo test -p sts2
 scripts/validate.sh bridge-tests --json
+scripts/validate.sh bridge-live-host-tests
 scripts/verify_parallel.sh --json
 scripts/validate.sh npm-wrapper-tests --json
 scripts/validate.sh bridge-live-host-tests --filter FullyQualifiedName~MapScreenInspector --json
@@ -53,7 +54,7 @@ scripts/validate.sh reflected-members            # by-name game reads across two
 scripts/validate.sh reflected-members --self-test
 ```
 
-Use `scripts/validate.sh cargo-test-filter --package sts2 --test <integration-test> --filter <test-name> --json` for focused Rust integration-test filters so zero matched tests fail explicitly; use `scripts/validate.sh cargo-unit-test-filter --package sts2 --filter <unit-test-filter> --json` for package/unit tests that live under `src/lib.rs` rather than an integration target. Raw `cargo test -p sts2 --test <relevant-test>` remains the broad integration-test command. Use `scripts/validate.sh dotnet-format --include <bridge path> --json` for selected C# formatting checks, and `scripts/validate.sh rust-proto-selected --path <proto-or-rust path> --json` when unrelated dirty Rust/npm edits would make a normal workspace build noisy. Use `scripts/validate.sh bridge-live-host-tests --filter FullyQualifiedName~MapScreenInspector --json` only when you explicitly need live-host-gated .NET coverage (`RunSts2LiveHostTests=true` / `#if ENABLE_STS2_LIVE_HOST`). For a live bridge readiness check, run `cargo run -p sts2 -- --json game bridge-health`.
+Use `scripts/validate.sh cargo-test-filter --package sts2 --test <integration-test> --filter <test-name> --json` for focused Rust integration-test filters so zero matched tests fail explicitly; use `scripts/validate.sh cargo-unit-test-filter --package sts2 --filter <unit-test-filter> --json` for package/unit tests that live under `src/lib.rs` rather than an integration target. Raw `cargo test -p sts2 --test <relevant-test>` remains the broad integration-test command. Use `scripts/validate.sh dotnet-format --include <bridge path> --json` for selected C# formatting checks, and `scripts/validate.sh rust-proto-selected --path <proto-or-rust path> --json` when unrelated dirty Rust/npm edits would make a normal workspace build noisy. Run `scripts/validate.sh bridge-live-host-tests` (no filter) when you change live-host code (`Live/`, `GameApi/`, the action handler, the inspectors): it is a gate, so a change is judged by a green run (exit 0, 0 failed; the few quarantined tests show as skipped, see [testing.md](testing.md) "Live-host leg: the gate"), not by a list of known failures. Add `--filter FullyQualifiedName~MapScreenInspector --json` for a focused run of live-host-gated coverage (`RunSts2LiveHostTests=true` / `#if ENABLE_STS2_LIVE_HOST`). For a live bridge readiness check, run `cargo run -p sts2 -- --json game bridge-health`.
 
 Use `scripts/validate.sh reflected-members` after any change that reads a game member by name (`GetMemberValue`, `InvokeMethod`, ...) and whenever the game updates: `code verify-references` cannot see a string-spelled read, and this leg compares them across two decompile corpora. Exit `77` means no corpus pair was found and nothing was compared; `--strict` makes that a failure. Details in `docs/testing.md`.
 

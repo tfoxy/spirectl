@@ -9,7 +9,7 @@ Short orientation for the shipped repo. For deeper shape, see [architecture](./a
   - `scripts/validate.sh bridge-tests --json`
   - `scripts/validate.sh cargo-package-sts2 --json`
   - `scripts/verify_parallel.sh --json`
-  - `scripts/validate.sh bridge-live-host-tests --filter FullyQualifiedName~MapScreenInspector --json` for explicit live-host-gated .NET validation
+  - `scripts/validate.sh bridge-live-host-tests` for the live-host .NET gate (must be green; a few quarantined tests skip, see `docs/testing.md`); add `--filter FullyQualifiedName~MapScreenInspector --json` for a focused run
   - `scripts/validate.sh dotnet-format --include <bridge path> --json` for selected bridge C# edits
   - `cargo run -p sts2 -- --json inspect commands`
   - `cargo run -p sts2 -- --json inspect ai-tools`

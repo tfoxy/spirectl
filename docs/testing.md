@@ -418,7 +418,7 @@ For bridge-mod edits, keep the current verification split explicit:
 - Use `scripts/validate.sh cargo-package-sts2 --json` for the Rust crate packaging gate. It runs full `cargo package -p sts2 --allow-dirty` verification when possible; while the crate still depends on workspace-relative proto/version inputs, it reports `package_verification_unsupported` only after the accepted `--no-verify` package smoke succeeds.
 - Use `scripts/validate.sh cargo-test-filter --package sts2 --test <integration-test> --filter <test-name> --json` for focused Rust integration-test filters. It wraps `cargo test --color never -p <package> --test <integration-test> <test-name>` and fails with structured `zero_tests_matched` output when cargo reports zero executed tests, while preserving real cargo failures. Use `scripts/validate.sh cargo-unit-test-filter --package sts2 --filter <unit-test-filter> --json` for package/unit test filters, including unit tests that live under `src/lib.rs` rather than an integration target.
 - Use `scripts/validate.sh dotnet-format --include <bridge path> --json` for selected C# formatting checks; it supports selected files and selected directories, verifies selected whitespace and formatter style diagnostics (`IDE0055`), and excludes generated `bin` / `obj` artifacts from selected directory diffs without treating unrelated analyzer warnings elsewhere in the solution as the selected result.
-- If you explicitly need the live-host compile gate in .NET tests, run `scripts/validate.sh bridge-live-host-tests --filter FullyQualifiedName~MapScreenInspector --json` or pass `--assemblies-dir <authoritative STS2 assemblies dir>`. This sets `RunSts2LiveHostTests=true`, enables the host references, and includes tests under `#if ENABLE_STS2_LIVE_HOST` together.
+- The live-host leg is a gate, and its command is `scripts/validate.sh bridge-live-host-tests` with no filter (see "Live-host leg: the gate" below for the expected result). For a focused run add `--filter FullyQualifiedName~MapScreenInspector --json`, or pass `--assemblies-dir <authoritative STS2 assemblies dir>` when you mean a different install than `sts2.local.yaml`'s. The leg sets `RunSts2LiveHostTests=true`, enables the host references, and includes tests under `#if ENABLE_STS2_LIVE_HOST` together.
 - For S87 specifically, the focused validation set is `scripts/validate.sh bridge-tests --json`, `cargo test -p sts2 --test test_runner multiplayer_ownership`, `scripts/validate.sh npm-wrapper-tests --json`, `scripts/validate.sh bridge-live-host-tests --filter FullyQualifiedName~MultiplayerOwnershipLegality --json`, and `cargo run -p sts2 -- --config tests/sts2.mock.yaml --json test run tests/scenarios/fixture-basic-lobby.sts2.yaml`; the live-host command may return structured `environment_blocked` when the local STS2 host is unavailable.
 - For protobuf/Rust fallout checks when unrelated local edits make the normal workspace noisy, run `scripts/validate.sh rust-proto-selected --path proto/spirectl/v0/runtime.proto --json`; it builds a temporary copy from committed `HEAD`, overlays only selected paths, and reports ignored dirty paths without stashing or reverting user work.
 - Before live smoke reads against an existing game, run `cargo run -p sts2 -- --json game bridge-health`; it distinguishes missing, refused/stale, timed-out, version-mismatched, wrong-game-build (`game_version_mismatch`, exit 4, with the per-field comparison under `compatibility.gameBuild`), presentation/render RPC-incompatible, and reachable/current bridge states without deploying, restarting, killing, or mutating game files. Add `--verbose` when the full diagnostic payload is needed.
@@ -652,6 +652,34 @@ a host without `mingw-w64` needs a stub compiler (`cargo check` never links, so 
 have to exist). Nothing about the Windows paths has been exercised against a real game — that is an
 open gap, tracked in `.ai/tool-improvements.md`.
 
+## Live-host leg: the gate
+
+`scripts/validate.sh bridge-live-host-tests`, with no `--filter` and no `--assemblies-dir`, is the gate for changes
+under `bridge-mod/src/Spirectl.Sts2/Live/`, `GameApi/`, the action handler and the inspectors. It compiles the
+live-host code against the game assemblies named in `sts2.local.yaml` and runs every bridge test, including the
+roughly one hundred `Sts2HostTests`. It reads the game assemblies only: no game process and no window.
+
+**Expected result: exit 0, `Failed: 0`, and `Skipped:` equal to the number of quarantined tests below.** That is 4
+when the test host runs on .NET 10 and 3 when it runs on .NET 9 (the Harmony test then runs). Any failure is a
+regression, not a known failure; a filter that matches no test fails with `zero_tests_matched` instead of passing.
+It resolves the assemblies directory from `STS2_ASSEMBLIES_DIR` or `sts2.local.yaml`; pass `--assemblies-dir` only to
+point it at a different install. A worktree needs its own copy of `sts2.local.yaml`, or `Live/` is silently not compiled.
+
+A quarantined test is skipped with a stated reason and carries an xunit `Category` trait, so it can still be run on
+demand and the whole set can be listed with `--filter "Category=RequiresGodotEngine|Category=RequiresGameModelDb|Category=RequiresHarmonyRuntime"`.
+
+| Category | Tests | Why a plain test process cannot run it | Run it on demand |
+| --- | --- | --- | --- |
+| `RequiresGodotEngine` | `Sts2HostTests.LobbyPresentationGeometryResolvesCharacterTilesPlayerRowsAndControlsForLocalPlayer` | It builds real Godot controls. Godot's managed layer calls the engine through native function pointers that only a Godot process fills in, so the first `new Control()` jumps through a null pointer and kills the whole test host (SIGSEGV), losing every test that had not run yet. | Needs a process that hosts a Godot engine and sets `SPIRECTL_TEST_GODOT_ENGINE_HOSTED=1`. Nothing in this repo provides one yet; setting the variable in a plain test host reproduces the crash. |
+| `RequiresGameModelDb` | `Sts2EmbeddableAssetProviderTests`: `...RejectsExtraKeySegmentsForStrictFamilies`, `...PreservesResolvedProvenanceForVirtualAndResourceKeys` | They resolve ids through the game's model database, which the game fills at boot. In a test process it is empty, so every by-id lookup misses. | `SPIRECTL_TEST_POPULATE_MODELDB=1 scripts/validate.sh bridge-live-host-tests --filter Category=RequiresGameModelDb`. The fill is process-wide and breaks tests that construct models directly, so always select by the trait. Both pass this way. |
+| `RequiresHarmonyRuntime` | `EncounterVisualCatalogTests.KaiserHookInstallationRecordsRepresentativeTargetTransitions` | The Harmony build the game ships cannot patch under a runtime newer than .NET 9 (`PlatformNotSupportedException`), and the test host rolls forward to the newest installed runtime. | With a .NET 9 runtime installed: `DOTNET_ROLL_FORWARD=Minor scripts/validate.sh bridge-live-host-tests --filter Category=RequiresHarmonyRuntime`. A machine with only .NET 9 runs it by default. It passes there. |
+
+When you add a test that constructs Godot nodes or resolves game content by id, give it the matching attribute
+(`RequiresGodotEngineFact`, `RequiresGameModelDbFact`, `RequiresHarmonyRuntimeFact`, in
+`bridge-mod/tests/Spirectl.BridgeMod.Tests/`). A "Test host process crashed" result means one is missing: rerun with
+`-- --blame` to see which test was running, and check the kernel log for a `segfault at 0 ip 0000000000000000` line.
+CI does not run this leg: it has no game assemblies, only the declaration-only reference SDK.
+
 ## Suggested Commands
 
 ```bash
@@ -659,6 +687,7 @@ mise exec -- cargo test -p sts2
 mise exec -- cargo test -p sts2 --test test_runner
 scripts/validate.sh bridge-build --json
 scripts/validate.sh bridge-tests --json
+scripts/validate.sh bridge-live-host-tests
 scripts/validate.sh cargo-test-filter --package sts2 --test cli_snapshots --filter models_card --json
 scripts/validate.sh cargo-unit-test-filter --package sts2 --filter state_actions --json
 scripts/validate.sh cargo-package-sts2 --json

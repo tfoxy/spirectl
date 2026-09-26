@@ -12,7 +12,7 @@ Commands:
   dotnet-format           Verify whitespace and style formatting for selected .NET/C# paths.
   bridge-tests            Run the default serial bridge validation command.
   bridge-build            Build the bridge host with serial MSBuild.
-  bridge-live-host-tests  Run live-host-gated bridge tests.
+  bridge-live-host-tests  Run the live-host bridge tests. With no --filter this is the gate: it must exit 0.
   npm-wrapper-tests       Run npm-wrapper tests with sandbox-blocker diagnostics.
   cli-tests               Run cargo fmt and the normal sts2 CLI integration test set.
   rust-proto-selected     Validate selected Rust/protobuf paths in isolation.
@@ -27,6 +27,7 @@ Commands:
 Examples:
   scripts/validate.sh dotnet-format --include bridge-mod/src/Foo.cs --json
   scripts/validate.sh bridge-tests --json
+  scripts/validate.sh bridge-live-host-tests
   scripts/validate.sh bridge-live-host-tests --filter FullyQualifiedName~MapScreenInspector --assemblies-dir /tmp/sts2-assemblies --json
   scripts/validate.sh npm-wrapper-tests --json
   scripts/validate.sh cli-tests --json
@@ -784,6 +785,41 @@ cleanup_bridge_ref_outputs() {
 # exits. Those orphans hold file locks on the bridge outputs (the "locked bridge ref" retry below is
 # the symptom) and inherit whatever file descriptors their parent had — which is how a build run
 # under a lock ends up holding that lock after the build is gone.
+# A `dotnet test` filter that matches no test exits 0 with only a warning, so a mistyped --filter (or a renamed
+# test) would read as a green gate. Treat it as a failure, the way cargo-test-filter does.
+bridge_test_matched_nothing() {
+  local output_file="$1"
+  shift
+  [[ "${2:-}" == "test" ]] && rg -q 'No test matches the given testcase filter' "$output_file"
+}
+
+emit_bridge_zero_tests_matched() {
+  local command_name="$1"
+  local output_file="$2"
+  shift 2
+  if [[ "$VALIDATE_JSON" == "true" ]]; then
+    printf '{"command":"%s","status":"failed","code":"zero_tests_matched","argv":[' "$(json_escape "$command_name")"
+    local first=1
+    for arg in "$@"; do
+      if (( first )); then first=0; else printf ','; fi
+      printf '"%s"' "$(json_escape "$arg")"
+    done
+    printf '],"diagnostics":"%s","message":"dotnet test filter executed zero tests"}\n' \
+      "$(json_escape "$(tail -n 80 "$output_file")")"
+  else
+    cat "$output_file" >&2
+    printf 'dotnet test filter executed zero tests\n' >&2
+  fi
+}
+
+# Say what a passing test run covered: the pass, fail and skip counts, so a green run is a number and not silence.
+print_bridge_test_summary() {
+  local output_file="$1"
+  shift
+  [[ "${2:-}" == "test" && "$VALIDATE_JSON" != "true" ]] || return 0
+  rg -m1 '^(Passed|Failed)!  - Failed:' "$output_file" || true
+}
+
 run_bridge_command_with_locked_retry() {
   local command_name="$1"
   shift
@@ -795,6 +831,12 @@ run_bridge_command_with_locked_retry() {
 
   local status=0
   if run_command_capture "$output_file" "$@"; then
+    if bridge_test_matched_nothing "$output_file" "$@"; then
+      emit_bridge_zero_tests_matched "$command_name" "$output_file" "$@"
+      rm -f "$output_file"
+      return 1
+    fi
+    print_bridge_test_summary "$output_file" "$@"
     if [[ "$VALIDATE_JSON" == "true" ]]; then
       printf '{"command":"%s","status":"passed","code":"ok","argv":[' "$(json_escape "$command_name")"
       local first=1
@@ -818,6 +860,12 @@ run_bridge_command_with_locked_retry() {
     retry_performed=true
     cleanup_bridge_ref_outputs cleanup_attempted cleanup_removed
     if run_command_capture "$output_file" "$@"; then
+      if bridge_test_matched_nothing "$output_file" "$@"; then
+        emit_bridge_zero_tests_matched "$command_name" "$output_file" "$@"
+        rm -f "$output_file"
+        return 1
+      fi
+      print_bridge_test_summary "$output_file" "$@"
       if [[ "$VALIDATE_JSON" == "true" ]]; then
         printf '{"command":"%s","status":"passed","code":"ok","argv":[' "$(json_escape "$command_name")"
         local first=1

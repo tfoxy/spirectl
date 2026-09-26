@@ -103,12 +103,12 @@ public sealed class Sts2EmbeddableAssetProviderTests
     {
         var provider = CreateProvider(new CapturingExtractProvider());
 
-        var result = provider.GetAsset(new EmbeddableAssetRequest("encounter:kaiser_crab_boss:visuals", "png", "enc-err"));
+        var result = provider.GetAsset(new EmbeddableAssetRequest("composed://encounters/kaiser_crab_boss/visuals", "png", "enc-err"));
 
         Assert.False(result.Success);
         Assert.NotNull(result.Error);
         Assert.Equal("unsupported-asset-kind", result.Error!.Code);
-        Assert.Equal("encounter:kaiser_crab_boss:visuals", result.Error.Value);
+        Assert.Equal("composed://encounters/kaiser_crab_boss/visuals", result.Error.Value);
     }
 
     [Fact]
@@ -176,7 +176,8 @@ public sealed class Sts2EmbeddableAssetProviderTests
         Assert.False(extract.LastRequest.ImageOpaque);
     }
 
-    [Fact]
+    [RequiresGameModelDbFact]
+    [Trait("Category", RequiresGameModelDbFactAttribute.Category)]
     public void Sts2EmbeddableAssetProviderPreservesResolvedProvenanceForVirtualAndResourceKeys()
     {
         var extract = new CapturingExtractProvider();
@@ -279,11 +280,12 @@ public sealed class Sts2EmbeddableAssetProviderTests
         Assert.NotEmpty(result.Payload.Contents);
         Assert.Contains(result.Payload.Notices, n => n.Code == "package-warning");
         var json = System.Text.Encoding.UTF8.GetString(result.Payload.Contents);
-        Assert.Contains("\"selectorDiagnostic\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"selectorDiagnostics\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"resolvedNode\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"localBounds\"", json, StringComparison.Ordinal);
-        Assert.Contains("\"decision\"", json, StringComparison.Ordinal);
+        // The scene-package JSON is serialized with System.Text.Json's default naming, so its keys are PascalCase.
+        Assert.Contains("\"SelectorDiagnostic\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"SelectorDiagnostics\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"ResolvedNode\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"LocalBounds\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"Decision\"", json, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -419,7 +421,9 @@ public sealed class Sts2EmbeddableAssetProviderTests
         Assert.True(result.Success);
         Assert.NotNull(result.Payload);
         Assert.Equal("timeline", result.Payload!.ArtifactKind);
-        Assert.Equal("application/json", result.Payload.ContentType);
+        // The payload's ContentType describes the frame images, while Contents carries the JSON manifest below;
+        // AssetPayloadShapesArePinnedToAssetPayloadVersion pins that pair as shipped.
+        Assert.Equal("image/webp", result.Payload.ContentType);
         Assert.Equal(2, result.Payload.Frames.Count);
         Assert.Equal([1], result.Payload.Frames[0].Contents);
         Assert.Equal(100, result.Payload.Frames[1].DurationMs);
@@ -520,12 +524,13 @@ public sealed class Sts2EmbeddableAssetProviderTests
     }
 
 
-    [Fact]
+    [RequiresGameModelDbFact]
+    [Trait("Category", RequiresGameModelDbFactAttribute.Category)]
     public void Sts2EmbeddableAssetProviderRejectsExtraKeySegmentsForStrictFamilies()
     {
         var provider = CreateProvider(new CapturingExtractProvider());
 
-        var result = provider.GetAsset(new EmbeddableAssetRequest("model://cards/strike_r/image:extra", "png", "bad-1"));
+        var result = provider.GetAsset(new EmbeddableAssetRequest("model://cards/strike_ironclad/image:extra", "png", "bad-1"));
 
         Assert.False(result.Success);
         Assert.NotNull(result.Error);
