@@ -11,10 +11,10 @@ namespace Spirectl.Sts2.Live;
 /// <summary>
 /// The embedded profile's runtime factory (see <c>Sts2Profile</c> in the project file). It stands in for the
 /// full profile's <c>Live/Sts2RuntimeFactory.cs</c> and <c>Live/Sts2ReusableLiveComposition.cs</c>, and it
-/// neither constructs nor installs what an in-process embedder cannot reach: the legacy state extractor and
-/// its observation provider, the reference-data provider, the host-local seat watchers and the VFX-spawn
-/// hook. The install list below is the full profile's minus those; Sts2ProfileCompositionTests keeps the two
-/// lists from drifting apart.
+/// neither constructs nor installs what an in-process embedder cannot reach: the legacy state extractor, its
+/// observation provider and the extractor slot of the runtime services, the reference-data provider, the
+/// host-local seat watchers and the VFX-spawn hook. The install list below is the full profile's minus those;
+/// Sts2ProfileCompositionTests keeps the two lists from drifting apart.
 /// </summary>
 public static class Sts2RuntimeFactory
 {
@@ -59,10 +59,10 @@ public static class Sts2RuntimeFactory
         var assets = new Sts2AssetExtractProvider(resolvedLogStream);
         var models = new Sts2ModelCatalogProvider();
 
-        // The facade reads state through the state provider only; the extractor slot is never called on the
-        // embedded path, and reference data is a placeholder because no embedder asks the game for it.
+        // The facade reads state through the state provider only, so this profile's services record has no
+        // extractor slot at all; reference data is a placeholder because no embedder asks the game for it.
         return new SpirectlRuntimeFacade(new SpirectlRuntimeServices(
-            new PlaceholderStateExtractor(), actions, resolvedLogStream, perspective,
+            actions, resolvedLogStream, perspective,
             assets, assets, assets, assets, assets,
             models, new PlaceholderReferenceDataProvider(), sceneWatcher, stateProvider,
             Lifetime: sceneWatcher,

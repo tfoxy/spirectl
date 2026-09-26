@@ -27,7 +27,9 @@ public static class Sts2EmbeddableRuntimeFactory
                 source: DataSourceKind.Live,
                 provisional: false);
             return SpirectlRuntimeFacade.FromFactory(
+#if !SPIRECTL_PROFILE_EMBEDDED
                 new PlaceholderStateExtractor(),
+#endif
                 new PlaceholderActionHandler(),
                 logStream,
                 new DefaultPerspectiveProvider(),
@@ -40,6 +42,9 @@ public static class Sts2EmbeddableRuntimeFactory
 #endif
     }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
+    // The compose-your-own-ports overload takes the legacy extractor port, which the embedded profile does not
+    // compile; an in-process embedder uses Create() above.
     public static ISpirectlRuntime Create(
         Core.State.IGameStateExtractor stateExtractor,
         Core.Actions.IActionHandler actionHandler,
@@ -54,11 +59,14 @@ public static class Sts2EmbeddableRuntimeFactory
             perspectiveProvider,
             assetExtractProvider);
     }
+#endif
 
     private static ISpirectlRuntime CreateUnsupportedEmbeddedRuntime(
         string liveHostUnsupportedReason)
         => SpirectlRuntimeFacade.FromFactory(
+#if !SPIRECTL_PROFILE_EMBEDDED
             new PlaceholderStateExtractor(),
+#endif
             new PlaceholderActionHandler(),
             new InMemoryLogStream(),
             new DefaultPerspectiveProvider(),

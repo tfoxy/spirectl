@@ -491,7 +491,11 @@
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.Dispatch.cs" />
 
     <!-- The legacy state-extractor lane. The embedded facade reads state through Sts2StateProvider and never
-         calls an IGameStateExtractor, so the extractor slot holds a placeholder there. -->
+         calls an IGameStateExtractor, so the profile's runtime services have no extractor slot at all
+         (SpirectlRuntimeServices and the facade's factories compile it out behind SPIRECTL_PROFILE_EMBEDDED). -->
+    <Sts2EmbeddedExcluded Include="Core/State/IGameStateExtractor.cs" />
+    <Sts2EmbeddedExcluded Include="Core/State/PlaceholderStateExtractor.cs" />
+    <Sts2EmbeddedExcluded Include="Core/State/PresentationScaffoldState.cs" />
     <Sts2EmbeddedExcluded Include="Core/State/ObservedGameStateExtractor.cs" />
     <Sts2EmbeddedExcluded Include="Core/State/RuntimeStateMapper.cs" />
     <Sts2EmbeddedExcluded Include="Core/State/ScaffoldRuntimeObservationProvider.cs" />

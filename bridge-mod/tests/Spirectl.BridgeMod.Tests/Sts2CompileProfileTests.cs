@@ -83,7 +83,10 @@ public sealed class Sts2CompileProfileTests
         "Live/Sts2ReusableLiveComposition.cs",
         "GameApi/Sts2GameApiProbe.GameVersion.cs",
         "Live/Sts2ActionHandler.Dispatch.cs",
-        // The legacy state-extractor lane.
+        // The legacy state-extractor lane: the port, its placeholder and the scaffold the placeholder builds from.
+        "Core/State/IGameStateExtractor.cs",
+        "Core/State/PlaceholderStateExtractor.cs",
+        "Core/State/PresentationScaffoldState.cs",
         "Core/State/ObservedGameStateExtractor.cs",
         "Core/State/RuntimeStateMapper.cs",
         "Core/State/ScaffoldRuntimeObservationProvider.cs",
@@ -181,11 +184,8 @@ public sealed class Sts2CompileProfileTests
             "Embedding/SpirectlRuntimeFacade.cs",
             "Core/Reference/IReferenceDataProvider.cs",
             "Core/Reference/PlaceholderReferenceDataProvider.cs",
-            // The state DTOs and the placeholder the facade's extractor slot holds.
-            "Core/State/IGameStateExtractor.cs",
-            "Core/State/PlaceholderStateExtractor.cs",
+            // The state DTOs the live StateSnapshot is built from. The legacy extractor port has no slot here.
             "Core/State/GameStateSnapshot.cs",
-            "Core/State/PresentationScaffoldState.cs",
             // The seat registry the name hooks and the client-name action read.
             "Common/Sts2HostLocalSeatRegistry.cs",
             // The pieces of the live composition an embedder actually runs.
