@@ -25,7 +25,7 @@ public sealed partial class Sts2ActionHandler
     /// </summary>
     private static readonly EmbeddedRoute[] EmbeddedRoutes =
     [
-        // select-map-node and claim-reward are worded exactly as the full profile's catalog words them.
+        // select-map-node is worded exactly as the full profile's catalog words it.
         RouteFor(
             "select-map-node", SemanticActionKind.SelectMapNode,
             "Select an executable map node by stable id.",
@@ -33,14 +33,6 @@ public sealed partial class Sts2ActionHandler
             provisional: false, ActionImplementationStatus.Implemented,
             static (handler, request) => handler.ExecuteSelectMapNode(request),
             RouteParam("mapNodeId", true, "Stable map node id from state.choices[].id.")),
-        RouteFor(
-            "claim-reward", SemanticActionKind.ClaimReward,
-            "Claim a visible reward by stable reward id.",
-            "sts2 act claim-reward --reward reward:p1:0",
-            provisional: true, ActionImplementationStatus.Scaffolded,
-            static (handler, request) => handler.ExecuteClaimReward(request),
-            RouteParam("rewardId", true, "Stable reward id from state.rewards.rewards[].id."),
-            RouteParam("playerId", false, "Owning player id when explicit ownership is needed.")),
         RouteFor(
             "disconnect-client", SemanticActionKind.DisconnectClient,
             "Evict a remote client from the host by its net id.",

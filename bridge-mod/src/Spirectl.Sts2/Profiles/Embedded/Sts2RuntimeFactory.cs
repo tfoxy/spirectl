@@ -38,7 +38,6 @@ public static class Sts2RuntimeFactory
         Sts2MonoModNativeDependencies.EnsureLoaded(resolvedLogStream);
         Sts2MultiplayerConnectionHooks.Install(resolvedLogStream);
         Sts2SyntheticLobbyNameHooks.Install(resolvedLogStream);
-        Sts2RewardsCaptureHooks.Install(resolvedLogStream);
         Sts2EndTurnReadinessHooks.Install(resolvedLogStream);
         Sts2ParticleRestartHooks.Install(resolvedLogStream);
         Sts2SpineAnimationHooks.Install(resolvedLogStream);

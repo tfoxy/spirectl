@@ -72,6 +72,8 @@ embedder cannot reach, and does not construct or install it either:
   answers `InvalidAction` for the rest; the `SemanticActionKind` enum itself stays complete, so its wire values do
   not move. Members of a mixed area that no route reaches live in a matching `*.Full.cs` partial (the action
   handler's, and `Sts2ActionCatalog`'s, whose state-side action builders only the legacy lane called);
+- the `claim-reward` action body, reward screen inspector, reward capture registry and capture hook. Browser
+  clients use the game's input path for reward selection. Full keeps `claim-reward` for CLI and bridge callers;
 - the full action-descriptor catalog (`Common/Sts2ActionDescriptorCatalog.cs`), which words every kind the bridge
   and the CLI know. The embedded runtime's `Capabilities.SupportedActions` is the dispatcher's own route table
   (each route carries its descriptor), so it lists exactly the kinds the dispatcher carries out and cannot drift
