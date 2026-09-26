@@ -123,8 +123,13 @@ public sealed class Sts2CompileProfileTests
         "Live/Sts2ActionHandler.ContextOwnership.Full.cs",
         "Live/Sts2ActionHandler.FailuresInputTypes.Full.cs",
         "Live/Sts2ActionHandler.RewardCommit.Full.cs",
+        "Live/Sts2ActionHandler.RewardCommit.cs",
         "Live/Sts2ActionHandler.ScreenIntents.Full.cs",
         "Live/Sts2ActionHandler.ShopMapLobby.Full.cs",
+        "Live/Sts2RewardElementChoice.cs",
+        "Live/Sts2RewardCaptureRegistry.cs",
+        "Live/Sts2RewardScreenInspector.cs",
+        "Live/Sts2RewardsCaptureHooks.cs",
         // The state-side action catalog's moved half (the retained half keeps what a live arm still reads).
         "Common/Sts2ActionCatalog.Full.cs",
         // Left with no caller once those bodies are gone.
@@ -175,7 +180,6 @@ public sealed class Sts2CompileProfileTests
     /// <summary>The semantic action kinds the embedded dispatcher routes: what an embedder in this repo family sends.</summary>
     private static readonly string[] EmbeddedActionKinds =
     [
-        "ClaimReward",
         "ControllerInput",
         "DisconnectClient",
         "HoverElement",
@@ -196,6 +200,7 @@ public sealed class Sts2CompileProfileTests
         "Sts2HandSelectionHooks",
         "Sts2DamageEventHooks",
         "Sts2CardUpgradeEventHooks",
+        "Sts2RewardsCaptureHooks",
     ];
 
     [Theory]
@@ -266,7 +271,6 @@ public sealed class Sts2CompileProfileTests
             "Live/Sts2ActionHandler.Scroll.cs",
             "Live/Sts2ActionHandler.Multiplayer.cs",
             "Live/Sts2ActionHandler.ShopMapLobby.cs",
-            "Live/Sts2ActionHandler.RewardCommit.cs",
             "Profiles/Embedded/Sts2ActionHandler.Dispatch.cs",
             "Profiles/Embedded/Sts2ActionDescriptorCatalog.cs",
             "Live/Sts2RuntimeSceneWatcher.cs",
@@ -365,7 +369,8 @@ public sealed class Sts2CompileProfileTests
         var embedded = Entries(dispatcher);
         var shared = embedded.Keys.Intersect(full.Keys).ToArray();
         Assert.Contains("SelectMapNode", shared);
-        Assert.Contains("ClaimReward", shared);
+        Assert.Contains("ClaimReward", full.Keys);
+        Assert.DoesNotContain("ClaimReward", embedded.Keys);
         Assert.All(shared, kind =>
         {
             Assert.Equal(full[kind].Id, embedded[kind].Id);

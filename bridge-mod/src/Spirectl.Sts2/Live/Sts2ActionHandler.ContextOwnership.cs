@@ -83,6 +83,7 @@ public sealed partial class Sts2ActionHandler
         return true;
     }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     private bool TryResolveRewardContext([NotNullWhen(true)] out RewardActionContext? context)
     {
         var screen = _screenLocator.Locate();
@@ -106,6 +107,7 @@ public sealed partial class Sts2ActionHandler
         return true;
     }
 
+#endif
     private bool TryResolveLobbyContext([NotNullWhen(true)] out LobbyActionContext? context)
     {
         var screen = _screenLocator.Locate();

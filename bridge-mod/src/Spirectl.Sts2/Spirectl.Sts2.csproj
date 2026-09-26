@@ -541,8 +541,14 @@
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.ContextOwnership.Full.cs" />
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.FailuresInputTypes.Full.cs" />
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.RewardCommit.Full.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.RewardCommit.cs" />
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.ScreenIntents.Full.cs" />
     <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.ShopMapLobby.Full.cs" />
+    <!-- No embedded route claims rewards, so these reward-only helpers and capture hook have no caller. -->
+    <Sts2EmbeddedExcluded Include="Live/Sts2RewardElementChoice.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2RewardCaptureRegistry.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2RewardScreenInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2RewardsCaptureHooks.cs" />
 
     <!-- Most of the state-side action catalog (the AvailableAction builders): only the observation provider and
          the action bodies above called them. The retained half keeps the two members a live arm still reads. -->

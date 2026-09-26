@@ -31,6 +31,7 @@ public sealed partial class Sts2ActionHandler
     // The members an embedded-profile dispatch arm reaches. The rest of this area is in
     // Sts2ActionHandler.ScreenIntents.Full.cs, moved verbatim, which the embedded profile does not compile.
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     private ActionExecutionResult ExecuteClaimReward(SemanticActionRequest request)
     {
         var rewardId = ResolveRequestValue(request, "rewardId");
@@ -225,11 +226,13 @@ public sealed partial class Sts2ActionHandler
             ?? choiceId;
     }
 
+#endif
     private static string? ResolveRequestValue(SemanticActionRequest request, string key)
         => request.Values is not null && request.Values.TryGetValue(key, out var value)
             ? value?.Trim()
             : null;
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     private static string ResolveActionName(SemanticActionKind kind)
         => kind switch
         {
@@ -253,5 +256,6 @@ public sealed partial class Sts2ActionHandler
             SemanticActionKind.LeaveLobbyPlayer => "leave-lobby-player",
             _ => kind.ToString(),
         };
+#endif
 
 }

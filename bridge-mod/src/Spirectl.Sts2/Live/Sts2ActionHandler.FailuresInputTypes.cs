@@ -153,11 +153,13 @@ public sealed partial class Sts2ActionHandler
         IReadOnlyDictionary<string, ResolvedMapNode> NodesById,
         IReadOnlyDictionary<string, ResolvedMapChoice> ChoicesById);
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     private sealed record RewardActionContext(
         ScreenLocatorResult Screen,
         object ScreenObject,
         string? LocalPlayerId,
         IReadOnlyDictionary<string, ResolvedRewardChoice> ChoicesById);
+#endif
 
     private sealed record LobbyActionContext(
         ScreenLocatorResult Screen,
