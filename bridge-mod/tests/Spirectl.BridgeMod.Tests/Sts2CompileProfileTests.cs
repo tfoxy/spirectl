@@ -78,11 +78,13 @@ public sealed class Sts2CompileProfileTests
     /// </summary>
     private static readonly string[] EmbeddedExcluded =
     [
-        // Stand-ins (the embedded composition and refusal helper replace these).
+        // Stand-ins (the embedded composition, dispatcher with its route table, action-descriptor catalog and
+        // refusal helper replace these).
         "Live/Sts2RuntimeFactory.cs",
         "Live/Sts2ReusableLiveComposition.cs",
         "GameApi/Sts2GameApiProbe.GameVersion.cs",
         "Live/Sts2ActionHandler.Dispatch.cs",
+        "Common/Sts2ActionDescriptorCatalog.cs",
         // The legacy state-extractor lane: the port, its placeholder and the scaffold the placeholder builds from,
         // and the snapshot types only that lane's port carried (the rest of the file is what StateSnapshot uses).
         "Core/State/GameStateSnapshot.Full.cs",
@@ -201,6 +203,7 @@ public sealed class Sts2CompileProfileTests
             "Live/Sts2ActionHandler.ShopMapLobby.cs",
             "Live/Sts2ActionHandler.RewardCommit.cs",
             "Profiles/Embedded/Sts2ActionHandler.Dispatch.cs",
+            "Profiles/Embedded/Sts2ActionDescriptorCatalog.cs",
             "Live/Sts2RuntimeSceneWatcher.cs",
             "Live/Sts2AssetExtractProvider.cs",
             "Live/Sts2ModelCatalogProvider.cs",
@@ -227,7 +230,11 @@ public sealed class Sts2CompileProfileTests
         ];
 
         var full = Arms("Live/Sts2ActionHandler.Dispatch.cs");
-        var embedded = Arms("Profiles/Embedded/Sts2ActionHandler.Dispatch.cs");
+        var embedded = EmbeddedRoutes(File.ReadAllText(Path.Combine(
+                projectDirectory, "Profiles/Embedded/Sts2ActionHandler.Dispatch.cs")))
+            .Select(route => route.Kind)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
 
         Assert.Equal(EmbeddedActionKinds.OrderBy(name => name, StringComparer.Ordinal), embedded);
         // The embedded dispatcher is a subset of the full one, never a second source of routing.
@@ -235,6 +242,73 @@ public sealed class Sts2CompileProfileTests
         Assert.True(full.Length > embedded.Length);
         // Dropping an arm must not drop the enum member: its ordinals are wire values.
         Assert.All(full, name => Assert.True(Enum.IsDefined(typeof(Spirectl.Sts2.Core.Actions.SemanticActionKind), name), name));
+    }
+
+    /// <summary>
+    /// The embedded dispatcher's route table, read from source: id, kind, and the action body the route runs.
+    /// </summary>
+    private static (string Id, string Kind, string Body)[] EmbeddedRoutes(string dispatcherSource)
+    {
+        var route = new Regex(
+            @"RouteFor\(\s*""([\w-]+)"",\s*SemanticActionKind\.(\w+),.*?handler\.Execute(\w+)\(request\)",
+            RegexOptions.CultureInvariant | RegexOptions.Singleline);
+        return
+        [
+            .. route.Matches(dispatcherSource)
+                .Select(match => (match.Groups[1].Value, match.Groups[2].Value, match.Groups[3].Value)),
+        ];
+    }
+
+    [Fact]
+    public void EmbeddedActionCatalogListsExactlyTheKindsTheEmbeddedDispatcherRoutes()
+    {
+        var projectDirectory = Path.Combine(FindRepositoryRoot(), "bridge-mod/src/Spirectl.Sts2");
+        string Read(string relativePath) => File.ReadAllText(Path.Combine(projectDirectory, relativePath));
+        var dispatcher = Read("Profiles/Embedded/Sts2ActionHandler.Dispatch.cs");
+        var catalog = Read("Profiles/Embedded/Sts2ActionDescriptorCatalog.cs");
+
+        // One list. The dispatcher looks a kind up in its route table, the catalog returns that table's
+        // descriptors, and neither restates a kind on its own, so they cannot drift apart.
+        Assert.Empty(new Regex(@"SemanticActionKind\.\w+\s*=>", RegexOptions.CultureInvariant).Matches(dispatcher));
+        Assert.Contains("EmbeddedRoutesByKind.TryGetValue(request.Kind", dispatcher, StringComparison.Ordinal);
+        Assert.DoesNotContain("SemanticActionKind.", catalog, StringComparison.Ordinal);
+        Assert.Contains("Sts2ActionHandler.RoutedActionDescriptors", catalog, StringComparison.Ordinal);
+
+        // The catalog's list is the declared set, each route runs the body named for its kind, and each id is the
+        // kind's kebab-case name (the id is a wire value the full catalog spells the same way).
+        var routes = EmbeddedRoutes(dispatcher);
+        Assert.Equal(
+            EmbeddedActionKinds.OrderBy(name => name, StringComparer.Ordinal),
+            routes.Select(route => route.Kind).OrderBy(name => name, StringComparer.Ordinal));
+        Assert.All(routes, route =>
+        {
+            Assert.Equal(route.Kind, route.Body);
+            Assert.Equal(Regex.Replace(route.Kind, "(?<!^)([A-Z])", "-$1").ToLowerInvariant(), route.Id);
+            Assert.True(Enum.IsDefined(typeof(Spirectl.Sts2.Core.Actions.SemanticActionKind), route.Kind), route.Kind);
+        });
+
+        // A kind the full catalog already advertises keeps its id; and keeps its wording too, except mouse-click,
+        // which the full catalog words as a dangerous raw click and only advertises in dangerous mode.
+        var entry = new Regex(
+            @"\(\s*""([\w-]+)"",\s*SemanticActionKind\.(\w+),\s*""([^""]*)"",\s*""([^""]*)""",
+            RegexOptions.CultureInvariant);
+        Dictionary<string, (string Id, string Summary, string Hint)> Entries(string source) =>
+            entry.Matches(source).ToDictionary(
+                match => match.Groups[2].Value,
+                match => (match.Groups[1].Value, match.Groups[3].Value, match.Groups[4].Value));
+        var full = Entries(Read("Common/Sts2ActionDescriptorCatalog.cs"));
+        var embedded = Entries(dispatcher);
+        var shared = embedded.Keys.Intersect(full.Keys).ToArray();
+        Assert.Contains("SelectMapNode", shared);
+        Assert.Contains("ClaimReward", shared);
+        Assert.All(shared, kind =>
+        {
+            Assert.Equal(full[kind].Id, embedded[kind].Id);
+            if (kind != "MouseClick")
+            {
+                Assert.Equal(full[kind], embedded[kind]);
+            }
+        });
     }
 
     [Fact]
