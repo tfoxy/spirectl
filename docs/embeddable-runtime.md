@@ -45,6 +45,35 @@ in `Spirectl.BridgeMod`; STS2/Godot-backed bridge-only implementations live in
 `Spirectl.BridgeMod.Sts2Host`. Runtime owners dispose their facade or bridge lifetime to release subscriptions
 and scene hooks.
 
+## Compile profiles
+
+`Spirectl.Sts2` compiles as one of two profiles, chosen by the `Sts2Profile` MSBuild property. The default is
+`Full`, set inside the project, so the bridge, the CLI, the NuGet package and the tests get everything unless they
+ask otherwise.
+
+An embedder that runs the runtime in-process selects `Embedded` from its own project reference
+(`AdditionalProperties="Sts2Profile=Embedded;EnableSts2LiveHost=true;..."`). That profile leaves out code the
+embedder cannot reach, and does not construct or install it either:
+
+- the legacy state-extractor lane and the observation provider, resolvers and inspectors only it calls (the
+  facade reads state through the state provider), and the reference-data provider implementation (the
+  `Core/Reference` DTOs and the reference port stay, because `ISpirectlRuntime` inherits them);
+- the host-local seat watchers and the VFX-spawn hook;
+- the action bodies no embedded dispatch arm reaches. The embedded dispatcher
+  (`Profiles/Embedded/Sts2ActionHandler.Dispatch.cs`) routes only the semantic action kinds an embedder sends and
+  answers `InvalidAction` for the rest; the `SemanticActionKind` enum itself stays complete, so its wire values do
+  not move. Members of a mixed area that no arm reaches live in a matching `*.Full.cs` partial;
+- the game-API manifest requirements that only those omitted lanes read (the lane manifests mark them with
+  `#if !SPIRECTL_PROFILE_EMBEDDED`), so a game update that moves such a member cannot stop an embedder from starting.
+
+The omitted files are listed once, in the "Embedded profile" item group of
+`bridge-mod/src/Spirectl.Sts2/Spirectl.Sts2.csproj`, next to the stand-ins under `Profiles/Embedded/`.
+`Sts2CompileProfileTests` pins that list, the dispatcher's kinds, the install list and the manifest partition. To
+add an embedded action kind, add its arm to the embedded dispatcher and, if its body sits in a `*.Full.cs`
+partial, move it back into the main partial. The profile is stamped into the assembly as `SpirectlSts2Profile`
+metadata. Compile it with the game assemblies present:
+`dotnet build bridge-mod/src/Spirectl.Sts2/Spirectl.Sts2.csproj -p:EnableSts2LiveHost=true -p:Sts2Profile=Embedded`.
+
 ## Current-state subscription pacing
 
 `SubscribeCurrentState` / `WatchCurrentStateAsync` push an event only when the snapshot's semantic fingerprint

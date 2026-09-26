@@ -20,11 +20,36 @@
     <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == ''">$(STS2_ASSEMBLIES_DIR)</Sts2AssembliesDir>
     <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == '' and '$(Sts2AssembliesDir)' != '' and Exists('$(Sts2AssembliesDir)/sts2.dll') and Exists('$(Sts2AssembliesDir)/GodotSharp.dll') and Exists('$(Sts2AssembliesDir)/0Harmony.dll')">true</EnableSts2LiveHost>
     <EnableSts2LiveHost Condition="'$(EnableSts2LiveHost)' == ''">false</EnableSts2LiveHost>
+    <!-- The compile profile: which of this project's sources a build takes.
+           Full      (the default) everything: the bridge, the CLI, the NuGet package and the tests.
+           Embedded  the subset an in-process embedder can reach, chosen by that embedder's ProjectReference
+                     (AdditionalProperties="Sts2Profile=Embedded"). It needs the live host, and it swaps in the
+                     embedded composition and action dispatcher. The files it leaves out are listed once, under
+                     "Embedded profile" below.
+         The default lives here, inside the project, so a consumer that says nothing gets Full. -->
+    <Sts2Profile Condition="'$(Sts2Profile)' == ''">Full</Sts2Profile>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
     <DefineConstants>$(DefineConstants);ENABLE_STS2_LIVE_HOST</DefineConstants>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Sts2Profile)' == 'Embedded'">
+    <DefineConstants>$(DefineConstants);SPIRECTL_PROFILE_EMBEDDED</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Which profile this binary was compiled as, so an embedder's test can prove it got the one it asked for. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>SpirectlSts2Profile</_Parameter1>
+      <_Parameter2>$(Sts2Profile)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <Target Name="ValidateSts2Profile" BeforeTargets="ResolveReferences">
+    <Error Condition="'$(Sts2Profile)' != 'Full' and '$(Sts2Profile)' != 'Embedded'" Text="Unknown Sts2Profile '$(Sts2Profile)'. Known profiles: Full, Embedded." />
+    <Error Condition="'$(Sts2Profile)' == 'Embedded' and '$(EnableSts2LiveHost)' != 'true'" Text="Sts2Profile=Embedded needs EnableSts2LiveHost=true: the embedded profile only exists to trim the live host." />
+  </Target>
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="" />
@@ -319,7 +344,125 @@
       <HintPath>$(Sts2AssembliesDir)/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <Compile Include="Live/**/*.cs" Exclude="Live/Debugging/ILiveDebugRuntimeHooks.cs;Live/Sts2RuntimeSceneWatchControls.cs;Live/Sts2ModelCatalogProjection.cs;Live/Sts2SpineGeoClipRefusalMemo.cs;Live/Debugging/LiveDebugControl.cs;Live/EncounterVisuals/Sts2EncounterVisualCatalog.cs;Live/EncounterVisuals/Sts2EncounterVisualEventStore.cs;Live/Sts2MainThreadDispatcher.cs;Live/Sts2RuntimeInstrumentation.cs;Live/Sts2AnimationHintInstrumentation.cs;Live/Sts2LiveIntrospection.cs;Live/Sts2ScreenContext.cs;Live/Sts2CardStateSnapshotFactory.cs;Live/Sts2SelectedCardViewState.cs;Live/Sts2RewardsOverlayInspector.cs;Live/Sts2ScenarioProvider.cs;Live/Sts2RecordedFixtureProvider.cs;Live/Sts2GodotSceneStateModels.cs;Live/Sts2TweenEndpointTuples.cs;Live/Sts2SpineSchedule.cs;Live/Sts2SpineGeometryMath.cs;Live/Sts2SpineAtlasText.cs;Live/Sts2SpineGeoClipCore.cs;Live/Sts2SpineGeoClipHeadlessRemint.cs;Live/Sts2SpineGeoClipHeadlessMintMark.cs;Live/Sts2SceneFitFrame.cs;Live/Sts2EventBackgroundFrameMath.cs;Live/Sts2OneShotArmClaim.cs;Live/Sts2SpineDefaults.cs;Live/Sts2SpineMaterialKey.cs;Live/Sts2SpineLiveMaterialStore.cs;Live/Sts2SpineReprobeGate.cs;Live/Sts2RegionEmitCap.cs;Live/Sts2CosmeticEmitCap.cs;Live/Sts2DecorEmitSuppress.cs;Live/Sts2TopBarFold.cs;Live/Sts2ProceedGlow.cs;Live/Sts2ContentKey.cs;Live/Sts2MapPointPulse.cs;Live/Sts2IntentBobFold.cs;Live/Sts2IntentGlyphFold.cs;Live/Sts2OrbSpinFold.cs;Live/Sts2EndTurnGlowFold.cs;Live/Sts2SpineAnchorFold.cs;Live/Sts2ReparentEmit.cs;Live/Sts2ViewportContentPrune.cs;Live/Sts2CombatBackgroundLayerSelection.cs;Live/Sts2StreamSkipMeta.cs;Live/Sts2RichRoleFontEmit.cs;Live/Sts2Line2DGeometryEmit.cs;Live/Sts2SpineEventBackgroundClip.cs;Live/Sts2SpineClipComposite.cs;Live/Sts2TweenParentResolver.cs;Live/Sts2CancelledTweenResync.cs;Live/Sts2CardFlightMath.cs;Live/Sts2CardFlightWindows.cs;Live/Sts2CardFlightResolvePark.cs;Live/Sts2TrailWindowPolicy.cs;Live/Sts2HandTweenMath.cs;Live/Sts2LocTemplateText.cs;Live/Sts2RestOverlayStream.cs;Live/Sts2SpineStillFrame.cs;Live/Sts2RenderEncodeBudget.cs;Live/Sts2RenderPhaseProfile.cs;Live/Sts2ImageEncodePolicy.cs;Live/Sts2SceneWatchRuntimeSettings.cs;Live/Sts2ClickableFocus.cs;Live/Sts2RewardElementChoice.cs;Live/Sts2StateWatchRuntimeSettings.cs;Live/Sts2SemanticStateRevision.cs;Live/Sts2BackgroundThrottleOptions.cs;Live/Sts2ScrollOffsetMath.cs;Live/Sts2BrowserPadMap.cs;Live/Sts2GameBuildIdentity.cs" />
+    <!-- Live/ sources that need the game assemblies. An explicit list, not a glob with an Exclude mirror of the
+         always-compiled files above: the mirror drifted (five entries named files that had moved out, and one file
+         was compiled twice). A new Live/ file needs a line here or in the always-compiled list above;
+         Sts2CompileProfileTests fails on a Live/ file that neither list names. -->
+    <Compile Include="Live/CharacterSelectStateBuilder.cs" />
+    <Compile Include="Live/CombatStateBuilder.cs" />
+    <Compile Include="Live/EncounterVisuals/Sts2EncounterCameraResolver.cs" />
+    <Compile Include="Live/EncounterVisuals/Sts2KaiserCrabVisualHooks.cs" />
+    <Compile Include="Live/MapStateBuilder.cs" />
+    <Compile Include="Live/MarkerDynamicVar.cs" />
+    <Compile Include="Live/RoomStateBuilder.cs" />
+    <Compile Include="Live/RunShellStateBuilder.cs" />
+    <Compile Include="Live/StateProjectionValues.cs" />
+    <Compile Include="Live/Sts2ActionHandler.CardPile.cs" />
+    <Compile Include="Live/Sts2ActionHandler.Combat.cs" />
+    <Compile Include="Live/Sts2ActionHandler.ContextOwnership.cs" />
+    <Compile Include="Live/Sts2ActionHandler.ContextOwnership.Full.cs" />
+    <Compile Include="Live/Sts2ActionHandler.DeckView.cs" />
+    <Compile Include="Live/Sts2ActionHandler.Dispatch.cs" />
+    <Compile Include="Live/Sts2ActionHandler.FailuresInputTypes.cs" />
+    <Compile Include="Live/Sts2ActionHandler.FailuresInputTypes.Full.cs" />
+    <Compile Include="Live/Sts2ActionHandler.HandSelection.cs" />
+    <Compile Include="Live/Sts2ActionHandler.Input.cs" />
+    <Compile Include="Live/Sts2ActionHandler.InspectRelic.cs" />
+    <Compile Include="Live/Sts2ActionHandler.Multiplayer.cs" />
+    <Compile Include="Live/Sts2ActionHandler.RewardCommit.cs" />
+    <Compile Include="Live/Sts2ActionHandler.RewardCommit.Full.cs" />
+    <Compile Include="Live/Sts2ActionHandler.ScreenIntents.cs" />
+    <Compile Include="Live/Sts2ActionHandler.ScreenIntents.Full.cs" />
+    <Compile Include="Live/Sts2ActionHandler.Scroll.cs" />
+    <Compile Include="Live/Sts2ActionHandler.ShopMapLobby.cs" />
+    <Compile Include="Live/Sts2ActionHandler.ShopMapLobby.Full.cs" />
+    <Compile Include="Live/Sts2ActionHandler.TopBar.cs" />
+    <Compile Include="Live/Sts2ActionHandler.cs" />
+    <Compile Include="Live/Sts2AssetExtractProvider.EncounterNodes.cs" />
+    <Compile Include="Live/Sts2AssetExtractProvider.Explanation.cs" />
+    <Compile Include="Live/Sts2AssetExtractProvider.ExtractExplain.cs" />
+    <Compile Include="Live/Sts2AssetExtractProvider.RenderAssets.cs" />
+    <Compile Include="Live/Sts2AssetExtractProvider.ResourceIO.cs" />
+    <Compile Include="Live/Sts2AssetExtractProvider.SceneHelpers.cs" />
+    <Compile Include="Live/Sts2AssetExtractProvider.cs" />
+    <Compile Include="Live/Sts2AssetKeyResolver.cs" />
+    <Compile Include="Live/Sts2AssetModelResourceResolver.cs" />
+    <Compile Include="Live/Sts2AssetOperationServices.cs" />
+    <Compile Include="Live/Sts2AssetProviderCatalog.cs" />
+    <Compile Include="Live/Sts2AuthoredEndedTurnRegistry.cs" />
+    <Compile Include="Live/Sts2AuthoredTransientEffectsRegistry.cs" />
+    <Compile Include="Live/Sts2BrowserKeyMap.cs" />
+    <Compile Include="Live/Sts2CardDescriptionTemplateFactory.cs" />
+    <Compile Include="Live/Sts2CardFlightHooks.cs" />
+    <Compile Include="Live/Sts2CardFlightVfxProbe.cs" />
+    <Compile Include="Live/Sts2CardHostValueResolver.cs" />
+    <Compile Include="Live/Sts2CardOverlayInspector.cs" />
+    <Compile Include="Live/Sts2CardSelectionScreenInspector.cs" />
+    <Compile Include="Live/Sts2CardUpgradeEventHooks.cs" />
+    <Compile Include="Live/Sts2ChooseACardOverlayHooks.cs" />
+    <Compile Include="Live/Sts2CombatEventCapture.cs" />
+    <Compile Include="Live/Sts2CombatFacts.cs" />
+    <Compile Include="Live/Sts2CombatIds.cs" />
+    <Compile Include="Live/Sts2CombatPreviewCore.cs" />
+    <Compile Include="Live/Sts2ControlClipContents.cs" />
+    <Compile Include="Live/Sts2CrystalSphereOverlayInspector.cs" />
+    <Compile Include="Live/Sts2CrystalSphereScreenInspector.cs" />
+    <Compile Include="Live/Sts2DamageEventHooks.cs" />
+    <Compile Include="Live/Sts2DeckCardSelectionOverlayHooks.cs" />
+    <Compile Include="Live/Sts2DiscardFlightHooks.cs" />
+    <Compile Include="Live/Sts2EmbeddableAssetProvider.cs" />
+    <Compile Include="Live/Sts2EndTurnReadinessHooks.cs" />
+    <Compile Include="Live/Sts2EventRoomScreenInspector.cs" />
+    <Compile Include="Live/Sts2GeoClipDiagnostics.cs" />
+    <Compile Include="Live/Sts2GodotResourceProducer.cs" />
+    <Compile Include="Live/Sts2GodotSceneStateProducer.cs" />
+    <Compile Include="Live/Sts2GodotSynchronizationContext.cs" />
+    <Compile Include="Live/Sts2HandHolderHooks.cs" />
+    <Compile Include="Live/Sts2HandSelectionHooks.cs" />
+    <Compile Include="Live/Sts2HostLocalSeatSyncWatcher.cs" />
+    <Compile Include="Live/Sts2HostLocalSeatTurnWatcher.cs" />
+    <Compile Include="Live/Sts2HoverTipProjection.cs" />
+    <Compile Include="Live/Sts2InputCoordinates.cs" />
+    <Compile Include="Live/Sts2IntentFramesInspector.cs" />
+    <Compile Include="Live/Sts2LobbyPresentationGeometryResolver.cs" />
+    <Compile Include="Live/Sts2MainMenuStartRunHooks.cs" />
+    <Compile Include="Live/Sts2MapScreenInspector.cs" />
+    <Compile Include="Live/Sts2ModelCatalogProvider.cs" />
+    <Compile Include="Live/Sts2ModelResolver.cs" />
+    <Compile Include="Live/Sts2MonoModNativeDependencies.cs" />
+    <Compile Include="Live/Sts2MultiplayerConnectionHooks.cs" />
+    <Compile Include="Live/Sts2ParticleInspector.cs" />
+    <Compile Include="Live/Sts2ParticleRestartHooks.cs" />
+    <Compile Include="Live/Sts2PresentationStateResolver.cs" />
+    <Compile Include="Live/Sts2RampExtractor.cs" />
+    <Compile Include="Live/Sts2ReferenceDataProvider.cs" />
+    <Compile Include="Live/Sts2RestSiteScreenInspector.cs" />
+    <Compile Include="Live/Sts2ReusableLiveComposition.cs" />
+    <Compile Include="Live/Sts2RewardCaptureRegistry.cs" />
+    <Compile Include="Live/Sts2RewardScreenInspector.cs" />
+    <Compile Include="Live/Sts2RewardsCaptureHooks.cs" />
+    <Compile Include="Live/Sts2RuntimeFactory.cs" />
+    <Compile Include="Live/Sts2RuntimeObservationProvider.cs" />
+    <Compile Include="Live/Sts2RuntimeSceneWatcher.Animations.cs" />
+    <Compile Include="Live/Sts2RuntimeSceneWatcher.cs" />
+    <Compile Include="Live/Sts2SceneAnimationBinding.cs" />
+    <Compile Include="Live/Sts2SceneAnimationCallbacks.cs" />
+    <Compile Include="Live/Sts2ScreenLocator.cs" />
+    <Compile Include="Live/Sts2ShaderMaterialInspector.cs" />
+    <Compile Include="Live/Sts2ShopScreenInspector.cs" />
+    <Compile Include="Live/Sts2SpineAnimationHooks.cs" />
+    <Compile Include="Live/Sts2SpineCatalogService.cs" />
+    <Compile Include="Live/Sts2SpineDiagnostics.cs" />
+    <Compile Include="Live/Sts2SpineGeoClipBaker.cs" />
+    <Compile Include="Live/Sts2SpineInspector.cs" />
+    <Compile Include="Live/Sts2SpineLiveMaterials.cs" />
+    <Compile Include="Live/Sts2StateProvider.cs" />
+    <Compile Include="Live/Sts2SyntheticLobbyNameHooks.cs" />
+    <Compile Include="Live/Sts2TargetManagerAccess.cs" />
+    <Compile Include="Live/Sts2TreasureRoomScreenInspector.cs" />
+    <Compile Include="Live/Sts2TweenEndpointMath.cs" />
+    <Compile Include="Live/Sts2TweenRecorderHooks.cs" />
+    <Compile Include="Live/Sts2VfxSpawnEventHooks.cs" />
   </ItemGroup>
 
   <!-- The per-game-build compat seam. Deliberately OUTSIDE Live/, which is compiled by a glob behind a
@@ -333,6 +476,76 @@
   </ItemGroup>
   <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v111'">
     <Compile Include="GameApi/V111/**/*.cs" />
+  </ItemGroup>
+
+  <!-- Embedded profile: what an in-process embedder (CouchCoop's private copy) does not compile, and the files
+       that stand in for them. The full profile compiles everything above, unchanged. A file leaves the embedded
+       copy only when nothing the embedder can reach calls it; Sts2CompileProfileTests pins this list, and the
+       embedder's own boundary test proves the built assembly. Removing the lines below is the whole rollback. -->
+  <ItemGroup Condition="'$(Sts2Profile)' == 'Embedded'">
+    <!-- Stand-ins: the embedded composition, and the one refusal helper that named an excluded file. -->
+    <Compile Include="Profiles/Embedded/**/*.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2RuntimeFactory.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ReusableLiveComposition.cs" />
+    <Sts2EmbeddedExcluded Include="GameApi/Sts2GameApiProbe.GameVersion.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.Dispatch.cs" />
+
+    <!-- The legacy state-extractor lane. The embedded facade reads state through Sts2StateProvider and never
+         calls an IGameStateExtractor, so the extractor slot holds a placeholder there. -->
+    <Sts2EmbeddedExcluded Include="Core/State/ObservedGameStateExtractor.cs" />
+    <Sts2EmbeddedExcluded Include="Core/State/RuntimeStateMapper.cs" />
+    <Sts2EmbeddedExcluded Include="Core/State/ScaffoldRuntimeObservationProvider.cs" />
+    <Sts2EmbeddedExcluded Include="Core/State/IRuntimeObservationProvider.cs" />
+    <Sts2EmbeddedExcluded Include="Core/State/BridgeRuntimeObservation.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2RuntimeObservationProvider.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2LobbyPresentationGeometryResolver.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2PresentationStateResolver.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CardOverlayInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Common/Sts2UnsupportedScreenNotice.cs" />
+    <Sts2EmbeddedExcluded Include="Core/Models/RandomCharacterFacts.cs" />
+
+    <!-- The reference-data provider implementation. The Core/Reference DTOs and the IGameReferenceSource port
+         stay: ISpirectlRuntime inherits them. -->
+    <Sts2EmbeddedExcluded Include="Live/Sts2ReferenceDataProvider.cs" />
+
+    <!-- Synthetic host-local seats: the watchers arm only on synthetic-seat demand, and the only code that
+         registers a synthetic seat is the lobby-join action the embedded dispatcher does not carry. -->
+    <Sts2EmbeddedExcluded Include="Live/Sts2HostLocalSeatSyncWatcher.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2HostLocalSeatTurnWatcher.cs" />
+
+    <!-- The VFX-spawn hook: a Harmony postfix on the game's generic add-child helper that only feeds the
+         combat-event hub, which nothing in an embedder subscribes to. -->
+    <Sts2EmbeddedExcluded Include="Live/Sts2VfxSpawnEventHooks.cs" />
+
+    <!-- Found by a reachability pass over the embedded sources rather than named in advance: nothing an
+         embedder can reach calls them. Each has a bridge or test caller only (the resource-reference collector:
+         tests; the two encounter-visual files: the bridge host's startup). -->
+    <Sts2EmbeddedExcluded Include="Core/State/StateResourceReferenceCollector.cs" />
+    <Sts2EmbeddedExcluded Include="Live/EncounterVisuals/Sts2EncounterVisualEventStore.cs" />
+    <Sts2EmbeddedExcluded Include="Live/EncounterVisuals/Sts2KaiserCrabVisualHooks.cs" />
+
+    <!-- Action bodies no embedded dispatch arm reaches (see Profiles/Embedded/Sts2ActionHandler.Dispatch.cs). -->
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.CardPile.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.Combat.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.DeckView.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.HandSelection.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.InspectRelic.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.TopBar.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.ContextOwnership.Full.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.FailuresInputTypes.Full.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.RewardCommit.Full.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.ScreenIntents.Full.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2ActionHandler.ShopMapLobby.Full.cs" />
+
+    <!-- Left with no caller once the action bodies above are gone: only those bodies, the observation
+         provider, the bridge or tests named them. -->
+    <Sts2EmbeddedExcluded Include="Live/Sts2MainMenuStartRunHooks.cs" />
+    <Sts2EmbeddedExcluded Include="Live/Sts2CrystalSphereScreenInspector.cs" />
+    <Sts2EmbeddedExcluded Include="Common/Sts2LobbyCharacterButtonInvoker.cs" />
+    <Sts2EmbeddedExcluded Include="Common/Sts2PartialChoiceNotice.cs" />
+    <Sts2EmbeddedExcluded Include="Core/Map/Sts2MapDrawingTransform.cs" />
+
+    <Compile Remove="@(Sts2EmbeddedExcluded)" />
   </ItemGroup>
 
   <Target Name="ValidateSts2LiveHostReferences" BeforeTargets="ResolveReferences" Condition="'$(EnableSts2LiveHost)' == 'true'">

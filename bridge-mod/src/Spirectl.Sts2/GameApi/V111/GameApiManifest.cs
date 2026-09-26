@@ -24,6 +24,13 @@ namespace Spirectl.Sts2.Live.GameApi;
 /// game builds, (b) the reads whose fallback is a plausible wrong answer rather than an obvious one, and
 /// (c) the invocation targets whose parameter list the by-name invoker matches exactly.
 /// </para>
+///
+/// <para>
+/// The embedded profile (<c>Sts2Profile=Embedded</c>) declares only what a lane it still compiles reads. An
+/// entry inside <c>#if !SPIRECTL_PROFILE_EMBEDDED</c> is read only by code that profile leaves out, so a game
+/// update that moves that member must not stop an embedder from starting; the full profile lists every entry,
+/// in this order. Sts2CompileProfileTests pins which entries those are.
+/// </para>
 /// </summary>
 internal static class GameApiManifest
 {
@@ -38,8 +45,10 @@ internal static class GameApiManifest
             Note: "the lobby roster the state snapshot and the synthetic-seat actions walk"),
 
         // ── In-run and saved-run lobby rosters ───────────────────────────────────────────────────────
+#if !SPIRECTL_PROFILE_EMBEDDED
         new(typeof(RunLobby), GameApiNames.LobbyPlayerIds, GameApiMemberKind.Value,
             Note: "the in-run roster the host-local seat sync watcher acknowledges combat sync for"),
+#endif
         new(typeof(LoadRunLobby), GameApiNames.LobbyPlayerIds, GameApiMemberKind.Value,
             Note: "decides which saved-run seats report as connected"),
 
@@ -67,6 +76,7 @@ internal static class GameApiManifest
             ],
             "every previewed damage number in the state snapshot and the combat-preview endpoint"),
 
+#if !SPIRECTL_PROFILE_EMBEDDED
         // ── Lobby screen refresh, invoked BY NAME with an exact argument list ────────────────────────
         new(typeof(NCharacterSelectScreen), "PlayerConnected", GameApiMemberKind.Method,
             [typeof(GameLobbyPlayer)],
@@ -74,6 +84,7 @@ internal static class GameApiManifest
         new(typeof(NCharacterSelectScreen), "PlayerChanged", GameApiMemberKind.Method,
             [typeof(GameLobbyPlayer), typeof(bool)],
             "refreshes an existing host-local seat's nameplate and character"),
+#endif
 
         // ── The per-seat end-turn barrier the couch seats are arbitrated against ─────────────────────
         new(typeof(CombatManager), nameof(CombatManager.AllPlayersReadyToEndTurn), GameApiMemberKind.Method,
@@ -83,6 +94,7 @@ internal static class GameApiManifest
             [typeof(Player)],
             "per-seat readiness inside that postfix"),
 
+#if !SPIRECTL_PROFILE_EMBEDDED
         // ── The enemy-turn readiness set a synthetic seat's own client would complete ─────────────────
         // Two hops on this build, so both are required: the manager's turn state, then the set on it. The
         // second hop's owner is internal to the game assembly, so it is named by string.
@@ -95,6 +107,7 @@ internal static class GameApiManifest
             OwnerTypeName: GameApiHooks.TurnStateTypeName,
             Note: "the set the host-local seat turn watcher completes for synthetic seats; without it the "
                 + "watcher goes silently inert and a synthetic seat's combat stalls at the enemy-turn barrier"),
+#endif
 
         // ── Spine animation control (also Harmony targets pinned by parameter types) ─────────────────
         new(typeof(MegaAnimationState), nameof(MegaAnimationState.SetAnimation), GameApiMemberKind.Method,
@@ -119,11 +132,13 @@ internal static class GameApiManifest
             [typeof(string), typeof(float), typeof(bool), typeof(int)],
             "reports a queued LOOPING clip — the idle a one-shot hands back to — to the mirror"),
 
+#if !SPIRECTL_PROFILE_EMBEDDED
         // ── Fixture scaffolding: the main-menu overlay and the host net service ──────────────────────
         new(typeof(NMainMenu), GameApiNames.MainMenuBlurBackstop, GameApiMemberKind.Value,
             Note: "the menu blur panel a lobby fixture has to hide before it can drive the screen"),
         new(typeof(NetHostGameService), ".ctor", GameApiMemberKind.Constructor,
             [typeof(PeerVersionInfo)],
             "the host net service every live lobby fixture starts"),
+#endif
     ];
 }
