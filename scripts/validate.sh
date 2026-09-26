@@ -22,6 +22,7 @@ Commands:
   m78-live-encounter-artifacts Preflight live bridge and export standard encounter visual artifacts.
   producer-walk-profile   Emit the producer-walk perf report envelope from the scene watcher's profiler counters.
   docs-map-paths          Verify every backticked repo path in docs/maps/*.md still exists.
+  reflected-members       Sweep the by-name game member reads across two game builds' decompile corpora.
 
 Examples:
   scripts/validate.sh dotnet-format --include bridge-mod/src/Foo.cs --json
@@ -36,6 +37,9 @@ Examples:
   scripts/validate.sh m78-live-encounter-artifacts --encounter kaiser_crab_boss --json
   scripts/validate.sh producer-walk-profile --log .sts2/perf-reports/producer-walk.log --json
   scripts/validate.sh docs-map-paths --json
+  scripts/validate.sh reflected-members --json
+  scripts/validate.sh reflected-members --couch-root ../sts2-couch-coop
+  scripts/validate.sh reflected-members --self-test
 EOF
 }
 
@@ -1663,6 +1667,39 @@ PY
   rm -f "$output_file"
 }
 
+# The two decompile corpora `reflected-members` compares when none are named: the stable-lane (v107) and
+# beta-lane (v111) corpora a CouchCoop checkout keeps under its own .sts2/. The corpora live there because that
+# is where the per-branch `project recover --kind decompile` runs write them; a linked worktree has an EMPTY
+# .sts2/, so the default resolves to the REAL checkout's sibling, not to this working tree's.
+reflected_couch_checkout() {
+  local candidate="${1:-${SPIRECTL_COUCH_ROOT:-}}" common
+  if [[ -z "$candidate" ]]; then
+    common="$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || common="$repo_root/.git"
+    candidate="$(dirname "$(dirname "$common")")/sts2-couch-coop"
+  fi
+  printf '%s' "$candidate"
+}
+
+# Emits the leg's result. status is passed|drift|skipped|failed; the captured output (if any) rides along.
+reflected_members_result() {
+  local command_name="$1" status="$2" code="$3" exit_code="$4" message="$5" output_file="${6:-}"
+  if [[ "${VALIDATE_JSON:-false}" == "true" ]]; then
+    printf '{"command":"%s","status":"%s","code":"%s","exitCode":%s,"message":"%s"' \
+      "$(json_escape "$command_name")" "$status" "$code" "$exit_code" "$(json_escape "$message")"
+    if [[ -n "$output_file" && -s "$output_file" ]]; then
+      printf ',"output":"%s"' "$(json_escape "$(cat "$output_file")")"
+    fi
+    printf '}\n'
+  else
+    [[ -z "$output_file" || ! -s "$output_file" ]] || cat "$output_file"
+    case "$status" in
+      passed) printf '%s: %s\n' "$command_name" "$message" ;;
+      skipped) printf 'SKIP: %s\n' "$message" >&2 ;;
+      *) printf 'FAIL: %s\n' "$message" >&2 ;;
+    esac
+  fi
+}
+
 strip_json_flag() {
   local -n _out=$1
   shift
@@ -2167,6 +2204,124 @@ EOF
     else
       printf 'docs-map-paths: checked %s repo path(s) in docs/maps/*.md\n' "$docs_map_checked"
     fi
+    ;;
+  reflected-members)
+    args=()
+    strip_json_flag args "$@"
+    reflected_a=""
+    reflected_b=""
+    reflected_couch=""
+    reflected_strict=false
+    reflected_self_test=false
+    reflected_pass=()
+    i=0
+    while (( i < ${#args[@]} )); do
+      case "${args[$i]}" in
+        --help|-h)
+          cat <<'EOF'
+Usage: scripts/validate.sh reflected-members [--a <build> --b <build>] [--couch-root <dir>] [--root <dir>]...
+                                             [--no-default-root] [--strict] [--self-test] [--json]
+
+Runs scripts/verify-reflected-game-members.sh: the by-name game member reads in the source trees, tested
+against two game builds. A name one build has and the other lacks is a read that silently returns null on the
+build that lacks it. Ordinary output is the script's own report.
+
+Builds. --a and --b each name a decompile corpus (the decompile/ dir, or the toolchain dir holding it) or a
+game assemblies dir; both must be the same kind. Without them the leg compares the two lane corpora a
+CouchCoop checkout keeps: <checkout>/.sts2/toolchain-public/decompile (stable, v107) against
+<checkout>/.sts2/toolchain-public-beta/decompile (beta, v111). The checkout is --couch-root, else
+$SPIRECTL_COUCH_ROOT, else the sibling ../sts2-couch-coop of the real (non-worktree) spirectl checkout.
+
+Source trees. Default is this repo's bridge-mod/src. --root <dir> adds a tree; --no-default-root drops
+bridge-mod/src; --couch-root <checkout> also scans <checkout>/src for CouchCoop's by-name shapes.
+
+Exit codes:
+  0   clean: every by-name read resolves the same on both builds
+  3   DRIFT: a name is present in one build and missing from the other (the report names each one)
+  2   refused: bad arguments, a path that is not a build, two identical builds, or a missing tool;
+      also a SKIP under --strict
+  77  SKIP: no default corpus pair on this machine (nothing was compared). Not a pass and not drift.
+      Generate one corpus per build with `sts2 --config <config> project recover --kind decompile`, each into
+      its own absolute toolchain.dir, or name builds you have with --a/--b.
+
+--self-test runs scripts/test-verify-reflected-game-members.sh instead, against a fixture pair.
+EOF
+          exit 0
+          ;;
+        --a|--b|--couch-root|--root)
+          (( i + 1 < ${#args[@]} )) || fail "$command" "missing_argument" "${args[$i]} requires a value"
+          case "${args[$i]}" in
+            --a) reflected_a="${args[$((i + 1))]}" ;;
+            --b) reflected_b="${args[$((i + 1))]}" ;;
+            --couch-root) reflected_couch="${args[$((i + 1))]}" ;;
+            --root) reflected_pass+=(--root "${args[$((i + 1))]}") ;;
+          esac
+          i=$((i + 1))
+          ;;
+        --no-default-root) reflected_pass+=(--no-default-root) ;;
+        --strict) reflected_strict=true ;;
+        --self-test) reflected_self_test=true ;;
+        *) fail "$command" "invalid_argument" "unknown reflected-members argument: ${args[$i]}" ;;
+      esac
+      i=$((i + 1))
+    done
+
+    reflected_out="$(mktemp "${TMPDIR:-/tmp}/spirectl-reflected-members-out.XXXXXX")"
+    trap 'rm -f "$reflected_out"' EXIT
+
+    if [[ "$reflected_self_test" == "true" ]]; then
+      reflected_status=0
+      bash scripts/test-verify-reflected-game-members.sh > "$reflected_out" 2>&1 || reflected_status=$?
+      if (( reflected_status == 0 )); then
+        reflected_members_result "$command" passed ok 0 "self-test passed" "$reflected_out"
+      elif (( reflected_status == 77 )); then
+        reflected_members_result "$command" skipped self_test_tool_missing 77 \
+          "the self-test needs rg, strings and md5sum on PATH" "$reflected_out"
+        exit 77
+      else
+        reflected_members_result "$command" failed self_test_failed "$reflected_status" \
+          "the verify-reflected-game-members self-test failed" "$reflected_out"
+        exit "$reflected_status"
+      fi
+      exit 0
+    fi
+
+    if [[ -z "$reflected_a" && -z "$reflected_b" ]]; then
+      reflected_home="$(reflected_couch_checkout "$reflected_couch")"
+      reflected_a="$reflected_home/.sts2/toolchain-public/decompile"
+      reflected_b="$reflected_home/.sts2/toolchain-public-beta/decompile"
+      reflected_missing=""
+      [[ -d "$reflected_a/sts2" && -d "$reflected_a/GodotSharp" ]] || reflected_missing+=" $reflected_a (stable lane, v107)"
+      [[ -d "$reflected_b/sts2" && -d "$reflected_b/GodotSharp" ]] || reflected_missing+=" $reflected_b (beta lane, v111)"
+      if [[ -n "$reflected_missing" ]]; then
+        reflected_msg="nothing was compared: no game-build pair on this machine. No decompile corpus at:$reflected_missing. To fix: point --couch-root (or SPIRECTL_COUCH_ROOT) at a CouchCoop checkout that has both, name builds with --a/--b, or generate one corpus per build with \`sts2 --config <config> project recover --kind decompile\` (each into its own absolute toolchain.dir). --strict makes this a failure."
+        if [[ "$reflected_strict" == "true" ]]; then
+          reflected_members_result "$command" failed corpus_unavailable 2 "$reflected_msg"
+          exit 2
+        fi
+        reflected_members_result "$command" skipped corpus_unavailable 77 "$reflected_msg"
+        exit 77
+      fi
+    elif [[ -z "$reflected_a" || -z "$reflected_b" ]]; then
+      fail "$command" "missing_argument" "--a and --b go together: name both builds or neither"
+    fi
+
+    reflected_argv=(scripts/verify-reflected-game-members.sh)
+    [[ -z "$reflected_couch" ]] || reflected_argv+=(--couch-root "$reflected_couch")
+    reflected_argv+=(${reflected_pass[@]+"${reflected_pass[@]}"} "$reflected_a" "$reflected_b")
+    reflected_status=0
+    "${reflected_argv[@]}" > "$reflected_out" 2>&1 || reflected_status=$?
+    case "$reflected_status" in
+      0) reflected_members_result "$command" passed ok 0 "every by-name member read resolves the same on both builds" "$reflected_out" ;;
+      3)
+        reflected_members_result "$command" drift drift 3 "by-name reads diverge between the two builds (names listed in the report)" "$reflected_out"
+        exit 3
+        ;;
+      *)
+        reflected_members_result "$command" failed refused "$reflected_status" "the sweep was refused (see output)" "$reflected_out"
+        exit "$reflected_status"
+        ;;
+    esac
     ;;
   *)
     fail "$command" "invalid_validation_command" "unknown validation command: $command"
