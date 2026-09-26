@@ -121,6 +121,8 @@ public sealed class Sts2CompileProfileTests
         "Live/Sts2ActionHandler.RewardCommit.Full.cs",
         "Live/Sts2ActionHandler.ScreenIntents.Full.cs",
         "Live/Sts2ActionHandler.ShopMapLobby.Full.cs",
+        // The state-side action catalog's moved half (the retained half keeps what a live arm still reads).
+        "Common/Sts2ActionCatalog.Full.cs",
         // Left with no caller once those bodies are gone.
         "Live/Sts2MainMenuStartRunHooks.cs",
         "Live/Sts2CrystalSphereScreenInspector.cs",
