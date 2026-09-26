@@ -83,7 +83,9 @@ public sealed class Sts2CompileProfileTests
         "Live/Sts2ReusableLiveComposition.cs",
         "GameApi/Sts2GameApiProbe.GameVersion.cs",
         "Live/Sts2ActionHandler.Dispatch.cs",
-        // The legacy state-extractor lane: the port, its placeholder and the scaffold the placeholder builds from.
+        // The legacy state-extractor lane: the port, its placeholder and the scaffold the placeholder builds from,
+        // and the snapshot types only that lane's port carried (the rest of the file is what StateSnapshot uses).
+        "Core/State/GameStateSnapshot.Full.cs",
         "Core/State/IGameStateExtractor.cs",
         "Core/State/PlaceholderStateExtractor.cs",
         "Core/State/PresentationScaffoldState.cs",
