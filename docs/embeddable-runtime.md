@@ -55,14 +55,18 @@ An embedder that runs the runtime in-process selects `Embedded` from its own pro
 (`AdditionalProperties="Sts2Profile=Embedded;EnableSts2LiveHost=true;..."`). That profile leaves out code the
 embedder cannot reach, and does not construct or install it either:
 
-- the legacy state-extractor lane and the observation provider, resolvers and inspectors only it calls (the
-  facade reads state through the state provider), and the reference-data provider implementation (the
+- the legacy state-extractor lane, the full semantic-state provider and subscription hub, their builders,
+  projections and state-only screen/overlay inspectors, and the reference-data provider implementation (the
   `Core/Reference` DTOs and the reference port stay, because `ISpirectlRuntime` inherits them). The extractor
   port (`IGameStateExtractor`), its placeholder and scaffold are out too: the profile's `SpirectlRuntimeServices`
   has no extractor slot, and `Sts2EmbeddableRuntimeFactory` has no overload that takes one. So are the snapshot
   types only that port carried (`GameStateSnapshot` and the DTOs only it names): `Core/State/GameStateSnapshot.cs`
   keeps the types some retained file still names, and `GameStateSnapshot.Full.cs` holds the rest, verbatim;
 - the host-local seat watchers and the VFX-spawn hook;
+- the combat-preview helper, damage and card-upgrade observation hooks and their combat-event hub. The end-turn readiness hook remains
+  installed because it changes combat behavior; only its semantic-state revision bump is omitted;
+- the fixture-only main-menu and net-host helpers from both game-API lanes. Their manifest requirements are
+  already full-profile-only;
 - the action bodies no embedded dispatch route reaches. The embedded dispatcher
   (`Profiles/Embedded/Sts2ActionHandler.Dispatch.cs`) routes only the semantic action kinds an embedder sends and
   answers `InvalidAction` for the rest; the `SemanticActionKind` enum itself stays complete, so its wire values do
@@ -72,7 +76,8 @@ embedder cannot reach, and does not construct or install it either:
   and the CLI know. The embedded runtime's `Capabilities.SupportedActions` is the dispatcher's own route table
   (each route carries its descriptor), so it lists exactly the kinds the dispatcher carries out and cannot drift
   from it;
-- the game-API manifest requirements that only those omitted lanes read (the lane manifests mark them with
+- the game-API manifest requirements that only those omitted lanes read, including the state-only lobby cap,
+  saved-run roster, potion permission and damage-preview funnel (the lane manifests mark them with
   `#if !SPIRECTL_PROFILE_EMBEDDED`), so a game update that moves such a member cannot stop an embedder from starting.
 
 The omitted files are listed once, in the "Embedded profile" item group of
@@ -83,7 +88,12 @@ its body sits in a `*.Full.cs` partial, move it back into the main partial. The 
 metadata. Compile it with the game assemblies present:
 `dotnet build bridge-mod/src/Spirectl.Sts2/Spirectl.Sts2.csproj -p:EnableSts2LiveHost=true -p:Sts2Profile=Embedded`.
 
+The Embedded profile does not expose current semantic state or combat-event subscriptions; the Full profile
+continues to expose both.
+
 ## Current-state subscription pacing
+
+`Full` profile only.
 
 `SubscribeCurrentState` / `WatchCurrentStateAsync` push an event only when the snapshot's semantic fingerprint
 changes. What they cost is decided by how often the hub re-walks state to find that out — and that walk runs on

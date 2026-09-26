@@ -133,6 +133,43 @@ public sealed class Sts2CompileProfileTests
         "Common/Sts2LobbyCharacterButtonInvoker.cs",
         "Common/Sts2PartialChoiceNotice.cs",
         "Core/Map/Sts2MapDrawingTransform.cs",
+        // Full semantic-state path and its state-only observation hooks.
+        "Core/State/StateSnapshot.cs",
+        "Live/Sts2StateProvider.cs",
+        "Live/CharacterSelectStateBuilder.cs",
+        "Live/CombatStateBuilder.cs",
+        "Live/MapStateBuilder.cs",
+        "Live/RoomStateBuilder.cs",
+        "Live/RunShellStateBuilder.cs",
+        "Live/StateProjectionValues.cs",
+        "Live/Sts2CardStateSnapshotFactory.cs",
+        "Live/Sts2RewardsOverlayInspector.cs",
+        "Live/Sts2CardSelectionScreenInspector.cs",
+        "Live/Sts2CrystalSphereOverlayInspector.cs",
+        "Live/Sts2DeckCardSelectionOverlayHooks.cs",
+        "Live/Sts2EventRoomScreenInspector.cs",
+        "Live/Sts2RestSiteScreenInspector.cs",
+        "Live/Sts2TreasureRoomScreenInspector.cs",
+        "Live/Sts2CombatPreviewCore.cs",
+        "Live/Sts2DamageEventHooks.cs",
+        "Live/Sts2CardUpgradeEventHooks.cs",
+        "Live/Sts2CombatEventCapture.cs",
+        "Embedding/EmbeddableCombatEventHub.cs",
+        "Embedding/EmbeddableStateSubscriptionHub.cs",
+        "Embedding/EmbeddableStateFingerprint.cs",
+        "Live/Sts2StateWatchRuntimeSettings.cs",
+        "Live/Sts2SemanticStateRevision.cs",
+        "Common/Sts2RunOverlayRegistry.cs",
+        "Core/State/CardDescriptionTemplate.cs",
+        "Core/State/StateDeckViewSortNormalizer.cs",
+        "Live/Sts2CardDescriptionTemplateFactory.cs",
+        "Live/Sts2HoverTipProjection.cs",
+        "Live/Sts2CardHostValueResolver.cs",
+        "Live/Sts2AuthoredTransientEffectsRegistry.cs",
+        "Live/Sts2ChooseACardOverlayHooks.cs",
+        "Live/Sts2HandSelectionHooks.cs",
+        "Live/MarkerDynamicVar.cs",
+
     ];
 
     /// <summary>The semantic action kinds the embedded dispatcher routes: what an embedder in this repo family sends.</summary>
@@ -155,7 +192,36 @@ public sealed class Sts2CompileProfileTests
         "Sts2HostLocalSeatSyncWatcher",
         "Sts2HostLocalSeatTurnWatcher",
         "Sts2VfxSpawnEventHooks",
+        "Sts2ChooseACardOverlayHooks",
+        "Sts2HandSelectionHooks",
+        "Sts2DamageEventHooks",
+        "Sts2CardUpgradeEventHooks",
     ];
+
+    [Theory]
+    [InlineData("V107")]
+    [InlineData("V111")]
+    public void EmbeddedProfileHasNoExcludedGameApiHelpers(string lane)
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(), "bridge-mod/src/Spirectl.Sts2/GameApi", lane, "GameApiMembers.cs"));
+        var guard = new Regex(@"#if !SPIRECTL_PROFILE_EMBEDDED\r?\n(.*?)#endif", RegexOptions.Singleline);
+        var fullOnly = string.Concat(guard.Matches(source).Select(match => match.Groups[1].Value));
+        var embedded = guard.Replace(source, string.Empty);
+
+        Assert.Contains("internal static decimal ModifyDamage", fullOnly);
+        Assert.Contains("class GameApiPlayer", fullOnly);
+        Assert.Contains("LobbyMaxPlayers", fullOnly);
+        Assert.Contains("PlayerCanRemoveOrUsePotions", fullOnly);
+        Assert.DoesNotContain("internal static decimal ModifyDamage", embedded);
+        Assert.DoesNotContain("class GameApiPlayer", embedded);
+        Assert.DoesNotContain("internal const string LobbyMaxPlayers", embedded);
+        Assert.DoesNotContain("internal const string PlayerCanRemoveOrUsePotions", embedded);
+        Assert.Contains("class GameApiNetHost", fullOnly);
+        Assert.Contains("class GameApiMainMenu", fullOnly);
+        Assert.DoesNotContain("class GameApiNetHost", embedded);
+        Assert.DoesNotContain("class GameApiMainMenu", embedded);
+    }
 
     [Fact]
     public void EmbeddedProfileLeavesOutExactlyTheDeclaredSet()
@@ -190,12 +256,11 @@ public sealed class Sts2CompileProfileTests
             "Embedding/SpirectlRuntimeFacade.cs",
             "Core/Reference/IReferenceDataProvider.cs",
             "Core/Reference/PlaceholderReferenceDataProvider.cs",
-            // The state DTOs the live StateSnapshot is built from. The legacy extractor port has no slot here.
+            // Action DTOs remain even though the semantic state provider does not.
             "Core/State/GameStateSnapshot.cs",
             // The seat registry the name hooks and the client-name action read.
             "Common/Sts2HostLocalSeatRegistry.cs",
             // The pieces of the live composition an embedder actually runs.
-            "Live/Sts2StateProvider.cs",
             "Live/Sts2ActionHandler.cs",
             "Live/Sts2ActionHandler.Input.cs",
             "Live/Sts2ActionHandler.Scroll.cs",
@@ -345,7 +410,8 @@ public sealed class Sts2CompileProfileTests
         {
             "V107",
             [
-                "LobbyPlayerIds",
+                "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
+                "PlayerCanRemoveOrUsePotions", "ModifyDamage",
                 "PlayerConnected", "PlayerChanged",
                 "CombatPlayersReadyToBeginEnemyTurn",
                 "MainMenuBlurBackstop", ".ctor",
@@ -354,7 +420,8 @@ public sealed class Sts2CompileProfileTests
         {
             "V111",
             [
-                "LobbyPlayerIds",
+                "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
+                "PlayerCanRemoveOrUsePotions", "ModifyDamage",
                 "PlayerConnected", "PlayerChanged",
                 "CombatTurnState", "TurnStatePlayersReadyToBeginEnemyTurn",
                 "MainMenuBlurBackstop", ".ctor",
@@ -382,18 +449,22 @@ public sealed class Sts2CompileProfileTests
 
         Assert.Equal(expectedDropped.Order(StringComparer.Ordinal), Members(droppedText).Order(StringComparer.Ordinal));
 
-        // What an embedder still runs must stay pinned: the end-turn readiness pair, the damage preview, the
-        // lobby roster reads the state builders make, and the spine and animation calls.
+        // What an embedder still runs must stay pinned: the local lobby roster, end-turn readiness,
+        // and the spine and animation calls. Full retains every dropped entry above.
         var shared = Members(sharedText).ToHashSet(StringComparer.Ordinal);
         string[] mustKeep =
         [
-            "AllPlayersReadyToEndTurn", "IsPlayerReadyToEndTurn", "ModifyDamage",
-            "LobbyMaxPlayers", "LobbyPlayerIds", "PlayerCanRemoveOrUsePotions",
+            "LocalPlayer", "Players", "AllPlayersReadyToEndTurn", "IsPlayerReadyToEndTurn",
             "SetAnimation", "AddAnimation",
         ];
-        // LobbyPlayerIds is dropped for the in-run lobby only; the saved-run lobby entry stays.
         Assert.Empty(mustKeep.Where(name => !shared.Contains(name)));
-        Assert.Contains("LoadRunLobby", sharedText, StringComparison.Ordinal);
+        if (lane == "V107") Assert.Contains("IsDebugEncounter", shared);
+        foreach (var stateOnly in new[] { "LobbyMaxPlayers", "LobbyPlayerIds", "PlayerCanRemoveOrUsePotions", "ModifyDamage" })
+        {
+            Assert.DoesNotContain(stateOnly, shared);
+            Assert.Contains(stateOnly, Members(manifest));
+        }
+        Assert.DoesNotContain("LoadRunLobby", sharedText, StringComparison.Ordinal);
         Assert.DoesNotContain("NMainMenu", sharedText, StringComparison.Ordinal);
         Assert.DoesNotContain("NetHostGameService", sharedText, StringComparison.Ordinal);
         Assert.DoesNotContain("NCharacterSelectScreen", sharedText, StringComparison.Ordinal);

@@ -30,7 +30,9 @@ internal static class Sts2RewardCaptureRegistry
             SeatsByPlayerId[playerId] = new Seat(netId, [.. rewards]);
         }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
         Republish(playerId);
+#endif
     }
 
     public static bool TryResolve(string playerId, int visibleIndex, out Reward reward, out ulong netId)
@@ -64,24 +66,33 @@ internal static class Sts2RewardCaptureRegistry
             }
         }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
         Republish(playerId);
+#endif
     }
 
     public static void ClearAll()
     {
+#if !SPIRECTL_PROFILE_EMBEDDED
         string[] playerIds;
+#endif
         lock (Sync)
         {
+#if !SPIRECTL_PROFILE_EMBEDDED
             playerIds = [.. SeatsByPlayerId.Keys];
+#endif
             SeatsByPlayerId.Clear();
         }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
         foreach (var playerId in playerIds)
         {
             Sts2RunOverlayRegistry.Unregister(Sts2RewardsOverlayInspector.CapturedRewardsOverlayId(playerId));
         }
+#endif
     }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     private static void Republish(string playerId)
     {
         List<Reward> rewards;
@@ -106,4 +117,5 @@ internal static class Sts2RewardCaptureRegistry
             Sts2RunOverlayRegistry.Unregister(Sts2RewardsOverlayInspector.CapturedRewardsOverlayId(playerId));
         }
     }
+#endif
 }

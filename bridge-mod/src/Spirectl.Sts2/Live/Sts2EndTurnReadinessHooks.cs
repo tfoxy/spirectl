@@ -110,6 +110,7 @@ internal static class Sts2EndTurnReadinessHooks
 
         __result = allReady && state!.CurrentSide == CombatSide.Player;
 
+#if !SPIRECTL_PROFILE_EMBEDDED
         // This postfix runs on a POLLED predicate, so bumping unconditionally would defeat idle backoff
         // entirely. Only the transition is news; the steady state is not. Accelerator only, and single-threaded
         // (game main thread), so a plain field is enough.
@@ -118,7 +119,10 @@ internal static class Sts2EndTurnReadinessHooks
             _lastReadyResult = __result;
             Sts2SemanticStateRevision.Bump();
         }
+#endif
     }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
     private static bool _lastReadyResult;
+#endif
 }

@@ -37,8 +37,10 @@ internal static class GameApiManifest
     internal static IReadOnlyList<GameApiRequirement> Requirements { get; } =
     [
         // ── The start-run lobby roster ───────────────────────────────────────────────────────────────
+#if !SPIRECTL_PROFILE_EMBEDDED
         new(typeof(StartRunLobby), GameApiNames.LobbyMaxPlayers, GameApiMemberKind.Value,
             Note: "the lobby's live player cap; without it every seat-count limit sizes off a constant"),
+#endif
         new(typeof(StartRunLobby), nameof(StartRunLobby.LocalPlayer), GameApiMemberKind.Value,
             Note: "identifies the local seat in the start-run lobby"),
         new(typeof(StartRunLobby), nameof(StartRunLobby.Players), GameApiMemberKind.Value,
@@ -49,6 +51,7 @@ internal static class GameApiManifest
         new(typeof(RunLobby), GameApiNames.LobbyPlayerIds, GameApiMemberKind.Value,
             Note: "the in-run roster the host-local seat sync watcher acknowledges combat sync for"),
 #endif
+#if !SPIRECTL_PROFILE_EMBEDDED
         new(typeof(LoadRunLobby), GameApiNames.LobbyPlayerIds, GameApiMemberKind.Value,
             Note: "decides which saved-run seats report as connected"),
 
@@ -56,10 +59,12 @@ internal static class GameApiManifest
         new(typeof(Player), GameApiNames.PlayerCanRemoveOrUsePotions, GameApiMemberKind.Value,
             Note: "gates the potion actions the catalog advertises"),
 
+#endif
         // EncounterModel.IsDebugEncounter has no successor on this build. The catalog reports false and says
         // so on its notice channel, so there is nothing here to require.
 
         // ── The damage-preview funnel (exact parameter list) ─────────────────────────────────────────
+#if !SPIRECTL_PROFILE_EMBEDDED
         new(typeof(Hook), nameof(Hook.ModifyDamage), GameApiMemberKind.Method,
             [
                 typeof(IRunState),
@@ -75,6 +80,8 @@ internal static class GameApiManifest
                 typeof(IEnumerable<AbstractModel>).MakeByRefType(),
             ],
             "every previewed damage number in the state snapshot and the combat-preview endpoint"),
+
+#endif
 
 #if !SPIRECTL_PROFILE_EMBEDDED
         // ── Lobby screen refresh, invoked BY NAME with an exact argument list ────────────────────────

@@ -34,7 +34,9 @@ internal sealed record SpirectlRuntimeServices(
     IModelCatalogProvider ModelCatalogProvider,
     IReferenceDataProvider ReferenceDataProvider,
     IRuntimeSceneWatcher RuntimeSceneWatcher,
+#if !SPIRECTL_PROFILE_EMBEDDED
     IStateProvider? StateProvider = null,
+#endif
     bool Provisional = false,
     IDisposable? Lifetime = null,
     IReadOnlyList<Core.Actions.ActionDescriptorSnapshot>? SupportedActions = null,

@@ -17,6 +17,7 @@ public interface IRuntimeAssetSource
     EmbeddableAssetBatchResult GetPresentationAssets(PresentationAssetBatchRequest request);
 }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
 public interface IRuntimeStateSource
 {
     /// <summary>Returns the current semantic state synchronously; callers needing changes should subscribe instead.</summary>
@@ -25,6 +26,7 @@ public interface IRuntimeStateSource
     IAsyncEnumerable<CurrentStateWatchEvent> WatchCurrentStateAsync(CurrentStateSubscriptionRequest request, CancellationToken cancellationToken = default);
 }
 
+#endif
 public interface IRuntimeMultiplayerConnectionSource
 {
     /// <summary>Returns the latest native connection observation, or null when no connection has been observed.</summary>
@@ -34,6 +36,7 @@ public interface IRuntimeMultiplayerConnectionSource
     IDisposable SubscribeMultiplayerConnection(Action<MultiplayerConnectionSnapshot> onEvent);
 }
 
+#if !SPIRECTL_PROFILE_EMBEDDED
 public interface ICombatEventSource
 {
     /// <summary>Callbacks may run on the game thread and must not block; resume is bounded by SinceSequence retention.</summary>
@@ -41,6 +44,7 @@ public interface ICombatEventSource
     IAsyncEnumerable<CombatWatchEvent> WatchCombatEventsAsync(CombatEventSubscriptionRequest request, CancellationToken cancellationToken = default);
 }
 
+#endif
 public interface IAnimationHintSource
 {
     /// <summary>Hints are hot, non-buffered timing signals with no resume. First/last subscriptions enable/disable capture; callbacks must not block.</summary>
