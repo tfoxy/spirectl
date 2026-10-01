@@ -12,6 +12,24 @@ namespace Spirectl.BridgeMod.Tests;
 public sealed class Sts2AssetExtractRawFormatTests
 {
     [Theory]
+    [InlineData("res://scenes/cards/card_grid.tscn::GradientTexture2D_pcr5u", "res://scenes/cards/card_grid.tscn", "GradientTexture2D_pcr5u")]
+    [InlineData("res://shaders/example.tres::Shader_aaaaa", "res://shaders/example.tres", "Shader_aaaaa")]
+    public void EmbeddedPathSplitsAtTheResourceBoundary(string path, string parent, string id)
+    {
+        Assert.True(Sts2EmbeddedResourcePath.TrySplit(path, out var actualParent, out var actualId));
+        Assert.Equal(parent, actualParent);
+        Assert.Equal(id, actualId);
+    }
+
+    [Theory]
+    [InlineData("res://x.tscn::")]
+    [InlineData("res://x.tscn::Texture::extra")]
+    [InlineData("http://x.tscn::Texture")]
+    [InlineData("res://x.tscn")]
+    public void EmbeddedPathRejectsInvalidSelectors(string path)
+        => Assert.False(Sts2EmbeddedResourcePath.TrySplit(path, out _, out _));
+
+    [Theory]
     [InlineData("raw", true)]
     [InlineData("RAW", true)]
     [InlineData(" raw ", true)]

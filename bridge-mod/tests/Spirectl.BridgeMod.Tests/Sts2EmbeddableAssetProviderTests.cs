@@ -12,6 +12,22 @@ namespace Spirectl.BridgeMod.Tests;
 
 public sealed class Sts2EmbeddableAssetProviderTests
 {
+    [Fact]
+    public void MissingEmbeddedResourceKeepsItsStructuredCode()
+    {
+        const string key = "res://scenes/cards/card_grid.tscn::GradientTexture2D_missing";
+        var failed = AssetExtractOperationResult.Failure(
+            requestId: "embedded-resource",
+            source: DataSourceKind.Live,
+            provisional: false,
+            code: AssetExtractFailureCode.RuntimeFailure,
+            message: "The live bridge could not render the requested asset.",
+            details: [new AssetExtractDetail("missing-subresource", key, "No matching resource.")]);
+
+        var result = BridgeEmbeddableAssetProvider.MapResult(key, failed);
+        Assert.Equal("missing-subresource", result.Error?.Code);
+    }
+
     private const string EndTurnButtonPath = "res://scenes/gameplay/room/combat/control/n_end_turn_button.tscn";
     private const string CardFramePath = "res://resources/textures/cards/card_default.png";
     private const string BlockSparkVfxPath = "res://scenes/vfx/block_spark_vfx.tscn";

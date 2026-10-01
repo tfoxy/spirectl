@@ -102,9 +102,13 @@ public sealed class BridgeEmbeddableAssetProvider(IAssetExtractor extractor) : I
                     detail.Field)).ToArray());
 
     private static string FailureCodeWithStructuredDetail(AssetExtractFailure failure)
-        => failure.Details.Any(detail => string.Equals(detail.Field, "font-bytes-unavailable", StringComparison.Ordinal))
-            ? "font-bytes-unavailable"
-            : MapFailureCode(failure.Code);
+    {
+        if (failure.Details.Any(detail => string.Equals(detail.Field, "font-bytes-unavailable", StringComparison.Ordinal)))
+            return "font-bytes-unavailable";
+        if (failure.Details.Any(detail => string.Equals(detail.Field, "missing-subresource", StringComparison.Ordinal)))
+            return "missing-subresource";
+        return MapFailureCode(failure.Code);
+    }
 
     public static EmbeddableAssetResult MapResult(
         string key,
