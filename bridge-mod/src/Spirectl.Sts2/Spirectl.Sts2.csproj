@@ -385,6 +385,7 @@
     <Compile Include="Live/Sts2AssetExtractProvider.ResourceIO.cs" />
     <Compile Include="Live/Sts2AssetExtractProvider.SceneHelpers.cs" />
     <Compile Include="Live/Sts2AssetExtractProvider.cs" />
+    <Compile Include="Live/Sts2EmbeddedResourcePath.cs" />
     <Compile Include="Live/Sts2AssetKeyResolver.cs" />
     <Compile Include="Live/Sts2AssetModelResourceResolver.cs" />
     <Compile Include="Live/Sts2AssetOperationServices.cs" />

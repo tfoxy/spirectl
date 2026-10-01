@@ -55,6 +55,27 @@ public sealed partial class Sts2AssetExtractProvider
         }
 
         var loadPath = ResolveLoadPath(request);
+        if (Sts2EmbeddedResourcePath.TrySplit(loadPath, out var parentPath, out _))
+        {
+            var parent = ResourceLoader.Load(parentPath);
+            if (parent is null)
+            {
+                return Failure(request, "load_path", parentPath, "The parent resource could not be loaded.");
+            }
+
+            // Scene state exposes referenced resources. Ask Godot for the qualified path as a
+            // fallback so a named shader that the parent does not reference remains addressable.
+            var embedded = Sts2EmbeddedResourcePath.Find(parent, loadPath)
+                ?? ResourceLoader.Load(loadPath);
+            return embedded switch
+            {
+                Texture2D embeddedTexture => await ExtractTextureAsync(embeddedTexture, request, "flattened-static", []),
+                Shader shader => ExtractShaderSource(shader, request),
+                null => Failure(request, "missing-subresource", loadPath, "The parent does not contain the named sub-resource."),
+                _ => Failure(request, "resource_type", loadPath, "The named sub-resource is not a texture or shader."),
+            };
+        }
+
         if (TryExtractFontBytes(loadPath, request, out var fontResult))
         {
             return fontResult;
