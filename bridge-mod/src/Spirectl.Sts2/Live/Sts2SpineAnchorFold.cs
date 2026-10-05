@@ -30,7 +30,7 @@ namespace Spirectl.Sts2.Live;
 // with it — which is why arm B below is gated on the emitters being idle, and why the fold must resume the instant
 // one starts (a particle burst has to come out of the right mouth).
 //
-// TWO ARMS, deliberately different in kind:
+// THREE ARMS, deliberately different in kind:
 //
 //   A. CHILDLESS anchor — STRUCTURAL, no scene table. An anchor with no tracked descendants cannot be a factor in
 //      anybody's composed global, and paints nothing itself, so its transform provably cannot move a pixel under
@@ -49,6 +49,32 @@ namespace Spirectl.Sts2.Live;
 //      at least its own burst tail (see BurstTailMs), so the particles of a burst that just ended are not left
 //      hanging at a stale mouth.
 //
+//   C. HIDDEN-DESCENDANT anchor — STRUCTURAL again, no table (switch SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD, default on,
+//      under both masters). Every descendant is either an inert class or a CanvasItem whose OWN `visible` is false;
+//      a hidden descendant's subtree is pruned, not scanned, because nothing below a hidden CanvasItem paints and
+//      the client composes visibility down the same chain. The measured case after R15 was the Ironclad's
+//      `Visuals/EyeSlot` (a `SpineSlotNode`) whose only child `EyeFire` (a `TextureRect`) is hidden: about 35
+//      transform deltas per second, nearly the whole idle-combat wire, for a pose nothing on screen used. Arms A
+//      and B both miss it (it has a child; the child is neither inert nor an emitter). The fact is built from what
+//      the walk already holds — each descendant's last-read `visible` and its cached class — so it adds no read.
+//
+//      THE PRICE OF REUSING LAST CAPTURE'S `visible`: the walk is pre-order, so an anchor is decided before its
+//      descendants are read this tick. On the tick a hidden descendant turns visible the anchor has already been
+//      withheld, and the descendant was read relative to the anchor's LIVE pose. So the watcher records each arm-C
+//      subtree as it reads it (FlipFlushRecorder) and, after the walk, re-runs the same scan over THIS tick's reads;
+//      if it no longer holds, it ships the anchor's live transform — and that of every recorded subtree node that
+//      moved — in the same delta, ahead of the descendant (DecideFlush / InsertInOrder). Every value it ships was
+//      read this tick; nothing is re-read. The
+//      next capture's scan sees the new `visible` and stops folding on its own. Arms A and B need none of this:
+//      their facts (structure, `Emitting`) are read live at the anchor.
+//
+// FROZEN SKELETONS. The watcher stops reading the skeleton leaves of a frozen, stationary SpineSprite root (their
+// pose cannot change). A pose this fold withheld before the freeze would then stay stale on the client for good,
+// while the anchor's children are still read and placed against its LIVE pose. So a withheld leaf with descendants
+// is exempt from that elision (ShouldElideFrozenLeaf), and under a frozen, stationary root no arm withholds
+// (DecideArm): the pose ships once, and the elision takes over from the next capture. Which poses count as withheld
+// is PoseStillWithheld: the mark survives any other suppression (a tween window) until the pose really ships.
+//
 // SUPPRESSION, NOT SUBSTITUTION. Unlike every R12-R14 fold this one pins NOTHING and names no `PinnedLoopAnim`:
 // there is no analytic rest pose to substitute (the skeleton owns the value) and nothing for the client to replay
 // (it paints no pixel). The watcher simply withholds the transform via the same `Tracked.SuppressTransformUntil`
@@ -62,11 +88,12 @@ namespace Spirectl.Sts2.Live;
 // transform differs from the stale last-emitted one and the node emits immediately, on that same capture. The
 // membership edge is its own change trigger, exactly like `PinnedLoopAnim` is for the R12b map-point fold.
 //
-// KNOWN COST, accepted (kill switches: SPIRECTL_SPINE_ANCHOR_FOLD=0, or the master SPIRECTL_DECOR_EMIT_SUPPRESS=0):
-// while a creature idles, its emitters' spawn points sit at the pose they last streamed instead of tracking the
-// skeleton. Nothing is being emitted there (arm B's whole gate), and the previous burst has outlived its tail, so
-// the only thing that can be visibly wrong is a particle system that spawns while reporting `Emitting == false` —
-// which Godot cannot do.
+// KNOWN COST, accepted (kill switches: SPIRECTL_SPINE_ANCHOR_FOLD=0, or the master SPIRECTL_DECOR_EMIT_SUPPRESS=0;
+// arm C alone: SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD=0): while a creature idles, its emitters' spawn points sit at the
+// pose they last streamed instead of tracking the skeleton. Nothing is being emitted there (arm B's whole gate),
+// and the previous burst has outlived its tail, so the only thing that can be visibly wrong is a particle system
+// that spawns while reporting `Emitting == false` — which Godot cannot do. Arm C's hidden children likewise sit at
+// a stale pose only while they cannot be seen; the flip flush moves them before the frame they become visible.
 internal static class Sts2SpineAnchorFold
 {
     /// <summary>
@@ -200,28 +227,495 @@ internal static class Sts2SpineAnchorFold
 
     // ---- The decision --------------------------------------------------------------------------------------
 
+    /// <summary>Which arm withheld the transform. Only <see cref="Arm.HiddenDescendants"/> needs the flip flush.</summary>
+    internal enum Arm : byte
+    {
+        None = 0,
+        Childless,
+        TabledEmitters,
+        HiddenDescendants,
+    }
+
     /// <summary>
-    /// The whole rule, as one pure table. <paramref name="hasDescendants"/> selects the arm.
+    /// The whole rule, as one pure table, naming the arm that withholds the transform (or <see cref="Arm.None"/>).
+    /// <paramref name="hasDescendants"/> selects the arm. The watcher needs the name: arms A and B are decided on
+    /// facts that are live this tick, so they self-heal on the edge; arm C is decided on facts one capture old, so
+    /// its suppression must be undone in the same delta when they turn out to have changed (see
+    /// <see cref="DecideFlush"/>).
     ///
     /// <para>`skeletonLeaf` = Tracked.IsSpineSkeletonLeafType (a spine-family native class that is NOT the
-    /// SpineSprite clip root). `carriesOwnPaint` = this node contributes a browser-visible field of its own; both
-    /// arms refuse then, because the client WOULD place such a node and a withheld transform would strand it.</para>
+    /// SpineSprite clip root). `carriesOwnPaint` = this node contributes a browser-visible field of its own; every
+    /// arm refuses then, because the client WOULD place such a node and a withheld transform would strand it.</para>
+    ///
+    /// <para><paramref name="hiddenArmEnabled"/> is the SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD switch (the watcher only
+    /// reaches this call at all under the two R15 master switches), and <paramref name="descendantsHiddenOrInert"/>
+    /// is <see cref="DescendantsHiddenOrInert{TView}"/>'s verdict.</para>
+    ///
+    /// <para><paramref name="frozenStationaryRoot"/>: the anchor sits under a frozen, stationary SpineSprite root
+    /// whose skeleton leaves the watcher read-elides. Then no arm withholds: the leaf cannot move any more, so
+    /// streaming it costs one settle emit, after which it is elided like every other frozen leaf (see
+    /// <see cref="ShouldElideFrozenLeaf"/>). Withholding it instead would freeze a STALE pose on the client for as
+    /// long as the skeleton stays frozen, while its children keep being placed against the live one.</para>
     /// </summary>
-    internal static bool ShouldSuppressTransform(
+    internal static Arm DecideArm(
         bool skeletonLeaf,
         bool carriesOwnPaint,
         bool hasDescendants,
         bool tabledEmitterAnchor,
-        bool subtreeQuiet)
+        bool subtreeQuiet,
+        bool hiddenArmEnabled,
+        bool descendantsHiddenOrInert,
+        bool frozenStationaryRoot = false)
     {
-        if (!skeletonLeaf || carriesOwnPaint)
+        if (!skeletonLeaf || carriesOwnPaint || frozenStationaryRoot)
         {
-            return false;
+            return Arm.None;
         }
 
         // Arm A — childless: provable from structure alone, no table, no gate.
+        if (!hasDescendants)
+        {
+            return Arm.Childless;
+        }
+
         // Arm B — emitter parent: the table names it AND the live subtree scan agreed it is idle this tick.
-        return hasDescendants ? tabledEmitterAnchor && subtreeQuiet : true;
+        if (tabledEmitterAnchor && subtreeQuiet)
+        {
+            return Arm.TabledEmitters;
+        }
+
+        // Arm C — every descendant is inert or locally hidden: structural, no table.
+        return hiddenArmEnabled && descendantsHiddenOrInert ? Arm.HiddenDescendants : Arm.None;
+    }
+
+    /// <summary>
+    /// The watcher's frozen-spine read-elision, with the one exemption this fold needs. Under a frozen, stationary
+    /// SpineSprite root a skeleton leaf's pose cannot change, so it is normally not read at all — but a leaf whose
+    /// pose the fold WITHHELD (it, or an ancestor anchor, was suppressed while the skeleton still moved) is stale on
+    /// the client, and if it has descendants they are still read and placed against its LIVE pose. Such a leaf takes
+    /// the normal read path instead, where <see cref="DecideArm"/>'s frozen-root rule lets its pose ship once; that
+    /// clears <paramref name="poseWithheld"/> and it is elided from the next capture on. A childless withheld leaf
+    /// stays elided: nothing composes against it.
+    /// </summary>
+    internal static bool ShouldElideFrozenLeaf(
+        bool elisionEnabled,
+        bool fullCapture,
+        bool frozenStationaryRoot,
+        bool skeletonLeaf,
+        bool poseWithheld,
+        bool hasDescendants)
+        => elisionEnabled && !fullCapture && frozenStationaryRoot && skeletonLeaf && !(poseWithheld && hasDescendants);
+
+    /// <summary>
+    /// After a node's read and emit step: does the client still hold a pose for it that the FOLD left stale? This is
+    /// the mark <see cref="ShouldElideFrozenLeaf"/> reads, so clearing it early would let the elision freeze a stale
+    /// pose for good; keeping it a capture too long costs at most one extra read and settle emit.
+    ///
+    /// <list type="bullet">
+    /// <item>Arm A withheld it (<paramref name="foldedChildless"/>): marked without a compare. The node is childless,
+    /// so the elision ignores the mark until a child is attached — exactly when the stale pose starts to matter —
+    /// and the hundreds of childless skeleton meshes pay nothing.</item>
+    /// <item>Inside an arm-B/C fold (root or subtree): withheld while this tick's transform differs from the last one
+    /// shipped — unless this capture's upsert carried it and no tween window covers the node, in which case the
+    /// client now holds exactly it.</item>
+    /// <item>Otherwise suppressed (a tween window the fold did not open — the fold block is skipped then): the change
+    /// test neither saw nor recorded the pose, so the mark stays as it was. Clearing it here was the bug where a
+    /// creature's lunge tween wiped the mark of an anchor the fold had withheld just before.</item>
+    /// <item>Not suppressed at all: the change test compared the live transform and recorded it when it emitted, so
+    /// the client holds the live pose (to the emit test's precision).</item>
+    /// </list>
+    /// </summary>
+    internal static bool PoseStillWithheld(
+        bool wasWithheld,
+        bool foldedChildless,
+        bool insideFold,
+        bool transformSuppressed,
+        bool tweenWindow,
+        bool shippedLiveTransform,
+        bool differsFromLastShipped)
+    {
+        if (foldedChildless)
+        {
+            return true;
+        }
+
+        if (insideFold)
+        {
+            return !(shippedLiveTransform && !tweenWindow) && differsFromLastShipped;
+        }
+
+        return transformSuppressed && wasWithheld;
+    }
+
+    // ---- Arm C: the hidden-descendant fact --------------------------------------------------------------------
+
+    /// <summary>What one descendant contributes to arm C's fact.</summary>
+    internal enum DescendantKind : byte
+    {
+        /// <summary>A grouping/attachment class that paints nothing itself (<see cref="IsInertDescendantClass"/>).</summary>
+        Inert = 0,
+
+        /// <summary>A CanvasItem whose OWN `visible` is false: it and its whole subtree paint nothing.</summary>
+        Hidden,
+
+        /// <summary>Visible and not an inert class: the anchor's motion reaches the screen through it.</summary>
+        Paints,
+
+        /// <summary>No trustworthy fact yet (a node not read since it was added). Treated like
+        /// <see cref="Paints"/>: the fold fails closed, i.e. keeps streaming.</summary>
+        Unknown,
+    }
+
+    /// <summary>
+    /// A pre-order slice of the watcher's node list starting AT the anchor: index 0 is the anchor, the entries after
+    /// it belong to its subtree while their depth exceeds the anchor's. <see cref="KindAt"/> is only asked for
+    /// entries the scan actually looks at, so a caller can make it lazy (the class probe is not free).
+    /// </summary>
+    internal interface ISubtreeView
+    {
+        int Count { get; }
+
+        int DepthAt(int index);
+
+        DescendantKind KindAt(int index);
+    }
+
+    /// <summary>
+    /// Arm C's fact: is every descendant of the anchor either inert or locally hidden? A hidden descendant's own
+    /// subtree is PRUNED, not scanned — nothing below a hidden CanvasItem can paint, and the client composes
+    /// visibility down the same chain. Bounded like arm B's scan: past <see cref="MaxSubtreeNodes"/> visited entries
+    /// (pruned ones included, so a large hidden subtree cannot make the walk unbounded) or past
+    /// <see cref="MaxSubtreeDepth"/> for an entry it has to classify, it answers false and the anchor streams.
+    /// </summary>
+    internal static bool DescendantsHiddenOrInert<TView>(ref TView view)
+        where TView : struct, ISubtreeView
+    {
+        var count = view.Count;
+        if (count <= 1)
+        {
+            return true;
+        }
+
+        var anchorDepth = view.DepthAt(0);
+        var visited = 0;
+        var prunedBelow = int.MaxValue;
+        for (var i = 1; i < count; i++)
+        {
+            var depth = view.DepthAt(i);
+            if (depth <= anchorDepth)
+            {
+                break; // left the anchor's subtree
+            }
+
+            if (++visited > MaxSubtreeNodes)
+            {
+                return false;
+            }
+
+            if (depth > prunedBelow)
+            {
+                continue; // inside a hidden descendant's subtree
+            }
+
+            prunedBelow = int.MaxValue;
+            if (depth - anchorDepth > MaxSubtreeDepth)
+            {
+                return false;
+            }
+
+            switch (view.KindAt(i))
+            {
+                case DescendantKind.Hidden:
+                    prunedBelow = depth;
+                    break;
+                case DescendantKind.Inert:
+                    break;
+                default:
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    // ---- Arm C: the flip flush -----------------------------------------------------------------------------------
+
+    /// <summary>
+    /// One node of an arm-C-suppressed subtree as the capture saw it THIS tick, root first, in pre-order. Only nodes
+    /// the walk actually read are recorded (a node pruned under a still-hidden parent is not).
+    /// </summary>
+    /// <param name="Depth">Tree depth, for the same pruning as <see cref="DescendantsHiddenOrInert{TView}"/>.</param>
+    /// <param name="Kind">This tick's kind (own `visible` as just read). Ignored for the root.</param>
+    /// <param name="Emitted">The capture already put an upsert for this node in the delta.</param>
+    /// <param name="EmittedTransform">...and that upsert carries a transform (this tick's read).</param>
+    /// <param name="HasTransform">This tick's read has a transform at all.</param>
+    /// <param name="TransformDiffers">This tick's transform differs from the last one shipped, at the emit test's
+    /// precision.</param>
+    /// <param name="TweenWindow">A client-replayed transform window covers the node — its own, or an ancestor's
+    /// (inside the region too), apart from the fold's own sentinel: the client discards a streamed transform for it,
+    /// and one shipped mid-transition would be pinned for the rest of the window — the reason a reparent emit omits
+    /// it. The flush never adds one.</param>
+    internal readonly record struct FlushEntry(
+        int Depth,
+        DescendantKind Kind,
+        bool Emitted,
+        bool EmittedTransform,
+        bool HasTransform,
+        bool TransformDiffers,
+        bool TweenWindow = false);
+
+    internal enum FlushAction : byte
+    {
+        /// <summary>Leave the node alone.</summary>
+        None = 0,
+
+        /// <summary>The delta already ships this tick's transform: record it as the last shipped one.</summary>
+        Advance,
+
+        /// <summary>The node's upsert omitted its transform: put this tick's transform on it, then advance.</summary>
+        Patch,
+
+        /// <summary>Add an upsert carrying this tick's transform at the node's pre-order position, then advance.</summary>
+        Ship,
+    }
+
+    /// <summary>A node's part in the flip flush this capture.</summary>
+    internal enum FlushRole : byte
+    {
+        None = 0,
+        Root,
+        Descendant,
+    }
+
+    /// <summary>
+    /// What to do with one recorded node after the walk.
+    ///
+    /// <para>An upsert that already carries this tick's transform is always recorded as shipped, flip or not: the
+    /// client now holds that pose (a keyframe, or a hidden child whose modulate changed), so the next change test
+    /// must compare against it.</para>
+    ///
+    /// <para>On a flip, every recorded node of the subtree must reach the client at this tick's pose IN THIS DELTA:
+    /// the newly visible descendant was read relative to the root's live pose, so the root and every node between
+    /// them have to arrive with it, or it draws one capture late at a stale anchor. A node whose transform did not
+    /// change since it was last shipped is already there.</para>
+    ///
+    /// <para>A node a tween window covers is left alone entirely: the client is replaying that tween and would pin
+    /// whatever transform arrived, and the window's own settle re-emit ships the final pose.</para>
+    /// </summary>
+    internal static FlushAction DecideFlush(in FlushEntry entry, bool triggered)
+    {
+        if (entry.TweenWindow)
+        {
+            return FlushAction.None;
+        }
+
+        if (entry.Emitted)
+        {
+            if (entry.EmittedTransform)
+            {
+                return FlushAction.Advance;
+            }
+
+            return triggered && entry.HasTransform ? FlushAction.Patch : FlushAction.None;
+        }
+
+        return triggered && entry.HasTransform && entry.TransformDiffers ? FlushAction.Ship : FlushAction.None;
+    }
+
+    /// <summary>
+    /// Merge flushed upserts into the delta's upsert list at their pre-order positions. A position is the list's
+    /// length when the walk reached that node, so a root is inserted ahead of any descendant upsert that the walk
+    /// appended later, and entries sharing a position keep the order they were recorded in (pre-order). Positions
+    /// must be non-decreasing, which the walk guarantees.
+    /// </summary>
+    internal static void InsertInOrder<T>(List<T> items, IReadOnlyList<(int Position, T Item)> inserts)
+    {
+        if (inserts.Count == 0)
+        {
+            return;
+        }
+
+        var merged = new List<T>(items.Count + inserts.Count);
+        var next = 0;
+        for (var i = 0; i <= items.Count; i++)
+        {
+            while (next < inserts.Count && inserts[next].Position <= i)
+            {
+                merged.Add(inserts[next].Item);
+                next++;
+            }
+
+            if (i < items.Count)
+            {
+                merged.Add(items[i]);
+            }
+        }
+
+        while (next < inserts.Count)
+        {
+            merged.Add(inserts[next].Item);
+            next++;
+        }
+
+        items.Clear();
+        items.AddRange(merged);
+    }
+
+    /// <summary>What the flush does to the watcher's own state; the recorder decides, this acts.</summary>
+    internal interface IFlushTarget<TPayload, TDelta>
+    {
+        /// <summary>A volatile upsert carrying this tick's read (transform included), for a node that had none.</summary>
+        TDelta BuildShip(in TPayload node);
+
+        /// <summary>The node's existing upsert, with this tick's transform put on it.</summary>
+        TDelta WithTransform(TDelta upsert, in TPayload node);
+
+        /// <summary>This tick's transform reached the client: it is now the last shipped one.</summary>
+        void Shipped(in TPayload node);
+
+        /// <summary>The node's changed transform stays withheld this capture (profiler bookkeeping).</summary>
+        void Withheld(in TPayload node);
+    }
+
+    /// <summary>
+    /// The recording half of the flip flush, so the bookkeeping the watcher's walk does is the code under test:
+    /// which nodes belong to an arm-C region (<see cref="Enter"/> / <see cref="BeginRoot"/>), where each node's upsert
+    /// sits in pre-order (<see cref="Record"/> takes it from the upsert list itself — right after this node's own
+    /// append, or where it would have gone), and the post-walk decision and merge (<see cref="Flush"/>). One reused
+    /// list of structs; nothing allocates per capture unless a flip actually ships something.
+    /// </summary>
+    internal sealed class FlipFlushRecorder<TPayload, TDelta>
+    {
+        private readonly List<Recorded> _records = [];
+        private int _rootDepth = int.MaxValue;
+
+        public int Count => _records.Count;
+
+        /// <summary>Forget everything recorded. Called at the start of every capture, whatever it returns.</summary>
+        public void Reset()
+        {
+            _records.Clear();
+            _rootDepth = int.MaxValue;
+        }
+
+        /// <summary>Called for EVERY node the walk visits, before anything can skip it: leaves the current region
+        /// when the walk is back at or above its root's depth, and says whether this node is inside one.</summary>
+        public FlushRole Enter(int depth)
+        {
+            if (_rootDepth != int.MaxValue && depth <= _rootDepth)
+            {
+                _rootDepth = int.MaxValue;
+            }
+
+            return _rootDepth != int.MaxValue ? FlushRole.Descendant : FlushRole.None;
+        }
+
+        /// <summary>Arm C (and only arm C) withheld this node: it starts a region.</summary>
+        public FlushRole BeginRoot(int depth)
+        {
+            _rootDepth = depth;
+            return FlushRole.Root;
+        }
+
+        /// <summary>
+        /// Record a node the walk read, AFTER its emit step. <paramref name="emitted"/> means its upsert was the last
+        /// one appended to <paramref name="upserts"/>; otherwise it would have gone at the current end.
+        /// </summary>
+        public void Record(
+            FlushRole role,
+            List<TDelta> upserts,
+            in TPayload payload,
+            int depth,
+            DescendantKind kind,
+            bool emitted,
+            bool emittedTransform,
+            bool hasTransform,
+            bool transformDiffers,
+            bool tweenWindow)
+        {
+            if (role == FlushRole.None)
+            {
+                return;
+            }
+
+            var entry = new FlushEntry(
+                depth,
+                role == FlushRole.Root ? DescendantKind.Inert : kind,
+                emitted,
+                emitted && emittedTransform,
+                hasTransform,
+                transformDiffers,
+                tweenWindow);
+            _records.Add(new Recorded(entry, payload, emitted ? upserts.Count - 1 : upserts.Count, role == FlushRole.Root));
+        }
+
+        /// <summary>
+        /// After the walk, before the delta is judged empty: decide each region and apply the decisions. Inserts are
+        /// merged last, so every recorded position still indexes the walk's own list while patches are applied.
+        /// </summary>
+        public void Flush(List<TDelta> upserts, IFlushTarget<TPayload, TDelta> target)
+        {
+            List<(int Position, TDelta Item)>? inserts = null;
+            var start = 0;
+            while (start < _records.Count)
+            {
+                var end = start + 1;
+                while (end < _records.Count && !_records[end].IsRoot)
+                {
+                    end++;
+                }
+
+                // Did arm C's fact stop holding THIS tick? The anchor's own scan, over this tick's reads instead of
+                // last capture's. When it did, the next capture's anchor scan fails on its own (the descendants' last
+                // visible flags are now these), so the flush is needed exactly once per flip.
+                var view = new RecordView(_records, start, end - start);
+                var triggered = !DescendantsHiddenOrInert(ref view);
+                for (var i = start; i < end; i++)
+                {
+                    var record = _records[i];
+                    switch (DecideFlush(record.Entry, triggered))
+                    {
+                        case FlushAction.Advance:
+                            target.Shipped(record.Payload);
+                            break;
+                        case FlushAction.Patch:
+                            upserts[record.Position] = target.WithTransform(upserts[record.Position], record.Payload);
+                            target.Shipped(record.Payload);
+                            break;
+                        case FlushAction.Ship:
+                            (inserts ??= []).Add((record.Position, target.BuildShip(record.Payload)));
+                            target.Shipped(record.Payload);
+                            break;
+                        default:
+                            if (record.Entry.TransformDiffers && !record.Entry.EmittedTransform)
+                            {
+                                target.Withheld(record.Payload);
+                            }
+                            break;
+                    }
+                }
+
+                start = end;
+            }
+
+            if (inserts is not null)
+            {
+                InsertInOrder(upserts, inserts);
+            }
+
+            Reset();
+        }
+
+        private readonly record struct Recorded(FlushEntry Entry, TPayload Payload, int Position, bool IsRoot);
+
+        private readonly struct RecordView(List<Recorded> records, int start, int count) : ISubtreeView
+        {
+            public int Count => count;
+
+            public int DepthAt(int index) => records[start + index].Entry.Depth;
+
+            public DescendantKind KindAt(int index) => records[start + index].Entry.Kind;
+        }
     }
 
     // ---- The subtree scan's policy (the walk supplies the facts) -------------------------------------------

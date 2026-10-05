@@ -190,10 +190,11 @@
     <Compile Include="Live/Sts2OrbSpinFold.cs" />
     <Compile Include="Live/Sts2EndTurnGlowFold.cs" />
     <!-- R15 Godot-free CREATURE SPINE-ANCHOR FOLD (the skeleton anchors that were 100% of an idle combat wire once
-         the R14 folds landed): the two-arm decision table, the emitter-parent scene table, the inert-descendant
-         class allowlist and the burst-tail policy. Always compiled (no Godot dependency) so all four are
-         offline-unit-testable, like the folds above; the Godot-typed watcher that reads the live subtree and
-         withholds the transform stays in the live-host glob below. -->
+         the R14 folds landed): the three-arm decision table, arm C's hidden-descendant scan and flip-flush plan,
+         the emitter-parent scene table, the inert-descendant class allowlist and the burst-tail policy. Always
+         compiled (no Godot dependency) so all of it is offline-unit-testable, like the folds above; the
+         Godot-typed watcher that reads the live subtree and withholds the transform stays in the live-host glob
+         below. -->
     <Compile Include="Live/Sts2SpineAnchorFold.cs" />
     <!-- P2 Godot-free reparent-emit transform-omission predicate: always compiled (no Godot dependency) so the
          truth-table is offline-unit-testable. The Godot-typed watcher that applies it stays in the live-host glob. -->

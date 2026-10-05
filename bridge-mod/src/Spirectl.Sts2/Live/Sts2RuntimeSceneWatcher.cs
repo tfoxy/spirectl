@@ -100,6 +100,13 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     // re-allocated per capture (the walk is allocation-sensitive). Only populated/read in local mode.
     private readonly List<Transform2D> _emittedGlobalByDepth = [];
 
+    // R15 arm C flip flush: every node of an arm-C-suppressed subtree the walk read THIS capture, root first, in
+    // pre-order (Sts2SpineAnchorFold.FlipFlushRecorder owns the region and position bookkeeping and the decision;
+    // HiddenFoldTarget applies it to the watcher's state). Reused across captures and reset at the start of each,
+    // so an idle combat whose only arm-C region is one anchor and its hidden child appends two structs per tick.
+    private readonly Sts2SpineAnchorFold.FlipFlushRecorder<HiddenFoldNode, RuntimeSceneNodeDelta> _hiddenFold = new();
+    private HiddenFoldTarget? _hiddenFoldTarget;
+
     // A parent transform with |determinant| at or below this is treated as singular (visually collapsed) when
     // re-basing a child to LOCAL space — no inverse exists, so the child emits identity local (the collapsed parent
     // already zeroes the subtree on screen). Matches Sts2TweenEndpointTuples' singular epsilon.
@@ -315,9 +322,17 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     // an anchor paints no pixel of its own, so while it provably cannot move anything on screen (no descendants at
     // all, or only idle particle emitters) the watcher simply WITHHOLDS its transform through the same
     // SuppressTransformUntil depth sentinel that streaming tween-suppression uses — which silences the emitter
-    // children too. See Sts2SpineAnchorFold for the two arms, the scene table and the burst-tail gate.
+    // children too. See Sts2SpineAnchorFold for the three arms, the scene table and the burst-tail gate.
     private static readonly bool SpineAnchorFold =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_ANCHOR_FOLD") ?? "1")
+            .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
+
+    // R15 arm C, HIDDEN-DESCENDANT anchors (default ON; SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD=0 restores arms A+B only).
+    // Also gated by both switches above. Withholds a paintless anchor whose every descendant is inert or locally
+    // hidden (the Ironclad's `EyeSlot` over its hidden `EyeFire`), and flushes the anchor's live pose in the same
+    // delta when one of them turns visible. See Sts2SpineAnchorFold arm C and HiddenFoldTarget.
+    private static readonly bool SpineAnchorHiddenFold =
+        (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
     // Cached Godot member names for the fold gates. Every one is a REGISTERED script member
@@ -677,6 +692,8 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
     private RuntimeSceneDelta? Capture(bool subscriberFullRequested)
     {
+        // R15 arm C: nothing recorded by an earlier capture (one that threw, or returned early) may reach this one.
+        _hiddenFold.Reset();
         var root = ResolveRoot();
         if (root is null || !GodotObject.IsInstanceValid(root))
         {
@@ -773,6 +790,15 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // when an NIntent is visited (pre-order → the parent is reached before its `%Intent` child), consumed when
         // that child glyph node is emitted a few iterations later. Lazily allocated (no combat = no dictionary).
         Dictionary<ulong, RuntimeSceneIntentFramesSnapshot>? intentFramesByGlyph = null;
+        // R15: the depth of the spine-anchor fold root (any arm) whose subtree the walk is in (int.MaxValue = none).
+        // Kept apart from `suppressDepth`, which tween windows share: it marks the nodes whose pose the FOLD left
+        // stale on the client (Tracked.AnchorPoseWithheld), which the frozen-spine elision must not skip.
+        var anchorFoldDepth = int.MaxValue;
+        // R15: the depth of the nearest open client-replayed tween window (SuppressTransformUntil) above or at the
+        // current node, IGNORING the fold's own sentinel. `suppressDepth` cannot answer that inside a fold region:
+        // there the fold's root owns the sentinel and a descendant's own window never opens a new one. The flip
+        // flush must not put a transform on a node the client is replaying a tween for (it would pin it).
+        var tweenWindowDepth = int.MaxValue;
         // INDEXED (not foreach) so the R15 spine-anchor fold can scan a candidate anchor's SUBTREE — the entries
         // that follow it in this pre-order list while their Depth exceeds its own — without a per-node child list.
         for (var orderIndex = 0; orderIndex < _ordered.Count; orderIndex++)
@@ -784,6 +810,28 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 frozenRootDepth = -1;
                 frozenRootStationary = false;
             }
+
+            // R15: left the fold root's subtree → clear the context. Arm C's own region (for the flip flush) is
+            // tracked by the recorder, which must see every visited node for the same reason.
+            if (anchorFoldDepth != int.MaxValue && tracked.Depth <= anchorFoldDepth)
+            {
+                anchorFoldDepth = int.MaxValue;
+            }
+            var hiddenFoldRole = _hiddenFold.Enter(tracked.Depth);
+            // Leave a finished suppression subtree HERE, for every visited entry, not only at the next node that is
+            // actually read: a frozen skeleton leaf that is elided below `continue`s before the reset further down, so
+            // a node read after elided siblings would otherwise inherit a sentinel from a subtree it is not in (its
+            // depth can exceed that subtree's root while not being below it). Identical for every read node.
+            if (suppressDepth != int.MaxValue && tracked.Depth <= suppressDepth)
+            {
+                suppressDepth = int.MaxValue;
+            }
+            if (tweenWindowDepth != int.MaxValue && tracked.Depth <= tweenWindowDepth)
+            {
+                tweenWindowDepth = int.MaxValue;
+            }
+            // R15 arm A withheld this (childless) node this capture — see the AnchorPoseWithheld update below.
+            var foldedChildless = false;
 
             // FIX 4: maintain the rest-site overlay depth sentinel. Reset on subtree exit (depth back to/above the
             // pinned root), then (re-)pin on the NRestSiteRoom root. Root detection reads only cached strings
@@ -812,7 +860,19 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // return false → no upsert. Skipping the read+diff produces the identical (empty) result. Scoped to
             // skeleton-leaf CLASSES (bones/slots/meshes) — the SpineSprite root and bone-attached non-spine VFX
             // children are separate entries and stay fully read, so nothing hook-driven or rendered is dropped.
-            if (ElideFrozenSpine && !full && frozenRootDepth >= 0 && frozenRootStationary && tracked.IsSpineSkeletonLeafType)
+            //
+            // R15 exemption: a leaf whose pose the spine-anchor fold withheld while the skeleton still moved is STALE on
+            // the client; if it has descendants they keep being read and placed against its live pose. It takes the
+            // normal read path instead, where the fold lets its pose ship once (see Sts2SpineAnchorFold
+            // .ShouldElideFrozenLeaf / DecideArm's frozen-root rule) — the same read this elision would skip, not a
+            // new one — and it is elided from the next capture on.
+            if (Sts2SpineAnchorFold.ShouldElideFrozenLeaf(
+                    elisionEnabled: ElideFrozenSpine,
+                    fullCapture: full,
+                    frozenStationaryRoot: frozenRootDepth >= 0 && frozenRootStationary,
+                    skeletonLeaf: tracked.IsSpineSkeletonLeafType,
+                    poseWithheld: tracked.AnchorPoseWithheld,
+                    hasDescendants: tracked.AnchorPoseWithheld && HasTrackedDescendants(orderIndex, tracked)))
             {
                 if (_instrumentation.ProducerProfilingEnabled)
                 {
@@ -899,6 +959,14 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
             // Opacity suppression is TARGET-ONLY (no depth propagation): opacity is emitted per-node-local, so a
             // fade changes only the target's own modulate/self_modulate → only the target ever needs suppressing.
+            // R15: tween suppression in effect for this node apart from the fold (see tweenWindowDepth). Read before
+            // the fold below can open its own sentinel; only the flip flush and the withheld-pose bit consult it.
+            if (tweenWindowDepth == int.MaxValue && tracked.SuppressTransformUntil > now)
+            {
+                tweenWindowDepth = tracked.Depth;
+            }
+            var tweenWindow = tweenWindowDepth != int.MaxValue || tracked.SuppressTransformSelfUntil > now;
+
             var suppressOpacity = tracked.SuppressOpacityUntil > now;
             forceOpacityResync = WindowClosed(tracked.SuppressOpacityUntil, now);
             if (forceOpacityResync)
@@ -973,8 +1041,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // ---- R15 CREATURE SPINE-ANCHOR FOLD ---------------------------------------------------------------
             // Withhold the transform of a spine skeleton anchor that provably cannot move a pixel right now: it
             // paints nothing itself (the client's `placementBox` returns null for it) and it either has no
-            // descendants at all (arm A — structural, corpus-wide) or its whole subtree is idle particle emitters
-            // named by Sts2SpineAnchorFold's scene table (arm B). Suppression — not a pin — so the SUBTREE follows
+            // descendants at all (arm A — structural, corpus-wide), its whole subtree is idle particle emitters
+            // named by Sts2SpineAnchorFold's scene table (arm B), or every descendant is inert or locally hidden
+            // (arm C — structural again). Suppression — not a pin — so the SUBTREE follows
             // through the depth sentinel above, which is what also stops the emitter children re-sending the local
             // that wobbles in its 4th decimal as the anchor moves.
             //
@@ -989,28 +1058,59 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // correct. Never applied on a node's first appearance (JustAdded), whose upsert carries the static
             // block the client builds its element from.
             //
-            // The facts are gathered cheapest-first and SHORT-CIRCUITED: the (bounded) subtree scan runs only for a
-            // paintless skeleton leaf that both has descendants and is named by the table, i.e. a handful of nodes
-            // per creature — never for the hundreds of skeleton meshes a SpineSprite root owns.
+            // The facts are gathered cheapest-first and SHORT-CIRCUITED: the (bounded) subtree scans run only for a
+            // paintless skeleton leaf that has descendants — arm B's only when the table names it, arm C's only when
+            // arm B did not already decide — i.e. a handful of nodes per creature, never for the hundreds of skeleton
+            // meshes a SpineSprite root owns (those are childless: arm A, no scan).
+            //
+            // Arm C reads nothing new: its scan uses each descendant's LastVisible and cached class. That makes its
+            // fact one capture old, which the flip flush (after the walk) corrects for: the anchor becomes a recorded
+            // region root here, and its subtree is recorded as the walk reads it below.
+            //
+            // Under a frozen, stationary SpineSprite root no arm withholds (`frozenStationaryRoot`): the leaf can no
+            // longer move, so its pose ships once and the frozen-spine elision takes over. Only a leaf the elision
+            // exempted (or a keyframe) gets here in that state.
             if (DecorEmitSuppress && SpineAnchorFold && !suppressTransform && !tracked.JustAdded
                 && tracked.IsSpineSkeletonLeafType && !CarriesOwnPaint(read))
             {
                 var hasDescendants = HasTrackedDescendants(orderIndex, tracked);
                 var tabledAnchor = (tracked.DecorChannels & Sts2DecorEmitSuppress.Channels.SpineAnchorTransform) != 0;
                 var subtreeQuiet = hasDescendants && tabledAnchor && SpineAnchorSubtreeQuiet(orderIndex, tracked, now);
-                if (Sts2SpineAnchorFold.ShouldSuppressTransform(
-                        skeletonLeaf: true,
-                        carriesOwnPaint: false,
-                        hasDescendants: hasDescendants,
-                        tabledEmitterAnchor: tabledAnchor,
-                        subtreeQuiet: subtreeQuiet))
+                var hiddenOrInert = SpineAnchorHiddenFold && hasDescendants && !subtreeQuiet
+                    && SpineAnchorDescendantsHiddenOrInert(orderIndex);
+                var arm = Sts2SpineAnchorFold.DecideArm(
+                    skeletonLeaf: true,
+                    carriesOwnPaint: false,
+                    hasDescendants: hasDescendants,
+                    tabledEmitterAnchor: tabledAnchor,
+                    subtreeQuiet: subtreeQuiet,
+                    hiddenArmEnabled: SpineAnchorHiddenFold,
+                    descendantsHiddenOrInert: hiddenOrInert,
+                    frozenStationaryRoot: ElideFrozenSpine && frozenRootDepth >= 0 && frozenRootStationary);
+                if (arm != Sts2SpineAnchorFold.Arm.None)
                 {
                     suppressTransform = true;
                     suppressDepth = tracked.Depth; // this anchor is a suppression root → its subtree follows
+                    if (arm == Sts2SpineAnchorFold.Arm.Childless)
+                    {
+                        foldedChildless = true;
+                    }
+                    else
+                    {
+                        anchorFoldDepth = tracked.Depth;
+                    }
+
+                    if (arm == Sts2SpineAnchorFold.Arm.HiddenDescendants)
+                    {
+                        hiddenFoldRole = _hiddenFold.BeginRoot(tracked.Depth);
+                    }
                 }
             }
 
-            if (_instrumentation.ProducerProfilingEnabled && suppressTransform && !XformEq(tracked.LastTransform, read.Transform))
+            // Arm-C region nodes count their withheld transform after the walk instead, once it is known whether
+            // the flip flush shipped it after all (HiddenFoldTarget.Withheld).
+            if (_instrumentation.ProducerProfilingEnabled && suppressTransform && hiddenFoldRole == Sts2SpineAnchorFold.FlushRole.None
+                && !XformEq(tracked.LastTransform, read.Transform))
             {
                 _profile.RecordSuppressDrop(); // a transform change withheld — mid-replay, or a folded spine anchor (profiler only)
             }
@@ -1293,6 +1393,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             var parentChanged = Sts2SceneWatchRuntimeSettings.EmitReparents
                 && !string.Equals(tracked.ParentIdStr, tracked.LastEmittedParentId, StringComparison.Ordinal);
 
+            // R15 arm C: whether this node's upsert was appended this tick, and what it carried.
+            var emitted = false;
+            var emittedTransform = false;
             if (full || changedNow || intentAnimChanged || lineSigChanged || spineReprobeUpgraded || parentChanged)
             {
                 // Force a wholesale keyframe-style upsert when the node's renderable box first appears (localRect
@@ -1334,6 +1437,8 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                     emitRead = read with { Transform = null };
                 }
                 upserts.Add(BuildNodeDelta(tracked, emitRead, includeStatic, intentFrames, lineGeometry));
+                emitted = true;
+                emittedTransform = emitRead.Transform is not null;
                 // R10: this node's FIRST appearance on the wire. Its id was withheld from OrderedIds until now
                 // (see Tracked.EverEmitted), so the order must be re-shipped this capture or the client would
                 // merge the node with no structure trigger and never build an element for it.
@@ -1346,6 +1451,40 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 // Record the parentId the client now knows, so a later reparent (not a first emit) is detected.
                 tracked.LastEmittedParentId = tracked.ParentIdStr;
             }
+
+            // R15 arm C: record this region node as read THIS tick, for the flip flush. `read` is the value the change
+            // test just used; a flush ships exactly this transform, so nothing is ever re-read. The descendant's kind
+            // is taken from this tick's own `visible` (the anchor's scan used last capture's). Called right after this
+            // node's own emit step: the recorder takes its pre-order position from the upsert list.
+            if (hiddenFoldRole != Sts2SpineAnchorFold.FlushRole.None)
+            {
+                _hiddenFold.Record(
+                    hiddenFoldRole,
+                    upserts,
+                    new HiddenFoldNode(tracked, read),
+                    depth: tracked.Depth,
+                    kind: hiddenFoldRole == Sts2SpineAnchorFold.FlushRole.Root
+                        ? Sts2SpineAnchorFold.DescendantKind.Inert
+                        : CurrentDescendantKind(tracked, read),
+                    emitted: emitted,
+                    emittedTransform: emittedTransform,
+                    hasTransform: read.Transform is not null,
+                    transformDiffers: !XformEq(tracked.LastTransform, read.Transform),
+                    tweenWindow: tweenWindow);
+            }
+
+            // R15: is this node's pose, as the client holds it, stale because the fold withheld it? Read by the
+            // frozen-spine elision above on later captures; cleared only when the pose actually reaches the client
+            // (here, or by the flip flush). See Sts2SpineAnchorFold.PoseStillWithheld for the rule.
+            tracked.AnchorPoseWithheld = Sts2SpineAnchorFold.PoseStillWithheld(
+                wasWithheld: tracked.AnchorPoseWithheld,
+                foldedChildless: foldedChildless,
+                insideFold: anchorFoldDepth != int.MaxValue,
+                transformSuppressed: suppressTransform,
+                tweenWindow: tweenWindow,
+                shippedLiveTransform: emittedTransform,
+                // Only the fold branch of the rule reads it, so only fold nodes pay the compare.
+                differsFromLastShipped: anchorFoldDepth != int.MaxValue && !XformEq(tracked.LastTransform, read.Transform));
 
             // A frozen (ProcessMode.Disabled) SpineSprite root with an unchanged global transform gates read-elision
             // of its skeleton subtree (visited next in this pre-order walk). One cheap ProcessMode read per creature.
@@ -1369,6 +1508,17 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             {
                 skipDepth = tracked.Depth;
             }
+        }
+
+        // R15 arm C flip flush: BEFORE the empty check and the orderedIds build, so a flushed node's first emit (if it
+        // ever were one) still re-ships the order under the R10 contract. A flush only ever fires alongside an upsert
+        // of the descendant that flipped, so it never turns an empty capture into a non-empty one.
+        if (_hiddenFold.Count > 0)
+        {
+            var target = _hiddenFoldTarget ??= new HiddenFoldTarget(this);
+            target.FirstEmit = false;
+            _hiddenFold.Flush(upserts, target);
+            firstEmitThisPass |= target.FirstEmit;
         }
 
         if (!full && upserts.Count == 0 && removedIds.Count == 0)
@@ -1725,6 +1875,125 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
         return true;
     }
+
+    /// <summary>
+    /// Arm C's fact for the anchor at <paramref name="orderIndex"/>, from LAST capture's values: each descendant's
+    /// <c>LastVisible</c> and its cached class. Lazily classified — a hidden descendant is never class-probed, and a
+    /// pruned one is never looked at — so the per-tick cost for `EyeSlot` is one depth compare and one bool.
+    /// </summary>
+    private bool SpineAnchorDescendantsHiddenOrInert(int orderIndex)
+    {
+        var view = new OrderedSubtreeView(_ordered, orderIndex);
+        return Sts2SpineAnchorFold.DescendantsHiddenOrInert(ref view);
+    }
+
+    /// <summary>
+    /// A descendant's kind as of the last capture that read it. A node not read since it was added has no
+    /// trustworthy <c>LastVisible</c> yet (it defaults to false), so it is <c>Unknown</c> and the anchor streams.
+    /// </summary>
+    private static Sts2SpineAnchorFold.DescendantKind LastDescendantKind(Tracked descendant)
+    {
+        if (descendant.JustAdded)
+        {
+            return Sts2SpineAnchorFold.DescendantKind.Unknown;
+        }
+
+        if (!descendant.LastVisible)
+        {
+            return Sts2SpineAnchorFold.DescendantKind.Hidden;
+        }
+
+        if (descendant.AnchorInertKind == Tracked.InertUnknown && !GodotObject.IsInstanceValid(descendant.Node))
+        {
+            return Sts2SpineAnchorFold.DescendantKind.Unknown;
+        }
+
+        return DescendantIsInert(descendant)
+            ? Sts2SpineAnchorFold.DescendantKind.Inert
+            : Sts2SpineAnchorFold.DescendantKind.Paints;
+    }
+
+    /// <summary>A recorded region node's kind as of THIS tick's read (the walk just read it, so it is valid).</summary>
+    private static Sts2SpineAnchorFold.DescendantKind CurrentDescendantKind(Tracked descendant, VolatileRead read)
+    {
+        if (!read.Visible)
+        {
+            return Sts2SpineAnchorFold.DescendantKind.Hidden;
+        }
+
+        return DescendantIsInert(descendant)
+            ? Sts2SpineAnchorFold.DescendantKind.Inert
+            : Sts2SpineAnchorFold.DescendantKind.Paints;
+    }
+
+    /// <summary>
+    /// The arm-C flip flush's effect on the watcher (Sts2SpineAnchorFold.FlipFlushRecorder decides; this acts).
+    ///
+    /// <para>Why this tick's values are the right ones to ship, in both transform spaces. LOCAL: every node in the
+    /// subtree was read relative to its parent's LIVE global (the depth scratch stores the streamed global of every
+    /// read node, suppressed or not), and the root's parent is outside any suppression, so once the root and the
+    /// moved nodes carry this tick's locals the client composes exactly this tick's globals — the pose it will hold
+    /// for the anchor after this delta is the one the descendant was re-based on. GLOBAL: each node's transform is
+    /// absolute, so this tick's values are trivially consistent.</para>
+    ///
+    /// <para>LastTransform: advanced for every node whose transform this delta carries (and ONLY those), because
+    /// that is what the change test compares against next tick — the gate has failed by then (the descendant's
+    /// LastVisible is now true), so streaming resumes from exactly the pose the client holds.</para>
+    /// </summary>
+    private sealed class HiddenFoldTarget(Sts2RuntimeSceneWatcher owner)
+        : Sts2SpineAnchorFold.IFlushTarget<HiddenFoldNode, RuntimeSceneNodeDelta>
+    {
+        // R10: set when a ship was some node's first emit, so the capture re-ships the order.
+        public bool FirstEmit;
+
+        public RuntimeSceneNodeDelta BuildShip(in HiddenFoldNode node)
+        {
+            // A volatile upsert like any per-tick emission. A region node is never JustAdded (that one always emits)
+            // and so has always been shipped before; the R10 bookkeeping is kept anyway so the order contract cannot
+            // break if that ever stops being true.
+            var tracked = node.Tracked;
+            var firstEmit = !tracked.EverEmitted;
+            var delta = BuildNodeDelta(tracked, node.Read, includeStatic: firstEmit);
+            tracked.LastEmittedParentId = tracked.ParentIdStr;
+            if (firstEmit)
+            {
+                tracked.EverEmitted = true;
+                FirstEmit = true;
+            }
+
+            return delta;
+        }
+
+        public RuntimeSceneNodeDelta WithTransform(RuntimeSceneNodeDelta upsert, in HiddenFoldNode node)
+            => upsert with { Transform = node.Read.Transform };
+
+        public void Shipped(in HiddenFoldNode node)
+        {
+            node.Tracked.LastTransform = node.Read.Transform;
+            node.Tracked.AnchorPoseWithheld = false;
+        }
+
+        public void Withheld(in HiddenFoldNode node)
+        {
+            if (owner._instrumentation.ProducerProfilingEnabled)
+            {
+                owner._profile.RecordSuppressDrop(); // withheld, and the flush did not ship it after all
+            }
+        }
+    }
+
+    // R15 arm C: a pre-order view of `_ordered` starting at a candidate anchor, classified from last capture.
+    private readonly struct OrderedSubtreeView(List<Tracked> ordered, int anchorIndex) : Sts2SpineAnchorFold.ISubtreeView
+    {
+        public int Count => ordered.Count - anchorIndex;
+
+        public int DepthAt(int index) => ordered[anchorIndex + index].Depth;
+
+        public Sts2SpineAnchorFold.DescendantKind KindAt(int index) => LastDescendantKind(ordered[anchorIndex + index]);
+    }
+
+    // R15 arm C: what the flush needs about one recorded node — the node and the value the walk read for it.
+    private readonly record struct HiddenFoldNode(Tracked Tracked, VolatileRead Read);
 
     /// <summary>
     /// Is this descendant a node that paints nothing itself (a grouping Node2D, a Marker2D, a nested spine
@@ -3999,6 +4268,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // cached forever after (class strings are invariant). Unknown until then, so nodes outside every anchor
         // subtree — i.e. almost all of them — never pay the probe at all.
         public byte AnchorInertKind = InertUnknown;
+        // R15: the client holds a STALE pose for this node because the spine-anchor fold withheld it (as an anchor or
+        // inside one's subtree) while it still moved. Exempts it (when it has descendants) from the frozen-spine
+        // read-elision, so its pose can ship once before the elision takes over. Cleared whenever its pose ships.
+        public bool AnchorPoseWithheld;
 
         public const byte InertUnknown = 0;
         public const byte InertYes = 1;
