@@ -107,8 +107,10 @@ internal static class Sts2DecorEmitSuppress
         // whose whole authored subtree is particle emitters: while every one of them is idle the watcher WITHHOLDS
         // the anchor's transform (and, through the depth sentinel, its subtree's) instead of substituting anything —
         // there is no analytic rest to pin and nothing for the client to replay. Its own kill switch is
-        // SPIRECTL_SPINE_ANCHOR_FOLD. NOTE the fold's OTHER arm — a CHILDLESS anchor — deliberately carries no
-        // channel: it is proved structurally, per tick, for every scene in the game rather than by this table.
+        // SPIRECTL_SPINE_ANCHOR_FOLD. NOTE the fold's OTHER two arms deliberately carry no channel: a CHILDLESS
+        // anchor (arm A) and an anchor whose every descendant is inert or locally hidden (arm C, its own switch
+        // SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD) are proved structurally, per tick, for every scene in the game rather
+        // than by this table.
         SpineAnchorTransform = 128,
     }
 
