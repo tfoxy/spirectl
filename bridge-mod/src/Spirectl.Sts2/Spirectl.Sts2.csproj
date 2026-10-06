@@ -325,7 +325,7 @@
     <Compile Include="Live/Sts2GameBuildIdentity.cs" />
     <!-- Explicit LogicalName: the loader addresses this by the literal "Spirectl.Sts2.Data.<file>" string, but the
          DEFAULT logical name is derived from the project path — and when the project is reached through a symlinked
-         path (e.g. a .claude/worktrees/spirectl link) MSBuild drops the Data directory segment, producing
+         path (e.g. a symlinked checkout under .worktrees/) MSBuild drops the Data directory segment, producing
          "Spirectl.Sts2.base-game-….json" and a resource the loader cannot find. -->
     <EmbeddedResource Include="Data/base-game-encounter-visual-packages.json" LogicalName="Spirectl.Sts2.Data.base-game-encounter-visual-packages.json" />
   </ItemGroup>
