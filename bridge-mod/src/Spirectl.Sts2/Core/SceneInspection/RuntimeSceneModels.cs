@@ -128,9 +128,9 @@ public sealed record RuntimeSceneTextRenderedMetricsSnapshot(
     /// </summary>
     /// <remarks>
     /// THE STALENESS SEAM, and it is load-bearing rather than defensive. A node's text is streamed on the
-    /// PER-TICK (lean) path and these ranges are produced on the STATIC (non-lean) one, so a label whose words
-    /// change without a static re-describe would carry ranges describing the string it used to hold. Slicing the
-    /// new text at the old offsets is a WRONG-WORDS failure — the one failure a text path must never ship — and
+    /// per-tick lean path; ranges are produced on add and refreshed by the watcher when that text changes.
+    /// Either read can fail or lag, so a changed label may still carry ranges for its previous words. Slicing
+    /// new text at old offsets is a WRONG-WORDS failure — the one failure a text path must never ship — and
     /// it would be silent.
     ///
     /// So the ranges are not self-evidently valid and must not be treated as such: a consumer recomputes the

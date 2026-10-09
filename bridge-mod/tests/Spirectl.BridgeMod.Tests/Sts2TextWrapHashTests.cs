@@ -8,8 +8,9 @@ namespace Spirectl.BridgeMod.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A node's line ranges ride the producer's STATIC path while its words ride the per-tick one, so a client may
-/// only use a streamed wrap after re-hashing the string it is about to draw and finding the same value. That
+/// A node's line ranges are produced on add and refreshed when text changes, while its words ride the per-tick
+/// path; a probe can still fail or lag, so a client may only use a streamed wrap after re-hashing the string it
+/// is about to draw and finding the same value. That
 /// makes this function a WIRE CONTRACT with the browser's <c>@/mirror/textWrap.fnv1a32</c>, not an internal
 /// detail — and a contract with two failure modes that look nothing alike:
 /// </para>

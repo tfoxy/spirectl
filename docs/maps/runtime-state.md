@@ -112,8 +112,9 @@ The live scene delta stream (`SubscribeRuntimeSceneDelta`, produced by
 parts of it are published as referenceable API rather than left to be copied by hand:
 
 - `bridge-mod/src/Spirectl.Sts2/Core/SceneInspection/RuntimeSceneNodeDeltaFields.cs` — `StaticFieldNames` and
-  `VolatileFieldNames` partition `RuntimeSceneNodeDelta`. Static fields ride add/keyframe deltas only; a consumer
-  must retain the last non-default value it saw for each and ignore the record default in between. Volatile fields
+  `VolatileFieldNames` partition `RuntimeSceneNodeDelta`. Static fields ride add/keyframe deltas, with the five
+  text-wrap fields also refreshed together when label text changes. A consumer must retain the last non-default
+  value it saw for each and ignore the record default in between. Volatile fields
   are on every emitted delta. The split is defined by exactly one thing — whether the watcher gates that argument
   on its `includeStatic` flag — and `RuntimeSceneNodeDeltaFieldsTests` holds the lists to the record and to the
   watcher's source, so a field added without being classified fails the bridge test leg.
