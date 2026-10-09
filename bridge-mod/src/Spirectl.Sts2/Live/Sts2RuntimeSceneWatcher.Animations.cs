@@ -178,6 +178,47 @@ internal sealed partial class Sts2RuntimeSceneWatcher
                 }
             }
 
+            // LOCAL mode: the node's streamed Transform is emitted parent-relative, so a pinned endpoint must be too. Keep
+            // the GLOBAL end/start tuples computed above (all the position/scale/rotation + global-position math is
+            // unchanged), then re-base each against the emitted parent's global — the SAME parent + prefix the capture
+            // walk uses (NOT the internal Godot parent-item local, which diverges across chain-breaks). Opacity is
+            // space-agnostic. Identity parent (root) leaves the tuple unchanged. Read the knob directly (this runs on the
+            // capture thread from the tween hook's deferred Finalize, outside Capture's per-tick latch).
+            if (Sts2SceneWatchRuntimeSettings.EmitLocalTransforms)
+            {
+                var parentGlobal = _emittedParentGlobalTuple(tracked);
+                if (transform is not null)
+                {
+                    transform = Sts2TweenEndpointTuples.LocalizeEndTuple(transform, parentGlobal);
+                }
+
+                if (startTransform is not null)
+                {
+                    startTransform = Sts2TweenEndpointTuples.LocalizeEndTuple(startTransform, parentGlobal);
+                }
+            }
+
+            // A non-finite endpoint (a NaN/Infinity read, or a degenerate parent whose inverse is non-finite) is not
+            // replayable: drop that channel BEFORE any suppression window opens, so the node simply keeps streaming
+            // its (guarded) live value, exactly as when an endpoint does not resolve. Hence the localization above
+            // runs before the windows below rather than after them.
+            if (!Sts2SceneFiniteGuard.IsFinite(transform) || !Sts2SceneFiniteGuard.IsFinite(startTransform))
+            {
+                var bad = !Sts2SceneFiniteGuard.IsFinite(transform) ? transform : startTransform;
+                LogNonFinite(tracked.IdStr, () => new Sts2SceneWatchFaultFormat.NodeContext(tracked.IdStr, tracked.Name, tracked.NodeType),
+                    "tweenEndpoint", Sts2SceneWatchFaultFormat.Value(bad), "dropped");
+                transform = null;
+                startTransform = null;
+            }
+            if (!Sts2SceneFiniteGuard.IsFinite(opacity) || !Sts2SceneFiniteGuard.IsFinite(startOpacity))
+            {
+                LogNonFinite(tracked.IdStr, () => new Sts2SceneWatchFaultFormat.NodeContext(tracked.IdStr, tracked.Name, tracked.NodeType),
+                    "tweenOpacity", Sts2SceneWatchFaultFormat.Number(!Sts2SceneFiniteGuard.IsFinite(opacity) ? opacity!.Value : startOpacity!.Value),
+                    "dropped");
+                opacity = null;
+                startOpacity = null;
+            }
+
             if (transform is null && opacity is null)
             {
                 return null;
@@ -206,26 +247,6 @@ internal sealed partial class Sts2RuntimeSceneWatcher
                 if (_producerProfilingEnabled())
                 {
                     _profile.RecordSuppressOpacityWindow();
-                }
-            }
-
-            // LOCAL mode: the node's streamed Transform is emitted parent-relative, so a pinned endpoint must be too. Keep
-            // the GLOBAL end/start tuples computed above (all the position/scale/rotation + global-position math is
-            // unchanged), then re-base each against the emitted parent's global — the SAME parent + prefix the capture
-            // walk uses (NOT the internal Godot parent-item local, which diverges across chain-breaks). Opacity is
-            // space-agnostic. Identity parent (root) leaves the tuple unchanged. Read the knob directly (this runs on the
-            // capture thread from the tween hook's deferred Finalize, outside Capture's per-tick latch).
-            if (Sts2SceneWatchRuntimeSettings.EmitLocalTransforms)
-            {
-                var parentGlobal = _emittedParentGlobalTuple(tracked);
-                if (transform is not null)
-                {
-                    transform = Sts2TweenEndpointTuples.LocalizeEndTuple(transform, parentGlobal);
-                }
-
-                if (startTransform is not null)
-                {
-                    startTransform = Sts2TweenEndpointTuples.LocalizeEndTuple(startTransform, parentGlobal);
                 }
             }
 

@@ -32,7 +32,9 @@ public static class Sts2ViewportPrefixTransform
     /// </summary>
     public static Fit? Compute(double rectW, double rectH, double vpW, double vpH, bool keepAspect)
     {
-        if (rectW <= 0 || rectH <= 0 || vpW <= 0 || vpH <= 0)
+        // Not `x <= 0`: a NaN size compares false both ways and must count as degenerate too, as must an infinite
+        // one (its fit would be infinite, or zero times infinity).
+        if (!IsPositiveFinite(rectW) || !IsPositiveFinite(rectH) || !IsPositiveFinite(vpW) || !IsPositiveFinite(vpH))
         {
             return null;
         }
@@ -91,7 +93,7 @@ public static class Sts2ViewportPrefixTransform
         bool stretch,
         int stretchShrink)
     {
-        if (containerW <= 0 || containerH <= 0 || vpW <= 0 || vpH <= 0)
+        if (!IsPositiveFinite(containerW) || !IsPositiveFinite(containerH) || !IsPositiveFinite(vpW) || !IsPositiveFinite(vpH))
         {
             return null;
         }
@@ -108,4 +110,6 @@ public static class Sts2ViewportPrefixTransform
 
         return new Fit(containerW / vpW, containerH / vpH, 0.0, 0.0);
     }
+
+    private static bool IsPositiveFinite(double value) => value > 0 && double.IsFinite(value);
 }

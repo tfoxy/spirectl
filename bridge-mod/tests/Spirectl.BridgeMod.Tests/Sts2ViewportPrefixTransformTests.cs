@@ -207,4 +207,19 @@ public sealed class Sts2ViewportPrefixTransformTests
         Assert.NotNull(Sts2ViewportPrefixTransform.ComputeContainerFit(
             324.0, 200.0, 162.0, 100.0, stretch: false, stretchShrink));
     }
+
+    [Theory]
+    [InlineData(double.NaN, 100.0)]
+    [InlineData(100.0, double.NaN)]
+    [InlineData(double.PositiveInfinity, 100.0)]
+    [InlineData(100.0, double.PositiveInfinity)]
+    public void NonFiniteSizes_AreDegenerate_NoFit(double displayW, double viewportW)
+    {
+        // A NaN compares false against zero both ways, so a plain `<= 0` test let it through and the fit came out
+        // NaN. The watcher would then have baked that NaN into every node flattened out of the viewport.
+        Assert.Null(Sts2ViewportPrefixTransform.Compute(displayW, 100.0, viewportW, 100.0, keepAspect: true));
+        Assert.Null(Sts2ViewportPrefixTransform.Compute(displayW, 100.0, viewportW, 100.0, keepAspect: false));
+        Assert.Null(Sts2ViewportPrefixTransform.ComputeContainerFit(displayW, 100.0, viewportW, 100.0, stretch: false, stretchShrink: 1));
+        Assert.Null(Sts2ViewportPrefixTransform.ComputeContainerFit(displayW, 100.0, viewportW, 100.0, stretch: true, stretchShrink: 1));
+    }
 }

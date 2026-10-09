@@ -156,6 +156,11 @@
          dependency) so it's offline-unit-testable, like Sts2RegionEmitCap above. The Godot-typed watcher that applies
          it stays in the live-host glob below. -->
     <Compile Include="Live/Sts2CosmeticEmitCap.cs" />
+    <!-- Godot-free scene-watch fault handling (non-finite read checks, the failed-capture retry backoff, the
+         rate-limited fault log and its line formats): always compiled (no Godot dependency) so the decisions and the
+         log contract are offline-unit-testable. The Godot-typed watcher that applies them stays in the live-host
+         glob below. -->
+    <Compile Include="Live/Sts2SceneWatchFaults.cs" />
     <!-- R12 Godot-free decorative-animator scene-identity table (which node of which instanced scene routes to which
          fold, plus the rel-path composer): always compiled (no Godot dependency) so the table is
          offline-unit-testable, like the two caps above. The Godot-typed watcher that resolves each node's scene
