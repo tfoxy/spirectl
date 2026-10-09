@@ -247,8 +247,10 @@ public static class Sts2RuntimeSceneTextDiagnostics
     private static string ThemeFontColorKey(string source)
         => source is "mega-rich-text-label" or "godot-rich-text-label" ? "default_color" : "font_color";
 
+    // Keep the exact string whose character offsets the native line ranges address. Trimming whitespace here
+    // makes a valid range appear out of bounds in the browser, especially for rich text with a trailing space.
     private static string? NormalizeText(string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        => string.IsNullOrWhiteSpace(value) ? null : value;
 
     private static object? ProbeMember(object? target, string memberName, string noticeField, List<RuntimeScenePropertyNoticeSnapshot> notices)
     {
