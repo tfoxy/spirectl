@@ -1557,7 +1557,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
             // Always update last-volatile (so a full keyframe doesn't mark every node changed next tick);
             // emit on a keyframe OR when this node actually changed.
+            var currentText = read.Text?.Text;
+            var textChanged = !string.Equals(tracked.LastTextRaw, currentText, StringComparison.Ordinal);
             var changedNow = ApplyIfChanged(tracked, read, suppressTransform, suppressOpacity, tracked.SuppressOpacityIsSelf, forceTransformResync, forceOpacityResync);
+            tracked.LastTextRaw = currentText;
             if (Sts2SpineDiagnostics.Current.Enabled && tracked.Style.Spine is not null
                 && (priorSpineVisible != read.Visible || !NearlyEqual(priorSpineOpacity, read.Opacity)))
             {
@@ -1613,6 +1616,14 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 // Spine snapshot (scene/node/skel + animation list) it previously cached empty. A REPARENT likewise
                 // ships the static block so the client fully re-attaches the node under its new parent.
                 var includeStatic = full || tracked.JustAdded || spineReprobeUpgraded || parentChanged || (priorLocalRect is null && read.LocalRect is not null);
+                // Native line ranges depend on the label's current words. Compare the raw text separately from
+                // the volatile signature, which also changes for colors; a full keyframe retries only if
+                // an earlier metrics probe failed while the words changed. Ship the five-field wrap unit without
+                // re-sending all static styling on an ordinary text change.
+                var wrapIsStale = !string.Equals(tracked.Style.TextWrapRawText, currentText, StringComparison.Ordinal);
+                var includeTextWrap = ((textChanged && (!tracked.JustAdded || wrapIsStale)) || (full && wrapIsStale))
+                    && (tracked.Style.RichText || tracked.Style.TextLineRanges is not null)
+                    && RefreshTextWrap(tracked, currentText);
                 RuntimeSceneIntentFramesSnapshot? intentFrames = null;
                 if (stashedIntentFrames is not null && (includeStatic || intentAnimChanged))
                 {
@@ -1643,7 +1654,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 {
                     emitRead = read with { Transform = null };
                 }
-                upserts.Add(BuildNodeDelta(tracked, emitRead, includeStatic, intentFrames, lineGeometry));
+                upserts.Add(BuildNodeDelta(tracked, emitRead, includeStatic, intentFrames, lineGeometry, includeTextWrap));
                 emitted = true;
                 emittedTransform = emitRead.Transform is not null;
                 // R10: this node's FIRST appearance on the wire. Its id was withheld from OrderedIds until now
@@ -2714,9 +2725,67 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         return true;
     }
 
-    // Probed ONCE per node (on add). Runtime-invariant styling: nine-patch margins, text font/outline/shadow
-    // (the expensive text reflection the per-tick path skips), bbcode flag, material/shader refs, and the
-    // draw-order flag. Each probe is independently guarded so one failure never blanks the rest.
+    private sealed record TextWrapFields(
+        IReadOnlyList<int> Ranges, string Basis, string? ParsedText, int SourceLength, int SourceHash);
+
+    private static TextWrapFields? FlattenTextWrap(RuntimeSceneTextRenderedMetricsSnapshot? metrics)
+    {
+        if (metrics is not { RangeBasis: not null, RangeSourceLength: not null, RangeSourceHash: not null })
+        {
+            return null;
+        }
+
+        var flat = new List<int>(metrics.Lines.Count * 2);
+        foreach (var line in metrics.Lines)
+        {
+            if (line.RangeStart is { } start && line.RangeEnd is { } end)
+            {
+                flat.Add(start);
+                flat.Add(end);
+            }
+        }
+
+        return flat.Count > 0
+            ? new TextWrapFields(flat, metrics.RangeBasis, metrics.ParsedText,
+                metrics.RangeSourceLength.Value, metrics.RangeSourceHash.Value)
+            : null;
+    }
+
+    private static bool RefreshTextWrap(Tracked tracked, string? emittedText)
+    {
+        try
+        {
+            var fullText = Sts2RuntimeSceneTextDiagnostics.Describe(tracked.Node, lean: false);
+            if (!string.Equals(fullText?.Text, emittedText, StringComparison.Ordinal))
+            {
+                return false;
+            }
+            var wrap = FlattenTextWrap(fullText?.RenderedMetrics);
+            if (wrap is null)
+            {
+                return false;
+            }
+
+            tracked.Style = tracked.Style with
+            {
+                TextLineRanges = wrap.Ranges,
+                TextLineBasis = wrap.Basis,
+                TextParsedText = wrap.ParsedText,
+                TextLineSourceLength = wrap.SourceLength,
+                TextLineSourceHash = wrap.SourceHash,
+                TextWrapRawText = fullText?.Text,
+            };
+            return true;
+        }
+        catch
+        {
+            // A failed metrics probe leaves the previous wrap intact; its hash prevents wrong-word rendering.
+            return false;
+        }
+    }
+
+    // Probed once per node on add. Runtime-invariant styling: nine-patch margins, text font/outline/shadow,
+    // bbcode flag, material/shader refs, and the draw-order flag. Text wrap is refreshed separately on change.
     private static StaticStyle DescribeStaticStyle(Node node)
     {
         var canvasItem = node as CanvasItem;
@@ -2768,6 +2837,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         string? textParsedText = null;
         int? textLineSourceLength = null;
         int? textLineSourceHash = null;
+        string? textWrapRawText = null;
         try
         {
             // Full (non-lean) describe runs the expensive font/shadow/outline reflection ONCE here; non-text
@@ -2791,27 +2861,15 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 // Emitted ALL-OR-NOTHING. A basis names the string the offsets address and the hash is what lets
                 // a consumer notice they have gone stale; ranges without either are ranges nobody may safely use,
                 // so the whole block is dropped rather than partially sent.
-                var metrics = fullText.RenderedMetrics;
-                if (metrics is { RangeBasis: not null, RangeSourceHash: not null })
+                var wrap = FlattenTextWrap(fullText.RenderedMetrics);
+                if (wrap is not null)
                 {
-                    var flat = new List<int>(metrics.Lines.Count * 2);
-                    foreach (var line in metrics.Lines)
-                    {
-                        if (line.RangeStart is { } start && line.RangeEnd is { } end)
-                        {
-                            flat.Add(start);
-                            flat.Add(end);
-                        }
-                    }
-
-                    if (flat.Count > 0)
-                    {
-                        textLineRanges = flat;
-                        textLineBasis = metrics.RangeBasis;
-                        textParsedText = metrics.ParsedText;
-                        textLineSourceLength = metrics.RangeSourceLength;
-                        textLineSourceHash = metrics.RangeSourceHash;
-                    }
+                    textLineRanges = wrap.Ranges;
+                    textLineBasis = wrap.Basis;
+                    textParsedText = wrap.ParsedText;
+                    textLineSourceLength = wrap.SourceLength;
+                    textLineSourceHash = wrap.SourceHash;
+                    textWrapRawText = fullText.Text;
                 }
             }
         }
@@ -2941,7 +2999,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
         var containerLayout = DescribeContainerLayout(node);
 
-        return new StaticStyle(showBehind, clipChildren, clipContents, margins, font, fontWeight, fontStyle, outlineColor, outlineSize, shadow, richText, material, shader, shaderParameters, textureStretchMode, textureFlipH, textureFlipV, canvasBlendMode, particleSpec, spine, sceneFilePath, containerLayout, richBoldFont, richItalicFont, richBoldItalicFont, richBoldFontSizePx, richItalicFontSizePx, richBoldItalicFontSizePx, richBoldFontSpacingPx, richItalicFontSpacingPx, richBoldItalicFontSpacingPx, textLineRanges, textLineBasis, textParsedText, textLineSourceLength, textLineSourceHash);
+        return new StaticStyle(showBehind, clipChildren, clipContents, margins, font, fontWeight, fontStyle, outlineColor, outlineSize, shadow, richText, material, shader, shaderParameters, textureStretchMode, textureFlipH, textureFlipV, canvasBlendMode, particleSpec, spine, sceneFilePath, containerLayout, richBoldFont, richItalicFont, richBoldItalicFont, richBoldFontSizePx, richItalicFontSizePx, richBoldItalicFontSpacingPx, richBoldFontSpacingPx, richItalicFontSpacingPx, richBoldItalicFontSpacingPx, textLineRanges, textLineBasis, textParsedText, textLineSourceLength, textLineSourceHash, textWrapRawText);
     }
 
     // Godot-4 RichTextLabel theme item names for the per-role fonts + sizes the mirror needs. NOTE the Godot-4
@@ -4080,7 +4138,8 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         VolatileRead read,
         bool includeStatic,
         RuntimeSceneIntentFramesSnapshot? intentFrames = null,
-        LineGeometry? lineGeometry = null)
+        LineGeometry? lineGeometry = null,
+        bool includeTextWrap = false)
     {
         var style = tracked.Style;
         return new RuntimeSceneNodeDelta(
@@ -4206,14 +4265,13 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             RichBoldFontSpacingPx: includeStatic ? style.RichBoldFontSpacingPx : null,
             RichItalicFontSpacingPx: includeStatic ? style.RichItalicFontSpacingPx : null,
             RichBoldItalicFontSpacingPx: includeStatic ? style.RichBoldItalicFontSpacingPx : null,
-            // Godot's own line breaking, on the STATIC path like the role fonts above — which is exactly why each
-            // block carries its source length and hash: unlike a theme font, a wrap goes stale when the label's
-            // words change on the per-tick path, and the consumer is required to detect that rather than trust it.
-            TextLineRanges: includeStatic ? style.TextLineRanges : null,
-            TextLineBasis: includeStatic ? style.TextLineBasis : null,
-            TextParsedText: includeStatic ? style.TextParsedText : null,
-            TextLineSourceLength: includeStatic ? style.TextLineSourceLength : null,
-            TextLineSourceHash: includeStatic ? style.TextLineSourceHash : null,
+            // Line breaking is sent on add/keyframe and when the changed text was re-measured. Keep the five
+            // fields together so a new string never reaches the client beside an old range/hash unit.
+            TextLineRanges: includeStatic || includeTextWrap ? style.TextLineRanges : null,
+            TextLineBasis: includeStatic || includeTextWrap ? style.TextLineBasis : null,
+            TextParsedText: includeStatic || includeTextWrap ? style.TextParsedText : null,
+            TextLineSourceLength: includeStatic || includeTextWrap ? style.TextLineSourceLength : null,
+            TextLineSourceHash: includeStatic || includeTextWrap ? style.TextLineSourceHash : null,
             // WS-2 Line2D stroke geometry — non-null ONLY on the stroke deltas the capture loop chose to (re)ship it
             // on (keyframe/add or a changed stroke signature). All three ride together or not at all: a half-shipped
             // stroke (new points at the old width) would render wrong, and the client's MergeVolatile carries the
@@ -4597,6 +4655,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         public string LastTexture = string.Empty;
         public bool LastNinePatch;
         public string LastTextSig = string.Empty;
+        public string? LastTextRaw;
         // Numeric change-tracking (allocation-free): hold the last-emitted snapshot records (already allocated by
         // ReadVolatile — no extra cost) and compare rounded components next frame, instead of building an
         // interpolated-string signature per node per capture (the old per-frame GC/CPU hot spot). Records are
@@ -4749,9 +4808,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // map-point fold's `with` expression ever sets it.
         string? PinnedLoopAnim = null);
 
-    // Per-node STATIC styling — probed ONCE on add (the expensive text/material reflection the watcher
-    // deliberately keeps off the per-tick path), reused on every keyframe/add. Text styling (font, shadow,
-    // outline) does not change at runtime, so it never needs polling.
+    // Per-node styling — probed on add and reused on keyframes. Text wrap alone is refreshed when the label's
+    // raw text changes, so a card preview can keep its native breaks without re-probing fonts,
+    // materials, or other styling on every capture.
     private sealed record StaticStyle(
         bool ShowBehindParent,
         int ClipChildren,
@@ -4796,5 +4855,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         string? TextLineBasis = null,
         string? TextParsedText = null,
         int? TextLineSourceLength = null,
-        int? TextLineSourceHash = null);
+        int? TextLineSourceHash = null,
+        // Local cache witness for the wrap's source. Never streamed; used to retry a failed refresh on keyframe.
+        string? TextWrapRawText = null);
 }

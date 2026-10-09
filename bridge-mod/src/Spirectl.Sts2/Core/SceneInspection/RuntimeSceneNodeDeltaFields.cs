@@ -2,7 +2,7 @@ namespace Spirectl.Sts2.Core.SceneInspection;
 
 /// <summary>
 /// The published split of <see cref="RuntimeSceneNodeDelta"/> into the fields the scene watcher emits on
-/// EVERY delta and the fields it emits only on an add or a keyframe.
+/// EVERY delta and the fields gated by an add or a keyframe.
 /// </summary>
 /// <remarks>
 /// <para>This exists because embedders re-project the delta and have to know the difference. A consumer that
@@ -18,9 +18,10 @@ namespace Spirectl.Sts2.Core.SceneInspection;
 /// reflected property list AND against the watcher's own source text, so adding a field to the record without
 /// classifying it here fails the build's test leg rather than shipping an unclassified field.</para>
 ///
-/// <para>Two shadings the names alone do not carry. A handful of "volatile" fields are STICKY rather than
-/// per-tick — the watcher ships them when their value changes and relies on the consumer's merge to carry them
-/// forward in between (intent frames, the Line2D stroke unit) — which is a superset of volatile behaviour and
+/// <para>Two shadings the names alone do not carry. The five text-wrap fields also refresh as a unit when a
+/// label's text changes; consumers retain the last unit between those emissions. A handful of "volatile" fields
+/// are STICKY rather than per-tick — the watcher ships them when their value changes and relies on the consumer's
+/// merge to carry them forward in between (intent frames, the Line2D stroke unit) — a superset of volatile behaviour and
 /// safe for a consumer that simply keeps every volatile field. And four legacy fields
 /// (<c>ScaleX</c>/<c>ScaleY</c>/<c>PivotX</c>/<c>PivotY</c>) are not passed at all any more: they ride the
 /// record's default on every emission, which is ungated, so they sit on the volatile side.</para>
@@ -28,8 +29,8 @@ namespace Spirectl.Sts2.Core.SceneInspection;
 public static class RuntimeSceneNodeDeltaFields
 {
     /// <summary>
-    /// Fields the watcher emits ONLY on an add or a keyframe (its <c>includeStatic</c> block). A consumer must
-    /// retain the last non-default value it saw for each of these and ignore the record default in between.
+    /// Fields gated by <c>includeStatic</c>. Text-wrap fields also refresh when the label's text changes. A
+    /// consumer must retain the last non-default value it saw for each and ignore record defaults in between.
     /// </summary>
     public static readonly IReadOnlyList<string> StaticFieldNames =
     [
