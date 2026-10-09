@@ -84,7 +84,9 @@ public sealed class MegaRichTextLabel
         int? themeFontSize = 24,
         bool autoSizeEnabled = true,
         bool isVerticallyBound = true,
-        bool isHorizontallyBound = false)
+        bool isHorizontallyBound = false,
+        string? parsedText = null,
+        (int, int)[]? lineRanges = null)
     {
         Text = text;
         _lastAdjustedSize = lastAdjustedSize;
@@ -95,9 +97,21 @@ public sealed class MegaRichTextLabel
         _isAutoSizeEnabled = autoSizeEnabled;
         _isVerticallyBound = isVerticallyBound;
         _isHorizontallyBound = isHorizontallyBound;
+        ParsedText = parsedText;
+        LineRanges = lineRanges;
     }
 
     public string? Text { get; }
+
+    public string? ParsedText { get; }
+
+    public bool RichTextEnabled => true;
+
+    public (int, int)[]? LineRanges { get; }
+
+    public string? GetParsedText() => ParsedText;
+
+    public FakeVector2I GetLineRange(int line) => new(LineRanges![line].Item1, LineRanges![line].Item2);
 
     public bool HasThemeColor(string name)
         => name is "default_color" or "font_shadow_color";
@@ -135,7 +149,7 @@ public sealed class MegaRichTextLabel
         => name == "normal_font" ? new(1) : null;
 
     public int GetLineCount()
-        => 2;
+        => LineRanges?.Length ?? 2;
 
     public double GetLineAscent(int index)
         => index < 2 ? 18 : 0;

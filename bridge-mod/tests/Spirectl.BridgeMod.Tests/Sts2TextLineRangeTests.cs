@@ -54,4 +54,39 @@ public sealed class Sts2TextLineRangeTests
         Assert.Equal(6, metrics?.RangeSourceLength);
         Assert.Equal(Sts2RuntimeSceneTextDiagnostics.Fnv1a32("Strike"), metrics?.RangeSourceHash);
     }
+
+    [Fact]
+    public void PlainRangesKeepTrailingWhitespaceInTheirTextSource()
+    {
+        const string source = "星のしおり ";
+        var node = new MegaLabel(text: source, themeFontSize: 24)
+        {
+            LineRanges = [(0, source.Length)]
+        };
+
+        var described = Sts2RuntimeSceneTextDiagnostics.Describe(node, lean: false);
+        Assert.Equal(source, described?.Text);
+        Assert.Equal("text", described?.RenderedMetrics?.RangeBasis);
+        Assert.Equal(source.Length, described?.RenderedMetrics?.RangeSourceLength);
+        Assert.Equal(Sts2RuntimeSceneTextDiagnostics.Fnv1a32(source), described?.RenderedMetrics?.RangeSourceHash);
+    }
+
+    [Fact]
+    public void RichRangesKeepTrailingWhitespaceInTheirParsedSource()
+    {
+        const string parsed = "星のしおり ";
+        var node = new MegaRichTextLabel(
+            text: "[sine]星のしおり [/sine]",
+            parsedText: parsed,
+            lineRanges: [(0, parsed.Length)]);
+
+        var metrics = Sts2RuntimeSceneTextDiagnostics.Describe(node, lean: false)?.RenderedMetrics;
+        Assert.Equal("parsed", metrics?.RangeBasis);
+        Assert.Equal(parsed, metrics?.ParsedText);
+        Assert.Equal(parsed.Length, metrics?.RangeSourceLength);
+        Assert.Equal(Sts2RuntimeSceneTextDiagnostics.Fnv1a32(parsed), metrics?.RangeSourceHash);
+        var line = Assert.Single(metrics?.Lines ?? []);
+        Assert.Equal(0, line.RangeStart);
+        Assert.Equal(parsed.Length, line.RangeEnd);
+    }
 }
