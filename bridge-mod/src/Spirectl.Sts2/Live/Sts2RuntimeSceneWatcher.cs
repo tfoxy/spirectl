@@ -89,6 +89,33 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     private ulong _rootId;
     private bool _structureDirty = true;
     private bool _needsFull = true;
+
+    // FAILED-CAPTURE RECOVERY (see OnTick's catch). A capture that throws has already committed the Last* values of
+    // every node it walked and spent the settle re-emit of every suppression window that closed in that walk, and its
+    // delta is never dispatched — so the next capture must be a FULL keyframe, and the failure must be visible.
+    //   * _consecutiveCaptureFailures / _firstCaptureFailureMs — the outage, for the recovery log line.
+    //   * _captureRetryNotBeforeMs — the backoff deadline (Sts2SceneCaptureRetry). Separate from the adaptive
+    //     cadence on purpose: structural signals reset that one to the active rate, and a faulting VFX is exactly
+    //     where nodes are being added and removed every frame.
+    //   * _capturePhase / _captureCursor* — where the capture was when it threw. Plain field writes (one reference
+    //     per walked node), so the hot loop pays nothing measurable; read only by the catch.
+    private int _consecutiveCaptureFailures;
+    private long _firstCaptureFailureMs;
+    private long _captureRetryNotBeforeMs;
+    private string _capturePhase = CapturePhaseIdle;
+    private Tracked? _captureCursorTracked;
+    private Node? _captureCursorNode;
+    private const string CapturePhaseIdle = "idle";
+    private const string CapturePhaseResolveRoot = "resolve-root";
+    private const string CapturePhaseReconcile = "reconcile";
+    private const string CapturePhasePrefixRefresh = "prefix-refresh";
+    private const string CapturePhaseWalk = "walk";
+    private const string CapturePhaseFlipFlush = "flip-flush";
+    private const string CapturePhaseOrder = "order";
+
+    // Fault log limits: per key (exception site, or node+channel) at most one line per 10 s, and at most 40 lines per
+    // 10 s across all keys. Lines go to godot.log through GD.Print (the embedded profile has no other sink there).
+    private static readonly Sts2RateLimitedLog FaultLog = new(keyIntervalMs: 10_000, globalBudget: 40, globalWindowMs: 10_000);
     // LOCAL-transform emission mode (Sts2SceneWatchRuntimeSettings.EmitLocalTransforms), LATCHED once per capture so a
     // single capture is internally consistent even if an embedder flips the knob mid-walk. When it differs from the
     // last capture's mode a FULL keyframe is forced (see Capture) so clients rebuild in the new space and every
@@ -547,10 +574,15 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     private void OnTick()
     {
         if (Volatile.Read(ref _disposed) != 0) return;
+        var now = System.Environment.TickCount64;
         try
         {
-            var now = System.Environment.TickCount64;
             if (now - _lastCaptureMs < _captureIntervalMs)
+            {
+                return;
+            }
+            // Backoff after consecutive failed captures (see the catch below). Not shortened by structural signals.
+            if (now < _captureRetryNotBeforeMs)
             {
                 return;
             }
@@ -573,7 +605,19 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 delta = Capture(admission.Value.NeedsFull);
             }
 
+            _capturePhase = CapturePhaseIdle;
+            _captureCursorTracked = null;
+            _captureCursorNode = null;
+
             if (!TryAcceptCapture(admission.Value, delta)) return;
+
+            // The outage ends with the first accepted capture that produced a delta. A failure set _needsFull, so that
+            // delta is the repairing keyframe (a capture that returned nothing, e.g. no scene root yet, repairs nothing
+            // and leaves the keyframe request pending).
+            if (_consecutiveCaptureFailures > 0 && delta is not null)
+            {
+                LogCaptureRecovered(now, delta.Full);
+            }
 
             if (delta is null)
             {
@@ -585,10 +629,154 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             _captureIntervalMs = MinEmitIntervalMs; // activity → capture at the full active rate
             _ = Dispatch(delta, admission.Value);
         }
+        catch (Exception ex)
+        {
+            // A capture failure must never take down the game tick. It must not lose state either: the aborted walk
+            // committed Last* values (and consumed closed suppression windows' settle re-emits) for every node it
+            // reached, and its delta is never dispatched, so an incremental next capture would never re-send them.
+            // Request a FULL keyframe through the watcher's own keyframe flag — the same one a scene-root change or a
+            // resubscribe uses — and reconcile the (possibly half-rebuilt) registry with it.
+            //
+            // A fault that persists keeps failing, so every retry is again a full keyframe. That is deliberate (the
+            // first capture after the faulting node goes away must be the keyframe that repairs the client), and the
+            // cost is bounded by backing the retries off: 16, 32, 64, then every 128 ms (the idle cadence ceiling,
+            // already the accepted worst-case wake latency) for as long as the failure lasts. A failed capture sends
+            // nothing, so the backoff bounds main-thread cost only; the wire carries exactly one keyframe, on recovery.
+            _structureDirty = true;
+            _needsFull = true;
+            _consecutiveCaptureFailures++;
+            if (_consecutiveCaptureFailures == 1)
+            {
+                _firstCaptureFailureMs = now;
+            }
+            var retryMs = Sts2SceneCaptureRetry.DelayMs(_consecutiveCaptureFailures, MinEmitIntervalMs, MaxIdleIntervalMs);
+            _captureRetryNotBeforeMs = now + retryMs;
+            LogCaptureFailure(ex, now, retryMs);
+            _capturePhase = CapturePhaseIdle;
+            _captureCursorTracked = null;
+            _captureCursorNode = null;
+        }
+    }
+
+    // Godot's output log (godot.log) is the only place the embedded profile's diagnostics reach a person, and the
+    // watcher runs on the main thread, so GD.Print is both the right sink and safe to call here. Printing is
+    // best-effort: a logging failure must never turn into a capture failure.
+    private static void FaultPrint(string line)
+    {
+        try
+        {
+            GD.Print(line);
+        }
         catch
         {
-            // A capture failure must never take down the game tick; the next tick retries.
-            _structureDirty = true;
+            // Best-effort.
+        }
+    }
+
+    private void LogCaptureFailure(Exception ex, long now, long retryMs)
+    {
+        try
+        {
+            var site = Sts2SceneWatchFaultFormat.FirstFrameIn(ex, "Spirectl.") ?? Sts2SceneWatchFaultFormat.TopFrame(ex) ?? "-";
+            var admission = FaultLog.Admit($"capture-failed:{ex.GetType().FullName}@{site}", now);
+            if (!admission.Log)
+            {
+                return;
+            }
+
+            var context = _captureCursorTracked is { } tracked
+                ? DescribeNode(tracked)
+                : DescribeNode(_captureCursorNode);
+            FaultPrint(Sts2SceneWatchFaultFormat.CaptureFailed(
+                ex, _capturePhase, context, _consecutiveCaptureFailures, admission.Suppressed, admission.BudgetDropped,
+                retryMs));
+        }
+        catch
+        {
+            // Diagnostics only.
+        }
+    }
+
+    // One line per outage, on the capture that ends it (never rate-limited: an outage that ends is the event the QA
+    // leg needs to see, and there is one per outage).
+    private void LogCaptureRecovered(long now, bool full)
+    {
+        var failures = _consecutiveCaptureFailures;
+        var outageMs = now - _firstCaptureFailureMs;
+        _consecutiveCaptureFailures = 0;
+        _firstCaptureFailureMs = 0;
+        _captureRetryNotBeforeMs = 0;
+        FaultPrint(Sts2SceneWatchFaultFormat.CaptureRecovered(failures, outageMs, full));
+    }
+
+    // Rate-limited non-finite read report: the first occurrence per node+channel logs at once. This line is the
+    // evidence that names a faulting node, so it carries the node's id, registry path and type, and the bad value.
+    private void LogNonFinite(Tracked tracked, string channel, string value, string action)
+        => LogNonFinite(tracked.IdStr, () => DescribeNode(tracked), channel, value, action);
+
+    // Static form for the read helpers that run without a Tracked entry (shader uniform refresh, viewport prefixes).
+    // `describe` runs only when the line is actually written, so a suppressed repeat costs a dictionary lookup.
+    private static void LogNonFinite(
+        string key, Func<Sts2SceneWatchFaultFormat.NodeContext> describe, string channel, string value, string action)
+    {
+        try
+        {
+            var admission = FaultLog.Admit($"non-finite:{key}:{channel}", System.Environment.TickCount64);
+            if (admission.Log)
+            {
+                FaultPrint(Sts2SceneWatchFaultFormat.NonFinite(
+                    channel, describe(), value, action, admission.Suppressed, admission.BudgetDropped));
+            }
+        }
+        catch
+        {
+            // Diagnostics only.
+        }
+    }
+
+    // The node's path through the watcher's own registry (cached names, root first) — managed data only, so it is
+    // safe to build from a catch block even when the faulting node is mid-teardown.
+    private Sts2SceneWatchFaultFormat.NodeContext DescribeNode(Tracked tracked)
+    {
+        var names = new List<string>();
+        Tracked? current = tracked;
+        for (var hops = 0; current is not null && hops < 64; hops++)
+        {
+            names.Add(current.Name);
+            current = current.ParentId is { } parentId && _registry.TryGetValue(parentId, out var parent) ? parent : null;
+        }
+        if (current is not null)
+        {
+            names.Add("...");
+        }
+        names.Reverse();
+        return new Sts2SceneWatchFaultFormat.NodeContext(tracked.IdStr, string.Join('/', names), tracked.NodeType);
+    }
+
+    // Reconcile-phase context: the live node being reconciled (not yet in the registry). Its Godot path is read only
+    // if the node is still valid, and any failure there just leaves the field out.
+    private static Sts2SceneWatchFaultFormat.NodeContext DescribeNode(Node? node)
+    {
+        if (node is null)
+        {
+            return default;
+        }
+
+        try
+        {
+            if (!GodotObject.IsInstanceValid(node))
+            {
+                return new Sts2SceneWatchFaultFormat.NodeContext(null, "(freed)", null);
+            }
+
+            return new Sts2SceneWatchFaultFormat.NodeContext(
+                node.GetInstanceId().ToString(),
+                node.IsInsideTree() ? node.GetPath().ToString() : node.Name.ToString(),
+                node.GetClass());
+        }
+        catch
+        {
+            return default;
         }
     }
 
@@ -608,6 +796,12 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         _needsFull = true;
         _lastCaptureMs = 0;
         _captureIntervalMs = MinEmitIntervalMs;
+        _consecutiveCaptureFailures = 0;
+        _firstCaptureFailureMs = 0;
+        _captureRetryNotBeforeMs = 0;
+        _capturePhase = CapturePhaseIdle;
+        _captureCursorTracked = null;
+        _captureCursorNode = null;
         _animations.Reset();
         _registry.Clear();
         _ordered.Clear();
@@ -694,6 +888,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     {
         // R15 arm C: nothing recorded by an earlier capture (one that threw, or returned early) may reach this one.
         _hiddenFold.Reset();
+        _capturePhase = CapturePhaseResolveRoot;
+        _captureCursorTracked = null;
+        _captureCursorNode = null;
         var root = ResolveRoot();
         if (root is null || !GodotObject.IsInstanceValid(root))
         {
@@ -737,7 +934,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         var orderChanged = _structureDirty || full;
         if (_structureDirty || full)
         {
+            _capturePhase = CapturePhaseReconcile;
             Reconcile(root, removedIds);
+            _captureCursorNode = null;
             // R14: the registry has just been refilled — this is the ONE instant in the tick where a card-flight
             // resolve that missed the registry can newly succeed, so retry the parked ones here, before the emission
             // walk below reads the suppression windows a successful retry opens. Deliberately NOT inside
@@ -752,6 +951,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // A viewport→screen prefix embeds the LIVE transform of the node that displays the viewport texture, so
             // it is volatile — it must be re-read on the same cadence as every other transform. Reconcile already
             // recomputed them a few lines up, so only the non-reconcile path needs this.
+            _capturePhase = CapturePhasePrefixRefresh;
             RefreshViewportPrefixes();
         }
 
@@ -801,9 +1001,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         var tweenWindowDepth = int.MaxValue;
         // INDEXED (not foreach) so the R15 spine-anchor fold can scan a candidate anchor's SUBTREE — the entries
         // that follow it in this pre-order list while their Depth exceeds its own — without a per-node child list.
+        _capturePhase = CapturePhaseWalk;
         for (var orderIndex = 0; orderIndex < _ordered.Count; orderIndex++)
         {
             var tracked = _ordered[orderIndex];
+            _captureCursorTracked = tracked; // failure context only (see OnTick's catch)
             // Left the frozen spine root's subtree (depth returned to/above it) → clear the elision context.
             if (frozenRootDepth >= 0 && tracked.Depth <= frozenRootDepth)
             {
@@ -998,6 +1200,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
             var profStart = _instrumentation.ProducerProfilingEnabled ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
             var read = ReadVolatile(node, tracked.Style.ShaderParameters, tracked.Style.Spine, tracked.FocusCapable, tracked.ViewportPrefix, localMode, emittedParentGlobal, out var streamedGlobal);
+            // A non-finite channel (NaN/Infinity) is UNREADABLE this capture: keep what the client last received
+            // instead of streaming it. Runs before anything below compares, folds or stores the read, so neither the
+            // change test, the Last* commit, nor a child's re-base ever sees the bad value. A finite read (the
+            // overwhelmingly common case) costs a few dozen IsFinite checks and returns the same instance.
+            read = GuardNonFinite(tracked, read, localMode, emittedParentGlobal, ref streamedGlobal);
             // Record this node's streamed GLOBAL (pre-rebase) so its children re-base against it. Every read node
             // fills its slot regardless of whether it emits a delta — a child needs the parent global either way.
             if (localMode)
@@ -1513,6 +1720,8 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // R15 arm C flip flush: BEFORE the empty check and the orderedIds build, so a flushed node's first emit (if it
         // ever were one) still re-ships the order under the R10 contract. A flush only ever fires alongside an upsert
         // of the descendant that flipped, so it never turns an empty capture into a non-empty one.
+        _captureCursorTracked = null;
+        _capturePhase = CapturePhaseFlipFlush;
         if (_hiddenFold.Count > 0)
         {
             var target = _hiddenFoldTarget ??= new HiddenFoldTarget(this);
@@ -1539,6 +1748,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         //      arrives with an unchanged order is merged into the map and then never placed in the tree.
         // Together they restore the invariant `orderedIds ⊆ nodes the client holds`, which is exactly what both
         // clients' structure builders (and the couch host's SceneStructureIndex) already assume.
+        _capturePhase = CapturePhaseOrder;
         IReadOnlyList<string>? orderedIds = orderChanged || (OrderEmittedOnly && firstEmitThisPass)
             ? BuildOrderedIds()
             : null;
@@ -1637,6 +1847,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
     private void ReconcileNode(Node node, ulong? parentId, int depth, HashSet<ulong> seen, ViewportPrefixChain? prefixChain)
     {
+        _captureCursorNode = node; // failure context only (see OnTick's catch)
         // EMBEDDER OPT-OUT, checked before anything else (and deliberately ABOVE the CanvasItem branch, since an
         // injected root is often a plain logic Node whose children carry the visuals): a subtree stamped with the
         // `spirectl_stream_skip` metadata key is neither tracked nor descended, so a downstream mod's own host-local
@@ -2214,7 +2425,19 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 superSample = MakeFit((double)size.X / overrideSize.X, (double)size.Y / overrideSize.Y, 0.0, 0.0);
             }
 
-            prefix = display.GetGlobalTransformWithCanvas() * fitTransform * superSample;
+            var composed = display.GetGlobalTransformWithCanvas() * fitTransform * superSample;
+            // A non-finite prefix (a NaN/Infinity display transform or size) would carry into every node flattened
+            // out of this viewport. Treat it like any other unresolvable prefix: the per-capture refresh keeps the
+            // last good one, and a reconcile sees "no prefix" for this pass.
+            if (!IsFinite(composed))
+            {
+                LogNonFinite(
+                    subViewport.GetInstanceId().ToString(), () => DescribeNode(subViewport), "viewportPrefix",
+                    FormatTransform(composed), "kept-last");
+                return false;
+            }
+
+            prefix = composed;
             return true;
         }
         catch
@@ -2979,9 +3202,154 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         }
     }
 
+    private static bool IsFinite(Transform2D t)
+        => float.IsFinite(t.X.X) && float.IsFinite(t.X.Y) && float.IsFinite(t.Y.X) && float.IsFinite(t.Y.Y)
+            && float.IsFinite(t.Origin.X) && float.IsFinite(t.Origin.Y);
+
+    private static string FormatTransform(Transform2D t)
+        => $"[{Sts2SceneWatchFaultFormat.Number(t.X.X)},{Sts2SceneWatchFaultFormat.Number(t.X.Y)},"
+            + $"{Sts2SceneWatchFaultFormat.Number(t.Y.X)},{Sts2SceneWatchFaultFormat.Number(t.Y.Y)},"
+            + $"{Sts2SceneWatchFaultFormat.Number(t.Origin.X)},{Sts2SceneWatchFaultFormat.Number(t.Origin.Y)}]";
+
+    // Fast path of the non-finite read guard: every numeric channel the per-tick read carries, checked on values
+    // already read. Shader uniforms are guarded where they are refreshed (RefreshShaderParams).
+    private static bool ReadIsFinite(VolatileRead read)
+        => Sts2SceneFiniteGuard.IsFinite(read.Transform)
+            && Sts2SceneFiniteGuard.IsFinite(read.LocalRect)
+            && double.IsFinite(read.Opacity)
+            && Sts2SceneFiniteGuard.IsFinite(read.Modulate)
+            && Sts2SceneFiniteGuard.IsFinite(read.SelfModulate)
+            && Sts2SceneFiniteGuard.IsFinite(read.FillColor)
+            && Sts2SceneFiniteGuard.IsFinite(read.TextureRegion)
+            && Sts2SceneFiniteGuard.IsFinite(read.TextureMargin)
+            && Sts2SceneFiniteGuard.IsFinite(read.RangeValue)
+            && Sts2SceneFiniteGuard.IsFinite(read.RangeMin)
+            && Sts2SceneFiniteGuard.IsFinite(read.RangeMax)
+            && double.IsFinite(read.SpineTrackTime)
+            && Sts2SceneFiniteGuard.IsFinite(read.AnchorLeft)
+            && Sts2SceneFiniteGuard.IsFinite(read.AnchorRight)
+            && Sts2SceneFiniteGuard.IsFiniteLeanText(read.Text);
+
+    // Replace each non-finite channel of a fresh read with the value the client last received for it (Tracked.Last*,
+    // which ApplyIfChanged commits only on emit), or — on a node's first appearance, when there is none — the
+    // channel's absent/neutral value. Every replacement is logged (rate-limited) with the node and the bad value.
+    //
+    // LOCAL mode also stores this node's streamed GLOBAL for its children to re-base against. A non-finite global is
+    // replaced by the global the client currently shows for the node (its emitted parent's global composed with its
+    // last emitted local, exactly what the cosmetic-cap pin stores), so the children keep their shown placement too.
+    private VolatileRead GuardNonFinite(
+        Tracked tracked, VolatileRead read, bool localMode, Transform2D emittedParentGlobal, ref Transform2D streamedGlobal)
+    {
+        var globalFinite = !localMode || IsFinite(streamedGlobal);
+        if (globalFinite && ReadIsFinite(read))
+        {
+            return read;
+        }
+
+        if (!globalFinite)
+        {
+            LogNonFinite(tracked, "global", FormatTransform(streamedGlobal), KeptOrDropped(tracked.LastTransform));
+            streamedGlobal = tracked.LastTransform is { } shownLocal
+                ? emittedParentGlobal * ToTransform2D(shownLocal)
+                : emittedParentGlobal;
+        }
+
+        if (!Sts2SceneFiniteGuard.IsFinite(read.Transform))
+        {
+            LogNonFinite(tracked, "transform", Sts2SceneWatchFaultFormat.Value(read.Transform), KeptOrDropped(tracked.LastTransform));
+            read = read with { Transform = tracked.LastTransform };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.LocalRect))
+        {
+            LogNonFinite(tracked, "localRect", Sts2SceneWatchFaultFormat.Value(read.LocalRect), KeptOrDropped(tracked.LastLocalRect));
+            read = read with { LocalRect = tracked.LastLocalRect };
+        }
+        if (!double.IsFinite(read.Opacity))
+        {
+            LogNonFinite(tracked, "opacity", Sts2SceneWatchFaultFormat.Number(read.Opacity), tracked.EverEmitted ? "kept-last" : "dropped");
+            read = read with { Opacity = tracked.EverEmitted ? tracked.LastOpacity : 1.0 };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.Modulate))
+        {
+            LogNonFinite(tracked, "modulate", Sts2SceneWatchFaultFormat.Value(read.Modulate), KeptOrDropped(tracked.LastModulate));
+            read = read with { Modulate = tracked.LastModulate };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.SelfModulate))
+        {
+            LogNonFinite(tracked, "selfModulate", Sts2SceneWatchFaultFormat.Value(read.SelfModulate), KeptOrDropped(tracked.LastSelfModulate));
+            read = read with { SelfModulate = tracked.LastSelfModulate };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.FillColor))
+        {
+            LogNonFinite(tracked, "fillColor", Sts2SceneWatchFaultFormat.Value(read.FillColor), KeptOrDropped(tracked.LastFillColor));
+            read = read with { FillColor = tracked.LastFillColor };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.TextureRegion))
+        {
+            LogNonFinite(tracked, "textureRegion", Sts2SceneWatchFaultFormat.Value(read.TextureRegion), KeptOrDropped(tracked.LastTextureRegion));
+            read = read with { TextureRegion = tracked.LastTextureRegion };
+        }
+        // The channels below have no last-emitted copy in Tracked; their absent value (null / 0) is what the wire
+        // already uses for "not known", and a later finite read re-ships them through the normal change test.
+        if (!Sts2SceneFiniteGuard.IsFinite(read.TextureMargin))
+        {
+            LogNonFinite(tracked, "textureMargin", Sts2SceneWatchFaultFormat.Value(read.TextureMargin), "dropped");
+            read = read with { TextureMargin = null };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.RangeValue))
+        {
+            LogNonFinite(tracked, "rangeValue", Sts2SceneWatchFaultFormat.Number(read.RangeValue!.Value), double.IsNaN(tracked.LastRangeValue) ? "dropped" : "kept-last");
+            read = read with { RangeValue = double.IsNaN(tracked.LastRangeValue) ? null : tracked.LastRangeValue };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.RangeMin))
+        {
+            LogNonFinite(tracked, "rangeMin", Sts2SceneWatchFaultFormat.Number(read.RangeMin!.Value), "dropped");
+            read = read with { RangeMin = null };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.RangeMax))
+        {
+            LogNonFinite(tracked, "rangeMax", Sts2SceneWatchFaultFormat.Number(read.RangeMax!.Value), "dropped");
+            read = read with { RangeMax = null };
+        }
+        if (!double.IsFinite(read.SpineTrackTime))
+        {
+            LogNonFinite(tracked, "spineTrackTime", Sts2SceneWatchFaultFormat.Number(read.SpineTrackTime), "dropped");
+            read = read with { SpineTrackTime = 0 };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.AnchorLeft))
+        {
+            LogNonFinite(tracked, "anchorLeft", Sts2SceneWatchFaultFormat.Number(read.AnchorLeft!.Value), "dropped");
+            read = read with { AnchorLeft = null };
+        }
+        if (!Sts2SceneFiniteGuard.IsFinite(read.AnchorRight))
+        {
+            LogNonFinite(tracked, "anchorRight", Sts2SceneWatchFaultFormat.Number(read.AnchorRight!.Value), "dropped");
+            read = read with { AnchorRight = null };
+        }
+        if (!Sts2SceneFiniteGuard.IsFiniteLeanText(read.Text))
+        {
+            var dropped = new List<(string Field, string Value)>();
+            var text = Sts2SceneFiniteGuard.DropNonFiniteLeanText(read.Text, dropped);
+            foreach (var (field, value) in dropped)
+            {
+                LogNonFinite(tracked, "text." + field, value, "dropped");
+            }
+            read = read with { Text = text };
+        }
+
+        return read;
+    }
+
+    // The log's `action=`: kept-last when a last-emitted value was substituted, dropped when there was none (a node's
+    // first appearance), so the channel streams its absent/neutral value instead.
+    private static string KeptOrDropped(object? last) => last is null ? "dropped" : "kept-last";
+
     // Re-base a child's streamed GLOBAL against its emitted parent's streamed global: L = parentGlobal⁻¹ · childGlobal
     // (the Transform2D form of Sts2TweenEndpointTuples.RebaseLocalTuple). A singular (collapsed) parent has no inverse
     // → identity local (the parent already zeroes the subtree on screen). Identity parent ⇒ L == childGlobal (roots).
+    // A nearly-singular parent just above the epsilon (or a non-finite one, whose determinant fails the test) can still
+    // give a non-finite inverse; that result is not special-cased here because GuardNonFinite checks the EMITTED
+    // transform after this re-base and keeps the last value, and the parent globals in the depth scratch are guarded.
     private static Transform2D RebaseGlobalToLocal(Transform2D parentGlobal, Transform2D childGlobal)
     {
         if (Math.Abs(parentGlobal.Determinant()) <= SingularParentDeterminantEpsilon)
@@ -3276,6 +3644,12 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 if (p.Kind == "number")
                 {
                     var value = material.GetShaderParameter(p.Name).AsDouble();
+                    if (!double.IsFinite(value))
+                    {
+                        // Unreadable this tick: keep the last value, like a uniform that failed to read.
+                        LogNonFiniteUniform(canvasItem, p.Name, Sts2SceneWatchFaultFormat.Number(value));
+                        continue;
+                    }
                     if (value != p.Number)
                     {
                         refreshed ??= [.. staticParams];
@@ -3296,6 +3670,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 }
 
                 var color = material.GetShaderParameter(p.Name).AsColor();
+                if (!float.IsFinite(color.R) || !float.IsFinite(color.G) || !float.IsFinite(color.B) || !float.IsFinite(color.A))
+                {
+                    LogNonFiniteUniform(canvasItem, p.Name, Sts2SceneWatchFaultFormat.Value(VolatileColor(color)));
+                    continue;
+                }
                 if (p.Color is not { } previous
                     || previous.R != color.R || previous.G != color.G || previous.B != color.B || previous.A != color.A)
                 {
@@ -3311,6 +3690,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
         return refreshed ?? staticParams;
     }
+
+    private static void LogNonFiniteUniform(CanvasItem canvasItem, string uniform, string value)
+        => LogNonFinite(
+            canvasItem.GetInstanceId().ToString(), () => DescribeNode(canvasItem), "shader." + uniform, value, "kept-last");
 
     // SPIRECTL_SHADER_COLOR_REFRESH: escape hatch for the R9 per-tick COLOR uniform refresh above. Default ON;
     // `0`/`false`/`off`/`no` restores the numbers-only refresh (colors frozen at add) for an A/B, in case a shipped
