@@ -147,6 +147,124 @@ public sealed class Sts2RuntimeSceneWatcherLifecycleTests : IDisposable
         Assert.True(watcher.AdmitCapture()!.Value.NeedsFull);
     }
 
+    [Fact]
+    public async Task DispatchPreservesCaptureOrderWhenFirstCallbackIsBlocked()
+    {
+        Sts2MainThreadDispatcher.Capture(new SynchronizationContext());
+        using var watcher = new Sts2RuntimeSceneWatcher();
+        using var releaseFirst = new ManualResetEventSlim();
+        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var applied = new ConcurrentQueue<RuntimeSceneDelta>();
+        var firstDelta = Delta(full: true);
+        var secondDelta = Delta(full: false);
+        var firstTimedOut = false;
+        using var subscription = watcher.Subscribe(delta =>
+        {
+            if (ReferenceEquals(delta, firstDelta))
+            {
+                firstEntered.SetResult();
+                firstTimedOut = !releaseFirst.Wait(TimeSpan.FromSeconds(5));
+            }
+            applied.Enqueue(delta);
+        });
+        var admission = watcher.AdmitCapture()!.Value;
+        Assert.True(watcher.TryAcceptCapture(admission, firstDelta));
+        var first = watcher.Dispatch(firstDelta, admission);
+        await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(watcher.TryAcceptCapture(admission, secondDelta));
+        var second = watcher.Dispatch(secondDelta, admission);
+
+        try
+        {
+            // A later pool worker would finish here with the former independent Task.Run dispatch.
+            var completed = await Task.WhenAny(second, Task.Delay(500));
+            Assert.NotSame(second, completed);
+            Assert.Empty(applied);
+        }
+        finally
+        {
+            releaseFirst.Set();
+            await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(2));
+        }
+
+        Assert.False(firstTimedOut);
+        Assert.Equal(new[] { firstDelta, secondDelta }, applied.ToArray());
+    }
+
+    [Fact]
+    public async Task CallbackFailureDoesNotSkipOtherSubscribersOrLaterDeltas()
+    {
+        Sts2MainThreadDispatcher.Capture(new SynchronizationContext());
+        using var watcher = new Sts2RuntimeSceneWatcher();
+        var received = new ConcurrentQueue<RuntimeSceneDelta>();
+        var failures = 0;
+        using var failing = watcher.Subscribe(_ =>
+        {
+            Interlocked.Increment(ref failures);
+            throw new InvalidOperationException("subscriber failed");
+        });
+        using var continuing = watcher.Subscribe(received.Enqueue);
+        var admission = watcher.AdmitCapture()!.Value;
+        var firstDelta = Delta(full: true);
+        var secondDelta = Delta(full: false);
+
+        var first = watcher.Dispatch(firstDelta, admission);
+        var second = watcher.Dispatch(secondDelta, admission);
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(2, failures);
+        Assert.Equal(new[] { firstDelta, secondDelta }, received.ToArray());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task QueuedDispatchSkipsDeactivatedSubscribers(bool disposeWatcher)
+    {
+        Sts2MainThreadDispatcher.Capture(new SynchronizationContext());
+        using var watcher = new Sts2RuntimeSceneWatcher();
+        using var releaseFirst = new ManualResetEventSlim();
+        var firstEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var received = new ConcurrentQueue<RuntimeSceneDelta>();
+        var newcomerEvents = new ConcurrentQueue<RuntimeSceneDelta>();
+        var firstDelta = Delta(full: true);
+        using var blocking = watcher.Subscribe(delta =>
+        {
+            if (!ReferenceEquals(delta, firstDelta)) return;
+            firstEntered.SetResult();
+            releaseFirst.Wait(TimeSpan.FromSeconds(5));
+        });
+        using var departed = watcher.Subscribe(received.Enqueue);
+        var admission = watcher.AdmitCapture()!.Value;
+        var first = watcher.Dispatch(firstDelta, admission);
+        await firstEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var second = watcher.Dispatch(Delta(full: false), admission);
+        IDisposable? newcomer = null;
+
+        try
+        {
+            if (disposeWatcher)
+            {
+                watcher.Dispose();
+            }
+            else
+            {
+                departed.Dispose();
+                newcomer = watcher.Subscribe(newcomerEvents.Enqueue);
+                Assert.True(watcher.AdmitCapture()!.Value.NeedsFull);
+            }
+        }
+        finally
+        {
+            releaseFirst.Set();
+            await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(2));
+            newcomer?.Dispose();
+        }
+
+        Assert.Empty(received);
+        Assert.Empty(newcomerEvents);
+    }
+
     private static RuntimeSceneDelta Delta(bool full)
         => new(full, "test", "screen:test", [], [], full ? Array.Empty<string>() : null);
 
