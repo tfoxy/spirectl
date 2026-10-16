@@ -8,6 +8,8 @@ namespace Spirectl.Sts2.Live;
 // later stages.
 internal readonly struct TweenTargetChange
 {
+    // A cancellation reads authoritative global geometry without opening a replay window.
+    public bool ReadCurrentGlobalTransform { get; init; }
     public Vector2? Position { get; init; }
     public float? PositionX { get; init; }
     public float? PositionY { get; init; }
@@ -63,7 +65,7 @@ internal readonly struct TweenTargetChange
     public bool HasGlobalPosition =>
         GlobalPosition.HasValue || GlobalPositionX.HasValue || GlobalPositionY.HasValue;
 
-    public bool HasAny => HasTransform || ModulateA.HasValue || SelfModulateA.HasValue;
+    public bool HasAny => ReadCurrentGlobalTransform || HasTransform || ModulateA.HasValue || SelfModulateA.HasValue;
 }
 
 // The resolved END state a tween reaches, in the scene watcher's STREAMED space. `Transform` is the target node's

@@ -46,7 +46,7 @@ public sealed class RequiresGameModelDbFactAttribute : FactAttribute
     {
         lock (PopulateGate)
         {
-            if (ModelDb.All.Any())
+            if (ModelDb.Contains(typeof(Sts2Live::MegaCrit.Sts2.Core.Models.Characters.Ironclad)))
             {
                 return true;
             }
@@ -56,7 +56,11 @@ public sealed class RequiresGameModelDbFactAttribute : FactAttribute
                 return false;
             }
 
+#if STS2_API_V111
             ModelDb.Init(AbstractModelSubtypes.All.ToArray());
+#else
+            ModelDb.Init();
+#endif
             return true;
         }
     }
