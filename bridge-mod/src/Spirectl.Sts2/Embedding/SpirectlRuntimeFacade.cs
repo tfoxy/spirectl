@@ -14,7 +14,7 @@ using Spirectl.Sts2.Live;
 
 namespace Spirectl.Sts2.Embedding;
 
-public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
+public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IInjectedInputControlSource, IDisposable
 {
     internal SpirectlRuntimeFacade(
         SpirectlRuntimeServices services,
@@ -364,6 +364,12 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IDisposable
                 .Distinct(StringComparer.Ordinal)
                 .Select(key => new EmbeddableAssetRequest(key, request.Format))],
             request.FailFast));
+    }
+
+    public void CancelInjectedInput()
+    {
+        if (_services.ActionHandler is IInjectedInputControlSource input)
+            input.CancelInjectedInput();
     }
 
     public EmbeddableActionResult ExecuteAction(EmbeddableActionRequest request)

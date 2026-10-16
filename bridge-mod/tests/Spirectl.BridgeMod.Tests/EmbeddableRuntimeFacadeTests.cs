@@ -860,6 +860,19 @@ public sealed class EmbeddableRuntimeFacadeTests
 
 
     [Fact]
+    public void CancelInjectedInputDelegatesToInputOwnerAndIsSafeForPlaceholder()
+    {
+        var actionHandler = new CapturingActionHandler();
+        var runtime = FacadeWith(
+            stateExtractor: new FixedSnapshotExtractor(MainMenuSnapshot()),
+            actionHandler: actionHandler,
+            assetExtractProvider: new PlaceholderAssetExtractProvider());
+        Assert.IsAssignableFrom<IInjectedInputControlSource>(runtime).CancelInjectedInput();
+        Assert.Equal(1, actionHandler.Cancellations);
+        Assert.IsAssignableFrom<IInjectedInputControlSource>(EmbeddedRuntimeTestFactory.Create()).CancelInjectedInput();
+    }
+
+    [Fact]
     public void ExecuteActionConvertsChooseRequestToSemanticAction()
     {
         var actionHandler = new CapturingActionHandler();
@@ -1502,9 +1515,11 @@ public sealed class EmbeddableRuntimeFacadeTests
         }
     }
 
-    private sealed class CapturingActionHandler : IActionHandler
+    private sealed class CapturingActionHandler : IActionHandler, IInjectedInputControlSource
     {
         public SemanticActionRequest? LastRequest { get; private set; }
+        public int Cancellations { get; private set; }
+        public void CancelInjectedInput() => Cancellations++;
 
         public ActionExecutionResult Execute(SemanticActionRequest request)
         {

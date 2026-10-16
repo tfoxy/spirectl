@@ -78,6 +78,13 @@ public interface ISemanticActionSource
     EmbeddableActionResult ExecuteAction(EmbeddableActionRequest request);
 }
 
+/// <summary>Releases only runtime-injected holds without delivering input to game controls.</summary>
+public interface IInjectedInputControlSource
+{
+    /// <summary>Runs on the game thread; also invalidates the remainder of an in-flight gesture.</summary>
+    void CancelInjectedInput();
+}
+
 /// <summary>Coupled scene-watch switches safe for an embedder to change at runtime.</summary>
 public interface IRuntimeSceneWatchControls
 {

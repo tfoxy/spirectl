@@ -26,7 +26,7 @@ using System.Threading.Tasks;
 
 namespace Spirectl.Sts2.Live;
 
-public sealed partial class Sts2ActionHandler : IActionHandler
+public sealed partial class Sts2ActionHandler : IActionHandler, Spirectl.Sts2.Embedding.IInjectedInputControlSource
 {
     private readonly Sts2ScreenLocator _screenLocator;
     private readonly ILogStream _logStream;
@@ -44,6 +44,10 @@ public sealed partial class Sts2ActionHandler : IActionHandler
 
     public ActionExecutionResult Execute(SemanticActionRequest request)
     {
-        return Sts2MainThreadDispatcher.Invoke(() => ExecuteOnMainThread(request));
+        return Sts2MainThreadDispatcher.Invoke(() =>
+        {
+            try { return ExecuteOnMainThread(request); }
+            finally { _injectedInput.Complete(Input.FlushBufferedEvents); }
+        });
     }
 }
