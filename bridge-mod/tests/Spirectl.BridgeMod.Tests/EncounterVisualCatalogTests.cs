@@ -359,8 +359,12 @@ public sealed class EncounterVisualCatalogTests
             .Where(encounter => Overrides(encounter, nameof(Sts2Live::MegaCrit.Sts2.Core.Models.EncounterModel.GetCameraOffset)))
             .ToArray();
 
-        Assert.InRange(scalingOverrides.Length, 24, 25);
-        Assert.InRange(offsetOverrides.Length, 18, 19);
+#if STS2_API_V111
+        Assert.Equal(24, scalingOverrides.Length);
+#else
+        Assert.Equal(23, scalingOverrides.Length);
+#endif
+        Assert.Equal(18, offsetOverrides.Length);
         foreach (var encounter in scalingOverrides.Concat(offsetOverrides).Distinct())
         {
             try

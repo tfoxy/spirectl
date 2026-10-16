@@ -93,7 +93,8 @@ public sealed record TweenHintDelta(
     // node to this (transition-less) before transitioning to the endpoint, so a re-anchored/primed node replays from
     // its true start instead of showing a 1-frame transient. Null unless the tween declared a start.
     IReadOnlyList<double>? StartTransform = null,
-    double? StartOpacity = null);
+    double? StartOpacity = null,
+    IReadOnlyList<double>? CancelTransform = null);
 
 // One node's state in a delta. `Id`/`ParentId` are node instance ids (stable for the node's lifetime).
 // Static fields (Name/NodeType + the styling block below) ride only on add/keyframe (null/default on a

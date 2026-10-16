@@ -376,17 +376,9 @@ internal static class Sts2HandHolderHooks
                 ? Sts2HandTweenMath.Teleport(entry.Touched, channel)
                 : Sts2HandTweenMath.Retarget(entry.Touched, channel);
             entry.InstantPose |= instant;
+            entry.Cancelled = false;
 
-            if (_drainScheduledFrame != _fanFrame)
-            {
-                _drainScheduledFrame = _fanFrame;
-                // DEFERRED to this frame's idle, exactly like Sts2TweenRecorderHooks' finalize and
-                // Sts2CardFlightHooks' publish: by then every setter of this batch has run (SetDefaultTargets fires
-                // all three back-to-back; RefreshLayout loops the whole hand), which is what lets one hint carry all
-                // three channels. The callback runs on the game main thread, the same thread as the capture walk,
-                // so the watcher reads below are legal.
-                Callable.From(DrainSafely).CallDeferred();
-            }
+            ScheduleDrain();
         }
         catch
         {
@@ -419,6 +411,11 @@ internal static class Sts2HandHolderHooks
             AbandonScratch.Clear();
             AbandonScratch.Add(id);
             cancel(AbandonScratch, false);
+            if (Pending.Count < PendingCap || Pending.ContainsKey(id))
+            {
+                Pending[id] = new PendingHolder(__instance) { Cancelled = true };
+                ScheduleDrain();
+            }
             AbandonScratch.Clear();
         }
         catch
@@ -428,6 +425,14 @@ internal static class Sts2HandHolderHooks
     }
 
     // ---- deferred publish ------------------------------------------------------------------------
+
+    private static void ScheduleDrain()
+    {
+        var frame = Engine.GetProcessFrames();
+        if (_drainScheduledFrame == frame) return;
+        _drainScheduledFrame = frame;
+        Callable.From(DrainSafely).CallDeferred();
+    }
 
     private static void DrainSafely()
     {
@@ -443,6 +448,7 @@ internal static class Sts2HandHolderHooks
         finally
         {
             Pending.Clear();
+            _drainScheduledFrame = ulong.MaxValue;
         }
     }
 
@@ -456,11 +462,12 @@ internal static class Sts2HandHolderHooks
         CancelScratch.Clear();
         foreach (var (id, entry) in Pending)
         {
-            if (!TryPublish(id, entry))
+            if (entry.Cancelled || !TryPublish(id, entry))
             {
                 // No hint for this holder this batch — so it must NOT stay pinned by a window an EARLIER batch
                 // opened. This is the mid-flight re-target's failure branch and the reason the canceller is wired.
                 CancelScratch.Add(id);
+                PublishCancellation(id);
             }
         }
 
@@ -470,6 +477,20 @@ internal static class Sts2HandHolderHooks
         }
 
         CancelScratch.Clear();
+    }
+
+    private static void PublishCancellation(ulong id)
+    {
+        if (!Embedding.EmbeddableAnimationHintHub.Shared.HasSubscribers || EndpointResolver is not { } resolve)
+        {
+            return;
+        }
+
+        var pose = resolve(id, new TweenTargetChange { ReadCurrentGlobalTransform = true }, 0)?.Transform;
+        if (Core.SceneInspection.TransformCancellationHint.Create(id, pose) is { } hint)
+        {
+            Embedding.EmbeddableAnimationHintHub.Shared.Publish(hint);
+        }
     }
 
     private static bool TryPublish(ulong id, PendingHolder entry)
@@ -545,16 +566,13 @@ internal static class Sts2HandHolderHooks
             ? Sts2HandTweenMath.ScaleSettleMs(Math.Abs(targetScale.X - liveScale.X), frameSeconds)
             : 0.0;
 
-        // The floor is only safe to apply to a holder NOBODY is pinned to. With a window still open a consumer has
-        // already armed an earlier hint and there is no wire-level way to abort it, so a dropped batch would strand
-        // the card at an endpoint the game has abandoned; publish a short CORRECTIVE hint instead. See
-        // Sts2HandTweenMath.CorrectiveDurationMs for the full argument and the two defects it fixes.
+        // Keep short corrections smooth while the producer window is open. A declined replacement explicitly
+        // cancels browser ownership: the browser's replay window can outlive this producer's window.
         var windowOpen = HasOpenWindow is { } isOpen && isOpen(id);
         var durationMs = Sts2HandTweenMath.CorrectiveDurationMs(positionMs, angleMs, scaleMs, windowOpen);
         if (durationMs <= 0)
         {
-            // Every touched channel is inside the game's own snap threshold, and nothing is pinned. Deliberately
-            // UNCOUNTED: a settled batch is normal, expected behaviour, not a hint going missing.
+            // Settled batches are normal and uncounted. Drain still cancels any older browser prediction.
             return false;
         }
 
@@ -669,6 +687,8 @@ internal static class Sts2HandHolderHooks
         public Node Node { get; } = node;
 
         public HandChannels Touched { get; set; } = HandChannels.None;
+
+        public bool Cancelled { get; set; }
 
         // Did this batch TELEPORT a channel rather than re-target it (SetAngleInstantly / SetScaleInstantly)? Then
         // the holder's live pose is the approach's real START and must be shipped as one — see TryPublish.

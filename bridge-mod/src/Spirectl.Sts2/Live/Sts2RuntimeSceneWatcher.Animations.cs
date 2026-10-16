@@ -71,6 +71,12 @@ internal sealed partial class Sts2RuntimeSceneWatcher
                 return null;
             }
 
+            if (change.ReadCurrentGlobalTransform)
+            {
+                var current = Sts2TweenEndpointMath.ToTuple(tracked.ViewportPrefix * canvasItem.GetGlobalTransformWithCanvas());
+                return Sts2SceneFiniteGuard.IsFinite(current) ? new TweenEndpoint { Transform = current } : null;
+            }
+
             // Only resolve a TRANSLATION endpoint. A scale-only / rotation-only tween (e.g. the targeting arrow head's
             // elastic scale pop) does not move the node, but TransformEndGlobal bakes the node's CURRENT origin into the
             // pinned 6-tuple; pinning it would freeze a translation the game may be driving per-frame independently

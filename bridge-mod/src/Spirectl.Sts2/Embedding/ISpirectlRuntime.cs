@@ -175,7 +175,9 @@ public sealed record TweenAnimationHint(
     double? StartOpacity = null,
     // WS-3: a declarative, closed-form NON-tween animation (the discard→draw shuffle card flight). Null for every
     // ordinary tween hint. See CardFlightHint.
-    CardFlightHint? CardFlight = null);
+    CardFlightHint? CardFlight = null,
+    // Explicit transform ownership release, carrying the current GLOBAL design-space pose.
+    IReadOnlyList<double>? CancelTransform = null);
 
 /// <summary>
 /// The discard→draw shuffle card flight, as a declarative description the consumer REPLAYS on its own clock
