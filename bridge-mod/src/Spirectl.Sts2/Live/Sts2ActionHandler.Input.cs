@@ -10,35 +10,63 @@ namespace Spirectl.Sts2.Live;
 // TryResolveElementPoint when no coordinate is supplied). All handlers run on the main-thread dispatcher.
 public sealed partial class Sts2ActionHandler
 {
-    // The mouse button currently HELD by a browser drag (press without release), or null. All input handlers
-    // run on the single main-thread dispatcher, so this needs no lock. While set, the continuous hover/move
-    // stream is injected as drag-MOTION (the button mask rides the motion events) instead of a free hover —
-    // that's what lets a card be dragged from hand to target. A release or a full click clears it.
-    private MouseButton? _heldMouseButton;
-    // Last injected motion point, so motion events carry a correct `Relative` delta (some Godot drag handlers
-    // read it). Shared across hover + click injection.
+    private readonly InjectedInputLifetime _injectedInput = new();
+    private readonly HashSet<MouseButton> _heldMouseButtons = [];
     private Vector2? _lastMotionPoint;
 
-    // The button-mask for whatever is held right now (none when not dragging).
-    private MouseButtonMask HeldMouseMask()
-        => _heldMouseButton is { } button ? ToMouseButtonMask(button) : (MouseButtonMask)0;
-
-    // Inject a mouse-motion at a window point with an explicit held-button mask (mask != 0 => Godot sees a drag).
-    private void InjectMotion(Vector2 point, MouseButtonMask mask)
-    {
-        var relative = _lastMotionPoint is { } last ? point - last : Vector2.Zero;
-        Input.ParseInputEvent(new InputEventMouseMotion
+    public void CancelInjectedInput()
+        => Sts2MainThreadDispatcher.Invoke(() =>
         {
-            Position = point,
-            GlobalPosition = point,
-            Relative = relative,
-            ButtonMask = mask,
+            try { _injectedInput.Cancel(SuppressInputDelivery, Input.FlushBufferedEvents); }
+            finally
+            {
+                _heldMouseButtons.Clear();
+                _lastMotionPoint = null;
+            }
+            return true;
         });
-        _lastMotionPoint = point;
+
+    private static IDisposable SuppressInputDelivery()
+    {
+        if (Engine.GetMainLoop() is not SceneTree tree || tree.Root is not Viewport viewport)
+            throw new InvalidOperationException("Cannot cancel injected input without a live viewport.");
+        return new InjectedInputDeliverySuppression(
+            () => viewport.GuiDisableInput,
+            disabled => viewport.GuiDisableInput = disabled,
+            viewport.SetInputAsHandled);
     }
+
+    private MouseButtonMask HeldMouseMask()
+        => _heldMouseButtons.Aggregate((MouseButtonMask)0, (mask, button) => mask | ToMouseButtonMask(button));
+
+    private bool InjectMotion(Vector2 point, MouseButtonMask mask, long generation)
+        => _injectedInput.Run(generation, () =>
+        {
+            var relative = _lastMotionPoint is { } last ? point - last : Vector2.Zero;
+            _lastMotionPoint = point;
+            Input.ParseInputEvent(new InputEventMouseMotion
+            {
+                Position = point,
+                GlobalPosition = point,
+                Relative = relative,
+                ButtonMask = mask,
+            });
+        });
+
+    private void InjectMouseButton(Vector2 point, MouseButton button, bool pressed, long generation)
+        => _injectedInput.Send(generation, $"mouse:{button}", pressed,
+            () =>
+            {
+                if (pressed) _heldMouseButtons.Add(button);
+                else _heldMouseButtons.Remove(button);
+                Input.ParseInputEvent(CreateMouseClickEvent(point, button, pressed));
+            },
+            // No caller-supplied release position is used during cancellation.
+            () => Input.ParseInputEvent(CreateMouseClickEvent(_lastMotionPoint ?? Vector2.Zero, button, false)));
 
     private ActionExecutionResult ExecuteHoverElement(SemanticActionRequest request)
     {
+        var generation = _injectedInput.Generation;
         Vector2 position;
         Node? node;
         if (!string.IsNullOrWhiteSpace(request.ElementId))
@@ -66,9 +94,9 @@ public sealed partial class Sts2ActionHandler
         Input.WarpMouse(inject);
         // If a button is held (a drag is in progress), the motion carries its mask so the game tracks a drag,
         // not a free hover — this turns the continuous hover stream into the drag itself.
-        InjectMotion(inject, HeldMouseMask());
+        InjectMotion(inject, HeldMouseMask(), generation);
         // Drive the Control's own hover state where it exposes the same hook the dev scene-hover uses.
-        if (node is Control control)
+        if (generation == _injectedInput.Generation && node is Control control)
         {
             Sts2LiveIntrospection.TryInvokeParameterlessMethod(control, "OnFocus");
         }
@@ -90,11 +118,11 @@ public sealed partial class Sts2ActionHandler
                 message: $"key-input has no Godot key mapping for '{request.Key}'.");
         }
 
+        var generation = _injectedInput.Generation;
         var (ctrl, shift, alt, meta) = ParseModifiers(request.KeyModifiers);
 
-        void Send(bool pressed)
-        {
-            Input.ParseInputEvent(new InputEventKey
+        void Parse(bool pressed)
+            => Input.ParseInputEvent(new InputEventKey
             {
                 Keycode = keycode,
                 PhysicalKeycode = keycode,
@@ -105,7 +133,10 @@ public sealed partial class Sts2ActionHandler
                 AltPressed = alt,
                 MetaPressed = meta,
             });
-        }
+
+        void Send(bool pressed)
+            => _injectedInput.Send(generation, $"key:{keycode}", pressed,
+                () => Parse(pressed), () => Parse(false));
 
         // Honor an explicit press/release; otherwise inject a full press+release (a "tap").
         if (request.KeyPressed is bool pressed)
@@ -148,14 +179,11 @@ public sealed partial class Sts2ActionHandler
                 message: $"controller-input '{request.ControllerInput}' {reason}.");
         }
 
+        var generation = _injectedInput.Generation;
         void Send(bool pressed)
-        {
-            Input.ParseInputEvent(new InputEventAction
-            {
-                Action = action,
-                Pressed = pressed,
-            });
-        }
+            => _injectedInput.Send(generation, $"pad:{action}", pressed,
+                () => Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = pressed }),
+                () => Input.ActionRelease(action));
 
         // Honor an explicit press/release; otherwise inject a full press+release (a "tap"). Held inputs are the
         // normal case for a pad — the game's UI reads both edges (a d-pad repeat, a charge-up) — so a client

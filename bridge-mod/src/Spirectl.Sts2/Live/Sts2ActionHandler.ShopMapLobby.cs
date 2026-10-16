@@ -89,6 +89,7 @@ public sealed partial class Sts2ActionHandler
         // a release is an edge, not a quantity — and only a WHEEL button, because repeating a left/right click would
         // silently multiply a destructive action. Absent/1/unparseable ⇒ exactly one tick, byte-identical to the
         // pre-`count` behaviour. Clamped to 20 so a malformed client can't stall the game thread.
+        var generation = _injectedInput.Generation;
         var clickCount = ReadWheelCount(request, rawButton);
         Input.WarpMouse(inject);
         // MousePressed selects the gesture: null = a full click (down+up); true = press/hold (begins a drag —
@@ -97,28 +98,25 @@ public sealed partial class Sts2ActionHandler
         if (request.MousePressed is null)
         {
             // A motion before the press lets Godot's hover-gated controls register the pointer over them first.
-            InjectMotion(inject, (MouseButtonMask)0);
+            InjectMotion(inject, HeldMouseMask(), generation);
             for (var i = 0; i < clickCount; i++)
             {
-                Input.ParseInputEvent(CreateMouseClickEvent(inject, mouseButton, pressed: true));
-                Input.ParseInputEvent(CreateMouseClickEvent(inject, mouseButton, pressed: false));
+                InjectMouseButton(inject, mouseButton, true, generation);
+                InjectMouseButton(inject, mouseButton, false, generation);
             }
-            _heldMouseButton = null;
             gesture = clickCount > 1 ? $"click x{clickCount}" : "click";
         }
         else if (request.MousePressed.Value)
         {
-            InjectMotion(inject, (MouseButtonMask)0);
-            Input.ParseInputEvent(CreateMouseClickEvent(inject, mouseButton, pressed: true));
-            _heldMouseButton = mouseButton;
+            InjectMotion(inject, HeldMouseMask(), generation);
+            InjectMouseButton(inject, mouseButton, true, generation);
             gesture = "press";
         }
         else
         {
             // Move to the release point with the button still held (so the drag tracks to here), then release.
-            InjectMotion(inject, ToMouseButtonMask(mouseButton));
-            Input.ParseInputEvent(CreateMouseClickEvent(inject, mouseButton, pressed: false));
-            _heldMouseButton = null;
+            InjectMotion(inject, HeldMouseMask(), generation);
+            InjectMouseButton(inject, mouseButton, false, generation);
             gesture = "release";
         }
 
