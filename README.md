@@ -168,4 +168,4 @@ Early exploration for `spirectl` was informed by [sts2-modding-mcp](https://gith
 
 ## Contributing
 
-Small, focused bug-fix PRs are welcome. Please discuss features and substantial changes in an issue first. See [CONTRIBUTING.md](CONTRIBUTING.md) for scope, licensing, credit, and review expectations.
+Small, focused bug-fix PRs are welcome. Please discuss features and substantial changes in an issue first. See [CONTRIBUTING.md](CONTRIBUTING.md) for scope, licensing, credit, and review expectations. See [CONTRIBUTORS.md](CONTRIBUTORS.md) for acknowledgements.

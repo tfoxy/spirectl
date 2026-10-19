@@ -15,4 +15,10 @@ First release not yet cut. `0.1.0` is declared in `cli/Cargo.toml`,
 downloads, the npm wrapper and the `Spirectl.Sts2` NuGet package — see
 [docs/releasing.md](docs/releasing.md).
 
+### Fixed
+
+- Preserve incremental scene-update dispatch order so retained consumers cannot be rolled back by a later callback overtaking an earlier one.
+
+Thanks to [KyleJKistner](https://github.com/KyleJKistner) for the investigation, patch, and regression tests in [PR #1](https://github.com/tfoxy/spirectl/pull/1).
+
 [Unreleased]: https://github.com/tfoxy/spirectl/commits/main
