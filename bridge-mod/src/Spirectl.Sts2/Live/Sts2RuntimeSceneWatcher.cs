@@ -43,6 +43,8 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     private static readonly Dictionary<Type, TextureProbe> TextureProbeByType = new();
 
     private readonly object _subscriberGate = new();
+    private readonly object _dispatchGate = new();
+    private Task _dispatchTail = Task.CompletedTask;
     private readonly List<SubscriberEntry> _subscribers = [];
     private SubscriberEntry[] _subscriberSnapshot = [];
     private long _subscriberGeneration;
@@ -4417,21 +4419,30 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     }
 
     internal Task Dispatch(RuntimeSceneDelta delta, CaptureAdmission admission)
-        => Task.Run(() =>
+    {
+        lock (_dispatchGate)
         {
-            foreach (var subscriber in admission.Subscribers)
+            // Captures are incremental: a later callback must not overtake an earlier one and
+            // roll retained consumers back. Queue on the pool without blocking the game thread.
+            // Do not execute synchronously, even when the preceding dispatch is already complete.
+            _dispatchTail = _dispatchTail.ContinueWith(_ =>
             {
-                try
+                foreach (var subscriber in admission.Subscribers)
                 {
-                    if (Volatile.Read(ref _disposed) == 0 && subscriber.IsActive)
-                        subscriber.Callback(delta);
+                    try
+                    {
+                        if (Volatile.Read(ref _disposed) == 0 && subscriber.IsActive)
+                            subscriber.Callback(delta);
+                    }
+                    catch
+                    {
+                        // Subscriber failures are isolated from the watcher and the game thread.
+                    }
                 }
-                catch
-                {
-                    // Subscriber failures are isolated from the watcher and the game thread.
-                }
-            }
-        });
+            }, CancellationToken.None, TaskContinuationOptions.DenyChildAttach, TaskScheduler.Default);
+            return _dispatchTail;
+        }
+    }
 
     internal sealed class SubscriberEntry(Action<RuntimeSceneDelta> callback)
     {
