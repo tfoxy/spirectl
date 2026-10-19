@@ -50,8 +50,8 @@ an update's code.
 
 Third-party patterns: `dtolnay/rust-toolchain@*` and `NuGet/login@*`. Keep Rust
 `toolchain: stable` explicit: the action implementation is pinned, but the compiler channel still
-advances. The current attestation composite pins its predicate action and `actions/attest` to
-commits; both are JavaScript leaf actions. The Rust composite has no nested action references.
+advances. The current attestation composite pins `actions/attest` to a commit; that dependency
+is a JavaScript leaf action. The Rust composite has no nested action references.
 
 After the maintainer pushes workflow changes, inspect the actual GitHub workflow contents on all
 executable refs, including dispatch branches, reusable workflows, and rerunnable revisions. Check
