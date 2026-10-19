@@ -165,3 +165,7 @@ Major command areas include `state`, `act`, `game`, `dev`, `test`, `code`, `asse
 ## Acknowledgements
 
 Early exploration for `spirectl` was informed by [sts2-modding-mcp](https://github.com/elliotttate/sts2-modding-mcp), which helped demonstrate the value of AI-assisted Slay the Spire 2 modding workflows. `spirectl` uses a separate CLI-first, contract-first architecture tailored to this repository's goals.
+
+## Contributing
+
+Small, focused bug-fix PRs are welcome. Please discuss features and substantial changes in an issue first. See [CONTRIBUTING.md](CONTRIBUTING.md) for scope, licensing, credit, and review expectations.
