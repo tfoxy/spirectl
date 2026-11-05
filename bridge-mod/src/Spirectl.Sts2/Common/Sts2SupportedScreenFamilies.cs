@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Spirectl.Sts2;
 
 public static class Sts2SupportedScreenIds
@@ -50,7 +52,7 @@ public static class Sts2SupportedScreenIds
     private const string CrystalSphereScreenType = "MegaCrit.Sts2.Core.Nodes.Events.Custom.CrystalSphere.NCrystalSphereScreen";
     private const string GameOverScreenType = "MegaCrit.Sts2.Core.Nodes.Screens.GameOverScreen.NGameOverScreen";
 
-    public static bool TryResolve(object? screenObject, out SupportedScreenIdMatch? match)
+    public static bool TryResolve(object? screenObject, [NotNullWhen(true)] out SupportedScreenIdMatch? match)
     {
         match = null;
         if (screenObject is null)

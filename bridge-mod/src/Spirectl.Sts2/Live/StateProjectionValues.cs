@@ -104,7 +104,7 @@ internal static class StateProjectionValues
         }
     }
 
-    internal static string ResolveRunPlayerId(object player, int fallbackIndex)
+    internal static string ResolveRunPlayerId(object? player, int fallbackIndex)
     {
         var netId = ToUInt64(Sts2LiveIntrospection.GetMemberValue(player, "NetId"));
         return netId.HasValue ? $"p:{netId.Value}" : $"p:unknown:{fallbackIndex}";

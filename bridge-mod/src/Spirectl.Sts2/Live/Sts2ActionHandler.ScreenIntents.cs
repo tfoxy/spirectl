@@ -59,7 +59,7 @@ public sealed partial class Sts2ActionHandler
                     kind: request.Kind,
                     code: ActionFailureCode.NotVisible,
                     message: "The requested reward element is not visible on the active rewards screen.",
-                    details: [new ActionFailureDetail("element_id", elementId, "Use a current NRewardButton id from the scene stream.")]);
+                    details: [new ActionFailureDetail("element_id", elementId!, "Use a current NRewardButton id from the scene stream.")]);
             }
         }
 

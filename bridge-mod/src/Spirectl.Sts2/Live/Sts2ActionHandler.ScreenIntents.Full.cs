@@ -1545,7 +1545,7 @@ public sealed partial class Sts2ActionHandler
         object screenObject,
         IReadOnlyDictionary<string, ResolvedCrystalSphereChoice> choicesById,
         string selectedTool,
-        out IReadOnlyList<string> checkedHookPaths)
+        out IReadOnlyList<string>? checkedHookPaths)
     {
         var toolChoiceId = selectedTool == "small"
             ? Sts2CrystalSphereIds.SmallToolChoiceId()
