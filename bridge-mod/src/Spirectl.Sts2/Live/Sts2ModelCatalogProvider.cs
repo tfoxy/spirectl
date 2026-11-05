@@ -1145,8 +1145,8 @@ public sealed class Sts2ModelCatalogProvider : IModelCatalogProvider
             SceneAssetKey: EncounterAssetKey(assetId, "scene"),
             ScenePath: NormalizeResourcePath(TryGetStringProperty(model, "ScenePath")),
             BossNodePath: TryStr(() => NormalizeResourcePath(model.BossNodePath)),
-            MapNodeAssetPaths: TryList(() => model.MapNodeAssetPaths.Select(path => NormalizeResourcePath(path))),
-            ExtraAssetPaths: TryList(() => model.ExtraAssetPaths.Select(path => NormalizeResourcePath(path))),
+            MapNodeAssetPaths: CleanStrings(TryList(() => model.MapNodeAssetPaths.Select(path => NormalizeResourcePath(path)))),
+            ExtraAssetPaths: CleanStrings(TryList(() => model.ExtraAssetPaths.Select(path => NormalizeResourcePath(path)))),
             CustomRewardDescription: ResolveLocString(model.CustomRewardDescription),
             FullyCenterPlayers: model.FullyCenterPlayers,
             CameraOffset: Vector2(model.GetCameraOffset()),
@@ -2170,7 +2170,7 @@ public sealed class Sts2ModelCatalogProvider : IModelCatalogProvider
     private static string? FirstNonBlank(params string?[] values)
         => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
-    private static string? TryGetString(Func<string> valueFactory)
+    private static string? TryGetString(Func<string?> valueFactory)
     {
         try
         {
