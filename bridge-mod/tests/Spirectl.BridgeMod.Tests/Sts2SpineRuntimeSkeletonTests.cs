@@ -3,9 +3,9 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// Round-8 items 8 + 13 (RUNTIME-INJECTED spine skeletons: the boss map point and the treasure chest — the two
-// nodes whose `.tscn` carries no `skeleton_data_res`, so their scene-addressed clip render 404s and the producer
-// sees an empty animation list when it first inspects them). Pure, Godot-free cores of:
+// RUNTIME-INJECTED spine skeletons (the boss map point and the treasure chest — the two nodes whose `.tscn`
+// carries no `skeleton_data_res`, so their scene-addressed clip render 404s and the producer sees an empty
+// animation list when it first inspects them). Pure, Godot-free cores of:
 //   * the late-static re-probe budget/re-arm gate (Sts2SpineReprobeGate), and
 //   * the shader-material discriminator that keeps a shaded clip from colliding with an unshaded (or
 //     differently-tinted) one under the same (scene, node, anim, skin, skel) address (Sts2SpineMaterialKey).
@@ -132,10 +132,10 @@ public sealed class Sts2SpineRuntimeSkeletonTests
         Assert.Matches("^[0-9a-f]{16}$", forward);
     }
 
-    // ── R9 LIVE-UNIFORM CARRY (Sts2SpineLiveMaterialStore) ────────────────────────────────────────────
+    // ── LIVE-UNIFORM CARRY (Sts2SpineLiveMaterialStore) ──────────────────────────────────────────────
     //
-    // Round-8 shipped the discriminator above (the `&mat=` key hashes the LIVE node's uniform values) but rendered
-    // through a material read off an OFFLINE `PackedScene.Instantiate()`. `boss_map_point.tscn` declares
+    // The discriminator above (the `&mat=` key hashes the LIVE node's uniform values) alone still renders through
+    // a material read off an OFFLINE `PackedScene.Instantiate()`. `boss_map_point.tscn` declares
     // `resource_local_to_scene = true` on that ShaderMaterial, so each instantiate gets a private copy at the
     // AUTHORED values — key live, pixels authored. The store below closes that gap: the inspector records the very
     // uniform values it hashed, and the bake resolves them back by the same signature.
@@ -208,7 +208,7 @@ public sealed class Sts2SpineRuntimeSkeletonTests
 
     // Bounded: a hypothetical churny material (capped per node at MaxSignatureChanges, but several nodes can each
     // contribute) drops the OLDEST identities rather than growing without limit. A dropped identity degrades to the
-    // offline material — the round-8 behaviour — never to a WRONG tint.
+    // offline material — the behaviour without the store — never to a WRONG tint.
     [Fact]
     public void LiveMaterials_EvictsOldestBeyondCapacity()
     {

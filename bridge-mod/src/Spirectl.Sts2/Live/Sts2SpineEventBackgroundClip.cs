@@ -1,14 +1,14 @@
 namespace Spirectl.Sts2.Live;
 
-// WS-NEOW: PURE, Godot-free routing + placement math for the event-background composed spine-clip lane
+// PURE, Godot-free routing + placement math for the event-background composed spine-clip lane
 // (like Sts2ReparentEmit / Sts2RegionEmitCap — unit-testable without the Godot-coupled provider).
 //
-// The bug: an ANIMATED clip request for a full-bleed event-background Spine (res://scenes/events/background_scenes/*)
-// used to fall through to the GENERIC tight-crop clip renderer, which bare-detaches the SpineSprite from its scene
-// ancestors. That drops the in-scene container transforms event backgrounds need, so the neow rig rendered
-// UNCENTERED; the creature #4 downscale then shrank the big rig, so the client upscaled it BLURRY.
+// Why: the GENERIC tight-crop clip renderer bare-detaches the SpineSprite from its scene ancestors. For a
+// full-bleed event-background Spine (res://scenes/events/background_scenes/*) that drops the in-scene container
+// transforms the background needs, so the clip renders UNCENTERED, and the creature downscale shrinks the big rig
+// so the client upscales it BLURRY.
 //
-// The fix routes event backgrounds (still or clip) through the in-situ composition (mount the scene root, hide
+// So event backgrounds (still or clip) route through the in-situ composition (mount the scene root, hide
 // siblings, deterministic seek), then expresses the capture rect in the SpineSprite's OWN LOCAL (bone) space so
 // the client re-applies the streamed node+ancestor transforms exactly once (no double-apply).
 internal static class Sts2SpineEventBackgroundClip
@@ -67,11 +67,11 @@ internal static class Sts2SpineEventBackgroundClip
     private const double ScaleEpsilon = 1e-6;
 
     // Capture scale s = min(1, ceiling / maxDim): shrink the raster only when the union cell would exceed the raster
-    // ceiling (4096). At the neow authored 0.58x the union is well under, so s == 1 (full-res, no downscale).
+    // ceiling (4096).
     internal static double ComputeCaptureScale(double maxDim, double ceiling)
         => maxDim > ceiling && maxDim > 0d && ceiling > 0d ? ceiling / maxDim : 1d;
 
-    // SPIRECTL_SPINE_EVENTBG_FULLRES=0 phone-memory fallback: fold a decoded-footprint budget INTO the capture scale
+    // SPIRECTL_SPINE_EVENTBG_FULLRES=0 low-memory fallback: fold a decoded-footprint budget INTO the capture scale
     // (cell px x frames <= budget) as a uniform shrink. Because the placement below is s-INVARIANT (s cancels), a
     // uniform footprint shrink keeps the clip centered and true-size, only lower raster resolution — never off-center.
     // Returns the (possibly reduced) capture scale; the caller re-derives the integer cell from it.
@@ -99,7 +99,7 @@ internal static class Sts2SpineEventBackgroundClip
 
     // Local = T_node^-1(R). The clip raster covers scene-root rect R (top-left (unionX, unionY), rendered at
     // captureScale into an integer cellWidth x cellHeight cell). T_node maps the SpineSprite's LOCAL (bone) space to
-    // that same scene-root frame (axis-aligned translate+scale; neow = origin(-390,-57) scale 0.58). Inverting maps
+    // that same scene-root frame (axis-aligned translate+scale). Inverting maps
     // the cell back to bone space so the client, re-applying the node's FULL streamed transform chain, lands it on
     // screen exactly once:
     //   LocalX = (unionX - originX) / scaleX            (exact anchor from the un-ceiled union top-left)

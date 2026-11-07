@@ -5,10 +5,10 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// P5-WS-DC: baking a RIG's whole pose set in ONE scene load, and getting a rig's atlas pages out without
-// decoding and re-encoding them.
+// Baking a RIG's whole pose set in ONE scene load, and getting a rig's atlas pages out without decoding and
+// re-encoding them.
 //
-// Everything decidable without the game lives here on purpose, because the two things this round can get
+// Everything decidable without the game lives here on purpose, because the two things a rig bake can get
 // SILENTLY wrong both are: copying the wrong file as a page (a creature drawn with someone else's atlas,
 // content-addressed and cached for ever) and sharing an association across poses it does not describe (one
 // slot's art baked onto another). Both are guarded by pure predicates, so both are provable offline.
@@ -196,9 +196,9 @@ public sealed class Sts2SpineGeoClipRigBakeTests
     [Fact]
     public void CtexParseMode_IsArmedUnlessItIsSpeltOff()
     {
-        // Default ARMED as of the phase-6 WS-5 gate. An unset environment variable is the shipped path, so it is
-        // the one asserted first; `nonsense` is here to pin that an unrecognised value falls through to the
-        // default rather than to the kill switch, which is the polarity Sts2SpineGeoClipPageSource already uses.
+        // Default ARMED. An unset environment variable is the shipped path, so it is the one asserted first;
+        // `nonsense` is here to pin that an unrecognised value falls through to the default rather than to the
+        // kill switch, which is the polarity Sts2SpineGeoClipPageSource already uses.
         Assert.Equal(Sts2SpineGeoClipCtexSource.Mode.Webp, Sts2SpineGeoClipCtexSource.ParseMode(null));
         Assert.Equal(Sts2SpineGeoClipCtexSource.Mode.Webp, Sts2SpineGeoClipCtexSource.ParseMode(string.Empty));
         Assert.Equal(Sts2SpineGeoClipCtexSource.Mode.Webp, Sts2SpineGeoClipCtexSource.ParseMode("nonsense"));
@@ -380,10 +380,9 @@ public sealed class Sts2SpineGeoClipRigBakeTests
         Assert.Equal(3, Sts2SpineGeoClipBatch.ChooseAcquisitionStop([0, 0, 0, 1]));
     }
 
-    // A SINGLE-ANIMATION bake must keep the natural frame order. The round's acceptance criterion is that
-    // association PAIRS are identical to the pre-change bake, and which frame a slot is probed at is exactly what
-    // decides which mesh moves — so a reordering that leaked into the single path would change answers nobody
-    // asked to change.
+    // A SINGLE-ANIMATION bake must keep the natural frame order. Association PAIRS must stay identical to the
+    // per-target bake, and which frame a slot is probed at is exactly what decides which mesh moves — so a
+    // reordering that leaked into the single path would change answers nobody asked to change.
     [Fact]
     public void ProbeOrder_IsUntouchedForOneAnimationAndAcquisitionFirstForARig()
     {
@@ -604,8 +603,8 @@ public sealed class Sts2SpineGeoClipRigBakeTests
         Assert.Equal(2, snapshot.ScenesLoaded);
         Assert.Equal("batched+fallback:attachmentDrift=3", snapshot.BatchNote);
 
-        // The RIG's wall time, not the primary pose's 210 ms — the amortized-per-pose number the round is graded
-        // on is this divided by the poses, and a figure that stopped at pose 1 would flatter it by 3x.
+        // The RIG's wall time, not the primary pose's 210 ms — the amortized per-pose cost is this divided by
+        // the poses, and a figure that stopped at pose 1 would flatter it by 3x.
         Assert.Equal(730d, snapshot.ElapsedMs);
 
         Assert.Equal(["idle_loop", "attack", "die"], snapshot.Poses!.Select(pose => pose.AnimationName));
@@ -679,7 +678,7 @@ public sealed class Sts2SpineGeoClipRigBakeTests
     /// <summary>
     /// A synthetic Godot <c>GST2</c> v1 container: the 56-byte header this reader parses, then a WebP payload.
     /// The offsets and the enum values are the ones verified byte for byte against real imported textures out of
-    /// the shipped pck (see the round's research note); nothing here is a guess about the layout.
+    /// the shipped pck; nothing here is a guess about the layout.
     /// </summary>
     private static byte[] Ctex(
         int width,

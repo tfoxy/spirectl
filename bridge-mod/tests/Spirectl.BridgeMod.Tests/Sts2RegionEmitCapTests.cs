@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R11 producer region-emit cap pacing (Sts2RegionEmitCap.Decide) — a pure, Godot-free unit exercise of the flame
+// Producer region-emit cap pacing (Sts2RegionEmitCap.Decide) — a pure, Godot-free unit exercise of the flame
 // frame-swap cap the watcher applies before ApplyIfChanged. Verifies: a pure same-size swap pins inside the window
 // and emits (restarting the window) once it elapses; a size-changing swap and a null/equal region always pass; and
 // cap=0 disables the pacing.

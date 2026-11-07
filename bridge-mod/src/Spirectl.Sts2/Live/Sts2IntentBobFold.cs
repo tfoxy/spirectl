@@ -3,15 +3,14 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R14 producer ENEMY-INTENT BOB FOLD — PURE and Godot-free (like Sts2TopBarFold / Sts2ProceedGlow /
+// Producer ENEMY-INTENT BOB FOLD — PURE and Godot-free (like Sts2TopBarFold / Sts2ProceedGlow /
 // Sts2MapPointPulse) so the math is unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
 // WHY. A visually IDLE combat (the player thinking, nothing animating that a human would call motion) still streams
-// ~30 deltas/s per enemy, because the intent holder's POSITION is rewritten every single frame, forever, for every
-// enemy on screen. Together with the orb spin (Sts2OrbSpinFold), the intent flipbook
+// a delta per enemy every frame, because the intent holder's POSITION is rewritten every single frame, forever, for
+// every enemy on screen. Together with the orb spin (Sts2OrbSpinFold), the intent flipbook
 // (Sts2IntentGlyphFold) and the end-turn glow (Sts2EndTurnGlowFold) this is the whole reason an idle combat wire
-// never goes quiet — measured at 898 messages / 30s with a maximum gap of 91ms, i.e. not one 200ms window of
-// silence in half a minute. Downstream that starves the mirror client's idle DOM hatchery (needs 200ms of wire
+// never goes quiet without the folds. Downstream that starves the mirror client's idle DOM hatchery (needs 200ms of wire
 // quiet) and stops a headless instance from ever reaching its idle MaxFps (needs 1000ms).
 //
 // ON SCREEN. The enemy's intent icon hovers above it and bobs gently up and down forever: a pure sine of WALL-CLOCK

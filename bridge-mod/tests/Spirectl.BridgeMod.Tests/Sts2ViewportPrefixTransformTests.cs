@@ -78,7 +78,7 @@ public sealed class Sts2ViewportPrefixTransformTests
         Assert.Equal(expected, Sts2ViewportPrefixTransform.StretchKeepsAspect(stretchMode));
     }
 
-    // ---- SubViewportContainer branch (WS-A) -------------------------------------------------------------------
+    // ---- SubViewportContainer branch -------------------------------------------------------------------
     // A SubViewportContainer has no ViewportTexture to find: it DRAWS its child viewport itself, at its own
     // control-local origin. Godot 4 SubViewportContainer::_notification(NOTIFICATION_DRAW):
     //     stretch ? draw_texture_rect(tex, Rect2(Vector2(), get_size()))

@@ -16,12 +16,12 @@ internal static class Sts2SpineSchedule
     // the handoff (≈0 at the switch → the client seeds the return clip from frame 0).
     //
     // A LONE one-shot (no NextAnim) keeps reporting itself, and past its end it now reports itself PAUSED at the
-    // clip's duration. WHY: nothing ever retires such a schedule. NRegentVfx.Attack() fires
-    // SetAnimation("attack", loop:false) on each weapon sprite and queues nothing behind it, so once the swing is
-    // over the producer still streamed ("attack", ever-growing t, looping:false) forever. The animated lane
-    // clamps on the last frame, but the product default is a server-baked STILL, and a still with no `&t=`
-    // samples the MIDDLE of the clip (Sts2SpineStillFrame.ChooseSampleTime) — so the browser kept a dagger frozen
-    // mid-swing long after the Regent had lowered it. Reporting the node as paused at the clip's end reuses the
+    // clip's duration. WHY: nothing ever retires such a schedule. A one-shot set with nothing queued behind it
+    // (a weapon sprite's attack swing) would otherwise stream ("attack", ever-growing t, looping:false) forever.
+    // The animated lane clamps on the last frame, but the product default is a server-baked STILL, and a still
+    // with no `&t=` samples the MIDDLE of the clip (Sts2SpineStillFrame.ChooseSampleTime) — so the browser would
+    // keep the weapon frozen mid-swing long after the game had lowered it. Reporting the node as paused at the
+    // clip's end reuses the
     // paused-still plumbing whole, with no client change: spineStillTime pins `&t=<duration>` and ChooseSampleTime
     // honours the request, yielding the clip's LAST frame — the pose the game rests in.
     //

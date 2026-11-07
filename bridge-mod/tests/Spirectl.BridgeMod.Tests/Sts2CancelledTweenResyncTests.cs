@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-REST rest-site "description stuck invisible" — the pure cancelled-tween opacity-resync predicate
+// Rest-site "description stuck invisible" — the pure cancelled-tween opacity-resync predicate
 // (Sts2CancelledTweenResync.ShouldForceOpacityResync). A killed fade-IN never opened an opacity-suppression window,
 // so CancelTweenSuppression's collapse-open-window path is a no-op; this predicate decides when the watcher should
 // instead FORCE one settled opacity re-emit of the node's live alpha (window-less) so a hint-less re-show un-sticks.

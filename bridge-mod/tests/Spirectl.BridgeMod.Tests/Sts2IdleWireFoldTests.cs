@@ -4,9 +4,9 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R14 producer IDLE-WIRE COMBAT FOLDS (Sts2IntentBobFold / Sts2IntentGlyphFold / Sts2OrbSpinFold /
+// Producer IDLE-WIRE COMBAT FOLDS (Sts2IntentBobFold / Sts2IntentGlyphFold / Sts2OrbSpinFold /
 // Sts2EndTurnGlowFold) — pure, Godot-free exercises of the four scene identities, their rest pins, and the one
-// gated loop among them. Together these are what takes a visually IDLE combat from ~30 msgs/s to silence, so
+// gated loop among them. Together these are what takes a visually IDLE combat to a silent wire, so
 // the properties asserted here are the ones a regression would break invisibly: the pins are ANALYTIC (never a
 // sample), the undo is exact for an arbitrarily placed/rotated/scaled node, and no fold leaks onto a sibling.
 public sealed class Sts2IdleWireFoldTests
@@ -404,7 +404,7 @@ public sealed class Sts2IdleWireFoldTests
         Assert.Equal(Sts2DecorEmitSuppress.Channels.None, all & Sts2DecorEmitSuppress.Channels.ProceedGlowAlpha);
         Assert.Equal(Sts2DecorEmitSuppress.Channels.None, all & Sts2DecorEmitSuppress.Channels.MapPointPulseScale);
 
-        // The R12/R13 rules still resolve exactly as before (the static merge must not have disturbed them).
+        // The earlier non-combat rules still resolve exactly as before (the static merge must not have disturbed them).
         Assert.Equal(
             Sts2DecorEmitSuppress.Channels.TopBarRotation,
             Sts2DecorEmitSuppress.Lookup(Sts2TopBarFold.DeckButtonScene, Sts2TopBarFold.IconRelPath));

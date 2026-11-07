@@ -29,7 +29,7 @@ internal sealed class SpineQueuedStateDouble(string id, bool isLooping)
     public (string Id, bool IsLooping) Describe() => (Id, IsLooping);
 }
 
-// Round-8 items 10/11 (spine animation semantics). Pure, Godot-free core of:
+// Spine animation semantics. Pure, Godot-free core of:
 //   * which clip the producer presents for a spine node it has not yet observed a real animation for,
 //   * whether that GUESS should be reported as looping (the wire's `spineLooping`, which both clients honour
 //     by clamping on the last frame when false),
@@ -97,12 +97,12 @@ public sealed class Sts2SpineDefaultsTests
         Assert.Equal("die_loop", Sts2SpineDefaults.PickDefaultAnimation(["attack", "die_loop"]));
     }
 
-    // Regression guards taken from committed recordings (.sts2/bench), i.e. shapes the producer really streams:
+    // Regression guards taken from recorded producer streams, i.e. shapes the producer really streams:
     //   * the merchant's hand (merchant_inventory.tscn) exposes ONLY "default", played looping — the guess must
-    //     stay "default" AND stay looping (audit-shop-open.ndjson);
+    //     stay "default" AND stay looping;
     //   * a rest-site character exposes two track-1 lamp overlays FIRST in ordinal order, and the pre-fix guess
     //     streamed "_tracks/light_off" (a lamp, not the character) as the body animation — the plain `*_loop`
-    //     body clip must win instead (audit-rest-refocus.ndjson).
+    //     body clip must win instead.
     [Fact]
     public void PickDefaultAnimation_MatchesRecordedProducerCases()
     {
@@ -123,10 +123,10 @@ public sealed class Sts2SpineDefaultsTests
     // ── A skeleton with NOTHING loop-shaped answers "no animation" (the Regent's permanent daggers) ────────────
 
     // The Regent's two weapon sprites (regent.tscn, Visuals/Weapons/WeaponAnim1+2, regent_weapon_skel_data.tres)
-    // are authored `preview_animation = "-- Empty --"`: the game applies nothing to them until NRegentVfx.Attack()
-    // fires a one-shot, and every clip the skeleton exposes is attack-shaped. So the pre-fix guess fell all the way
-    // to `animations[0]`, the client's default still-mode sampled the MIDDLE of it, and light daggers hung frozen
-    // mid-swing over the entire fight. There is no right clip to pick here — the right answer is NONE.
+    // are authored `preview_animation = "-- Empty --"`, and every clip the skeleton exposes is attack-shaped. So the
+    // pre-fix guess fell all the way to `animations[0]`, the client's default still-mode sampled the MIDDLE of it,
+    // and light daggers hung frozen mid-swing over the entire fight. There is no right clip to pick here — the
+    // right answer is NONE.
     //
     // Both the live-observed list (the running headless streams anim="attack" for these nodes) and the .skel's
     // other attack-shaped names are exercised: the property that matters is "every entry is a one-shot", not which
@@ -259,10 +259,10 @@ public sealed class Sts2SpineDefaultsTests
     }
 
     // …and the fallback answers NOTHING when the hook has not fired yet: vfx_bite's skeleton exposes only "bite",
-    // a one-shot. The pre-fix guess (animations[0], reported looping) is what made the overlay loop forever; the
-    // round-8 fix stopped the looping but still streamed a mid-bite frame for a node the game had not yet played
-    // anything on. NVfxSpine issues its SetAnimation("bite") from _Ready, so the correct picture for that gap is
-    // an un-posed (invisible) overlay, not a bite caught halfway. The kill switch shows what it used to answer.
+    // a one-shot. The pre-fix guess (animations[0], reported looping) is what made the overlay loop forever; an
+    // earlier fix stopped the looping but still streamed a mid-bite frame for a node the game had not yet played
+    // anything on. The correct picture for that gap is an un-posed (invisible) overlay, not a bite caught halfway.
+    // The kill switch shows what it used to answer.
     [Fact]
     public void BiteOverlay_FallbackGuessIsNoAnimationUntilTheGamePlaysIt()
     {

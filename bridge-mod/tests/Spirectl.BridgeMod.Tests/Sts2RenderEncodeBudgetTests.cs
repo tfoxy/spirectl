@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// Round-8 item 14 (spine bake budget), extended in R21 when the budget stopped being spine-only: the Godot-free
+// The render encode budget (originally spine-bake-only, now every offline encode): the Godot-free
 // primitives the couch-coop host drives —
 //   * WHICH animation time a single-frame (still / degraded) bake samples,
 //   * how many encode threads the process may use while N game instances share the machine, and
@@ -56,7 +56,7 @@ public sealed class Sts2RenderEncodeBudgetTests
         Assert.Equal(0f, Sts2SpineStillFrame.ChooseSampleTime("die", float.NaN));
     }
 
-    // ---- R10 `&t=` explicit sample time (the closed treasure chest) ---------------------------------------------
+    // ---- `&t=` explicit sample time (the closed treasure chest) -------------------------------------------------
 
     // THE chest case: its sole clip is named "animation" (the lid opening) and the room freezes it at t=0 with
     // SetTimeScale(0) for a CLOSED chest. The mid-frame default renders a half-open lid; the explicit request wins.
@@ -121,7 +121,7 @@ public sealed class Sts2RenderEncodeBudgetTests
         }
     }
 
-    // The offload is opt-OUT and the flag name is documented: it is both the way back to the pre-R21 render path
+    // The offload is opt-OUT and the flag name is documented: it is both the way back to the main-thread encode path
     // without a rebuild, and the seam that lets ONE build produce both halves of the before/after measurement.
     [Fact]
     public void OffloadIsOnByDefaultAndNamedByItsEnvVar()
@@ -155,7 +155,7 @@ public sealed class Sts2RenderEncodeBudgetTests
         Assert.False(Sts2RenderEncodeBudget.ResolveOffloadEnabled("0"));
     }
 
-    // ---- R21: the gate is PROCESS-WIDE ---------------------------------------------------------------------------
+    // ---- The gate is PROCESS-WIDE --------------------------------------------------------------------------------
 
     // The whole point of the rename. A per-bake semaphore capped one bake's fan-out, so two concurrent encoders
     // (a second bake, or the single-image lane now that it encodes off-thread) could each take the full budget.

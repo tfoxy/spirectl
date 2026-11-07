@@ -3,19 +3,18 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R11 producer cosmetic-emit cap decision — PURE and Godot-free (like Sts2RegionEmitCap / Sts2TweenEndpointTuples) so
+// Producer cosmetic-emit cap decision — PURE and Godot-free (like Sts2RegionEmitCap / Sts2TweenEndpointTuples) so
 // the pacing is unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
 // The Tezcatara rest-site fire VFX (NRestSiteFireVfx + their Sprite2D/Node2D children) animate their TRANSFORM every
-// frame — a continuous flicker. The recorded wire (tezca-defaultbridge.ndjson) shows the ONLY per-tick-changing channel
-// is `transform` (modulate/selfModulate/zIndex/localRect/texture never change), at ~97 upserts/drain × ~30 drains/s.
-// Because a transform change classifies as a Draw client-side, this both floods the wire AND keeps the wide-screen
-// spread walk from bailing → the 9-14fps signature.
+// frame — a continuous flicker. The ONLY per-tick-changing channel is `transform` (modulate/selfModulate/zIndex/
+// localRect/texture never change). Because a transform change classifies as a Draw client-side, this both floods
+// the wire AND keeps the wide-screen spread walk from bailing.
 //
-// NOTE: this is DEFAULT OFF in the watcher (SPIRECTL_COSMETIC_EMIT_CAP_MS). A replay A/B proved the Tezcatara fps is
-// bounded by client-side particle/shader re-simulation (~166 continuous nodes), NOT the upsert flood — stripping 98% of
-// transform upserts moved fps only 11→12. The cap is a correct BANDWIDTH/GC lever (cuts wire + client GC) with no fps
-// win here; enable it where wire/GC pressure matters (phones). The pacing logic below is what runs when enabled.
+// NOTE: this is DEFAULT OFF in the watcher (SPIRECTL_COSMETIC_EMIT_CAP_MS): the client-side cost of these nodes is
+// particle/shader re-simulation, which the cap does not reduce. The cap is a correct BANDWIDTH/GC lever (cuts wire +
+// client GC); enable it where wire/GC pressure matters (mobile clients). The pacing logic below is what runs when
+// enabled.
 //
 // This paces SUSTAINED per-frame transform churn to at most one emit per window per node, mirroring Sts2RegionEmitCap:
 // within the window the previously-emitted transform is substituted before the change test so the swap is invisible to

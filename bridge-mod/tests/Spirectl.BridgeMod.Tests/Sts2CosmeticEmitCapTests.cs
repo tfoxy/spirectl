@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R11 producer cosmetic-emit cap pacing (Sts2CosmeticEmitCap.Decide) — a pure, Godot-free exercise of the sustained
+// Producer cosmetic-emit cap pacing (Sts2CosmeticEmitCap.Decide) — a pure, Godot-free exercise of the sustained
 // per-frame transform-churn cap the watcher applies before ApplyIfChanged. Verifies: sustained churn pins inside the
 // window and emits (restarting the window) once it elapses; a one-shot (non-sustained) move streams instantly; churn
 // exit resets the streak so the settle frame passes through; and cap=0 disables the pacing entirely.

@@ -58,18 +58,18 @@ internal static class Sts2TweenRecorderHooks
     private static volatile bool _hintsEnabled;
     private static ILogStream? _log;
 
-    // Part C: an optional resolver (registered by Sts2RuntimeFactory, backed by the scene watcher) that turns a
+    // An optional resolver (registered by Sts2RuntimeFactory, backed by the scene watcher) that turns a
     // captured tween's target change into an END endpoint in the watcher's streamed space, so the mirror can
     // REPLAY the tween instead of only pre-arming timing. Null when no watcher is wired (recording-only / tests);
     // then hints stay timing-only (endpoint fields null) and consumers fall back to the streamed transforms.
     internal static Func<ulong, TweenTargetChange, double, TweenEndpoint?>? EndpointResolver { get => Sts2SceneAnimationCallbacks.TweenEndpointResolver; set => Sts2SceneAnimationCallbacks.TweenEndpointResolver = value; }
 
-    // Fix 1: an optional canceller (registered by Sts2RuntimeFactory, backed by the scene watcher) invoked when a
+    // An optional canceller (registered by Sts2RuntimeFactory, backed by the scene watcher) invoked when a
     // recorded tween is KILLED/STOPPED. It tells the watcher to drop any open streaming-suppression window on the
     // tween's target nodes and force one settle re-emit, so a superseded/interrupted tween (e.g. the shared main-menu
     // focus reticle re-anchored onto a new button) stops freezing those nodes' live stream. Null in tests / when no
     // watcher is wired — then a kill only prevents the (not-yet-emitted) hint via record.Cancelled.
-    // The bool is WS-REST's `forceOpacityResync`: when true the watcher forces a settled opacity re-emit even when
+    // The bool is `forceOpacityResync`: when true the watcher forces a settled opacity re-emit even when
     // the node has NO open opacity window (a killed fade-IN never opened one), so a hint-less re-show still un-sticks.
     internal static Action<IReadOnlyCollection<ulong>, bool>? WindowCanceller { get => Sts2SceneAnimationCallbacks.TweenWindowCanceller; set => Sts2SceneAnimationCallbacks.TweenWindowCanceller = value; }
 
@@ -156,7 +156,7 @@ internal static class Sts2TweenRecorderHooks
                 PatchPostfix(harmony, typeof(PropertyTweener), nameof(PropertyTweener.SetEase), nameof(SetEasePostfix));
                 PatchPostfix(harmony, typeof(PropertyTweener), nameof(PropertyTweener.SetDelay), nameof(SetDelayPostfix));
                 PatchPostfix(harmony, typeof(PropertyTweener), nameof(PropertyTweener.AsRelative), nameof(AsRelativePostfix));
-                // Fix 1: a killed/stopped tween must stop polluting the mirror (drop its hint, unfreeze its nodes).
+                // A killed/stopped tween must stop polluting the mirror (drop its hint, unfreeze its nodes).
                 PatchPostfix(harmony, typeof(Tween), nameof(Tween.Kill), nameof(KillPostfix));
                 PatchPostfix(harmony, typeof(Tween), nameof(Tween.Stop), nameof(KillPostfix));
             }
@@ -294,7 +294,7 @@ internal static class Sts2TweenRecorderHooks
             var step = record.BeginStep("property");
             step.Property = property?.ToString();
             step.To = VariantToJson(finalVal);
-            // Keep the raw Variant too, so Part C endpoint resolution reads the exact value (Vector2/float) without
+            // Keep the raw Variant too, so endpoint resolution reads the exact value (Vector2/float) without
             // a JSON round-trip. Value-typed for the transform props we resolve, so it survives to the deferred emit.
             step.ToRaw = finalVal;
             step.HasToRaw = true;
@@ -500,9 +500,8 @@ internal static class Sts2TweenRecorderHooks
 
     private static void FromPostfix(PropertyTweener __instance, Variant value)
     {
-        // Part C (Fix 2): the DECLARED start matters to the hints path too — a re-anchored/primed tween (the shared
-        // main-menu reticle hard-set to x=0, then `.From(num3)`) must replay FROM num3, not the live transient. So
-        // capture the raw Variant under Active (hints OR recording); the JSON `From` stays a recording-only concern.
+        // The DECLARED start matters to the hints path too — a re-anchored/primed tween (hard-set to one value, then
+        // `.From(start)`) must replay FROM that start, not the live transient. So capture the raw Variant under Active (hints OR recording); the JSON `From` stays a recording-only concern.
         if (!Active)
         {
             return;
@@ -584,7 +583,7 @@ internal static class Sts2TweenRecorderHooks
         }
     }
 
-    // ---- Tween.Kill / Tween.Stop postfix (Fix 1) -------------------------------------------------
+    // ---- Tween.Kill / Tween.Stop postfix -------------------------------------------------------
 
     // A killed/stopped tween is either (a) still pending its deferred Finalize — mark it Cancelled so no ghost hint
     // ships (a fade-OUT that was superseded a frame later would otherwise replay in reverse on the shared node); or
@@ -619,7 +618,7 @@ internal static class Sts2TweenRecorderHooks
                 ids.Add(record.TargetInstanceId);
             }
 
-            // WS-REST belt-and-braces: a killed fade-IN (a VISIBLE-target opacity step) never opened an opacity
+            // Belt-and-braces: a killed fade-IN (a VISIBLE-target opacity step) never opened an opacity
             // window, so the plain "collapse an open window" path is a no-op for it. Detect that case here and ask the
             // watcher to force one settled opacity re-emit of the LIVE alpha even with no window open — so the client's
             // hide-latch always gets a fresh, un-suppressed alpha write to release against.
@@ -746,13 +745,13 @@ internal static class Sts2TweenRecorderHooks
         }
 
         var node = record.Node ?? ".";
-        // Part C: attach declarative ENDPOINTS so a mirror consumer can REPLAY the tween (animate to the endpoint)
+        // Attach declarative ENDPOINTS so a mirror consumer can REPLAY the tween (animate to the endpoint)
         // rather than only pre-arm timing. A single Godot tween may animate MULTIPLE nodes in parallel (an event option
         // scales its ROOT while fading a highlight-glow CHILD's modulate), so we GROUP property steps by their own
         // target node and resolve each group independently — otherwise a child's fade endpoint would be attributed to
         // (and fanned across) the wrong node's subtree. Per group we combine its steps into one end state and resolve
-        // two channels: a TRANSFORM endpoint (Stage 2: parallel position + scale + rotation) attached to that group's
-        // longest-duration transform step, and an OPACITY endpoint (Stage 4: modulate alpha fade) attached to its
+        // two channels: a TRANSFORM endpoint (parallel position + scale + rotation) attached to that group's
+        // longest-duration transform step, and an OPACITY endpoint (modulate alpha fade) attached to its
         // longest-duration alpha step — each hint's duration is what the client uses for that channel's CSS transition.
         // Gated to Loops==0 (a one-shot CSS transition can't loop). Every other step — and every step when no resolver
         // is wired — stays a plain timing hint. Best-effort: any failure drops only the endpoints, never the timing
@@ -808,7 +807,7 @@ internal static class Sts2TweenRecorderHooks
                         (endOpacityByAnchor ??= new Dictionary<StepRecord, double>())[opacityAnchor] = o;
                     }
 
-                    // Fix 2: the declared START rides the SAME anchor as its endpoint channel (the client primes the
+                    // The declared START rides the SAME anchor as its endpoint channel (the client primes the
                     // element there before transitioning). Null unless the tween declared `.From(...)`.
                     if (endpoint.StartTransform is { } st && transformAnchor is not null)
                     {
@@ -870,14 +869,14 @@ internal static class Sts2TweenRecorderHooks
         }
     }
 
-    // Map a property step's raw target Variant to a TweenTargetChange the endpoint resolver understands. Stage 2
-    // handles the full transform set (position/scale/rotation, whole-vector or per-axis); opacity is handled
-    // separately by TryOpacityChange (Stage 4). Returns null for non-transform props.
+    // Map a property step's raw target Variant to a TweenTargetChange the endpoint resolver understands. Handles
+    // the full transform set (position/scale/rotation, whole-vector or per-axis); opacity is handled
+    // separately by TryOpacityChange. Returns null for non-transform props.
     private static TweenTargetChange? TryTransformChange(StepRecord step) =>
         step.HasToRaw ? MapTransform(step.Property, step.ToRaw) : null;
 
-    // The tween's START for a transform step, mapped to the same component. An explicit `.From(...)` (Fix 2) always
-    // wins; otherwise the IMPLICIT start sampled at registration time is used when the kill-switch is on (WS-ANIM), so
+    // The tween's START for a transform step, mapped to the same component. An explicit `.From(...)` always
+    // wins; otherwise the IMPLICIT start sampled at registration time is used when the kill-switch is on, so
     // an endpoint-only chrome tween still primes/replays from its real pre-tween value on a slow client. Null when the
     // step has neither — the client then falls back to the committed value (unchanged behavior).
     private static TweenTargetChange? TryTransformStart(StepRecord step)
@@ -920,7 +919,7 @@ internal static class Sts2TweenRecorderHooks
         };
     }
 
-    // Stage 4: map a property step's raw target Variant to an ALPHA (opacity) endpoint, if it is one. Handles both
+    // Map a property step's raw target Variant to an ALPHA (opacity) endpoint, if it is one. Handles both
     // the whole-color tween (take .a) and the alpha-only sub-property, for BOTH the `modulate` (child-cascade) and
     // `self_modulate` (own-paint-only) channels. The alpha value is the same math for both channels; WHICH channel
     // this step drives is recovered from step.Property by CombineTransformChange (self_modulate → SelfModulateA).
@@ -929,8 +928,8 @@ internal static class Sts2TweenRecorderHooks
     internal static float? TryOpacityChange(StepRecord step) =>
         step.HasToRaw ? MapOpacity(step.Property, step.ToRaw) : null;
 
-    // The START alpha for an opacity step. An explicit `.From(...)` (Fix 2) wins; otherwise the IMPLICIT start sampled
-    // at registration time is used when the kill-switch is on (WS-ANIM). Lets the resolver's opacity guard compare the
+    // The START alpha for an opacity step. An explicit `.From(...)` wins; otherwise the IMPLICIT start sampled
+    // at registration time is used when the kill-switch is on. Lets the resolver's opacity guard compare the
     // end alpha against the tween's real start rather than a stale live sample, and lets the client prime the fade from
     // its true start. Null when the step has neither — original live-sample behavior. `internal` for unit tests.
     internal static float? TryOpacityStart(StepRecord step)
@@ -992,7 +991,7 @@ internal static class Sts2TweenRecorderHooks
         float? globalPositionX = null;
         float? globalPositionY = null;
         float? modulateA = null;
-        // Fix 2: parallel accumulators for each step's DECLARED start (`.From(...)`), last-writer-wins like the end.
+        // Parallel accumulators for each step's DECLARED start (`.From(...)`), last-writer-wins like the end.
         Vector2? startPosition = null;
         float? startPositionX = null;
         float? startPositionY = null;
@@ -1414,11 +1413,11 @@ internal static class Sts2TweenRecorderHooks
         public string? Ease;
         public double? DelayMs;
         public bool Parallel;
-        // Raw target Variant, retained so Part C endpoint resolution reads the exact value without a JSON
+        // Raw target Variant, retained so endpoint resolution reads the exact value without a JSON
         // round-trip. Value-typed (Vector2/float) for the props we resolve.
         public Variant ToRaw;
         public bool HasToRaw;
-        // Raw DECLARED start Variant (`.From(...)`), retained for Part C so a re-anchored/primed tween replays from
+        // Raw DECLARED start Variant (`.From(...)`), retained so a re-anchored/primed tween replays from
         // its declared start rather than a stale live sample. Only set when the game called `.From(...)` on this step.
         public Variant FromRaw;
         public bool HasFromRaw;
@@ -1429,7 +1428,7 @@ internal static class Sts2TweenRecorderHooks
         // SPIRECTL_TWEEN_IMPLICIT_START kill-switch (default ON); an explicit `.From(...)` always wins.
         public Variant ImplicitFromRaw;
         public bool HasImplicitFromRaw;
-        // This STEP's own tween target (a single tween may animate multiple nodes in parallel). Part C attributes each
+        // This STEP's own tween target (a single tween may animate multiple nodes in parallel). Endpoint resolution attributes each
         // step's endpoint hint to this node; 0 when unresolved (falls back to the record's first-target address).
         public ulong TargetInstanceId;
 

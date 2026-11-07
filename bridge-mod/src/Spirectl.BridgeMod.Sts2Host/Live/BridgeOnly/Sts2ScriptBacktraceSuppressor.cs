@@ -18,18 +18,16 @@ namespace Spirectl.Sts2.Live;
 /// and the engine's error path passes a freshly captured per-scripting-language backtrace as a CALL ARGUMENT to
 /// its print function — so the capture happens before anything consults the print-enabled flag.
 /// <c>Engine.PrintErrorMessages = false</c> therefore cannot suppress it: it only skips the print, after the
-/// expensive part has already run. Measured live at the real call site (phase-6 WS-1, byrdonis, 20 000
-/// iterations each): a SUCCEEDING surface-count call costs 0.019 us, a failing one costs 28.4 us, and the
-/// backtrace capture ALONE — with no rendering-server call in it at all — costs 26.8 us. The capture is 94 % of
-/// the probe. Turning printing back on costs a further 135 us, so the existing flag is doing real work; this
-/// hook is about the 28 us it cannot reach.</para>
+/// expensive part has already run. The backtrace capture dominates the cost of each failed probe, and turning
+/// printing back on costs more again, so the existing flag is doing real work; this hook is about the capture cost
+/// it cannot reach.</para>
 ///
 /// <para><b>What it patches.</b> The engine reaches managed code through
 /// <c>GDMonoCache::managed_callbacks.DebuggingUtils_GetCurrentStackInfo</c>, a function pointer taken once at
 /// startup from <c>Godot.DebuggingUtils.GetCurrentStackInfo</c>. That method builds a
 /// <c>StackTrace(skipFrames: 2, fNeedFileInfo: true)</c> and then, per frame, resolves a method, tests an
 /// attribute, builds a signature string and marshals two strings to native — which is why the cost scales with
-/// stack depth (measured 1.79 us per added frame). A prefix that skips it leaves the C# backtrace empty, which
+/// stack depth. A prefix that skips it leaves the C# backtrace empty, which
 /// is exactly what a suppressed error wants.</para>
 ///
 /// <para><b>Why it is scoped, not global.</b> Armed around the sweep and disarmed in a finally on every path.

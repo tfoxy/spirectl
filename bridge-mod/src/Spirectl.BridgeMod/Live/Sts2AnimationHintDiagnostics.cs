@@ -61,7 +61,7 @@ public sealed class Sts2AnimationHintFamilyCounters : ISts2AnimationHintCounter
     public long PublishFailed => Interlocked.Read(ref _publishFailed);
 
     /// <summary>
-    /// R14 ATTRIBUTION FOR <see cref="ResolveNull"/>. A resolve that found NO tracked node for the mover and was
+    /// ATTRIBUTION FOR <see cref="ResolveNull"/>. A resolve that found NO tracked node for the mover and was
     /// therefore parked for a retry after the next reconcile. The hint was still declined on this pass (the hook
     /// records its <see cref="ResolveNull"/> as before), so this bucket does not replace that one — it says WHY the
     /// resolve came back empty, and pairs with <see cref="ResolveRetryHit"/> / <see cref="ResolveRetryDropped"/> to
@@ -84,14 +84,14 @@ public sealed class Sts2AnimationHintFamilyCounters : ISts2AnimationHintCounter
     public long ResolveRetryDropped => Interlocked.Read(ref _resolveRetryDropped);
 
     /// <summary>
-    /// R14 ATTRIBUTION FOR <see cref="ResolveNull"/>: the drawn scalars are not integrable (a non-finite value, a
+    /// ATTRIBUTION FOR <see cref="ResolveNull"/>: the drawn scalars are not integrable (a non-finite value, a
     /// non-positive duration or speed, a degenerate scale), so no client could replay the animation. Nothing to do
     /// with tracking — a nonzero value here points at the CAPTURE, not at the walk's timing.
     /// </summary>
     public long ResolveNotReplayable => Interlocked.Read(ref _resolveNotReplayable);
 
     /// <summary>
-    /// R14 ATTRIBUTION FOR <see cref="ResolveNull"/>: the mover WAS tracked, but its global transform is singular
+    /// ATTRIBUTION FOR <see cref="ResolveNull"/>: the mover WAS tracked, but its global transform is singular
     /// (visually collapsed), so there is no invertible basis to express the flight in and the hint would be
     /// meaningless.
     /// </summary>

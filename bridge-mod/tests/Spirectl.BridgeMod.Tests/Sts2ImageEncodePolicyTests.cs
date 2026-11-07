@@ -3,9 +3,9 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R21: which encoder a single-image asset render reaches for, and with what settings. The load-bearing property is
-// the FIRST test — a request that names no quality and no opacity must resolve to exactly the pre-R21 encoder call,
-// because every shipped caller is such a request and the round's contract is "the offload changes no bytes".
+// Which encoder a single-image asset render reaches for, and with what settings. The load-bearing property is
+// the FIRST test — a request that names no quality and no opacity must resolve to exactly the default encoder call,
+// because every shipped caller is such a request and the contract is "the offload changes no bytes".
 public sealed class Sts2ImageEncodePolicyTests
 {
     [Fact]

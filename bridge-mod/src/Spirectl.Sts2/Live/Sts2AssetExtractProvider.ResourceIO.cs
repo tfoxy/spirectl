@@ -617,14 +617,14 @@ public sealed partial class Sts2AssetExtractProvider
         // Optional selectors (a host appends these; the bare CLI omits them so its key/URL is byte-identical to
         // today). `skin` = the runtime skin to apply per lane (#3); `skel` = a res:// skeleton-data path for the
         // standalone fallback lane (#8), validated to a res:// prefix; `mat` = the live shader-material signature
-        // (R9) the render resolves back to the LIVE uniform values. `v` (version bump) is a client-side
+        // the render resolves back to the LIVE uniform values. `v` (version bump) is a client-side
         // cache-buster only (folded into the mod route key) — it changes nothing spirectl renders, so it is
         // ignored here (falls through the else, like any unrecognised param).
         string? skin = null;
         string? skel = null;
         string? mat = null;
-        // `t` (R10) = the STILL sample time in seconds (Sts2SpineStillFrame's explicit override). Only a paused
-        // track's client sends it; absent → the mid/end heuristic, i.e. the byte-identical pre-R10 bake.
+        // `t` = the STILL sample time in seconds (Sts2SpineStillFrame's explicit override). Only a paused
+        // track's client sends it; absent → the mid/end heuristic.
         float? stillTime = null;
         foreach (var pair in queryPart.Split('&', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
@@ -680,14 +680,14 @@ public sealed partial class Sts2AssetExtractProvider
             }
             else if (key.Equals("mat", StringComparison.OrdinalIgnoreCase))
             {
-                // R9: an opaque signature minted by Sts2SpineMaterialKey (16 lowercase hex chars). Used ONLY as a
+                // An opaque signature minted by Sts2SpineMaterialKey (16 lowercase hex chars). Used ONLY as a
                 // lookup key into the live-uniform snapshot store, so an unrecognised value simply misses and the
                 // render falls back to the offline scene material — it can never address a resource.
                 mat = string.IsNullOrWhiteSpace(value) ? null : value;
             }
             else if (key.Equals("t", StringComparison.OrdinalIgnoreCase))
             {
-                // R10: the STILL sample time in seconds. Non-negative + finite only; anything else drops to null
+                // The STILL sample time in seconds. Non-negative + finite only; anything else drops to null
                 // (the mid/end heuristic). ChooseSampleTime additionally clamps it to the clip's real duration, so
                 // an overshooting wall-clock track time lands on the last frame rather than failing.
                 if (float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var t)

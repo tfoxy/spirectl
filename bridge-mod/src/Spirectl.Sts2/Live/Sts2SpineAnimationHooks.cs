@@ -47,27 +47,25 @@ internal static class Sts2SpineAnimationHooks
     // Resolved once at install; the postfix uses it to key the recorded schedule by the node's instance id.
     private static FieldInfo? _spineControllerField;
 
-    // The private SpineAnimationAccess field holding the MegaSprite it wraps (#5). SpineAnimationAccess is a
+    // The private SpineAnimationAccess field holding the MegaSprite it wraps. SpineAnimationAccess is a
     // readonly struct; the postfix reads _sprite off the (boxed) instance to reach the driven node.
     private static FieldInfo? _spineAccessSpriteField;
 
-    // #5 (defeat death anim): opt-out escape hatch for the SpineAnimationAccess.SetAnimation hook. Default ON.
-    // When the player dies, NGameOverScreen.MoveCreaturesToDifferentLayerAndDisableUi poses the corpse via a
-    // DIRECT `nCreatureVisuals.SpineAnimation.SetAnimation("die", loop:false)` — SpineAnimationAccess.SetAnimation,
+    // Defeat death anim: opt-out escape hatch for the SpineAnimationAccess.SetAnimation hook. Default ON.
+    // The game-over screen poses the corpse through a DIRECT SpineAnimationAccess.SetAnimation("die", loop:false),
     // NOT CreatureAnimator.SetNextState. On a couch-frozen, freshly-created game-over creature that direct set
-    // never reaches the mirror (no animation_started; no SetNextState), so ReadLive falls to
-    // PickDefaultAnimation → idle_loop and the client shows the character standing idle instead of dead. Hooking
-    // SpineAnimationAccess.SetAnimation funnels the pose into RecordScheduledAnimation (non-looping "die" → the
-    // client freezes on the corpse frame). Combat is unaffected: CreatureAnimator.SetNextState drives the spine
-    // via MegaAnimationState.SetAnimation directly, bypassing SpineAnimationAccess, so this hook never fires for
-    // combat transitions.
+    // never reaches the mirror (no animation_started; no SetNextState), so ReadLive would fall to
+    // PickDefaultAnimation → idle_loop and the client would show the character standing idle instead of dead.
+    // Hooking SpineAnimationAccess.SetAnimation funnels the pose into RecordScheduledAnimation (non-looping "die" →
+    // the client freezes on the corpse frame). Combat transitions do not go through SpineAnimationAccess, so this
+    // hook never fires for them.
     private static readonly bool SetAnimationHookEnabled =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_SETANIM_HOOK") ?? string.Empty)
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // Round-8 items 10/11: opt-out for the DIRECT MegaAnimationState.SetAnimation/AddAnimation hooks (plus the
+    // Opt-out for the DIRECT MegaAnimationState.SetAnimation/AddAnimation hooks (plus the
     // MegaSprite.TryGetAnimationState owner map they need, and the HasAnimation gate on the SetNextState
-    // postfix). Default ON; `0`/`false`/`off`/`no` restores the pre-round-8 CreatureAnimator-only capture.
+    // postfix). Default ON; `0`/`false`/`off`/`no` restores the CreatureAnimator-only capture.
     private static readonly bool DirectAnimationHookEnabled =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_DIRECTANIM_HOOK") ?? string.Empty)
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
@@ -140,13 +138,13 @@ internal static class Sts2SpineAnimationHooks
                 return;
             }
 
-            // #5: also hook SpineAnimationAccess.SetAnimation (the direct-set path the game-over screen uses to
+            // Also hook SpineAnimationAccess.SetAnimation (the direct-set path the game-over screen uses to
             // pose the dead character). Best-effort and independent of the core SetNextState hook above — if it
             // cannot be patched (e.g. Harmony can't patch this readonly-struct instance method on some runtime),
             // the combat path still works; only the defeat-screen corpse pose is missed.
             TryInstallSetAnimationHook(harmony, logStream);
 
-            // Round-8 items 10/11: the DIRECT-set path (bite/chest/boss/merchant/rest-site — everything not
+            // The DIRECT-set path (bite/chest/boss/merchant/rest-site — everything not
             // driven by CreatureAnimator). Best-effort and independent of the hooks above.
             TryInstallDirectAnimationHooks(harmony, logStream);
 
@@ -158,7 +156,7 @@ internal static class Sts2SpineAnimationHooks
         }
     }
 
-    // Install the #5 SpineAnimationAccess.SetAnimation postfix. Kept separate + fully guarded so any failure is
+    // Install the SpineAnimationAccess.SetAnimation postfix. Kept separate + fully guarded so any failure is
     // non-fatal to the primary SetNextState hook. No-op when the escape hatch disables it.
     private static void TryInstallSetAnimationHook(Harmony harmony, ILogStream logStream)
     {
@@ -204,7 +202,7 @@ internal static class Sts2SpineAnimationHooks
         }
     }
 
-    // Install the round-8 DIRECT-animation hooks. Three postfixes that only ever WRITE to spirectl-owned
+    // Install the DIRECT-animation hooks. Three postfixes that only ever WRITE to spirectl-owned
     // dictionaries:
     //   * MegaSprite.TryGetAnimationState → the animation-state → SpineSprite owner map (see
     //     Sts2SpineInspector.NodeByAnimState). It is the sole choke point every caller goes through to obtain a
@@ -392,8 +390,8 @@ internal static class Sts2SpineAnimationHooks
 
     // Harmony postfix on every queue entry point the lane declares — MegaAnimationState.AddAnimation and, where
     // the build has one, its tracked sibling; the argument list is identical, so one postfix serves both. The
-    // queued companion of the set above: a one-shot's return loop (CreatureAnimator, NTreasureRoom's
-    // "shine_fade") or — when the game queues onto an empty track, which NBossMapPoint._Ready does — the clip
+    // queued companion of the set above: a one-shot's return loop (CreatureAnimator, the treasure chest) or —
+    // when the game queues onto an empty track (the boss map point) — the clip
     // that will actually play. `delay` is deliberately ignored: the schedule replays a single head→return
     // handoff, and every track-0 call site in the game passes 0.
     private static void DirectAddAnimationPostfix(MegaAnimationState __instance, string animationName, float delay, bool loop, int trackId)
@@ -420,11 +418,10 @@ internal static class Sts2SpineAnimationHooks
         }
     }
 
-    // Harmony postfix on MegaAnimationState.SetTimeScale(float) (round-8 item 13). The treasure chest is set up
-    // as `SetAnimation("animation") + AddAnimation("shine_fade") + SetTimeScale(0)`: the game FREEZES it on the
-    // closed-chest first frame and only resumes (SetTimeScale(1)) once the player opens it. The producer's
-    // schedule replay runs off WALL CLOCK, so without this the chest walked "animation" to its end and handed off
-    // to the queued "shine_fade" — both clients showed an OPEN, glowing chest in a room whose chest is visibly
+    // Harmony postfix on MegaAnimationState.SetTimeScale(float). A track can be FROZEN by SetTimeScale(0) on the
+    // first frame of a clip with another clip queued behind it (a closed treasure chest), and resumed by
+    // SetTimeScale(1). The producer's schedule replay runs off WALL CLOCK, so without this it would walk the clip
+    // to its end and hand off to the queued one — an OPEN, glowing chest in a room whose chest is visibly
     // shut. There is no track argument on this overload (it scales the whole state), so no track-0 gate here; the
     // owner map is the only thing needed. Never throws.
     private static void DirectSetTimeScalePostfix(MegaAnimationState __instance, float scale)
@@ -522,7 +519,7 @@ internal static class Sts2SpineAnimationHooks
 
             // A direct set has no pre-queued return chain (the game issues a single clip); record it as a lone
             // head. Looping → runs forever (an idle set directly); non-looping (die) → plays once then freezes.
-            // (Since round 8 this is a subset of DirectSetAnimationPostfix — SpineAnimationAccess.SetAnimation
+            // (This is a subset of DirectSetAnimationPostfix — SpineAnimationAccess.SetAnimation
             // delegates to MegaAnimationState.SetAnimation — but it is kept as an independent safety net: it
             // has its own kill switch and needs no owner-map entry.)
             Sts2SpineInspector.RecordDirectAnimation(
@@ -568,9 +565,9 @@ internal static class Sts2SpineAnimationHooks
                 static queued => (queued.Id, queued.IsLooping));
 
             // HasAnimation GATE: SetNextState/AddNextState log a warning and RETURN when the clip is absent from
-            // the skeleton, leaving the track untouched — this postfix used to record it anyway, so a creature
-            // whose skeleton lacks the state id had the mirror switch to a non-existent clip (or hand off to a
-            // return that was never queued) while the game kept playing the previous animation. Reading
+            // the skeleton, leaving the track untouched — recording it anyway would switch the mirror to a
+            // non-existent clip (or hand off to a return that was never queued) while the game kept playing the
+            // previous animation. Reading
             // HasAnimation here is safe: SetNextState called it on this very sprite one instruction earlier.
             var sequence = DirectAnimationHookEnabled
                 ? Sts2SpineDefaults.ResolveRecordableSequence(state.Id, state.IsLooping, queuedChain, sprite.HasAnimation)
@@ -607,7 +604,7 @@ internal static class Sts2SpineAnimationHooks
                 currentDurMsec = Sts2SpineSchedule.ResolveOneShotDurationMsec(endSeconds, skeletonSeconds);
             }
 
-            // Capture the runtime skin (#3) in this alive-native, main-thread window — the offline bake instance
+            // Capture the runtime skin in this alive-native, main-thread window — the offline bake instance
             // would otherwise render skin-less (missing body pieces). Defensive read; RecordSkin no-ops on null.
             var capturedSkin = Sts2SpineInspector.TryReadCurrentSkinName(node);
             Sts2SpineInspector.RecordSkin(node.GetInstanceId(), capturedSkin);

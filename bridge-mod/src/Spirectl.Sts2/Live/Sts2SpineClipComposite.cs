@@ -1,20 +1,20 @@
 namespace Spirectl.Sts2.Live;
 
-// WS5: PURE, Godot-free sizing rules for the generic spine-clip lane's SIDE-BY-SIDE composite (like
+// PURE, Godot-free sizing rules for the generic spine-clip lane's SIDE-BY-SIDE composite (like
 // Sts2SpineEventBackgroundClip — unit-testable without the Godot-coupled provider).
 //
 // The generic clip renderer renders `laneCount` independent skeleton clones into ONE SubViewport, laid out
 // left-to-right: `viewport.Size = (cellWidth * laneCount, cellHeight)`, and slices lane i back out with
 // `image.GetRegion(new Rect2I(i * cellWidth, 0, cellWidth, cellHeight))`.
 //
-// THE MERCHANT DEFECT. `FrameFromBoundsFitted` fits a rig's max dimension to MaxSceneSize (2048) and adds
-// 2*Padding, so a full-bleed background rig (the merchant's shop_merchant_bottom `bg` attachment is 5120x2400)
-// produces a 2176px-wide cell — and with the default 2 lanes the composite asks for a 4352px render target.
+// THE OVERSIZED-BACKGROUND DEFECT. `FrameFromBoundsFitted` fits a rig's max dimension to MaxSceneSize (2048) and
+// adds 2*Padding, so a full-bleed background rig produces a cell wider than 2048px — and with the default 2 lanes
+// the composite asks for a render target twice that wide.
 // When that request is refused/clamped, `viewport.GetTexture().GetImage()` reads back NARROWER than the
 // composite, and Godot's `Image.get_region` does NOT error: it allocates an image of the REQUESTED size and
 // blits the CLIPPED source into it, so the missing right-hand columns come back fully transparent. The lane-0
 // cell therefore carries only the LEFT slice of the background, tight-cropped to it, on a canvas that still
-// claims the full cell width — exactly "the merchant screen shows only the left side of its background".
+// claims the full cell width — a screen that shows only the left side of its background.
 //
 // Lanes are a THROUGHPUT knob only (how many clip frames are captured per render wait), never correctness, so
 // they can always be reduced. Two rules, both generic (no per-scene special cases):

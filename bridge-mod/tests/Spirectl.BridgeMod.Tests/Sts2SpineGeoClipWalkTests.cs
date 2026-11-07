@@ -8,27 +8,25 @@ namespace Spirectl.BridgeMod.Tests;
 // The bake's CHEAP mesh-RID acquisitions, both of them, against the same recorded id spaces: the WALK arm
 // (Sts2SpineGeoClipWalk), which finds a rig's slot meshes by column scan → stride ladder → walk, and the two dense
 // TIERS behind it (Sts2SpineGeoClipSweep.AcquireTieredAsync), which sweep the core index band before the whole
-// slacked plan. Between them they are about half a pose-only bake's wall time, so they are exactly the kind of
-// change that is worth nothing if it is wrong: a silently incomplete acquisition is what Phase 1 shipped (29 of
-// the merchant's 44 slots) and it took two rounds to find.
+// slacked plan. Both are worth nothing if they are wrong: a silently incomplete acquisition ships an artifact
+// with slots missing.
 //
 // THE DOUBLE IS REAL DATA. Every id space below is the actual (validator, index) set the geometry probe dumped
-// out of the game — both rigs, in BOTH recorded sessions, because the two sessions disagree about the thing the
-// acquisition depends on. In the later session each rig's meshes sit on an exact validator +5 / index +1
-// progression; in the earlier one the same rigs' validator deltas run 12, 15, 24, 8, 8, 7, 6, 8, 5, 9, 7 … while
-// the index still advances by exactly +1. An acquisition tested only against the clean session would pass here
-// and lose a third of the merchant on a bad day.
+// out of the game — both rigs, in two recorded captures, because the two captures disagree about the thing the
+// acquisition depends on. In the clean capture each rig's meshes sit on an exact validator +5 / index +1
+// progression; in the irregular one the same rigs' validator deltas wander while the index still advances by
+// exactly +1. An acquisition tested only against the clean capture would pass here and lose a third of the
+// merchant.
 public sealed class Sts2SpineGeoClipWalkTests
 {
     private static ulong Rid(uint validator, uint index) => Sts2SpineGeoClipSweep.ComposeRidId(validator, index);
 
     // ── The four recorded id spaces ──────────────────────────────────────────────────────────────────
     //
-    // Source: .sts2/research/data/spine-geoclip-phase{1,2}/probe-offline/offline-<rig>.json, `recipeA`. Each
-    // window below is the same file's recorded recipe-A plan, so the candidate counts these tests quote are the
-    // ones the dense sweep actually paid.
+    // Each window below is the probe's recorded recipe-A plan, so the candidate counts these tests quote are the
+    // dense sweep's own.
 
-    // merchant, later session — one clean +5/+1 line with a THIRTEEN-point hole in it (indices 116..128).
+    // merchant, clean capture — one clean +5/+1 line with a THIRTEEN-point hole in it (indices 116..128).
     private static readonly (uint V, uint I)[] MerchantMeshesClean =
     [
         (16417, 88), (16422, 89), (16427, 90), (16432, 91), (16437, 92), (16442, 93), (16447, 94), (16452, 95),
@@ -41,7 +39,7 @@ public sealed class Sts2SpineGeoClipWalkTests
     private static readonly ulong MerchantCleanBracketLow = Rid(16415, 87);
     private static readonly ulong MerchantCleanBracketMid = Rid(16637, 131);
 
-    // merchant, earlier session — the SAME rig with an irregular head (+12, +11) before the line settles.
+    // merchant, irregular capture — the SAME rig with an irregular head (+12, +11) before the line settles.
     private static readonly (uint V, uint I)[] MerchantMeshesIrregular =
     [
         (16212, 88), (16224, 89), (16235, 90), (16240, 91), (16245, 92), (16250, 93), (16255, 94), (16260, 95),
@@ -65,7 +63,7 @@ public sealed class Sts2SpineGeoClipWalkTests
     private static readonly ulong ByrdonisCleanBracketLow = Rid(16777, 88);
     private static readonly ulong ByrdonisCleanBracketMid = Rid(16919, 117);
 
-    // byrdonis, earlier session — eleven distinct validator lines. A constant-stride walk sees at most 8 of
+    // byrdonis, irregular capture — eleven distinct validator lines. A constant-stride walk sees at most 8 of
     // these 26; this is the case the index walk exists for.
     private static readonly (uint V, uint I)[] ByrdonisMeshesIrregular =
     [
@@ -78,25 +76,18 @@ public sealed class Sts2SpineGeoClipWalkTests
     private static readonly ulong ByrdonisIrregularBracketLow = Rid(18727, 88);
     private static readonly ulong ByrdonisIrregularBracketMid = Rid(18941, 117);
 
-    // A probe mesh taken after the acquisition-frame seek, closing window B. Not a recorded measurement — the
-    // baker never dumped one — so it is modelled on the same file's recipe-D probe mesh distance.
+    // A probe mesh taken after the acquisition-frame seek, closing window B. Not a recorded id — the baker never
+    // dumped one — so it is modelled on the recorded recipe-D probe mesh distance.
     private static readonly ulong MerchantBracketPost = Rid(16948, 160);
 
     // Window B's meshes: the ones the animation mints when it is SET, at indices the single-window bracket never
-    // reached. The probe never dumped their ids, so this space is CALIBRATED rather than recorded — but it is
-    // calibrated on the one thing about them that IS measured, and the thing the tier gate turns on: how they
-    // split either side of the mid bracket's index.
+    // reached. The probe never dumped their ids, so this space is CALIBRATED rather than recorded — on the thing
+    // the tier gate turns on: how they split either side of the mid bracket's index.
     //
-    // WHAT CHANGED, AND WHY IT MATTERS. This space used to be `indices 132..145` — every mesh ABOVE the mid
-    // bracket index of 131 — which is not a measurement but a restatement of the claim the narrow tier's window-B
-    // band was making. A fixture built out of the assumption it is testing cannot fail, and this one did not: it
-    // passed while the shipped band lost 13 of the merchant's 14 window-B meshes on every live bake (band
-    // 187..253 found 1, full axis 0..253 found 14, in 25 recorded arms; byrdonis 172..237 found 0 against
-    // 0..237 finding 2, in 31 arms).
-    //
-    // So the split is now the live one: THIRTEEN below the mid index, ONE at or above it. The validator
-    // progression is still the clean session's +5/+1 above the mid bracket's validator, which keeps them clear
-    // of window A's validator range (…16637) and so genuinely window-B-only.
+    // The split is the observed one: THIRTEEN below the mid index, ONE at or above it. Placing every mesh above
+    // the mid bracket index would restate the claim the narrow tier's window-B band makes, and a fixture built out
+    // of the assumption it is testing cannot fail. The validator progression is +5/+1 above the mid bracket's
+    // validator, which keeps them clear of window A's validator range (…16637) and so genuinely window-B-only.
     private static readonly (uint V, uint I)[] MerchantWindowBMeshes =
     [
         .. Enumerable.Range(0, 13).Select(k => ((uint)(16700 + (5 * k)), (uint)(117 + k))),
@@ -135,10 +126,10 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // ── The whole arm, against the real id spaces ────────────────────────────────────────────────────
 
-    // The headline: the acquisition it replaces validated 38 579 candidates to find these 30. Both the
-    // completeness and the cost are asserted, because either one alone is satisfiable by a useless arm — a walk
-    // that finds everything by sweeping the window has bought nothing, and a walk that probes twelve candidates
-    // and finds four has bought a fallback.
+    // The headline: the dense plan for this window is 38 579 candidates to find these 30. Both the completeness
+    // and the cost are asserted, because either one alone is satisfiable by a useless arm — a walk that finds
+    // everything by sweeping the window has bought nothing, and a walk that probes twelve candidates and finds
+    // four has bought a fallback.
     [Fact]
     public void Acquire_FindsEveryMerchantWindowAMeshOfTheCleanSessionForUnderFourPercentOfTheDenseSweep()
     {
@@ -156,7 +147,7 @@ public sealed class Sts2SpineGeoClipWalkTests
             $"the walk probed {result.Probed} of {window.Plan.TotalCandidates}, which is not a saving worth the risk");
     }
 
-    // The same rig, the session whose validator deltas wander between 5 and 24. A constant-stride walk cannot see
+    // The same rig, the capture whose validator deltas wander between 5 and 24. A constant-stride walk cannot see
     // the first two meshes at all; the index walk is what recovers them, and the line sweep is what reaches the
     // pair beyond the thirteen-point hole. Neither alone is enough — which is why both run off every anchor.
     [Fact]
@@ -191,7 +182,7 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // ── The stride is MEASURED, never assumed ────────────────────────────────────────────────────────
 
-    // The seeded stride is +5/+1 because that is what the clean session shows. A rig on a different progression
+    // The seeded stride is +5/+1 because that is what the clean capture shows. A rig on a different progression
     // must still be walked, so the ladder has to find the progression rather than confirm the seed.
     [Fact]
     public void Acquire_MeasuresAStrideTheAssumedOneWouldHaveMissedEntirely()
@@ -251,7 +242,7 @@ public sealed class Sts2SpineGeoClipWalkTests
             Sts2SpineGeoClipWalk.ModalStride(
                 [.. MerchantMeshesClean.Select(point => Rid(point.V, point.I))], fallback: 99));
 
-    // …and off the session whose head is irregular, where the ladder measures nothing at all.
+    // …and off the capture whose head is irregular, where the ladder measures nothing at all.
     [Fact]
     public void ModalStride_StillReadsFiveWhenTheRunsHeadIsIrregular()
         => Assert.Equal(
@@ -312,7 +303,7 @@ public sealed class Sts2SpineGeoClipWalkTests
     }
 
     // A hole SHORTER than the miss budget is bridged rather than treated as the end of the run. Byrdonis has
-    // exactly this shape (indices 107 and 108 mint meshes that never validate) in both recorded sessions, so the
+    // exactly this shape (indices 107 and 108 mint meshes that never validate) in both recorded captures, so the
     // SHIPPED budget is what this asserts — a literal here would let the default be lowered under it.
     [Fact]
     public void WalkByIndex_BridgesTheTwoIndexHoleByrdonisActuallyHasAtTheShippedMissBudget()
@@ -333,7 +324,7 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // The search WIDENS with each missed index rather than staying at one reach: a mesh that exists as an id but
     // fails the predicate still advanced the validator counter, so the member two indices out sits proportionally
-    // further away. At the largest per-mesh delta the sessions recorded (24) a two-index hole puts the next
+    // further away. At the largest per-mesh delta in the recorded captures (24) a two-index hole puts the next
     // member 72 validators out — beyond a single reach of 48, and inside the third step's widened one.
     [Fact]
     public void WalkByIndex_WidensItsValidatorSearchWithEachMissedIndex()
@@ -369,7 +360,7 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // ── The lone plausible quad ──────────────────────────────────────────────────────────────────────
 
-    // THE DOCUMENTED BLIND SPOT, and the one thing that closes it. The live battery found a 256×256 quad at
+    // THE DOCUMENTED BLIND SPOT, and the one thing that closes it. A recorded id space holds a 256×256 quad at
     // index 33 with four vertices, six indices, uvs exactly [0,1] and a box inside the skeleton's bounds — it
     // passes every clause of IsPlausibleSlotMesh and is excluded ONLY because nothing walks off it. If a change
     // to what "a run" means lets a run of one through, that quad is baked as a slot's art.
@@ -451,21 +442,16 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // WHAT THE FAN-OUT BUYS ON WINDOW B, AND WHAT IT STILL DOES NOT.
     //
-    // Buys: the 13 meshes below the seed. The scan now reaches index 129 on its fourth column (131, 130, 132,
-    // 129) instead of after a whole wrap of the axis, anchors there, and walks the run down to 117.
+    // Buys: the 13 meshes below the seed. The scan reaches index 129 on its fourth column (131, 130, 132, 129)
+    // instead of after a whole wrap of the axis, anchors there, and walks the run down to 117.
     //
     // Does not buy: the ISOLATED mesh at index 140. Once a run is accepted the scan stops at the first column
     // outside that run's own index extent (StopBandClosed), and 140 is past it — so the arm still under-delivers
-    // and the dense sweep behind it is still what completes the rig. That is the honest statement: the column
-    // order was wrong about the SIDE and is now right about it; it was never sufficient on its own.
+    // and the dense sweep behind it is still what completes the rig. The column order is right about the SIDE; it
+    // was never sufficient on its own.
     //
-    // HISTORY, kept because it is why this fixture reads the way it does. The scan used to run upward from the
-    // seed and wrap to the floor only afterwards, which is the same containment claim the narrow tier's window-B
-    // band was making — that these meshes sit at or above the mid bracket index. The fixture that "proved" it
-    // safe was built on that claim (indices 132..145) and so could not fail. It was recalibrated on the live
-    // split instead — 13 below the mid index, 1 at or above — and the walk arm then recovered NOTHING at all.
-    // None of this was ever a live defect: the walk is off by default, measured a loss, and the dense tiers
-    // sweep window B at full width. It is a PREREQUISITE for re-arming the walk.
+    // The walk is off by default and the dense tiers sweep window B at full width, so this is a PREREQUISITE for
+    // re-arming the walk rather than a live defect.
     [Fact]
     public void Acquire_RecoversWindowBsSubSeedMeshesButStillComesUpShortOfTheIsolatedOne()
     {
@@ -571,8 +557,8 @@ public sealed class Sts2SpineGeoClipWalkTests
     }
 
     // A window small enough to sweep outright is not worth an acquisition that can miss. Byrdonis's window B is
-    // 2 184 candidates and cost 0.10 s dense — less than the walk could save, and the place where a run too
-    // short to clear the minimum length lives.
+    // 2 184 candidates dense — less than the walk could save, and the place where a run too short to clear the
+    // minimum length lives.
     [Fact]
     public void Plan_RefusesAWindowSmallEnoughToSweepDensely()
     {
@@ -621,7 +607,7 @@ public sealed class Sts2SpineGeoClipWalkTests
     public void ArmName_NamesEveryCombinationTheReportCanCarry(bool walkRan, bool denseRan, string expected)
         => Assert.Equal(expected, Sts2SpineGeoClipWalk.ArmName(walkRan, denseRan));
 
-    // The under-delivery the rule is written for, end to end on real data: a session in which only part of the
+    // The under-delivery the rule is written for, end to end on real data: an id space in which only part of the
     // rig sits in window A leaves the total short, and that is what arms the sweep.
     [Fact]
     public void Acquire_UnderDeliversVisiblyWhenTheWindowHoldsOnlyPartOfTheRig()
@@ -662,12 +648,9 @@ public sealed class Sts2SpineGeoClipWalkTests
     // window A from 31 889 candidates into a few hundred; without it the arm proves the empty half of the index
     // axis empty, column by column, and saves nothing.
     //
-    // THE FAN-OUT MOVED WHICH SIDE IT CLOSES ON, and this is where that is recorded rather than glossed.
-    // Ascending-then-wrap anchored at 88, then met 89..130 INSIDE the extent — 42 skipped columns, free, since
-    // skipping is a `continue` — and closed at 131. Alternation reaches 88 on its third column (87, 86, 88) and
-    // the next column in the order is 85, already outside the extent, so it closes there and skips nothing. Same
-    // 30 meshes, same extent, same stop reason; the whole difference is the one extra empty column at 86, and
-    // the arm's total probe budget is asserted separately above.
+    // With the fan-out order the scan reaches 88 on its third column (87, 86, 88), and the next column in the
+    // order is 85, already outside the extent, so it closes there. The arm's total probe budget is asserted
+    // separately above.
     [Fact]
     public void Acquire_StopsScanningColumnsAtTheFirstColumnOutsideTheRunsIndexBand()
     {
@@ -690,7 +673,7 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // ── The two dense TIERS ──────────────────────────────────────────────────────────────────────────
     //
-    // The dense sweep is 70-76 % of a pose-only bake, and its index axis is mostly PADDING: window A widens the
+    // The dense sweep dominates a pose-only bake, and its index axis is mostly PADDING: window A widens the
     // bracket's own index band by 64 each way and window B floors its axis at 0. The narrow tier sweeps the
     // un-padded band first and the wide tier — the plan verbatim — only runs if that came up short.
     //
@@ -719,8 +702,8 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // THE CLAIM THE NARROW TIER RESTS ON, asserted against the data rather than quoted from a comment. In all
     // four recorded id spaces every mesh sits STRICTLY inside the bracket's own index range — never in the slack
-    // ring the plan pads it with. If a fifth recorded session ever violates this, this test is where it says so,
-    // and the wide tier behind the narrow one is what stops it from costing a mesh.
+    // ring the plan pads it with. If a further recorded id space ever violates this, this test is where it says
+    // so, and the wide tier behind the narrow one is what stops it from costing a mesh.
     [Fact]
     public void EveryRecordedMeshSitsStrictlyInsideItsBracketsOwnIndexBand()
     {
@@ -816,11 +799,9 @@ public sealed class Sts2SpineGeoClipWalkTests
     // window B was added for. Tier one delivers all 44 — window A narrowed to its core band, window B at full
     // width — for 80 235 probes against the two plans' 108 779, and the wide tier never fires.
     //
-    // 26 %, and the honest caveat with it. This fixture's window B is 70 200 of the 108 779 because its closing
-    // bracket is a MODELLED id, which makes the one window that cannot be narrowed two thirds of the space and
-    // flatters nothing. On the real recorded plans window B is much smaller relative to A (merchant live: A
-    // 38 700, B 18 288), so tier one costs 9 900 + 18 288 = 28 188 against the wide plan's 56 988 — a 51 % cut,
-    // and a 61 % cut against the 71 712 the shipped narrow+wide behaviour actually paid on every live bake.
+    // This fixture's window B is 70 200 of the 108 779 because its closing bracket is a MODELLED id, which makes
+    // the one window that cannot be narrowed two thirds of the space; the fixture understates the saving rather
+    // than flattering it.
     [Fact]
     public void NarrowTier_CarriesBothMerchantWindowsFor80235ProbesInsteadOf108779()
     {
@@ -846,9 +827,8 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.Equal(70_200, tiered.Passes[1].Probed);
     }
 
-    // THE REGRESSION THIS ROUND IS ABOUT, as a single number. Bounding window B too made tier one find 31 of 44,
-    // fire the wide tier, and pay for all four passes: 108 779 wide candidates on top of 39 363 narrow probes.
-    // Every one of the round's 20 live arms did exactly this, on both rigs.
+    // THE REGRESSION, as a single number. Bounding window B too made tier one find 31 of 44, fire the wide tier,
+    // and pay for all four passes: 108 779 wide candidates on top of 39 363 narrow probes.
     [Fact]
     public void BoundingWindowBToo_MakesTheWideTierUnavoidableAndTheWholeAcquisitionPureCost()
     {
@@ -1342,8 +1322,7 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.Equal(13, lost.Length);
         Assert.Single(kept);
 
-        // And the tier driver would have graded itself on that 1 and swept everything twice — which is exactly
-        // what 62 of the round's 65 recorded live bakes did.
+        // And the tier driver would have graded itself on that 1 and swept everything twice.
         var space = new IdSpace(MerchantWindowBMeshes);
         var tiered = Tiered([ifItBounded], expectedRunLength: 14, space);
 
@@ -1464,40 +1443,31 @@ public sealed class Sts2SpineGeoClipWalkTests
     // below `slotsEverVisible`, `unassociated` is DEFINED as the difference, and the bake refuses with no
     // association fault in it at all.
     //
-    // Round WS-I, `.sts2/research/data/geoclip-driven-combat-20260909T002811Z/`. Ten single-variable arms, a
-    // virgin process each: idle, 180 s elapsed, a mirror client attached, eight concurrent /spines/ bakes and two
-    // full rounds of card play with NO deaths all bake 4 of 4 rigs complete; two kills alone refuse 3 of 4.
-    // Pausing the scene tree for the whole bake — which stops every foreign RID allocation inside the bracket —
-    // changes nothing (40/23/17/10 paused against 40/23/17/10 unpaused), because the damage is in the allocator
-    // before the bake starts.
+    // The trigger is a creature death BEFORE the bake, not anything during it: pausing the scene tree for the
+    // whole bake — which stops every foreign RID allocation inside the bracket — changes nothing, because the
+    // damage is in the allocator before the bake starts.
     //
     // ── WHAT THE FIXTURES BELOW ARE, EXACTLY ────────────────────────────────────────────────────────
     //
     // The four id spaces are CALIBRATED, not dumped: the baker never dumped a post-death mesh id, and this test
-    // may not run the game. What IS recorded, per rig, is the arm's own sweep-plan line — the validator span, the
-    // core band, the slacked hull, and how many meshes each tier found — and every one of those bands is
-    // reproduced here by the PRODUCTION planner from the recorded bracket sentinels, not restated. That is what
-    // the `total=` assertions are for: PlanWindowA fed these sentinels reproduces 2 752 / 13 760 / 101 910
-    // candidates for magi and 595 / 15 827 / 137 683 for spectral, which are the logged numbers to the unit, in
-    // three independent bands each. A wrong reconstruction cannot hit twelve totals by accident.
+    // may not run the game. What IS recorded, per rig, is the sweep-plan log line — the validator span, the core
+    // band, the slacked hull, and how many meshes each tier found — and every one of those bands is reproduced
+    // here by the PRODUCTION planner from the recorded bracket sentinels, not restated. That is what the `total=`
+    // assertions are for: three independent bands per rig, so a wrong reconstruction cannot hit every total by
+    // accident.
     //
     // THE ONE THING THE FIXTURES ASSUME is WHERE the missing meshes sit: below the hull's floor rather than above
-    // its top. That is the assumption the fix turns on, so it does not get to be assumed quietly — a window-B
-    // fixture in this same file was once built out of the claim it was testing and passed while the shipped code
-    // lost 13 of the merchant's 14 meshes. It is asserted here because it is MEASURED elsewhere, by four
-    // independent controls in the same round: raising window B's index top from ~165–225 to ~1123–1185 across all
-    // four rigs (arm SlackA against arm SlackB, same process state) found not ONE extra mesh, and extending
-    // window A's own top from 196 to 288 on spectral (arm SlackA against arm Dq) found none either. The high side
-    // is empty; the low side is where a free list hands slots back. `WindowAIndexFloor_DoesNotReachAboveTheHull`
-    // below pins the limit that leaves in place, so the boundary is stated rather than hidden.
+    // its top. That is the assumption the floor strip turns on, so it does not get to be assumed quietly — a
+    // fixture built out of the claim it is testing cannot fail. Section (e) covers the residual above the top, and
+    // `IndexRecovery_ReachesBelowTheHullAndAFixedBudgetedDistanceAboveItAndStopsThere` below pins where the
+    // recovery tier's reach ends, so the boundary is stated rather than hidden.
 
     /// <summary>A scattered post-death run: ascending validators, the recorded index distribution.</summary>
     private static (uint V, uint I)[] Scatter(uint validatorStart, uint validatorStride, params uint[] indices)
         => [.. indices.Select((index, k) => (validatorStart + ((uint)k * validatorStride), index))];
 
-    // ironclad, arm SlackA — narrow 20, wide 30, window B 14, total 44 of 44. COMPLETE post-death: a free list
-    // is active in this very process and this rig's hull still happens to cover its meshes. The control that
-    // makes the fix's inertness gradeable.
+    // ironclad — narrow 20, wide 30, window B 14, total 44 of 44. COMPLETE post-death: a free list is active and
+    // this rig's hull still happens to cover its meshes. The control that makes the fix's inertness gradeable.
     private static readonly ulong IroncladPostDeathLow = Rid(36_114, 103);
     private static readonly ulong IroncladPostDeathMid = Rid(36_334, 181);
     private static readonly ulong IroncladPostDeathPost = Rid(36_405, 105);
@@ -1512,7 +1482,7 @@ public sealed class Sts2SpineGeoClipWalkTests
     private static readonly (uint V, uint I)[] IroncladPostDeathWindowB = Scatter(
         36_336, 4, 3, 11, 19, 27, 35, 44, 52, 60, 68, 77, 85, 93, 101, 110);
 
-    // flail_knight, arm SlackA — narrow 19, wide 37, window B 0, total 37 of 37. The second complete control.
+    // flail_knight — narrow 19, wide 37, window B 0, total 37 of 37. The second complete control.
     private static readonly ulong FlailPostDeathLow = Rid(36_492, 98);
     private static readonly ulong FlailPostDeathMid = Rid(36_682, 180);
     private static readonly ulong FlailPostDeathPost = Rid(36_683, 99);
@@ -1522,8 +1492,7 @@ public sealed class Sts2SpineGeoClipWalkTests
         99, 103, 107, 112, 116, 121, 125, 130, 134, 139, 143, 148, 152, 157, 161, 166, 170, 175, 180,
         36, 42, 48, 54, 60, 66, 72, 78, 84, 90, 190, 198, 206, 214, 222, 230, 238, 244);
 
-    // spectral_knight, arm SlackA — narrow 3, wide 16, window B 1, total 17 of 22. REFUSES. Arm SlackB, the same
-    // post-death state at IndexSlack 1024, found 21 on window A and admitted 22 of 22.
+    // spectral_knight — narrow 3, wide 16, window B 1, total 17 of 22. REFUSES at IndexSlack 64.
     private static readonly ulong SpectralPostDeathLow = Rid(36_756, 128);
     private static readonly ulong SpectralPostDeathMid = Rid(36_874, 132);
     private static readonly ulong SpectralPostDeathPost = Rid(36_881, 133);
@@ -1539,9 +1508,8 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     private static readonly (uint V, uint I)[] SpectralPostDeathWindowB = [(36_877, 144)];
 
-    // magi_knight, arm SlackA — narrow 7, wide 10, window B 0, total 10 of 16. REFUSES, and reproduces to the
-    // unit in SIX independent virgin processes (Dkill, Dq, Dq2, DqPause, DqElide0, DqLease0) plus this one: a
-    // free list is a deterministic structure, so replaying the same frees gives the same answer.
+    // magi_knight — narrow 7, wide 10, window B 0, total 10 of 16. REFUSES. A free list is a deterministic
+    // structure, so replaying the same frees gives the same answer.
     private static readonly ulong MagiPostDeathLow = Rid(36_980, 129);
     private static readonly ulong MagiPostDeathMid = Rid(37_065, 160);
     private static readonly ulong MagiPostDeathPost = Rid(37_066, 161);
@@ -1569,7 +1537,7 @@ public sealed class Sts2SpineGeoClipWalkTests
             Sts2SpineGeoClipSweep.PlanWindowB(mid, post, indexSlack, configuredCap: 50_000, envCap: null));
 
     // FIRST: the reconstruction is the recorded one. Every band and every candidate total below is the
-    // production planner's answer to the recorded bracket sentinels, checked against the arm's own log line.
+    // production planner's answer to the recorded bracket sentinels, checked against the recorded sweep-plan line.
     [Theory]
     // rig, low, mid, post, narrow band + total, wide band + total, window B band + total, slack-1024 total
     [InlineData("ironclad", 36_114u, 103u, 36_334u, 181u, 36_405u, 105u, 103u, 181u, 17_459, 39u, 245u, 45_747,
@@ -1639,8 +1607,8 @@ public sealed class Sts2SpineGeoClipWalkTests
     }
 
     // THE DEFECT, REPRODUCED. Switch the strip off and the acquisition is the shipped one, byte for byte: the
-    // two rigs the round measured refusing come up exactly as short as they did live — 17 of 22 and 10 of 16 —
-    // and the two it measured passing still pass, in the SAME post-death allocator state.
+    // two refusing rigs come up exactly as short as recorded — 17 of 22 and 10 of 16 — and the two complete
+    // controls still pass, in the SAME post-death allocator state.
     [Fact]
     public void WindowAIndexFloorOff_ReproducesTheRecordedPostDeathShortfallOnExactlyTwoOfFourRigs()
     {
@@ -1690,13 +1658,10 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.Equal((5, 6), (spectral.FloorFound, magi.FloorFound));
     }
 
-    // THE COST, against the mitigation it replaces. Raising IndexSlack to 1024 recovers the same meshes — arm
-    // SlackB measured exactly that, 22/22 and 16/16 — by widening the hull in BOTH directions, and nearly all of
-    // the extra is spent proving the high side empty. The strip buys the same recovery for the low side alone.
-    // The ratio is what matters and it is arithmetic, not a timing: at the round's measured ~1.3–2.0 µs per
-    // rendering-server probe, 7 616 and 5 590 candidates are ~10–15 ms against 137 683 and 101 910 at 0.27 s and
-    // 0.20 s. Asserted as an ORDER, not as a pair of magic numbers, so a later plan change cannot quietly invert
-    // it.
+    // THE COST, against the mitigation it replaces. Raising IndexSlack to 1024 recovers the same meshes by
+    // widening the hull in BOTH directions, and nearly all of the extra is spent proving the high side empty. The
+    // strip buys the same recovery for the low side alone. Asserted as an ORDER, not as a pair of magic numbers,
+    // so a later plan change cannot quietly invert it.
     [Theory]
     [InlineData("spectral_knight", 36_756u, 128u, 36_874u, 132u, 7_616, 137_683)]
     [InlineData("magi_knight", 36_980u, 129u, 37_065u, 160u, 5_590, 101_910)]
@@ -1729,11 +1694,9 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.Equal(0u, floor.IndexLow);
     }
 
-    // THE LIMIT, STATED — and it MOVED. This test used to assert that the recovery tier reached below the hull
-    // and never above it, on the strength of four controls that said the high side was empty. WS-N falsified
-    // those controls on the request lane (see the ceiling's section below), so the boundary is now the ceiling's
-    // budgeted reach, and it is asserted in both directions on the same magi bracket: the last column the reach
-    // buys is swept, the first column past it is not.
+    // THE LIMIT, STATED. Below the hull the recovery tier reaches index 0 (the floor strip); above it, the
+    // ceiling's budgeted reach (section (e)). The upper boundary is asserted in both directions on the same magi
+    // bracket: the last column the reach buys is swept, the first column past it is not.
     //
     // magi's window A is 86 validators wide with a hull of 65..224. The budget affords 32 768 / 86 = 381 columns,
     // which is under the 1 024-column ceiling, so the strip runs 225..605 — 86 × 381 = 32 766 candidates.
@@ -1808,54 +1771,34 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // ── (e) THE HULL'S CEILING: the residual the floor strip cannot reach ─────────────────────────────
     //
-    // WHAT THIS SECTION OVERTURNS, AND WHAT IT DOES NOT. Section (d)'s strip works: measured live on the request
-    // lane in a driven fight (round WS-N,
-    // `.sts2/research/data/geoclip-live-confirm-20260909T020500Z/`, read `results.txt` first), it took the lane
-    // from 0 of 4 rigs admitted to 3 of 4, recovering spectral 17/22 -> 22/22 and magi 10/16 -> 16/16 at exactly
-    // the 7 616 and 5 590 candidates section (d) predicted, reproduced to the unit in six independent processes,
-    // with foreignMeshes=0 on all 27 admitted bakes. None of that is in question here.
-    //
-    // What is in question is the SCOPE section (d) was justified on. Its comment says the high side of the hull is
-    // empty, on four controls: "raising window B's index top from ~165-225 to ~1123-1185 across all four rigs
-    // found not ONE extra mesh". Those controls held in the processes WS-I measured them in. WS-N drove real
-    // fights and every surviving residual sits ABOVE a hull top:
-    //
-    //   ironclad, arm H   window A covers 0..245 (wide 35..245 + the floor strip 0..34) and finds 30 of its 30 —
-    //                     the SAME 30 the slack-1024 leg finds at 0..1206. Window B covers 0..165 and finds 10 of
-    //                     its 14. Total 40 of 44. The four are in WINDOW B, above its top, and the floor strip
-    //                     cannot reach them: it is window A's and it only ever grows DOWNWARD.
-    //   flail, arm Hkills window A wide 26..166 finds 35, its floor strip 0..25 finds 0, window B finds 0 and its
-    //                     complement 158..166 finds 0. Total 35 of 37. Those two sit above window A's OWN top.
-    //
-    // In every driven arm the floor strip RAN on these two rigs and found exactly zero. Raising the tops is the
-    // only thing that recovers them.
+    // Section (d)'s floor strip recovers meshes recycled BELOW the hull. It cannot reach meshes that land ABOVE a
+    // hull top, and in a driven fight that is where the residuals sit: ironclad's four missing meshes are in
+    // WINDOW B, above its top, and the floor strip is window A's and only ever grows DOWNWARD; flail's two sit
+    // above window A's OWN top. Raising the tops is the only thing that recovers them.
     //
     // ── WHAT THE FIXTURES BELOW ARE, EXACTLY ────────────────────────────────────────────────────────
     //
-    // Same discipline as section (d), on the DRIVEN arms instead of the env lane. Each rig's three bracket
-    // sentinels are recovered from its recorded sweep-plan lines and then every band and every candidate total
-    // those lines report is reproduced by the PRODUCTION planner from those sentinels rather than restated:
-    // ironclad 18 343 / 46 631 / 11 952 / 7 735 and flail 2 483 / 26 931 / 316 / 4 966 / 18. Nine totals across
-    // two rigs, in bands the planner derives independently. A wrong reconstruction cannot hit nine by accident.
+    // Same discipline as section (d). Each rig's three bracket sentinels are recovered from its recorded
+    // sweep-plan lines, and then every band and every candidate total those lines report is reproduced by the
+    // PRODUCTION planner from those sentinels rather than restated: nine totals across two rigs, in bands the
+    // planner derives independently. A wrong reconstruction cannot hit nine by accident.
     //
     // The sentinels are not free either — they are SOLVED from the lines, and the solution is over-determined.
     // ironclad's window A band 99..181 fixes {lowIndex, midIndex} = {99, 181} but not which is which; its window B
-    // band 0..165 fixes postIndex = 101; and the ABSENCE of a window-B complement line in that arm forces
-    // max(midIndex, postIndex) + 64 < 166, i.e. midIndex <= 101, i.e. midIndex = 99 and lowIndex = 181. So in that
-    // process the FIRST sentinel came back at a HIGHER index than the second — the bracket's own endpoints are out
-    // of order, which is the free list scattering slots, visible directly in the recorded numbers. flail's
-    // complement line 158..166 is present and pins midIndex = 102 the same way.
+    // band 0..165 fixes postIndex = 101; and the ABSENCE of a window-B complement line forces
+    // max(midIndex, postIndex) + 64 < 166, i.e. midIndex <= 101, i.e. midIndex = 99 and lowIndex = 181. So the
+    // FIRST sentinel came back at a HIGHER index than the second — the bracket's own endpoints are out of order,
+    // which is the free list scattering slots. flail's complement line 158..166 is present and pins
+    // midIndex = 102 the same way.
     //
     // Then the per-tier FIND counts are reproduced too, before anything about the fix is asserted: ironclad
     // (narrow 18, wide 30, floor 0, window B 10) and flail (narrow 5, wide 35, floor 0, window B 0). The mesh
     // placements are constrained by those, not chosen to make a fix pass.
     //
-    // THE ONE THING THE FIXTURES CANNOT PIN is WHERE above the top the missing meshes sit. The archive's own
-    // "WHAT REMAINS UNPROVEN" says so: arm H's window B topped at 165 and found 10, the env leg's topped at 169
-    // and found 14, and the exact indices were never read out. So the placement is a THEORY PARAMETER here and
-    // the boundary is mapped rather than assumed — the rows below walk the missing meshes from one column above
-    // the top to one column past the ceiling's reach, and the last row asserts the ceiling still comes up short
-    // there. A live leg has to confirm the real indices are inside the reach; that is stated in the round report.
+    // THE ONE THING THE FIXTURES CANNOT PIN is WHERE above the top the missing meshes sit: the exact indices were
+    // never read out. So the placement is a THEORY PARAMETER here and the boundary is mapped rather than assumed —
+    // the rows below walk the missing meshes from one column above the top to one column past the ceiling's
+    // reach, and the last row asserts the ceiling still comes up short there.
 
     private static (
         Sts2SpineGeoClipSweep.SweepWindow A,
@@ -1871,7 +1814,7 @@ public sealed class Sts2SpineGeoClipWalkTests
                 mid, post, indexSlack: 64, configuredCap: 50_000, envCap: null,
                 indexCeilingRecovery: indexCeilingRecovery));
 
-    // ironclad, arm H (and H2, to the unit) — narrow 18, wide 30, floor 0, window B 10, total 40 of 44.
+    // ironclad — narrow 18, wide 30, floor 0, window B 10, total 40 of 44.
     // Solved sentinels: bracketLow index 181, bracketMid 99, bracketPost 101.
     private static readonly ulong IroncladDrivenLow = Rid(61_086, 181);
     private static readonly ulong IroncladDrivenMid = Rid(61_306, 99);
@@ -1879,7 +1822,7 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // 30 meshes on window A's validator span: 18 inside the core band 99..181 (what the narrow tier found) and
     // 12 more inside the slacked hull 35..245 but outside that band (what the wide tier added), none below 35
-    // (the floor strip found nothing in this arm, in six independent processes).
+    // (the floor strip finds nothing).
     private static readonly (uint V, uint I)[] IroncladDrivenWindowA = Scatter(
         61_088, 7,
         100, 104, 109, 113, 118, 122, 127, 131, 136, 140, 145, 149, 154, 158, 163, 170, 176, 181,
@@ -1890,13 +1833,13 @@ public sealed class Sts2SpineGeoClipWalkTests
     private static (uint V, uint I)[] IroncladDrivenWindowB(params uint[] aboveTheTop)
         => Scatter(61_308, 4, [5, 14, 23, 33, 42, 51, 61, 70, 88, 152, .. aboveTheTop]);
 
-    // flail_knight, arm Hkills — narrow 5, wide 35, floor 0, window B 0 and its complement 0, total 35 of 37.
+    // flail_knight — narrow 5, wide 35, floor 0, window B 0 and its complement 0, total 35 of 37.
     // Solved sentinels: bracketLow index 90, bracketMid 102, bracketPost 93.
     private static readonly ulong FlailDrivenLow = Rid(52_103, 90);
     private static readonly ulong FlailDrivenMid = Rid(52_293, 102);
     private static readonly ulong FlailDrivenPost = Rid(52_294, 93);
 
-    // All 37 sit on window A's validator span — window B's is two validators wide and found nothing in this arm.
+    // All 37 sit on window A's validator span — window B's is two validators wide and finds nothing.
     // 5 inside the core band 90..102, 30 more inside the hull 26..166, none below 26, and 2 above the top.
     private static (uint V, uint I)[] FlailDrivenWindowA(params uint[] aboveTheTop)
         => Scatter(
@@ -1957,7 +1900,7 @@ public sealed class Sts2SpineGeoClipWalkTests
     }
 
     // FIRST, AS IN SECTION (d): the reconstruction is the recorded one. Every band and every candidate total is
-    // the production planner's answer to the SOLVED sentinels, checked against the driven arm's own log line.
+    // the production planner's answer to the SOLVED sentinels, checked against the recorded sweep-plan line.
     [Theory]
     // rig, low, mid, post, narrow band + total, wide band + total, window B band + total, floor band + total
     [InlineData("ironclad/H", 61_086u, 181u, 61_306u, 99u, 61_377u, 101u,
@@ -2005,8 +1948,8 @@ public sealed class Sts2SpineGeoClipWalkTests
     }
 
     // …and window B's PRE-CEILING complement is reproduced too, in both of its recorded states: absent on
-    // ironclad's arm H (which is what pins its bracketMid index at 99) and present at 158..166 for 18 candidates
-    // on flail's arm Hkills (which is what pins flail's at 102).
+    // ironclad (which is what pins its bracketMid index at 99) and present at 158..166 for 18 candidates on flail
+    // (which is what pins flail's at 102).
     [Fact]
     public void DrivenBrackets_ReproduceWindowBsRecordedPreCeilingComplement()
     {
@@ -2021,10 +1964,9 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.Equal((158u, 166u, 18L), (complement.IndexLow, complement.IndexHigh, complement.TotalCandidates));
     }
 
-    // THE DEFECT, REPRODUCED. Switch the ceiling off and both rigs come up exactly as short as they did on the
-    // request lane in a driven fight — 40 of 44 and 35 of 37 — with every per-tier find count matching the arm's
-    // own log line, and the FLOOR strip running and finding nothing on both, which is what the round measured in
-    // six independent processes.
+    // THE DEFECT, REPRODUCED. Switch the ceiling off and both rigs come up exactly as short as recorded on the
+    // request lane in a driven fight — 40 of 44 and 35 of 37 — with every per-tier find count matching the
+    // recorded sweep-plan line, and the FLOOR strip running and finding nothing on both.
     [Theory]
     [InlineData("ironclad/H", 40, 18, 30, 10, 7_735, 0)]
     [InlineData("flail_knight/Hkills", 35, 5, 35, 0, 4_966, 0)]
@@ -2126,8 +2068,7 @@ public sealed class Sts2SpineGeoClipWalkTests
             new[] { ironcladA, ironcladB, flailA, flailB },
             window => Assert.False(window.IndexCeilingRecoveryPlan!.Truncated));
 
-        // The blanket alternative, planned by the same production code on THESE sentinels. (The archive's own
-        // slack-1024 leg planned 266 747 on its own bracket and spent 0.52 s on it.)
+        // The blanket alternative, planned by the same production code on THESE sentinels.
         var blanket = Sts2SpineGeoClipSweep.PlanWindowA(IroncladDrivenLow, IroncladDrivenMid, 1_024, 50_000).Plan;
         Assert.Equal(266_526L, blanket.TotalCandidates);
 
@@ -2149,10 +2090,10 @@ public sealed class Sts2SpineGeoClipWalkTests
             + "bracket, which is the trade this whole design rests on");
     }
 
-    // THE MEASUREMENT SECTION (d) BOUGHT MUST NOT REGRESS. spectral and magi are recovered by the FLOOR, at
-    // 7 616 and 5 590 candidates, and the round measured exactly those numbers live in six processes. The
-    // driver re-grades between strips, so a rig the floor rescues spends ZERO ceiling probes — the ceiling is
-    // added coverage for the rigs the floor cannot reach, not a tax on the rigs it can.
+    // THE RECOVERY SECTION (d) BOUGHT MUST NOT REGRESS. spectral and magi are recovered by the FLOOR, at
+    // 7 616 and 5 590 candidates. The driver re-grades between strips, so a rig the floor rescues spends ZERO
+    // ceiling probes — the ceiling is added coverage for the rigs the floor cannot reach, not a tax on the rigs
+    // it can.
     [Fact]
     public void Ceiling_CostsNothingOnARigTheFloorStripAlreadyRescues()
     {
@@ -2168,9 +2109,9 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.Equal((16, 5_590L, 6, 0L), (magi.Found, magi.FloorProbes, magi.FloorFound, magi.CeilingProbes));
     }
 
-    // …AND NEITHER STRIP RUNS AT ALL ON A BAKE THAT REACHED ITS SLOT COUNT. This is the property the live round
-    // measured — 7 complete bakes, 0 recovery passes, 0 probes, 0 allocations — and the one the ceiling is most
-    // able to break, because unlike the floor it is planned on EVERY window of every bracket.
+    // …AND NEITHER STRIP RUNS AT ALL ON A BAKE THAT REACHED ITS SLOT COUNT — no recovery passes, no probes, no
+    // allocations. This is the property the ceiling is most able to break, because unlike the floor it is planned
+    // on EVERY window of every bracket.
     [Theory]
     [InlineData("ironclad/complete", 44)]
     [InlineData("flail_knight/complete", 37)]
@@ -2265,18 +2206,17 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.True(Sts2SpineGeoClipSweep.IndexCeilingRecoveryDefault);
     }
 
-    // The two bounds are a measurement and a budget, so they are pinned as values: a later edit that moves either
-    // moves the live cost or the live reach and has to say which.
+    // The two bounds are pinned as values: a later edit that moves either moves the live cost or the live reach
+    // and has to say which.
     [Fact]
     public void IndexCeilingRecovery_BoundsArePinnedToWhatTheRoundMeasured()
     {
-        // The largest floor strip measured live (arm H2's flail, 31 706 candidates at 0.05 s), rounded up to the
-        // next power of two — and below the request lane's hard-coded 50 000 cap, which is what makes a ceiling
-        // strip unable to truncate.
+        // Sized from the largest floor strip seen in practice, rounded up to the next power of two — and below the
+        // request lane's hard-coded 50 000 cap, which is what makes a ceiling strip unable to truncate.
         Assert.Equal(32_768, Sts2SpineGeoClipSweep.IndexCeilingRecoveryBudget);
         Assert.True(Sts2SpineGeoClipSweep.IndexCeilingRecoveryBudget < 50_000);
 
-        // IndexSlack=1024, the blanket widen measured to recover every missing mesh — the furthest reach with any
+        // IndexSlack=1024, the blanket widen that recovered every missing mesh — the furthest reach with any
         // evidence behind it, and the furthest this strip will go however cheap the window is.
         Assert.Equal(1_024, Sts2SpineGeoClipSweep.IndexCeilingRecoveryMaxColumns);
     }
@@ -2285,18 +2225,10 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // TWO LANES, ONE DEFAULT. The env lane reads SPIRECTL_SPINE_GEOCLIP_DENSE_SWEEP inside the live-host-only
     // baker; the on-demand /geoclips/ lane plans its config here in the core. They each carried their own
-    // literal and had drifted apart — the request lane still armed the walk arm long after it was measured a
-    // loss and reverted on the env lane, and every one of those walks was wasted because the dense fallback
-    // fired anyway. Both now resolve through ResolveDenseSweepOnly, and this is what stops them drifting again:
-    // the request lane's plan must equal the env lane's unset answer.
-    //
-    // RETRACTED: this used to quote that loss as "+227 ms byrdonis, +485 ms merchant per cold pose". Those
-    // milliseconds were measured against a dense fallback of 38 579 candidates for the merchant's window A, and
-    // the narrow tier now carries that same window for 10 035
-    // (NarrowTierAlone_FindsEveryMerchantCleanMeshFor10035ProbesInsteadOf38579). A wasted walk is charged
-    // against a fallback roughly a quarter the size, so the figures do not transfer and are withdrawn. What
-    // survives is the shape of the fact — the walk ran, the dense sweep ran anyway, the walk was pure cost —
-    // and the probe counts, which the tests above re-measure rather than quote from a session.
+    // literal and had drifted apart — the request lane still armed the walk arm long after it was reverted on the
+    // env lane, and every one of those walks was pure cost because the dense fallback fired anyway. Both now
+    // resolve through ResolveDenseSweepOnly, and this is what stops them drifting again: the request lane's plan
+    // must equal the env lane's unset answer.
     [Fact]
     public void RequestLane_PlansTheSameDenseSweepDefaultTheEnvLaneResolvesWhenItsVariableIsUnset()
     {
@@ -2312,9 +2244,9 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.Equal(Sts2SpineGeoClipWalk.ResolveDenseSweepOnly("   "), config.DenseSweepOnly);
     }
 
-    // …and the SHIPPED value of that default is true, i.e. the walk arm is off. Pinned as a value because it is
-    // a measurement, not a preference: re-arming the walk needs per-window grading and a live answer for why
-    // window B seats no column, both recorded in the baker's DenseSweepEnv note.
+    // …and the SHIPPED value of that default is true, i.e. the walk arm is off. Pinned as a value: re-arming the
+    // walk needs per-window grading and an answer for why window B seats no column, both recorded in the baker's
+    // DenseSweepEnv note.
     [Theory]
     [InlineData(null, true)]
     [InlineData("", true)]
@@ -2336,18 +2268,16 @@ public sealed class Sts2SpineGeoClipWalkTests
     // discards the TOP of the validator axis. Window A's span IS the bracket its meshes were minted inside, so
     // there is no far end known to be empty for a cap to throw away safely.
     //
-    // RECORDED, not hypothetical. A live menu-background bake planned window A at 77 074 candidates against the
-    // 50 000 cap, truncated, and returned 8 meshes — while the SAME window's core-band pass, same validator span
-    // and a strict subset of the index axis, was small enough not to truncate and returned 21. A superset plan
-    // returning 13 fewer meshes is only possible if the cap cut the sweep off before it reached them. The bake
-    // shipped 25 meshes only because the narrow tier had already found them.
+    // A wide plan that hits the cap can therefore return FEWER meshes than a narrower, uncapped plan over the same
+    // validator span — a superset plan returning fewer meshes is only possible if the cap cut the sweep off
+    // before it reached them.
 
-    // The mechanism, at the size the live bake hit it: a cap that stops a wide plan short makes it miss meshes a
-    // narrower, uncapped plan over the same validator span finds.
+    // The mechanism, at the size a menu-background bake's window A plans: a cap that stops a wide plan short
+    // makes it miss meshes a narrower, uncapped plan over the same validator span finds.
     [Fact]
     public void ACappedWidePlan_MissesMeshesTheNarrowerUncappedPlanOverTheSameValidatorsFinds()
     {
-        // 433 validators × 178 indices = 77 074, the live menu-background numbers.
+        // 433 validators × 178 indices = 77 074, the menu-background window A's size.
         var low = Rid(22_820, 64);
         var high = Rid(23_252, 113);
 
@@ -2416,9 +2346,8 @@ public sealed class Sts2SpineGeoClipWalkTests
 
     // ── Window A's cap now covers window A ───────────────────────────────────────────────────────────
 
-    // The fix for the truncation above: window A's cap is RAISED to its own plan's size, ceilinged. The live
-    // window-A plans that truncated at 50 000 were 51 975 (merchant), 53 360 / 113 800 / 259 464 (ironclad) and
-    // 77 074 (menu background); all five fit now.
+    // The fix for the truncation above: window A's cap is RAISED to its own plan's size, ceilinged. The raised
+    // rows are window-A plan sizes that truncated under a fixed 50 000 cap; all of them fit now.
     [Theory]
     [InlineData(38_579, 50_000, 50_000, "config")]
     [InlineData(51_975, 50_000, 51_975, "auto-raised")]
@@ -2451,7 +2380,7 @@ public sealed class Sts2SpineGeoClipWalkTests
         Assert.Equal("auto-raised", source);
     }
 
-    // End to end on the plan that actually truncated live: the merchant's 51 975-candidate window A.
+    // End to end on a plan that truncated under the fixed cap: the merchant's 51 975-candidate window A.
     [Fact]
     public void PlanWindowA_NoLongerTruncatesTheMerchantPlanThatTruncatedLive()
     {

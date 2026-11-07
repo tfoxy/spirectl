@@ -3,7 +3,7 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R14 producer END-TURN GLOW FOLD — PURE and Godot-free (like Sts2ProceedGlow, whose shape it copies) so the gate
+// Producer END-TURN GLOW FOLD — PURE and Godot-free (like Sts2ProceedGlow, whose shape it copies) so the gate
 // algebra and both pins are unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
 // WHY THIS ONE IS MANDATORY FOR AN IDLE COMBAT. The other three combat churners (Sts2IntentBobFold,

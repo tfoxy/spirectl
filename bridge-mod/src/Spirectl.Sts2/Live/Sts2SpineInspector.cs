@@ -35,8 +35,8 @@ internal static class Sts2SpineInspector
         var snapshot = new RuntimeSceneSpineSnapshot(sceneResPath, relPath, ReadAnimations(node), ReadSkeletonResPath(node));
         if (Sts2SpineDiagnostics.Current.Enabled && snapshot.Animations.Count == 0)
         {
-            // #13 smoking-gun marker: a spine root with NO animations at add is one whose skeleton the game
-            // injects later (`MegaSprite.SetSkeletonDataRes` from `_Ready` — chest / boss map point). Pair it with
+            // Diagnostic marker: a spine root with NO animations at add is one whose skeleton the game
+            // injects later (`MegaSprite.SetSkeletonDataRes` — chest / boss map point). Pair it with
             // the watcher's "re-probe RE-ARMED"/"re-probe SUCCEEDED" lines to see the recovery end to end.
             Sts2SpineDiagnostics.Current.Log(
                 $"InspectStatic 0-animations-at-add node={node.GetInstanceId()} name={node.Name} "
@@ -46,7 +46,7 @@ internal static class Sts2SpineInspector
         return snapshot;
     }
 
-    // The res:// path of a SpineSprite's skeleton-data resource (#8), for the client's `&skel=` fallback. Read
+    // The res:// path of a SpineSprite's skeleton-data resource, for the client's `&skel=` fallback. Read
     // via the same defensive raw-Godot hops ReadAnimations uses; null on any failure or an in-memory resource
     // with no path (→ client omits `&skel=`, URL byte-identical). Runs only on add (InspectStatic), never a poll.
     private static string? ReadSkeletonResPath(Node spineNode)
@@ -71,7 +71,7 @@ internal static class Sts2SpineInspector
         }
     }
 
-    // The Godot instance id of a SpineSprite's CURRENT skeleton-data resource, or 0 when it has none (#8/#13).
+    // The Godot instance id of a SpineSprite's CURRENT skeleton-data resource, or 0 when it has none.
     // ONE native property Get, no MegaSpine hop — the cheap per-tick gate the watcher's late-static re-probe
     // uses to detect the RUNTIME skeleton injection (`MegaSprite.SetSkeletonDataRes`, called from _Ready by the
     // treasure chest and the boss map point) without paying for a full InspectStatic every tick.
@@ -98,8 +98,7 @@ internal static class Sts2SpineInspector
     //
     // The producer reacts to the SpineSprite's own `animation_started` signal instead of polling the live
     // animation state per tick. The signal fires from inside the game's spine update, so the track entry it
-    // hands us is freshly started and VALID — this is exactly how the game itself reads anim state (e.g.
-    // NQueenVfx / NBestiary connect this signal and read the entry's animation). We read the anim NAME off
+    // hands us is freshly started and VALID. We read the anim NAME off
     // the handed entry with a null-guard at every native hop, and NEVER call get_current (the crash path).
     //
     // State is keyed by Godot instance id (process-stable; ids aren't reused within a session). Two static
@@ -112,8 +111,8 @@ internal static class Sts2SpineInspector
     private static readonly ConcurrentDictionary<ulong, LiveAnim> LiveByInstance = new();
     private static readonly ConcurrentDictionary<ulong, byte> Connected = new();
 
-    // Live SKIN capture (#3). The runtime skin a spine node currently wears — the game applies it at runtime
-    // (creatures like Fossil Stalker / Skulking Colony carry no authored skin in their .tscn, so an offline
+    // Live SKIN capture. The runtime skin a spine node currently wears — the game applies it at runtime
+    // (some creatures carry no authored skin in their .tscn, so an offline
     // scene instantiate for the bake would render skin-less = missing body pieces). Fed by RecordSkin from the
     // anim hooks (SetNextState postfix + animation_started) — both run on the main thread while the native
     // skeleton is alive — never a per-tick native poll. ReadLive returns it (volatile SpineSkin wire field);
@@ -126,10 +125,10 @@ internal static class Sts2SpineInspector
     // (else it repeats every tick). Populated only when Sts2SpineDiagnostics.Current.Enabled; cleared in Forget.
     private static readonly ConcurrentDictionary<ulong, byte> DefaultFallbackLogged = new();
 
-    // ── Animation-state → owning SpineSprite map (round-8 items 10/11) ────────────────────────────────
+    // ── Animation-state → owning SpineSprite map ──────────────────────────────────────────────────────
     //
-    // The game drives MOST spine nodes by calling MegaAnimationState.SetAnimation/AddAnimation DIRECTLY (the
-    // bite/gaze/scratch one-shot VFX via NVfxSpine, the treasure chest, the boss map point, the merchant, the
+    // The game drives MOST spine nodes by calling MegaAnimationState.SetAnimation/AddAnimation DIRECTLY (one-shot
+    // VFX, the treasure chest, the boss map point, the merchant, the
     // rest-site character, …) — never through CreatureAnimator.SetNextState. Those calls carry the real clip
     // name AND the real loop flag, but a MegaAnimationState has no back-pointer to its sprite, so a postfix on
     // them cannot key the recording by node on its own.
@@ -188,7 +187,7 @@ internal static class Sts2SpineInspector
         // Captured runtime skin (null when unknown) — independent of the anim/time/loop derivation below, rides
         // along on every read so the volatile SpineSkin wire field tracks it.
         SkinByInstance.TryGetValue(id, out var skin);
-        // Shader-material discriminator (#8; null for every node with no normal_material ShaderMaterial, which is
+        // Shader-material discriminator (null for every node with no normal_material ShaderMaterial, which is
         // almost all of them) — same deal: independent of the anim derivation, rides along on every read.
         var mat = ReadMaterialKey(node, id);
 
@@ -220,10 +219,10 @@ internal static class Sts2SpineInspector
 
         // No live signal yet: GUESS a clip from the static list. The loop flag is derived from the guessed
         // NAME (Sts2SpineDefaults.DefaultAnimationLoops) rather than hardcoded true — a guess that landed on a
-        // one-shot (attack/die/bite, the only thing some skeletons expose) used to be replayed forever by both
-        // clients. Since the Regent round the guess is ABANDONED entirely when it lands on a one-shot (the pick
+        // one-shot (attack/die/bite, the only thing some skeletons expose) would otherwise be replayed forever by
+        // the clients. The guess is ABANDONED entirely when it lands on a one-shot (the pick
         // comes back null): a skeleton with nothing loop-shaped has no pose the game has played, and streaming
-        // one anyway painted the Regent's daggers, frozen mid-swing, over the whole fight. A node leaves this
+        // one anyway paints a frame frozen mid-swing over the whole fight. A node leaves this
         // state the moment the game issues a real SetAnimation (hook) or fires its first animation_started, both
         // of which carry the real clip AND loop flag.
         var fallback = PickDefaultAnimation(animations);
@@ -237,18 +236,18 @@ internal static class Sts2SpineInspector
         return (fallback, nowMsec / 1000.0, fallbackLooping, skin, mat, PausedElapsedMsec.ContainsKey(id));
     }
 
-    // SPIRECTL_SPINE_DEFAULT_LOOPFIX: escape hatch for the round-8 fallback change (smarter default pick + a
+    // SPIRECTL_SPINE_DEFAULT_LOOPFIX: escape hatch for the fallback change (smarter default pick + a
     // derived loop flag instead of a hardcoded `true`). Default ON; `0`/`false`/`off`/`no` restores the old
     // ordinal-first, always-looping guess for an A/B. Read once — env vars are process-stable.
     private static readonly bool DefaultLoopFixEnabled =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_DEFAULT_LOOPFIX") ?? string.Empty)
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // SPIRECTL_SPINE_DEFAULT_ONESHOT_BLANK: escape hatch for the Regent-weapon fix — a guess that lands on a
+    // SPIRECTL_SPINE_DEFAULT_ONESHOT_BLANK: escape hatch for the one-shot blank — a guess that lands on a
     // one-shot reports NO animation instead of the one-shot. Default ON; `0`/`false`/`off`/`no` restores the
     // pre-fix guess (the mid-frame of an attack, painted permanently) for an A/B. Read once, like the switch
-    // above. Only consulted on the round-8 pick path: `SPIRECTL_SPINE_DEFAULT_LOOPFIX=0` selects the whole
-    // pre-round-8 guess, blanking included.
+    // above. Only consulted on the smarter pick path: `SPIRECTL_SPINE_DEFAULT_LOOPFIX=0` selects the whole
+    // legacy guess, blanking included.
     private static readonly bool DefaultOneShotBlankEnabled =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_DEFAULT_ONESHOT_BLANK") ?? string.Empty)
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
@@ -260,9 +259,9 @@ internal static class Sts2SpineInspector
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_FINISHED_REST") ?? string.Empty)
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // ── Shader-material discriminator (#8) ────────────────────────────────────────────────────────────
+    // ── Shader-material discriminator ─────────────────────────────────────────────────────────────────
     //
-    // SPIRECTL_SPINE_MATERIAL_KEY: escape hatch for the round-8 material discriminator. Default ON; `0`/`false`/
+    // SPIRECTL_SPINE_MATERIAL_KEY: escape hatch for the material discriminator. Default ON; `0`/`false`/
     // `off`/`no` reports a null key for every node, which restores byte-identical clip URLs/keys (the bake still
     // applies the material — only the cache discrimination is dropped). Read once — env vars are process-stable.
     private static readonly bool MaterialKeyEnabled =
@@ -313,9 +312,9 @@ internal static class Sts2SpineInspector
         }
 
         MaterialKeyByInstance[id] = (key, previous.Changes + 1);
-        // R9 LIVE-UNIFORM CARRY: hand the bake the very values this signature was computed from, so the clip it
-        // renders and the cache key it is stored under can never disagree (the boss map point's act tint used to be
-        // read from an OFFLINE scene instance carrying the AUTHORED uniforms — see Sts2SpineLiveMaterialStore).
+        // LIVE-UNIFORM CARRY: hand the bake the very values this signature was computed from, so the clip it
+        // renders and the cache key it is stored under can never disagree (an OFFLINE scene instance carries only
+        // the AUTHORED uniforms — see Sts2SpineLiveMaterialStore).
         // Recorded on the CHANGE path only: a repeat signature is already stored, and the latched case above answers
         // with a signature that was recorded when it was first minted.
         Sts2SpineLiveMaterials.Record(key, shaderResPath, liveUniforms);
@@ -441,7 +440,7 @@ internal static class Sts2SpineInspector
     public static ulong ResolveAnimationStateOwner(ulong animStateInstanceId)
         => NodeByAnimState.TryGetValue(animStateInstanceId, out var nodeId) ? nodeId : 0;
 
-    // Record the runtime skin currently applied to a spine node (#3). Called by the anim hooks
+    // Record the runtime skin currently applied to a spine node. Called by the anim hooks
     // (Sts2SpineAnimationHooks.SetNextStatePostfix + OnAnimationStarted) — both run on the game main thread while
     // the native skeleton is alive. Empty/whitespace CLEARS the entry (null skin = unknown → the client omits
     // `&skin=` and its URL is byte-identical to today). Idempotent; never throws.
@@ -481,13 +480,12 @@ internal static class Sts2SpineInspector
         }
     }
 
-    // ── Paused playback (MegaAnimationState.SetTimeScale, round-8 item 13) ────────────────────────────
+    // ── Paused playback (MegaAnimationState.SetTimeScale) ─────────────────────────────────────────────
     //
-    // The treasure chest is set up as `SetAnimation("animation") + AddAnimation("shine_fade") +
-    // SetTimeScale(0)`: the game FREEZES it on the first frame of "animation" (a closed chest) and only resumes
-    // (SetTimeScale(1)) when the player opens it. The schedule replay below advances off WALL CLOCK, so without
-    // knowing about the freeze it walked "animation" to its end and handed off to the queued "shine_fade" —
-    // both clients then showed an OPEN, glowing chest sitting in a room whose chest is visibly shut.
+    // A track can be FROZEN by SetTimeScale(0) on the first frame of a clip with another clip queued behind it
+    // (a closed treasure chest), and resumed by SetTimeScale(1). The schedule replay below advances off WALL
+    // CLOCK, so without knowing about the freeze it would walk the clip to its end and hand off to the queued
+    // one — an OPEN, glowing chest sitting in a room whose chest is visibly shut.
     //
     // Keyed by node instance id: the elapsed schedule time at the moment the track was paused. Resuming shifts
     // the schedule's StartedAtMsec forward by the paused duration, so playback continues from where it stopped
@@ -750,7 +748,7 @@ internal static class Sts2SpineInspector
         }
 
         LiveByInstance[id] = new LiveAnim(name, Time.GetTicksMsec(), looping);
-        // Capture the runtime skin in the same alive-native window (#3) — this signal fires from inside the
+        // Capture the runtime skin in the same alive-native window — this signal fires from inside the
         // game's spine update, so the node's skin property is valid here.
         RecordSkin(id, TryReadCurrentSkinName(node));
         if (Sts2SpineDiagnostics.Current.Enabled)
@@ -782,10 +780,10 @@ internal static class Sts2SpineInspector
             ? Sts2SpineDefaults.PickDefaultAnimation(animations, DefaultOneShotBlankEnabled)
             : LegacyPickDefaultAnimation(animations);
 
-    // Pre-round-8 guess, kept behind SPIRECTL_SPINE_DEFAULT_LOOPFIX=0 for an A/B: exact well-known names, else
-    // animations[0]. ReadAnimations sorts ORDINALLY, so `animations[0]` picked "attack" for every creature
-    // whose skeleton has no `idle*`/`animation`/`loop*` clip (sneaky_gremlin, whose idle is "awake_loop") —
-    // reported as looping, which is why those enemies replayed their attack forever.
+    // Legacy guess, kept behind SPIRECTL_SPINE_DEFAULT_LOOPFIX=0 for an A/B: exact well-known names, else
+    // animations[0]. ReadAnimations sorts ORDINALLY, so `animations[0]` picks "attack" for a creature
+    // whose skeleton has no `idle*`/`animation`/`loop*` clip — reported as looping, so it replays its attack
+    // forever.
     private static string? LegacyPickDefaultAnimation(IReadOnlyList<string>? animations)
     {
         if (animations is null || animations.Count == 0)

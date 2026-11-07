@@ -75,6 +75,21 @@ expect allow "flock -no /tmp/sts2-dotnet-build.lock -c 'scripts/validate.sh brid
 expect allow 'flock /tmp/sts2-dotnet-build.lock echo no-command-flag'
 expect allow 'npm --prefix npm-wrapper test'
 
+echo "== must block: force-adding the private companion =="
+expect deny 'git add -f private'
+expect deny 'git add --force private/AGENTS.md'
+expect deny 'git add -fA ./private'
+expect deny 'git -C /tmp/x add -f -- private/docs'
+expect deny 'cd x && git add -f private/'
+expect deny "git add -f 'private/x y'"
+echo "== must allow: other adds =="
+expect allow 'git add private'
+expect allow 'git add -f privateer.md'
+expect allow 'git add -f docs/private/x'
+expect allow 'git -C private add -f .'
+expect allow 'git add -A'
+expect allow 'git commit -m "git add -f private"'
+
 echo "== must allow: command lines in docs/ =="
 expected_deny_re='(cargo test .*--test [a-z_]+ [a-z_]+|dotnet (build|test)( |$))'
 harvested=0; flagged=0

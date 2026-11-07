@@ -36,7 +36,7 @@ public static class Sts2SceneWatchRuntimeSettings
         ReadBool("SPIRECTL_SCENE_WATCH_CANCEL_KILLED_TWEENS", defaultOn: true);
 
     /// <summary>
-    /// WS-REST belt-and-braces for the rest-site "description stuck invisible" defect. When a fade-IN tween is
+    /// Belt-and-braces for the rest-site "description stuck invisible" defect. When a fade-IN tween is
     /// KILLED before its deferred Finalize (a re-focused option's description whose unfocus completes first), its
     /// opacity-suppression window was never opened, so <see cref="Sts2RuntimeSceneWatcher.CancelTweenSuppression"/>
     /// has nothing to collapse and no settle re-emit fires — the producer streams the resting alpha as a plain
@@ -93,14 +93,14 @@ public static class Sts2SceneWatchRuntimeSettings
     /// When a REPARENT force-emit (<see cref="EmitReparents"/>) fires WHILE a streaming-suppression window covers
     /// the node (the mirror is replaying a tween on it or an ancestor), OMIT the transform payload from the
     /// re-attach upsert so the client holds the node's LAST-KNOWN placed transform instead of adopting the
-    /// transition-START value the reparent tick happened to sample. Fixes the P2 discard-select flash: a hand card
+    /// transition-START value the reparent tick happened to sample. Fixes the discard-select flash: a hand card
     /// selected for discard reparents into a fresh <c>NSelectedHandCardHolder</c> under the centre container WHILE
-    /// that container lifts to centre on a real tween; round-3 shipped the card's mid-reparent local (≈ global
-    /// bottom-centre) which the client then PINNED for the whole window, flashing the card off-centre until the
+    /// that container lifts to centre on a real tween; shipping the card's mid-reparent local (≈ global
+    /// bottom-centre) let the client PIN it for the whole window, flashing the card off-centre until the
     /// settle re-emit snapped it back. Ships <c>Transform=null</c> (already nullable); the client's MergeNode
     /// wholesale-adopts the null → the card renders at centre immediately (last-known local (0,0) under the new
     /// holder) and the settle resync is unchanged. Deselect (no tween ⇒ no window) is byte-identical either way.
-    /// Default ON; <c>SPIRECTL_SCENE_WATCH_REPARENT_HOLD_TWEENED=0</c> seeds it OFF (restoring the round-3
+    /// Default ON; <c>SPIRECTL_SCENE_WATCH_REPARENT_HOLD_TWEENED=0</c> seeds it OFF (restoring the
     /// ship-the-transform behaviour). Read on the game main thread in the capture loop; a one-tick stale read is
     /// harmless.
     /// </summary>
@@ -108,10 +108,10 @@ public static class Sts2SceneWatchRuntimeSettings
         ReadBool("SPIRECTL_SCENE_WATCH_REPARENT_HOLD_TWEENED", defaultOn: true);
 
     /// <summary>
-    /// WS-3 discard→draw shuffle card flight. The game spawns one <c>NCardFlyShuffleVfx</c> per shuffled card and
+    /// Discard→draw shuffle card flight. The game spawns one <c>NCardFlyShuffleVfx</c> per shuffled card and
     /// animates it in a per-rendered-frame async loop (not a Godot <c>Tween</c>, so the tween recorder captures
-    /// nothing) with a <c>NCardTrailVfx</c> comet copying its pose every frame. A 34.8s wire recording attributed
-    /// 45% of a shuffle's upsert bytes — 1852 of 3469 upserts — to that one subtree. When ON, the producer instead
+    /// nothing) with a <c>NCardTrailVfx</c> comet copying its pose every frame, which makes that subtree a large
+    /// share of a shuffle's upsert bytes. When ON, the producer instead
     /// emits ONE declarative <see cref="Embedding.CardFlightHint"/> per card (the closed-form curve + integrator
     /// parameters) and opens a streaming-suppression window over the flight node's and the trail's subtrees for the
     /// flight's whole analytic lifetime, so the client replays it at its own frame rate with zero further deltas.
@@ -119,7 +119,7 @@ public static class Sts2SceneWatchRuntimeSettings
     /// <para>The hint and the window are ONE lever on purpose: with the window open and the hint ignored the
     /// subtree would freeze mid-flight, so a consumer that cannot replay must turn BOTH off — which is exactly what
     /// flipping this does (it gates the emit and the window in the same place). Default ON;
-    /// <c>SPIRECTL_SCENE_WATCH_CARD_FLIGHT=0</c> seeds it OFF (byte-identical to the pre-WS-3 producer: every
+    /// <c>SPIRECTL_SCENE_WATCH_CARD_FLIGHT=0</c> seeds it OFF (byte-identical to the producer without this lever: every
     /// flight frame streams as a transform delta). Read on the game main thread (the <c>_Ready</c> Harmony
     /// postfix's deferred resolve); a one-tick stale read is harmless.</para>
     /// </summary>
@@ -127,15 +127,14 @@ public static class Sts2SceneWatchRuntimeSettings
         ReadBool("SPIRECTL_SCENE_WATCH_CARD_FLIGHT", defaultOn: true);
 
     /// <summary>
-    /// R13 narrowing of a card flight's trail suppression: also freeze the trail VFX ROOT's OWN transform writes
+    /// Narrowing of a card flight's trail suppression: also freeze the trail VFX ROOT's OWN transform writes
     /// (and only its own — its <c>Sprites</c> spark branch keeps streaming, so the sparks still follow the card).
-    /// The root is a boxless container, so nothing on screen is painted from its transform directly; on the R12
-    /// capture its own writes were 1158 of the ~1.9k trail-subtree writes a 30-card shuffle produced, all of them
-    /// invisible.
+    /// The root is a boxless container, so nothing on screen is painted from its transform directly; its own writes
+    /// are a large share of the trail subtree's writes during a shuffle, all of them invisible.
     ///
     /// <para>In LOCAL emit mode this additionally requires <see cref="TrailSelfSuppressLocalMode"/>, because a
     /// consumer there has to place the frozen root itself to keep its descendants placed. Default ON;
-    /// <c>SPIRECTL_SCENE_WATCH_TRAIL_SELF_SUPPRESS=0</c> seeds it OFF (the R12 behaviour: the root streams every
+    /// <c>SPIRECTL_SCENE_WATCH_TRAIL_SELF_SUPPRESS=0</c> seeds it OFF (the root streams every
     /// frame of every flight). Read on the game main thread (the <c>_Ready</c> hook's deferred resolve); a one-tick
     /// stale read is harmless. See <see cref="Sts2TrailWindowPolicy"/> for the combined rule.</para>
     /// </summary>
@@ -143,9 +142,9 @@ public static class Sts2SceneWatchRuntimeSettings
         ReadBool("SPIRECTL_SCENE_WATCH_TRAIL_SELF_SUPPRESS", defaultOn: true);
 
     /// <summary>
-    /// R14 opt-in extending <see cref="TrailSelfSuppress"/> into LOCAL emit mode (<see cref="EmitLocalTransforms"/>),
+    /// Opt-in extending <see cref="TrailSelfSuppress"/> into LOCAL emit mode (<see cref="EmitLocalTransforms"/>),
     /// which is the mode the CouchCoop mirror actually runs — so without this the trail root's self-window never
-    /// engages in production and the root keeps streaming ~30 writes per card per flight.
+    /// engages in production and the root keeps streaming every frame of every flight.
     ///
     /// <para>Gated separately from <see cref="TrailSelfSuppress"/> because it is a CONSUMER capability, not a
     /// producer preference. In local mode a node's transform is composed down its emitted parent chain, so a client
@@ -166,7 +165,7 @@ public static class Sts2SceneWatchRuntimeSettings
         ReadBool("SPIRECTL_SCENE_WATCH_TRAIL_SELF_SUPPRESS_LOCAL", defaultOn: false);
 
     /// <summary>
-    /// R13 HAND→DISCARD CARD FLY (<c>vfx/vfx_card_fly</c>). The played card leaves the hand, arcs to the discard
+    /// HAND→DISCARD CARD FLY (<c>vfx/vfx_card_fly</c>). The played card leaves the hand, arcs to the discard
     /// pile darkening and shrinking away, and drags a comet behind it — driven, like the shuffle sweep, by a
     /// per-rendered-frame loop rather than a Godot <c>Tween</c>, so the tween recorder captures nothing and every
     /// frame of it streamed as a transform delta on the busiest node in the scene (the card the player is watching).
@@ -185,11 +184,10 @@ public static class Sts2SceneWatchRuntimeSettings
         ReadBool("SPIRECTL_SCENE_WATCH_DISCARD_FLIGHT", defaultOn: true);
 
     /// <summary>
-    /// WS-4 HAND-LAYOUT LERP. A hand card holder's position/angle/scale are animated by three async per-process-frame
+    /// HAND-LAYOUT LERP. A hand card holder's position/angle/scale are animated by three async per-process-frame
     /// <c>Lerp</c> loops, not by a Godot <c>Tween</c>, so <see cref="Sts2TweenRecorderHooks"/> — a Tween-only hook —
     /// captures nothing from them and every intermediate frame streamed as a
-    /// raw transform. A device trace of a start-of-turn draw attributed 369.3 KB / 594 upserts — 21.4% of a 3s draw
-    /// window, peaking at 1.03 MB / 2477 upserts in one second — to that one subtree, because every newly drawn card
+    /// raw transform. That subtree dominates a start-of-turn draw, because every newly drawn card
     /// re-targets every already-settled holder and the whole hand re-animates once per card.
     ///
     /// <para>When ON, a hand FAN-OUT batch (<c>NPlayerHand.RefreshLayout</c> / <c>NHandCardHolder.SetDefaultTargets</c>)
@@ -203,15 +201,15 @@ public static class Sts2SceneWatchRuntimeSettings
     /// window open and the hint ignored, the hand would FREEZE mid-fan for up to the hint's duration, so a consumer
     /// that cannot replay must turn BOTH off — which is what flipping this does (it gates the emit and, because the
     /// window is only ever opened on the emit path, the window too). Default ON;
-    /// <c>SPIRECTL_SCENE_WATCH_HAND_TWEEN=0</c> seeds it OFF (byte-identical to the pre-WS-4 producer: every lerp
-    /// frame streams as a transform delta). Read on the game main thread (the setters' postfixes and their deferred
-    /// idle publish); a one-tick stale read is harmless.</para>
+    /// <c>SPIRECTL_SCENE_WATCH_HAND_TWEEN=0</c> seeds it OFF (byte-identical to the producer without this lever:
+    /// every lerp frame streams as a transform delta). Read on the game main thread (the setters' postfixes and
+    /// their deferred idle publish); a one-tick stale read is harmless.</para>
     /// </summary>
     public static bool HandTweenHints { get; set; } =
         ReadBool("SPIRECTL_SCENE_WATCH_HAND_TWEEN", defaultOn: true);
 
     /// <summary>
-    /// WS-REST7 rest-site "option description stuck invisible on refocus" cure (producer-side). A rest-site option's
+    /// Rest-site "option description stuck invisible on refocus" cure (producer-side). A rest-site option's
     /// description (a shared <c>MegaRichTextLabel</c> under <c>ChoicesScreen</c>, driven by <c>modulate.a</c>) is
     /// PRUNED every tick because a <c>CanvasItem.Visible</c> in the ChoicesScreen chain reads FALSE in browser/headless
     /// mode — the documented rest-site overlay quirk — so its focus fade-in is never read/diffed/emitted and both
@@ -227,13 +225,13 @@ public static class Sts2SceneWatchRuntimeSettings
         ReadBool("SPIRECTL_SCENE_WATCH_REST_OVERLAY_STREAM", defaultOn: true);
 
     /// <summary>
-    /// R10 narrowing of <see cref="RestOverlayStream"/>'s visible-flip: a gamepad-prompt glyph inside the rest room
+    /// Narrowing of <see cref="RestOverlayStream"/>'s visible-flip: a gamepad-prompt glyph inside the rest room
     /// (<c>%ControllerIcon</c> and friends — see <c>Sts2RestOverlayStream.IsControllerPromptNode</c>) is NEVER flipped
     /// visible. The game hides those on its own global input state ("is a controller attached"), not through the
     /// rest-overlay compositing quirk, so the flip was streaming a "press Y" prompt onto a mouse/touch mirror while
     /// the game itself showed none. Nothing else in the room changes — the ProceedButton and the ChoicesScreen
     /// description chain the original fix targeted still flip. Default ON;
-    /// <c>SPIRECTL_SCENE_WATCH_REST_OVERLAY_PROMPT_DENYLIST=0</c> seeds it OFF (flip everything, pre-R10 behaviour).
+    /// <c>SPIRECTL_SCENE_WATCH_REST_OVERLAY_PROMPT_DENYLIST=0</c> seeds it OFF (flip everything).
     /// </summary>
     public static bool RestOverlayPromptDenylist { get; set; } =
         ReadBool("SPIRECTL_SCENE_WATCH_REST_OVERLAY_PROMPT_DENYLIST", defaultOn: true);

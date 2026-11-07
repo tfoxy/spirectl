@@ -3,18 +3,16 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R13 producer PROCEED-GLOW FOLD — PURE and Godot-free (like Sts2TopBarFold / Sts2MapPointPulse) so the gate algebra
+// PROCEED-GLOW FOLD — PURE and Godot-free (like Sts2TopBarFold / Sts2MapPointPulse) so the gate algebra
 // and the pin are unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
 // WHY. The shared `ui/proceed_button` Outline is an additive #ffcc00 glow whose SELF-MODULATE ALPHA pulses every
-// single frame, forever, on every screen that shows Proceed. Measured off the recorded mirror wire it is the SOLE
-// churner on a treasure room (60.1 deltas/s) and 91% of a card-reward screen's — a phone mirroring a still screen
-// paying a full delta pipeline for a ±25% alpha shimmer.
+// single frame, forever, on every screen that shows Proceed. It is the dominant source of deltas on a still screen,
+// so a client mirroring one would pay for a full delta pipeline for a ±25% alpha shimmer.
 //
-// WS-D silenced it by pinning the alpha to the node's first-emitted sample. That worked for the wire but deleted the
-// shimmer, and — like the top-bar pin it shipped with — leaned on a first-seen sample being a resting value. Here it
-// is provably NOT: the button starts out DISABLED and its stop path fades the alpha to **0**, so the first-seen
-// rest is 0 while the loop's own rest is 0.75. This is the same
+// Pinning the alpha to the node's first-emitted sample would silence the wire but delete the shimmer, and it leans
+// on a first-seen sample being a resting value. Here it is provably NOT: the button starts out DISABLED and its stop
+// path fades the alpha to **0**, so the first-seen rest is 0 while the loop's own rest is 0.75. This fold is the same
 // REAL FOLD the map point and the top bar use instead: pin the channel ANALYTICALLY and ship a declarative
 // `RuntimeSceneNodeDelta.PinnedLoopAnim = "proceedGlow"` token that changes only when the loop starts or stops, so
 // the client replays the shimmer on its own clock and the steady state is ZERO deltas.

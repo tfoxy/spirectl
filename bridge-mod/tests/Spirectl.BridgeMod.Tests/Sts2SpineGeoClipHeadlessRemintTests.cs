@@ -4,31 +4,22 @@ using Xunit;
 namespace Spirectl.BridgeMod.Tests;
 
 // THE ARM SWITCH for the headless mesh-pool re-mint. The lever itself is Godot-typed and lives in the baker; what
-// is provable without a game is the RULE that decides whether it runs — which, since the product-path round below,
-// is a function of the rendering backend rather than a constant.
+// is provable without a game is the RULE that decides whether it runs — which is a function of the rendering
+// backend rather than a constant.
 //
-// WHAT THE LEVER BUYS, measured, so the default is a choice and not an omission. Four rigs at `idle_loop`
-// (ironclad, flail_knight, spectral_knight, magi_knight), one build, virgin process per arm, compared against a
-// real-renderer bake of the SAME build on part identity (slotIndex, attachmentName):
+// WHAT THE LEVER BUYS, so the default is a choice and not an omission. Compared against a real-renderer bake of
+// the SAME build on part identity (slotIndex, attachmentName), a headless bake with the lever OFF misses parts and
+// matches almost none byte for byte; with the lever ON (plus the mint mark for a shared-attachment tie) every
+// part is present and byte-identical.
 //
-//   arm                                parts (of 44/37/22/16)   byte-identical parts
-//   headless, lever OFF                40 / 28 / 19 / 15        1 / 1 / 1 / 1
-//   headless, lever ON                 42 / 37 / 22 / 16       42 / 37 / 22 / 16
-//   headless, lever ON + mint mark     44 / 37 / 22 / 16       44 / 37 / 22 / 16
-//
-// WHY THE DEFAULT IS NOW DETECTED. Measured again through the SHIPPED `/geoclips/` route (not the env-armed baker
-// that bypasses couch's admission gate), private cache root per arm, virgin process per arm:
-//
-//   arm                                                  route answer for the four rigs
-//   headless, lever unset (the old default)              404 x4, `complete=false` on every one
-//   headless, lever armed                                200 x4, complete=true, 44/37/22/16 parts
-//   gamescope real renderer, lever unset                 200 x4, and the armed headless bakes are
-//                                                        byte-identical to it on parts[], frames[0] and pages
-//   gamescope real renderer, lever ARMED                 200 x4, byte-identical to the unarmed real arm
+// WHY THE DEFAULT IS DETECTED. Through the SHIPPED `/geoclips/` route (not the env-armed baker that bypasses the
+// consumer's admission gate), a headless bake with the lever unset answers 404 with `complete=false`, and with the
+// lever armed answers 200 with bytes identical to the real renderer's on parts[], frames[0] and pages. On a real
+// renderer, arming it changes nothing.
 //
 // So the lever is worth arming exactly where the backend is broken, and is inert where it is not. Left
 // default-off nobody could benefit: a bake worker under `--headless` is precisely the caller that cannot know to
-// set a variable. Evidence: `.sts2/research/data/geoclip-headless-route-*/` in the CouchCoop checkout.
+// set a variable.
 public class Sts2SpineGeoClipHeadlessRemintTests
 {
     [Fact]
@@ -100,7 +91,7 @@ public class Sts2SpineGeoClipHeadlessRemintTests
     [Fact]
     public void ASoftwareRasterizerIsNotADummyRenderer()
     {
-        // lavapipe (Vulkan) and llvmpipe (OpenGL) under Xvfb bake byte-identically to the RTX 2060 with the lever
+        // lavapipe (Vulkan) and llvmpipe (OpenGL) under Xvfb bake byte-identically to a hardware GPU with the lever
         // OFF — they are REAL rendering drivers with no GPU, and they report a real display server ('X11').
         // Matching them here would make every bake on that profile pay for a skeleton rebuild it does not need,
         // so the rule must not key on "no GPU" or "no window", only on the backend that cannot write a mesh in
@@ -140,7 +131,7 @@ public class Sts2SpineGeoClipHeadlessRemintTests
     {
         // The log line is the ONLY way an operator can tell an auto-armed bake from an unarmed one, so it is a
         // contract, not decoration: it has to name the decision AND the two names the decision was made on.
-        // The exact triple a `--headless` process reports on this build, measured from the live game.
+        // The exact triple a `--headless` process reports.
         var dummy = Sts2SpineGeoClipHeadlessRemint.Decide(raw: null, "vulkan", "forward_plus", "headless");
         Assert.True(dummy.Armed);
         Assert.Contains("ARMED", dummy.Description, System.StringComparison.Ordinal);

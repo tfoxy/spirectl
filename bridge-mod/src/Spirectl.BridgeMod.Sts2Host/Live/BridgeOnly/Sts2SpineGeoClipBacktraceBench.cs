@@ -18,7 +18,7 @@ namespace Spirectl.Sts2.Live;
 /// suspicion is a function of the managed stack that reaches the probe, and a bench on a fresh worker stack
 /// cannot see it.
 ///
-/// <para>The question it answers: the dense sweep spends 33-43 microseconds per candidate on what should be a
+/// <para>The question it answers: the dense sweep spends far longer per candidate than what should be a
 /// hash lookup. The hypothesis is that a failed <c>MeshGetSurfaceCount</c> raises an engine error, and the engine
 /// captures a per-scripting-language backtrace as a CALL ARGUMENT to <c>print_error</c> — so it is built before
 /// anything consults the print-enabled flag, and <c>Engine.PrintErrorMessages = false</c> cannot suppress it.
@@ -32,7 +32,7 @@ internal static class Sts2SpineGeoClipBacktraceBench
     private const string ArmsEnv = "SPIRECTL_SPINE_GEOCLIP_BT_BENCH";
     private const string IterEnv = "SPIRECTL_SPINE_GEOCLIP_BT_BENCH_N";
 
-    // A0/A1/A5 default. ~0.7 s at the suspected 33 us; enough that a per-call number is not dominated by the
+    // A0/A1/A5 default. Enough that a per-call number is not dominated by the
     // stopwatch, few enough that the main thread is not visibly frozen between the frame yields below.
     private const int DefaultIterations = 20_000;
 

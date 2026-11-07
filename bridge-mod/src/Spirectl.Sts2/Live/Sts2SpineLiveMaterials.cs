@@ -2,18 +2,18 @@ using Godot;
 
 namespace Spirectl.Sts2.Live;
 
-// Godot-typed face of the LIVE SPINE-MATERIAL CARRY (round-9). The producer records the uniform snapshot each
+// Godot-typed face of the LIVE SPINE-MATERIAL CARRY. The producer records the uniform snapshot each
 // `&mat=` signature was computed from (Sts2SpineInspector.ReadMaterialKey, main thread, per live SpineSprite that
 // carries a `normal_material` ShaderMaterial); the bake resolves that signature — which rides the clip URL verbatim
 // — and renders through a material carrying the LIVE values instead of the offline scene's authored ones.
 //
 // See Sts2SpineLiveMaterialStore for the full diagnosis (boss_map_point.tscn's ShaderMaterial is
-// `resource_local_to_scene = true`, so the offline `PackedScene.Instantiate()` the bake used to read is a private
-// copy with the AUTHORED tint, never the act tint `NBossMapPoint.RefreshColorInstantly` pushed into the live one).
+// `resource_local_to_scene = true`, so an offline `PackedScene.Instantiate()` is a private copy with the AUTHORED
+// tint, never the act tint the game pushed into the live one).
 internal static class Sts2SpineLiveMaterials
 {
-    // SPIRECTL_SPINE_LIVE_MATERIAL: escape hatch for the round-9 live-uniform carry. Default ON; `0`/`false`/`off`/
-    // `no` restores the round-8 behaviour (bake through the OFFLINE scene instance's material, authored uniforms and
+    // SPIRECTL_SPINE_LIVE_MATERIAL: escape hatch for the live-uniform carry. Default ON; `0`/`false`/`off`/
+    // `no` restores the previous behaviour (bake through the OFFLINE scene instance's material, authored uniforms and
     // all) for an A/B. Read once — env vars are process-stable.
     internal static readonly bool Enabled =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_LIVE_MATERIAL") ?? string.Empty)
@@ -52,7 +52,7 @@ internal static class Sts2SpineLiveMaterials
     /// <summary>
     /// A FRESH ShaderMaterial carrying the live uniform values a `&amp;mat=` signature was captured from, or null
     /// when the carry is disabled, the signature is unknown/evicted, or the shader cannot be loaded (the bake then
-    /// falls back to the offline scene material — round-8 behaviour).
+    /// falls back to the offline scene material).
     /// </summary>
     /// <remarks>
     /// Deliberately a NEW material rather than a re-parameterised capture of the scene's own: a `.tscn` sub-resource

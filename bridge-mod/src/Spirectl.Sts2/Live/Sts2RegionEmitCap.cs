@@ -3,7 +3,7 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R11 producer region-emit cap decision — PURE and Godot-free (like Sts2TweenEndpointTuples) so the pacing is
+// Producer region-emit cap decision — PURE and Godot-free (like Sts2TweenEndpointTuples) so the pacing is
 // unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher. A Sprite2D playing an AtlasTexture flip-book (the
 // Tezcatara candle flames) swaps its TextureRegion crop EVERY tick → a per-frame region delta per flame floods
 // producer→wire→client. The watcher's capture loop calls Decide before ApplyIfChanged and, on Pin, substitutes the

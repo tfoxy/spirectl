@@ -1,14 +1,13 @@
 namespace Spirectl.Sts2.Live;
 
-// R14 — the Godot-free half of a PARKED CARD-FLIGHT RESOLVE: one flight's resolve request, held until the watcher
+// The Godot-free half of a PARKED CARD-FLIGHT RESOLVE: one flight's resolve request, held until the watcher
 // has actually tracked the node the hint is about.
 //
 // THE RACE THIS EXISTS TO CLOSE. Both card-flight producers publish from a `_Ready` hook deferred by one idle
 // flush, and the hint can only be built once the watcher's node registry knows the mover — the registry is filled
-// exclusively by the capture walk's reconcile, which is timer-clocked AND interval-gated. On a bench whose walk
-// runs at ~50Hz the deferred publish usually lands after a reconcile and resolves; on a real host under viewer load
-// it usually lands BEFORE one, and the hint is lost for good. A live host measured a 100% loss of shuffle flights
-// this way (every deferred resolve found an untracked node) while the same build on a fast walk kept ~83% of them.
+// exclusively by the capture walk's reconcile, which is timer-clocked AND interval-gated. When the walk runs fast
+// the deferred publish usually lands after a reconcile and resolves; on a real host under viewer load it usually
+// lands BEFORE one, and the hint is lost for good.
 //
 // The producer cannot simply retry on its own clock: it has no signal for "the registry changed". So a resolve that
 // misses the registry is PARKED here, and the watcher DRAINS the park immediately after each reconcile — the one
@@ -69,7 +68,7 @@ internal readonly record struct Sts2ParkedFlightResolve(
 // flight's spawn and its first tracking, and the worst honest burst is one shuffle (~30 cards, spawned over several
 // frames, each entry living ~one reconcile). A park that grew past the cap would mean the drain has stopped
 // running, and in that state holding MORE stale geometry helps nobody — so the cap refuses, the caller counts the
-// refusal, and that flight simply keeps streaming (the pre-R14 behaviour, fail-open).
+// refusal, and that flight simply keeps streaming (fail-open).
 //
 // The TTL is the other half of the same guarantee: a mover that never gets tracked (a shuffle cancelled the same
 // frame, a node freed before the walk reached it) must not sit in a slot. 500ms is generous next to the ~16-128ms

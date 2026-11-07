@@ -3,59 +3,51 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R13 producer TOP-BAR ICON FOLD — PURE and Godot-free (like Sts2MapPointPulse / Sts2DecorEmitSuppress /
+// Producer TOP-BAR ICON FOLD — PURE and Godot-free (like Sts2MapPointPulse / Sts2DecorEmitSuppress /
 // Sts2RegionEmitCap) so the math + policy are unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
-// WHY THIS REPLACES WS-D's PIN. WS-D stopped the three top-bar icon animators from churning the wire by pinning the
-// node's WHOLE first-emitted transform (`DecorRestTransform ??= first emitted`). That had two problems:
+// WHY A FOLD AND NOT A PIN. Pinning the node's WHOLE first-emitted transform would stop the three top-bar icon
+// animators from churning the wire, but it has two problems:
 //
 //   1. A REAL BUG. The first emission happens before Godot's DEFERRED Control layout has settled, so the "rest"
-//      sample was a mid-layout pose — and it was then frozen FOREVER. The deck icon is CENTER-anchored, so its
-//      position depends on the button's width, which changes as soon as `DeckCardCount` auto-sizes its label; the
-//      settings icon is GROW_BOTH and sits at its (-32,-32) min-size clamp until the parent is sized. Both rendered
-//      MISPLACED in the browser for the rest of the run. (The map icon is full-rect anchored at (0,0), which is why
-//      only two of the three looked broken.) Pinning a whole transform can never be safe for a Control whose
-//      placement is laid out later; pinning ONE analytic channel can.
-//   2. It DELETED the animation. The icons stopped rocking/spinning while their screen was open and stopped tilting
-//      on hover/press — the affordance that tells you which screen the top bar has open.
+//      sample is a mid-layout pose — frozen FOREVER. Icons whose placement depends on their parent's later size
+//      (the deck and settings icons) render MISPLACED in the browser for the rest of the run. Pinning a whole
+//      transform can never be safe for a Control whose placement is laid out later; pinning ONE analytic channel can.
+//   2. It DELETES the animation. The icons stop rocking/spinning while their screen is open and stop tilting on
+//      hover/press — the affordance that tells you which screen the top bar has open.
 //
 // THE FOLD. Same shape as the map-point pulse: the producer divides the churning channel (here: the icon's ROTATION)
 // back out of the streamed transform and ships a declarative `RuntimeSceneNodeDelta.PinnedLoopAnim` token naming the
 // loop, which the client replays on its own clock. Position and scale keep streaming untouched, so a late layout
-// pass, a hover scale-up (1.1x) and any future move all reach the browser — the mispositioning bug ceases to exist
+// pass, a hover scale-up and any future move all reach the browser — the mispositioning bug ceases to exist
 // structurally, not by a better-chosen rest sample.
 //
 // ON SCREEN. While one of the top-bar screens is open, that button's icon animates — and all three animate the
-// SAME node (`Control/Icon`) under the SAME gate (the registered script variable `IsScreenOpen`), with three
-// different motions:
+// SAME node (`Control/Icon`) under the SAME gate (the button's open-state), with three different motions:
 //
-//   * deck screen open — the icon ROCKS: +/-0.12 rad about a base that decays back to 0, period 1570.8ms, so any
-//     leftover hover tilt eases out while it rocks.                        -> "topBarDeckRock"
-//   * map screen open — the icon rocks the same +/-0.12 rad, but as an infinite looped tween: two 0.8s Sine/InOut
-//     legs, period 1600ms.                                                 -> "topBarMapRock"
-//   * settings screen open — the icon SPINS at a constant 1 rad/s, period 6283.2ms. Its scene file is
-//     `top_bar_settings_button.tscn` while its script class is the pause button's, so every rule here keys off the
-//     SCENE, never the class.                                              -> "topBarSpin"
+//   * deck screen open — the icon ROCKS about a base that decays back to 0.   -> "topBarDeckRock"
+//   * map screen open — the icon rocks as an infinite looped tween.          -> "topBarMapRock"
+//   * settings screen open — the icon SPINS at a constant rate. Its scene file is `top_bar_settings_button.tscn`
+//     while its script class is the pause button's, so every rule here keys off the SCENE, never the class.
+//                                                                            -> "topBarSpin"
 //
-// WHY THE REST ROTATION IS ANALYTIC (0), not a sample. Every path off the loop drives the icon back to exactly 0 —
-// unhovering, closing the screen, and stopping the map oscillation all end at rotation 0, and the deck rock's own
-// base decays to 0. So `RestRotationRad = 0` can never strand an icon mid-loop — unlike a first-seen sample, which
-// for the settings spin (an unbounded accumulator) would have been an arbitrary angle.
+// WHY THE REST ROTATION IS ANALYTIC (0), not a sample. Every path off the loop drives the icon back to exactly 0, so
+// `RestRotationRad = 0` can never strand an icon mid-loop — unlike a first-seen sample, which for the settings spin
+// (an unbounded accumulator) would be an arbitrary angle.
 //
-// GATE = `IsScreenOpen` ONLY. When the screen is CLOSED nothing is pinned and nothing is named: the hover /
-// press-down / unhover one-shots (0.25-1.0s each, and the only rotation writers in that state) stream live exactly
-// as they do today. That is the whole "animated while you're pointing at it" behaviour, for free, with no client
-// work — and it is also why the fold cannot swallow a real animation: it is inert unless a KNOWN infinite loop is
-// provably running.
+// GATE = THE OPEN-STATE ONLY. When the screen is CLOSED nothing is pinned and nothing is named: the hover /
+// press-down / unhover one-shots stream live. That is the whole "animated while you're pointing at it" behaviour,
+// for free, with no client work — and it is also why the fold cannot swallow a real animation: it is inert unless a
+// KNOWN infinite loop is provably running.
 //
 // KNOWN COST, accepted (kill switches: SPIRECTL_TOPBAR_FOLD=0, or the master SPIRECTL_DECOR_EMIT_SUPPRESS=0):
 //   * A client that does NOT consume `PinnedLoopAnim` (today: the native Godot client) shows the icon still while
 //     its screen is open. Its hook points are `MirrorNode.PinnedLoopAnim` + `CosmeticAnimator.BindingFor`, the same
 //     pair Sts2MapPointPulse needs; until then the switch above restores the streamed rotation for that client.
-//     Note this is still strictly better than WS-D for that client: the icon is at rest but correctly PLACED.
-//   * The 0.5s `StopOscillation` spring-out and the deck rock's base decay are no longer streamed — an icon whose
-//     screen closes snaps from its client-side loop to rest instead of easing there (the same trade the map-point
-//     fold accepts). The hover/unhover one-shots, which are what the player actually looks at, are untouched.
+//     Even so, the icon is at rest but correctly PLACED for that client.
+//   * The spring-out when a loop stops and the deck rock's base decay are not streamed — an icon whose screen
+//     closes snaps from its client-side loop to rest instead of easing there (the same trade the map-point fold
+//     accepts). The hover/unhover one-shots, which are what the player actually looks at, are untouched.
 internal static class Sts2TopBarFold
 {
     /// <summary>The three instanced top-bar button scenes.</summary>
@@ -63,8 +55,7 @@ internal static class Sts2TopBarFold
     internal const string MapButtonScene = "res://scenes/ui/top_bar/top_bar_map_button.tscn";
 
     /// <summary>
-    /// The settings button's SCENE file. Its script class is the PAUSE button's (verified against a live
-    /// keyframe), so every rule here keys off the scene path, never the class name.
+    /// The settings button's SCENE file. Its script class is the PAUSE button's, so every rule here keys off the scene path, never the class name.
     /// </summary>
     internal const string SettingsButtonScene = "res://scenes/ui/top_bar/top_bar_settings_button.tscn";
 
@@ -134,9 +125,9 @@ internal static class Sts2TopBarFold
 
     /// <summary>
     /// True when this button's live gate must be read via its registered <c>IsOpen()</c> METHOD (Godot Call)
-    /// instead of the <c>IsScreenOpen</c> script variable (Godot Get). Live-validated 2026-08-05: the variable is
-    /// exact for the deck and settings buttons, but on the MAP button it is never updated and reads a dead false
-    /// while the map is open — its rock is driven from the map screen itself — so only the method is truthful there.
+    /// instead of the <c>IsScreenOpen</c> script variable (Godot Get). The variable is exact for the deck and
+    /// settings buttons, but on the MAP button it reads false while the map is open, so only the method is truthful
+    /// there.
     /// </summary>
     internal static bool GateIsOpenMethod(string? sceneFilePath)
         => string.Equals(sceneFilePath, MapButtonScene, StringComparison.Ordinal);
@@ -149,7 +140,7 @@ internal static class Sts2TopBarFold
     /// <param name="live">The transform as read this tick (local or global — see the remarks).</param>
     /// <param name="rotationRad">
     /// The Control's `Rotation` READ LIVE THIS TICK. It must come from the live node, never from a stored
-    /// first-emitted basis: deriving θ from a remembered transform is exactly the WS-D bug (a pre-layout sample
+    /// first-emitted basis: deriving θ from a remembered transform reintroduces the pin bug (a pre-layout sample
     /// frozen forever).
     /// </param>
     /// <param name="pivotX">The Control's `PivotOffset.X` — Godot bakes the pivot into a Control's transform.</param>

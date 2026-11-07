@@ -4,12 +4,12 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-0 embedder mirror-stream opt-out — the pure subtree-skip predicate (Sts2StreamSkipMeta.ShouldSkip) and the
+// Embedder mirror-stream opt-out — the pure subtree-skip predicate (Sts2StreamSkipMeta.ShouldSkip) and the
 // published metadata KEY. The runtime scene watcher streams every node under the game root to mirror clients,
 // including the UI a downstream mod injects into the live tree (the CouchCoop host-lobby "Show Couch Co-Op QR Code"
 // button and its dialog, AddChild'd onto NCharacterSelectScreen / NMultiplayerLoadGameScreen). Those are HOST-LOCAL
-// chrome, and because mirror clients drive the host with REAL injected input, a phone tapping the mirrored button
-// would open the dialog on the host's TV — so the filter must live in the producer. Truth table over
+// chrome, and because mirror clients drive the host with REAL injected input, a mirror client tapping the mirrored button
+// would open the dialog on the host — so the filter must live in the producer. Truth table over
 // {enabled}x{hasMeta} plus the key-string contract (the embedder stamps the literal, so a rename is a wire break).
 public sealed class Sts2StreamSkipMetaTests
 {

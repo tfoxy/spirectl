@@ -162,7 +162,7 @@ internal static class Sts2SpineProbeMath
     }
 
     // A skeleton's own reported bounds are a superset of its drawn attachments, but a mesh can still poke a
-    // little past them (Phase 1: one Fg mesh sits 68 px left of the reported box), so containment is judged
+    // little past them, so containment is judged
     // against the bounds inflated by this fraction of their larger side — the same 2% the readback-sanity
     // step uses, kept as one constant so the two cannot drift apart.
     internal const double DefaultSkeletonBoundsTolerance = 0.02;
@@ -189,11 +189,11 @@ internal static class Sts2SpineProbeMath
 
     internal readonly record struct SpineLikeVerdict(bool Accepted, string Reason);
 
-    // Is this surface plausibly one slot of the target skeleton? Every clause corresponds to something the
-    // Phase-1 full sweep actually dragged in: three 230-vertex PackedVector3Array meshes belonging to some
-    // other subsystem's 3D geometry (rejected on vertex type, and independently on their UV range, which is
-    // what broke gate b), and one 256x256 quad at (4489,33) which passes EVERY clause here — Vector2, four
-    // vertices, six indices, UVs exactly [0,1], bbox inside the skeleton's bounds. THAT ONE IS NOT
+    // Is this surface plausibly one slot of the target skeleton? Every clause corresponds to something a full
+    // sweep drags in: PackedVector3Array meshes belonging to some other subsystem's 3D geometry (rejected on
+    // vertex type, and independently on their UV range, which is what breaks gate b), and a plain quad which
+    // passes EVERY clause here — Vector2, four vertices, six indices, UVs exactly [0,1], bbox inside the
+    // skeleton's bounds. THAT ONE IS NOT
     // REJECTABLE by inspection, which is why an accepted candidate is only an anchor HYPOTHESIS: it is
     // confirmed by whether a stride run can be walked off it, not by this predicate.
     //
@@ -261,9 +261,9 @@ internal static class Sts2SpineProbeMath
     //
     // The anchor scan samples the validator axis every `s` rows and tests every index at each sample. The run
     // it is hunting is an arithmetic progression with validator step `stride`, so a sampled validator V hits a
-    // member only when V ≡ v0 (mod stride) — and v0 is unknown. Pick `s` as a MULTIPLE of the stride (which is
-    // exactly what the obvious "span / expected member count" choice gives: 14209/26 ≈ 546, or the 65 an
-    // earlier draft used) and every sample lands in the SAME residue class as the first one. If that class is
+    // member only when V ≡ v0 (mod stride) — and v0 is unknown. Pick `s` as a MULTIPLE of the stride (which
+    // the obvious "span / expected member count" choice easily does) and every sample lands in the SAME
+    // residue class as the first one. If that class is
     // not v0's, the scan provably never touches the run no matter how long it runs.
     //
     // With gcd(s, stride) = 1 the samples cycle through all `stride` residue classes, so any `stride`
@@ -405,7 +405,7 @@ internal static class Sts2SpineProbeMath
     }
 
     // How short a walked run may be before its anchor is treated as a false positive rather than a member.
-    // A quarter of the expected count is deliberately generous — the point is to reject the 256x256 quad
+    // A quarter of the expected count is deliberately generous — the point is to reject a lone foreign quad
     // (a run of exactly 1) and its kind, not to insist the whole rig was recovered.
     internal static int MinimumAnchorRunLength(int expectedRunLength)
         => Math.Max(3, expectedRunLength / 4);
@@ -438,11 +438,10 @@ internal static class Sts2SpineProbeMath
 
     // ── Trimming a multi-rig run down to the target's own window ─────────────────────────────────────
     //
-    // The walked run is one contiguous progression, but the rigs that were built back to back share it:
-    // Phase 1's 33-member run is one rig's 7 meshes followed by the target's 26. Two independent signals can
-    // say where the target's block starts inside the run, and they are computed BOTH WAYS ON PURPOSE — on the
-    // Phase-1 data they disagree (build order says 7, bounds says {4,5,6}), and a lane that silently picked
-    // one would have shipped a wrong answer with a passing gate.
+    // The walked run is one contiguous progression, but the rigs that were built back to back share it: a
+    // neighbouring rig's meshes can precede the target's. Two independent signals can say where the target's
+    // block starts inside the run, and they are computed BOTH WAYS ON PURPOSE — they can disagree, and a lane
+    // that silently picked one would ship a wrong answer with a passing gate.
 
     // Signal 1 — BUILD ORDER. If the run is the concatenation of whole rigs' blocks, in the order the rigs'
     // canvas items were minted, then only those contiguous groups of rigs whose child counts SUM to the run
@@ -502,7 +501,7 @@ internal static class Sts2SpineProbeMath
     // Signal 2 — BOUNDS. Slide a window of the target's own child count along the run and ask which position
     // reproduces the target skeleton's reported bounds: L1 distance between the window's union bbox and those
     // bounds, plus how many of the window's meshes poke strictly outside them. Ranked (outside, L1); a tie is
-    // REPORTED as a tie rather than broken, because on the Phase-1 run three offsets score an exact 0.
+    // REPORTED as a tie rather than broken, because several offsets can score an exact 0.
     internal static BoundsOffsetChoice ChooseOffsetByBounds(
         IReadOnlyList<IReadOnlyList<double>> runBboxes,
         int windowLength,

@@ -3,10 +3,10 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-2 map quill strokes render as nothing in the mirror — the pure Line2D stroke-geometry emit rules
+// Map quill strokes must not render as nothing in the mirror — the pure Line2D stroke-geometry emit rules
 // (Sts2Line2DGeometryEmit). A map annotation is a `Line2D` appended live under `…/MapDrawing/DrawViewport` whose
-// ENTIRE appearance is points + width + default_color; the watcher streamed such a node with a correct transform but
-// no geometry at all. These are the two decisions that make the fix affordable: the CHEAP per-tick change signature
+// ENTIRE appearance is points + width + default_color; without these rules the watcher streams such a node with a
+// correct transform but no geometry at all. These are the two decisions that make the fix affordable: the CHEAP per-tick change signature
 // (which must never marshal the point array) and the 2-dp flatten that builds the wire payload at emit time.
 public sealed class Sts2Line2DGeometryEmitTests
 {
@@ -163,12 +163,12 @@ public sealed class Sts2Line2DGeometryEmitTests
         Assert.False(double.IsNegative(Sts2Line2DGeometryEmit.Round2(-0.004)));
     }
 
-    // ---- WS4 SCOPE ---------------------------------------------------------------------------------------------
-    // The first cut gated on TYPE ALONE, so it fired for every Line2D in the game. The card trails behind a flying
-    // card (`card_trail_<character>.tscn` → `Trails/OuterTrail` width 96 + `Trails/InnerTrail` width 64) are the
-    // regression that forced this scope: their whole look is a width_curve + gradient + stretched texture +
-    // additive material, none of which this unit carries, so a client drew a thick solid bar; and a discard→draw
-    // reshuffle re-marshalled TWO growing point arrays per card per tick.
+    // ---- SCOPE -------------------------------------------------------------------------------------------------
+    // Gating on TYPE ALONE fires for every Line2D in the game. The card trails behind a flying card
+    // (`card_trail_<character>.tscn` → `Trails/OuterTrail` + `Trails/InnerTrail`) are why the stream is scoped:
+    // their whole look is a width_curve + gradient + stretched texture + additive material, none of which this unit
+    // carries, so a client would draw a thick solid bar; and a discard→draw reshuffle would re-marshal growing point
+    // arrays for every card on every tick.
 
     private const string PenScene = "res://scenes/screens/map/map_line_draw.tscn";
     private const string EraserScene = "res://scenes/screens/map/map_line_erase.tscn";

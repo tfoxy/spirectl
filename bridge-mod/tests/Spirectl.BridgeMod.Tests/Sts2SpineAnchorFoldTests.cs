@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R15 producer CREATURE SPINE-ANCHOR FOLD (Sts2SpineAnchorFold) — a pure, Godot-free exercise of the three arms of
+// Producer CREATURE SPINE-ANCHOR FOLD (Sts2SpineAnchorFold) — a pure, Godot-free exercise of the three arms of
 // the rule, the scene table behind arm B, the inert-class allowlist, the burst-tail policy, and arm C's
 // hidden-descendant scan and flip flush.
 //
@@ -91,13 +91,13 @@ public sealed class Sts2SpineAnchorFoldTests
     [Fact]
     public void TableNamesTheMeasuredAnchors()
     {
-        // The four instances of this one anchor were 100% of the measured 6s idle wire (52.8 msg/s, 8 node ids).
+        // The four instances of this one anchor dominate the idle wire.
         Assert.True(Sts2SpineAnchorFold.IsEmitterAnchor(Gardener, "Visuals/SpewSlotNode"));
-        // The Aug-6 recording's two emitter-parent sludge-spinner anchors (868/868 messages each).
+        // The sludge spinner's two emitter-parent anchors.
         Assert.True(Sts2SpineAnchorFold.IsEmitterAnchor(SludgeSpinner, "Visuals/MouthSpraySlot"));
         Assert.True(Sts2SpineAnchorFold.IsEmitterAnchor(SludgeSpinner, "Visuals/MouthDribbleBoneNode"));
-        // `testBone` was also 868/868 — but it is CHILDLESS, so it is arm A's and must NOT be in the table (listing
-        // it would imply the table is what keeps it safe).
+        // `testBone` sits on the same skeleton — but it is CHILDLESS, so it is arm A's and must NOT be in the table
+        // (listing it would imply the table is what keeps it safe).
         Assert.False(Sts2SpineAnchorFold.IsEmitterAnchor(SludgeSpinner, "Visuals/testBone"));
         Assert.False(Sts2SpineAnchorFold.IsEmitterAnchor(SludgeSpinner, "Visuals/HoverHeightAdjust"));
         Assert.False(Sts2SpineAnchorFold.IsEmitterAnchor(SludgeSpinner, "Visuals/TargetingDistanceBone"));
@@ -140,7 +140,7 @@ public sealed class Sts2SpineAnchorFoldTests
         // Siblings inside the same watched scene keep streaming everything.
         Assert.Equal(Sts2DecorEmitSuppress.Channels.None, Sts2DecorEmitSuppress.Lookup(Gardener, "Bounds"));
         Assert.Equal(Sts2DecorEmitSuppress.Channels.None, Sts2DecorEmitSuppress.Lookup(Gardener, "Visuals"));
-        // ...and no anchor rule leaked onto the R14 combat channels (or vice versa).
+        // ...and no anchor rule leaked onto the combat channels (or vice versa).
         Assert.Equal(
             Sts2DecorEmitSuppress.Channels.None,
             Sts2DecorEmitSuppress.Lookup(Sts2IntentBobFold.SceneFile, "Visuals/SpewSlotNode"));
@@ -228,7 +228,7 @@ public sealed class Sts2SpineAnchorFoldTests
     [Fact]
     public void HiddenDescendantArm_FoldsAnUntabledAnchorWhoseSubtreeIsHiddenOrInert()
     {
-        // The measured case: the Ironclad's `Visuals/EyeSlot` is in no table and its only child `EyeFire` is a
+        // The motivating case: the Ironclad's `Visuals/EyeSlot` is in no table and its only child `EyeFire` is a
         // hidden TextureRect. Arms A and B both refuse it; arm C takes it.
         Assert.False(Folds(
             skeletonLeaf: true, carriesOwnPaint: false, hasDescendants: true,
@@ -826,10 +826,10 @@ public sealed class Sts2SpineAnchorFoldTests
     [Fact]
     public void Recorder_TweenWindowOverAWithheldAnchor_KeepsTheMark_SoAFreezeStillShipsIt_AndALaterFlipIsPlaced()
     {
-        // The re-review's scenario: arm C withholds the anchor; an ancestor tween (a creature lunge) opens a window,
-        // which skips the fold block; the skeleton freezes and the window closes; the hidden child later turns
-        // visible. If the tween had wiped the mark, the frozen-spine elision would skip the anchor for good and the
-        // child would compose against its stale pose.
+        // The scenario: arm C withholds the anchor; an ancestor tween (a creature lunge) opens a window, which skips
+        // the fold block; the skeleton freezes and the window closes; the hidden child later turns visible. If the
+        // tween had wiped the mark, the frozen-spine elision would skip the anchor for good and the child would
+        // compose against its stale pose.
         var w = new MiniWorld();
         w.Capture();
         w.A.Live = 6.5;

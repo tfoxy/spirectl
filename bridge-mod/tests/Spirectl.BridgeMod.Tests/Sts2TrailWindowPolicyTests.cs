@@ -3,12 +3,12 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R14 — whether a card flight opens the SELF-ONLY suppression window on its trail VFX root, which is what stops that
+// Whether a card flight opens the SELF-ONLY suppression window on its trail VFX root, which is what stops that
 // root re-sending its own transform for the flight's lifetime.
 //
 // The rule has three inputs and therefore exactly eight cases, all enumerated below, because the interesting half of
-// it is a DEFAULT: the mirror runs in LOCAL emit mode, so before R14 the R13 feature silently never engaged in
-// production. The truth table is the contract that the local-mode opt-in changes that and nothing else — in
+// it is a DEFAULT: the mirror runs in LOCAL emit mode, where the feature alone never engages. The truth table is the
+// contract that the local-mode opt-in changes that and nothing else — in
 // particular that an embedder raising the local-mode lever alone (feature switch off) still opens nothing, and that
 // GLOBAL mode ignores the new lever in both positions.
 public sealed class Sts2TrailWindowPolicyTests
@@ -24,7 +24,7 @@ public sealed class Sts2TrailWindowPolicyTests
     [InlineData(true, false, false, true)]
     [InlineData(true, false, true, true)]
     // LOCAL emit mode, feature ON — the opt-in decides. Default (off) keeps the root streaming, which is the
-    // behaviour every pre-R14 consumer depends on.
+    // behaviour every consumer without the opt-in depends on.
     [InlineData(true, true, false, false)]
     [InlineData(true, true, true, true)]
     public void ShouldOpenTrailSelfWindow_TruthTable(
@@ -48,8 +48,7 @@ public sealed class Sts2TrailWindowPolicyTests
     [Fact]
     public void GlobalModeIsUnchangedByTheNewLever()
     {
-        // R13's shipped behaviour in global mode must be byte-identical after R14, so the new input cannot be
-        // observable there.
+        // Global-mode behaviour must not depend on the local-mode lever, so that input cannot be observable there.
         Assert.Equal(
             Sts2TrailWindowPolicy.ShouldOpenTrailSelfWindow(true, emitLocalTransforms: false, localModeLever: false),
             Sts2TrailWindowPolicy.ShouldOpenTrailSelfWindow(true, emitLocalTransforms: false, localModeLever: true));
@@ -58,7 +57,8 @@ public sealed class Sts2TrailWindowPolicyTests
     [Fact]
     public void DefaultSettingsLeaveTheLocalModeExtensionOff()
     {
-        // The shipped default is the conservative one: a process nobody configured behaves exactly as R13 did.
+        // The shipped default is the conservative one: a process nobody configured keeps the root streaming in local
+        // mode.
         Assert.False(Sts2SceneWatchRuntimeSettings.TrailSelfSuppressLocalMode);
     }
 }

@@ -1,18 +1,17 @@
 namespace Spirectl.Sts2.Live;
 
-// Godot-free core of the LIVE SPINE-MATERIAL CARRY (round-9 boss-map-node fade). Always compiled (no Godot
+// Godot-free core of the LIVE SPINE-MATERIAL CARRY (boss-map-node fade). Always compiled (no Godot
 // dependency) so the record/resolve/eviction contract is offline-unit-testable, like Sts2SpineMaterialKey (which
 // computes the signature this store is keyed by).
 //
 // WHY THIS EXISTS. A SpineSprite can paint through a `normal_material` ShaderMaterial the game re-parameterises at
-// RUNTIME: `NBossMapPoint.RefreshColorInstantly` pushes the current act's MapBgColor / MapTraveled|UntraveledColor
-// into `res://shaders/boss_map_point.gdshader` (an R/G/B channel-remap mask). Round-8 taught the bake to apply that
-// material, but it read the material off an OFFLINE `PackedScene.Instantiate()` of the addressed scene — and
-// `boss_map_point.tscn` marks its ShaderMaterial sub-resource `resource_local_to_scene = true`, so every
-// instantiation gets its OWN copy carrying the AUTHORED uniforms, never the live tint. Meanwhile the `&mat=` cache
-// key hashes the LIVE node's uniform values (Sts2SpineInspector.ReadMaterialKey). Key tracked live, render used
-// authored: the game showed one flat act-tinted silhouette while both mirrors painted the raw three-tone mask
-// (tan head + black body + white outline).
+// RUNTIME — the boss map point's act colours go into `res://shaders/boss_map_point.gdshader` (an R/G/B
+// channel-remap mask). The bake applies that material, but reading it off an OFFLINE `PackedScene.Instantiate()` of
+// the addressed scene does not see the live values: `boss_map_point.tscn` marks its ShaderMaterial sub-resource
+// `resource_local_to_scene = true`, so every instantiation gets its OWN copy carrying the AUTHORED uniforms, never
+// the live tint. Meanwhile the `&mat=` cache key hashes the LIVE node's uniform values
+// (Sts2SpineInspector.ReadMaterialKey). Key tracked live, render used authored: the mirrors painted the raw
+// three-tone mask instead of the act-tinted silhouette.
 //
 // THE CARRY. The inspector already reads the live (shader path, uniform values) pair to compute the signature, so it
 // records that exact snapshot here under that exact signature. The bake — which receives the signature verbatim in

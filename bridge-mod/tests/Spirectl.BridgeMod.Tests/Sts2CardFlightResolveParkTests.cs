@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R14 — the parked card-flight RESOLVE store. A flight's hint can only be built once the watcher has tracked the
+// The parked card-flight RESOLVE store. A flight's hint can only be built once the watcher has tracked the
 // node it describes, and the producer's `_Ready` publish frequently runs before that has happened; the request waits
 // here until the next reconcile can answer it. These tests pin the four properties the watcher's drain depends on:
 // a second request for the same mover replaces the payload without ever shortening the wait, an entry that is never

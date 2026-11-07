@@ -436,10 +436,10 @@ public sealed class Sts2SpineGeoClipProbeTests
             expected,
             Sts2SpineGeoClipProbe.AtlasFirstWidenReason(narrowed, starved, undecodable, conflicts));
 
-    // THE LICENCE, END TO END on the pure pieces. This is the WS-3 adversarial rig — mesh M driven by a slot
-    // that already claimed it AND by two slots in this group — run the way the ARMED arm runs it. The narrowed
-    // read hides M and starves both slots, which is precisely the silent-wrong-pairing setup; the widen rule
-    // sees the starvation, the group is re-read whole, and the answer is the unarmed path's answer: M refused as
+    // THE LICENCE, END TO END on the pure pieces. This is the adversarial setup — mesh M driven by a slot that
+    // already claimed it AND by two slots in this group — run the way the ARMED path runs it. The narrowed read
+    // hides M and starves both slots, which is precisely the silent-wrong-pairing setup; the widen rule sees the
+    // starvation, the group is re-read whole, and the answer is the unarmed path's answer: M refused as
     // moved-but-undecodable, with the one-at-a-time repair armed behind it.
     [Fact]
     public void ArmedReadSet_StarvesTheContendedRigAndTheWidenRuleRestoresTheUnarmedAnswer()
@@ -555,7 +555,7 @@ public sealed class Sts2SpineGeoClipProbeTests
 
     // The atlas-first knob now reads the SAME way round as the repair knob beside it: a kill switch, where only
     // an explicit off-word declines and absent, empty or misspelt arms. The affirmative spellings are kept as
-    // spellings — they are what every recorded measurement arm passed — but they no longer carry the default.
+    // spellings — existing configurations pass them — but they no longer carry the default.
     [Theory]
     [InlineData(null, true)]
     [InlineData("", true)]

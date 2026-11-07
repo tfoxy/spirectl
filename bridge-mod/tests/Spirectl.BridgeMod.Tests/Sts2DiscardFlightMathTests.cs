@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R13 hand→discard CARD FLY — the pure algebra the producer and the browser client both replay
+// Hand→discard CARD FLY — the pure algebra the producer and the browser client both replay
 // (Sts2CardFlightMath's Discard* half). The shared curve/integrator is already pinned by
 // Sts2CardFlightMathTests; what is tested here is only what the discard does DIFFERENTLY: the arc branch taken
 // against the live viewport, the two extra channels the card face carries, and the replayability gate's extra

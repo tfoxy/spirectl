@@ -3,8 +3,8 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS5: the generic spine-clip lane's side-by-side composite sizing rules — the seam behind the "merchant screen
-// shows only the LEFT side of its background" defect. Pure, offline; pinned against the real merchant numbers.
+// The generic spine-clip lane's side-by-side composite sizing rules — the seam behind the "merchant screen shows
+// only the LEFT side of its background" defect. Pure, offline; pinned against the real merchant numbers.
 public sealed class Sts2SpineClipCompositeTests
 {
     // FrameFromBoundsFitted on the merchant background rig (shop_merchant_bottom `bg` is 5120x2400): the max

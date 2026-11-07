@@ -3,7 +3,7 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R14 producer ENEMY-INTENT GLYPH FLIP-BOOK FOLD — PURE and Godot-free (like Sts2IntentBobFold, whose scene it
+// Producer ENEMY-INTENT GLYPH FLIP-BOOK FOLD — PURE and Godot-free (like Sts2IntentBobFold, whose scene it
 // shares) so the substitution is unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
 // WHY. An enemy intent animates TWO ways at once: the holder bobs (Sts2IntentBobFold) and the glyph itself runs a

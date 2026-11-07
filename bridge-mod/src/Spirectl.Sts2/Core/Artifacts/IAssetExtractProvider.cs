@@ -47,7 +47,7 @@ public sealed record AssetExtractRequestSnapshot(
     // When null, standalone-skeleton bakes fall back to a union of all skins.
     string? PreferredSkinName = null,
     // Requested output size (px). Combat-background SCENE renders treat it as the capture viewport;
-    // TEXTURE extracts (plain Texture2D and AtlasTexture, R19) RESAMPLE to it after the region crop.
+    // TEXTURE extracts (plain Texture2D and AtlasTexture) RESAMPLE to it after the region crop.
     // Both must be positive; null (or non-positive) => the source resolution / live root viewport size,
     // byte-identical to a request that omits them. See Sts2AssetExtractProvider.ApplyRequestedTextureResize.
     int? RenderWidth = null,

@@ -9,8 +9,8 @@ namespace Spirectl.Sts2.Live;
 /// <remarks>
 /// <para>
 /// A clip collapses to ONE frame when the client asks for <c>&amp;still=1</c>, when the subject is a genuine
-/// full-screen background, or (round-8 item 14) when the host DEGRADES a bake under instance oversubscription.
-/// That frame used to be t=0 — the pose the skeleton happens to hold at the start of the clip, which for most
+/// full-screen background, or when the host DEGRADES a bake under instance oversubscription.
+/// t=0 is the wrong frame — the pose the skeleton happens to hold at the start of the clip, which for most
 /// one-shots is the wind-up/entry pose (frequently near-empty: a creature spawning in, a fully-transparent first
 /// frame). The MID frame is the representative pose of an animation, so that is the default.
 /// </para>

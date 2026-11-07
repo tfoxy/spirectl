@@ -42,7 +42,7 @@ public static class Sts2RenderPhaseProfile
 
     /// <summary>
     /// The phase vocabulary. Stable strings: an embedder's perf report keys on them, so renaming one silently
-    /// re-labels a metric in a cross-round comparison. Grouped by lane, ordered as the render performs them
+    /// re-labels a metric in a before/after comparison. Grouped by lane, ordered as the render performs them
     /// (<see cref="PhaseOrder"/>).
     /// </summary>
     public static class Phase
@@ -125,7 +125,7 @@ public static class Sts2RenderPhaseProfile
         //
         // Its own `bake`-prefixed names rather than the render lanes'. A bake is a different SHAPE of work —
         // it owns the main thread for seconds and yields dozens of frames — so folding its ForceDraws into a
-        // background render's `forceDraw` would make both numbers uncomparable across rounds. `SceneLoad` and
+        // background render's `forceDraw` would make both numbers uncomparable across reports. `SceneLoad` and
         // `LanePrepare` ARE reused, because a bake performs literally the same two steps.
         //
         // The names are FINE-GRAINED on purpose: no coarse `bakeAssociate`-style wrapper spans them, because a
@@ -216,7 +216,7 @@ public static class Sts2RenderPhaseProfile
 
         // The geoclip bake, in the order the bake performs them. Appended rather than interleaved with the
         // render lanes above: these names are stable report keys, and moving an existing one would silently
-        // re-rank a column in a cross-round comparison.
+        // re-rank a column in a before/after comparison.
         Phase.BakeWarmupWait,
         Phase.BakeForceDraw,
         Phase.BakeAtlasRead,
@@ -343,7 +343,7 @@ public static class Sts2RenderPhaseProfile
     /// an extraction reaches the Godot main thread (<see cref="Sts2MainThreadDispatcher"/> queues the delegate and
     /// the main loop invokes it directly, so the posting thread's ExecutionContext, and with it the ambient
     /// recorder, does NOT travel). Without this the lane's stamps land nowhere and the render reports as one
-    /// unattributed block, which is exactly the shape the first live run of this profiler produced.
+    /// unattributed block.
     /// </remarks>
     public static Adoption Adopt(Recorder? recorder) => new(recorder);
 

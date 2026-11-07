@@ -1,6 +1,6 @@
 namespace Spirectl.Sts2.Live;
 
-// WS-S LOCALIZED-BODY TEMPLATE PREDICATE — PURE and Godot-free (like Sts2CancelledTweenResync / Sts2ReparentEmit)
+// LOCALIZED-BODY TEMPLATE PREDICATE — PURE and Godot-free (like Sts2CancelledTweenResync / Sts2ReparentEmit)
 // so the scan is unit-testable without the live host.
 //
 // WHY A CALLER WOULD ASK. A localized body can be a TEMPLATE: `{`-delimited NAMED tokens that the game's text
@@ -19,10 +19,8 @@ namespace Spirectl.Sts2.Live;
 // matching either: this answers "would the formatter have to source a name?", which the opening delimiter alone
 // decides.
 //
-// CORPUS CHECK (card bodies across all 14 shipped languages; counts + method in `.sts2/research/`, see AGENTS.md):
-// 8,237 bodies, 7,309 carrying a named token, 146 distinct token names, ZERO backslash escapes, and ZERO bodies
-// whose only `{` is non-named. On the shipped corpus this predicate is therefore exactly "contains a template
-// token"; the escape and positional clauses are defensive, and are what the unit tests pin.
+// On the shipped corpus this predicate is exactly "contains a template token"; the escape and positional
+// clauses are defensive, and are what the unit tests pin.
 internal static class Sts2LocTemplateText
 {
     // True when `rawText` carries at least one named template token the caller cannot source on its own.

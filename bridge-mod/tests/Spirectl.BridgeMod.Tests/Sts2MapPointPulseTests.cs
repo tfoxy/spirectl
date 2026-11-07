@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R12b producer MAP-POINT PULSE FOLD (Sts2MapPointPulse) — a pure, Godot-free exercise of the three things the
+// Producer MAP-POINT PULSE FOLD (Sts2MapPointPulse) — a pure, Godot-free exercise of the three things the
 // watcher leans on: the scene-identity rule, the pulse's gate algebra, and the pivot-anchored scale-undo.
 //
 // The scale-undo is the load-bearing part and is checked against Godot's own transform algebra: a Godot Control
@@ -103,7 +103,7 @@ public sealed class Sts2MapPointPulseTests
     [InlineData(1.45)]
     public void PinRestScale_RestoresTheRestingTransform(double k)
     {
-        const double rotation = 0.0065023587; // a real observed IconContainer tilt (~0.37 deg), off the live wire
+        const double rotation = 0.0065023587; // a small IconContainer tilt (~0.37 deg)
         const double pivot = 28.0;            // 56x56 container, pivot at its centre
 
         var live = ControlTransform(rotation, k, pivot, pivot);

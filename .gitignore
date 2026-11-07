@@ -34,3 +34,8 @@ sts2.local.yaml
 # Local-only leftovers of the extracted presentation dev app (captured fixtures, node_modules, caches);
 # the app itself now lives in the private spirectl-presentation archive.
 presentation/dev/
+
+# Private companion checkout (or, in a worktree, the installer's link to it; no trailing slash so
+# the symlink is ignored too) and the root files the installer links in from it.
+/private
+/.codex-orchestration.toml

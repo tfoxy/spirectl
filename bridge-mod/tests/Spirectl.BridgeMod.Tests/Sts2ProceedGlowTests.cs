@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R13 producer PROCEED-GLOW FOLD (Sts2ProceedGlow) — a pure, Godot-free exercise of the scene identity, the
+// Producer PROCEED-GLOW FOLD (Sts2ProceedGlow) — a pure, Godot-free exercise of the scene identity, the
 // loop gate (all eight combinations), and the analytic alpha pin.
 public sealed class Sts2ProceedGlowTests
 {

@@ -135,10 +135,10 @@ public sealed class Sts2RenderPhaseProfileTests : IDisposable
     [Fact]
     public async Task AdoptCarriesTheRecorderAcrossARawThreadHop()
     {
-        // The live regression this exists for: an extraction reaches the Godot main thread through a raw
+        // The regression this exists for: an extraction reaches the Godot main thread through a raw
         // SynchronizationContext.Post, which does NOT carry the posting thread's ExecutionContext — so the
-        // ambient recorder does not travel and every phase the lane stamps is dropped. The first live run of
-        // this profiler reported exactly that: dispatchWait only, and the whole render as unattributed.
+        // ambient recorder does not travel and every phase the lane stamps is dropped, leaving dispatchWait
+        // only and the whole render as unattributed.
         var recorder = Sts2RenderPhaseProfile.Begin("req-hop");
         var hopped = new TaskCompletionSource();
         var thread = new Thread(() =>
@@ -256,10 +256,10 @@ public sealed class Sts2RenderPhaseProfileTests : IDisposable
         Assert.Equal(Sts2RenderPhaseProfile.PhaseOrder.Count, Sts2RenderPhaseProfile.PhaseOrder.Distinct(StringComparer.Ordinal).Count());
     }
 
-    // R21: the shape RenderNodeResultAsync now records for a single-image render — the main thread parks in
+    // The shape RenderNodeResultAsync records for a single-image render — the main thread parks in
     // `encodeWait` while a worker (under the shared encode budget) does normalize+save. All three phases are
-    // NON-blocking, so the render's blocking fold is the capture only. Before the offload the same render put
-    // ~650ms of encodeSave in the blocking fold, which is the hitch this round exists to remove.
+    // NON-blocking, so the render's blocking fold is the capture only. Without the offload the same render puts
+    // its whole encodeSave in the blocking fold, which is the hitch the offload removes.
     [Fact]
     public async Task OffloadedSingleImageEncodeRecordsNoBlockingTime()
     {
@@ -289,7 +289,7 @@ public sealed class Sts2RenderPhaseProfileTests : IDisposable
         Assert.True(blockingAfterCapture > 0, "the capture itself still blocks — only the encode moved");
     }
 
-    // P7: Record() attributes a duration that something else already measured — the geoclip sweep hands back a
+    // Record() attributes a duration that something else already measured — the geoclip sweep hands back a
     // per-pass `Ms`, and the association's colour-read meter times the individual readbacks — without the
     // profiler having to wrap Godot-free code or re-time it more coarsely.
     [Fact]

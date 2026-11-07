@@ -40,7 +40,7 @@ namespace Spirectl.Sts2.Core.Artifacts;
 ///
 /// <para>WHY IT IS ON THE REQUEST rather than a second entry point: a rig bake IS a bake, with the same output
 /// contract (one artifact directory per (scene, node, anim), named exactly as before) and the same failure modes.
-/// What it saves is the per-SCENE work — 90-96 % of a pose-only bake is the bracket RID sweep plus the slot↔mesh
+/// What it saves is the per-SCENE work — most of a pose-only bake is the bracket RID sweep plus the slot↔mesh
 /// association, both properties of the RIG — which N separate requests pay N times.</para>
 ///
 /// <para>NOT A PROMISE. The baker measures whether the shared association actually holds for each pose

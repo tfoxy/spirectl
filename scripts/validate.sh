@@ -23,6 +23,7 @@ Commands:
   producer-walk-profile   Emit the producer-walk perf report envelope from the scene watcher's profiler counters.
   docs-map-paths          Verify every backticked repo path in docs/maps/*.md still exists.
   reflected-members       Sweep the by-name game member reads across two game builds' decompile corpora.
+  public-tree             Check the tracked tree against the public-tree policy (scripts/public-tree.conf).
 
 Examples:
   scripts/validate.sh dotnet-format --include bridge-mod/src/Foo.cs --json
@@ -41,6 +42,7 @@ Examples:
   scripts/validate.sh reflected-members --json
   scripts/validate.sh reflected-members --couch-root ../sts2-couch-coop
   scripts/validate.sh reflected-members --self-test
+  scripts/validate.sh public-tree --json
 EOF
 }
 
@@ -1630,7 +1632,7 @@ find_format_report_file() {
 
 # Emit the producer-walk perf report: the live scene watcher's OWN self-profiler counters
 # (SPIRECTL_SCENE_WATCH_PROFILE=1) folded into the shared cross-repo `perf-report/1` envelope, so an A/B lever
-# flip can be DIFFED instead of eyeballed on a phone.
+# flip can be DIFFED instead of eyeballed.
 #
 # REPORT ONLY. It never applies a wall-clock threshold and never fails because a number moved; a non-zero
 # exit means a bad invocation or a broken build. With no `--log`/`--snapshot` input it
@@ -2370,6 +2372,38 @@ EOF
         exit "$reflected_status"
         ;;
     esac
+    ;;
+  public-tree)
+    args=()
+    strip_json_flag args "$@"
+    if (( ${#args[@]} > 0 )); then
+      case "${args[0]}" in
+        --help|-h)
+          cat <<'EOF'
+Usage: scripts/validate.sh public-tree [--json]
+
+Runs scripts/check-public-tree.py: every tracked markdown file must be on the allowlist in
+scripts/public-tree.conf, and no tracked path or text may match its denylist or personal-data patterns.
+Needs only python3 and git; no game, no toolchain.
+EOF
+          exit 0
+          ;;
+        *)
+          fail "$command" "invalid_argument" "unknown public-tree argument: ${args[0]}"
+          ;;
+      esac
+    fi
+
+    public_tree_status=0
+    public_tree_out="$(python3 scripts/check-public-tree.py 2>&1)" || public_tree_status=$?
+    if (( public_tree_status != 0 )); then
+      fail "$command" "public_tree_violations" "$public_tree_out" "public-tree"
+    fi
+    if [[ "${VALIDATE_JSON:-false}" == "true" ]]; then
+      emit_json_success "$command" "$(printf '%s' "$public_tree_out" | tail -n 1)" "public-tree"
+    else
+      printf '%s\n' "$public_tree_out"
+    fi
     ;;
   *)
     fail "$command" "invalid_validation_command" "unknown validation command: $command"

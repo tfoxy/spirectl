@@ -17,6 +17,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # Every other job needs this one: refuse to release a tree that fails the public-tree policy.
+      - name: Check the public tree
+        run: python3 scripts/check-public-tree.py
       - id: version
         shell: bash
         run: |

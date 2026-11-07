@@ -45,10 +45,10 @@ public sealed partial class Sts2AssetExtractProvider : IAssetExtractProvider
     private const string CombatBackgroundRenderMode = "flattened-combat-background-scene";
     private const string CharacterSelectBgSpineStillRenderMode = "flattened-character-select-bg-spine-still";
     private const string EventBackgroundSpineStillRenderMode = "flattened-event-background-spine-still";
-    // WS-NEOW: the composed in-situ event-background animated clip lane (distinct render mode so a caller/probe can
+    // The composed in-situ event-background animated clip lane (distinct render mode so a caller/probe can
     // tell it apart from the generic spine-character-clip and the 1-frame still).
     private const string EventBackgroundSpineClipRenderMode = "composed-event-background-spine-clip";
-    // WS-NEOW: scene-root-space padding grown around the composed clip's union bounds so animation edges + AA don't
+    // Scene-root-space padding grown around the composed clip's union bounds so animation edges + AA don't
     // clip at the cell border (per-frame tight-crop then trims each frame within the padded cell).
     private const float EventBgClipPadding = 24f;
     private const string ComposedCombatBackgroundRenderMode = "flattened-combat-background-composed";
@@ -99,29 +99,29 @@ public sealed partial class Sts2AssetExtractProvider : IAssetExtractProvider
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_CLIP_SKIN_UNION") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // WS-NEOW composed event-background clip lane (default ON; SPIRECTL_SPINE_EVENTBG_COMPOSED_CLIP=0 restores
+    // Composed event-background clip lane (default ON; SPIRECTL_SPINE_EVENTBG_COMPOSED_CLIP=0 restores
     // today's routing where an animated event-bg spine falls to the generic detached tight-crop renderer — the
     // uncentered+blurry path — the A/B lever). Read once (env vars are process-stable).
     private static readonly bool EventBgComposedClipEnabled =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_EVENTBG_COMPOSED_CLIP") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // WS-NEOW full-res composed event-bg capture (default ON). SPIRECTL_SPINE_EVENTBG_FULLRES=0 folds a decoded
-    // footprint budget INTO the composed lane's capture scale (uniform shrink, stays centered — the phone-memory
+    // Full-res composed event-bg capture (default ON). SPIRECTL_SPINE_EVENTBG_FULLRES=0 folds a decoded
+    // footprint budget INTO the composed lane's capture scale (uniform shrink, stays centered — the low-memory
     // fallback). SPIRECTL_SPINE_CLIP_DOWNSCALE (the creature #4 lever) is untouched; event backgrounds never reach it.
     private static readonly bool EventBgFullResCapture =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_EVENTBG_FULLRES") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // WS5 char-select still placement (default ON; SPIRECTL_SPINE_CHARSELECT_PLACEMENT=0 restores the documented
-    // latent null placement). The char-select background-still lane used to return NO ClipPlacement, so
-    // WrapStillImageAsTimeline forwarded null, the wire shipped ClipLocalWidth=0 and the web client's
-    // `scale = localWidth / canvasWidth` computed scale(0) — the char-select background rendered as NOTHING.
+    // Char-select still placement (default ON; SPIRECTL_SPINE_CHARSELECT_PLACEMENT=0 restores the null
+    // placement). Without a ClipPlacement, WrapStillImageAsTimeline would forward null, the wire would ship
+    // ClipLocalWidth=0 and the web client's `scale = localWidth / canvasWidth` would compute scale(0) — the
+    // char-select background rendered as NOTHING.
     private static readonly bool CharacterSelectStillPlacementEnabled =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_CHARSELECT_PLACEMENT") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R10 char-select still OVERSCAN (default ON; SPIRECTL_SPINE_CHARSELECT_OVERSCAN=0 restores the bare
+    // Char-select still OVERSCAN (default ON; SPIRECTL_SPINE_CHARSELECT_OVERSCAN=0 restores the bare
     // root-viewport capture). The char-select rig is authored 2560x1200 inside a 1.1-scaled AnimatedBg container
     // that reaches from -516 to 2300 in screen space, so a capture at the 1920x1080 ROOT VIEWPORT physically
     // lacks the side pixels — a mirror stage wider than 16:9 then has nothing to show beside the still (the
@@ -132,15 +132,15 @@ public sealed partial class Sts2AssetExtractProvider : IAssetExtractProvider
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_CHARSELECT_OVERSCAN") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // WS5 generic clip-lane composite width cap (px). The generic lane renders SpineClipBatchSize lanes
+    // Generic clip-lane composite width cap (px). The generic lane renders SpineClipBatchSize lanes
     // side-by-side into ONE SubViewport (`viewport.Size = cellWidth * laneCount`). A full-bleed rig fits to
     // MaxSceneSize (2048) + 2*Padding = a 2176px cell, so 2 lanes ask for a 4352px render target: past the cap
     // the resize is refused/clamped, `GetImage()` reads back NARROWER than the composite, and `Image.get_region`
     // (which allocates the REQUESTED size and blits the clipped source) silently returns a lane cell whose right
-    // side is transparent — the "merchant shows only the LEFT side of its background" defect. Lanes are a
-    // throughput knob only, so capping them is always safe. SPIRECTL_SPINE_CLIP_MAX_COMPOSITE_WIDTH overrides.
-    // WS5 lane-cap kill switch (default ON; SPIRECTL_SPINE_CLIP_LANE_CAP=0 restores the legacy
-    // "always lay out SpineClipBatchSize lanes" behaviour — the A/B lever for the merchant left-truncation).
+    // side is transparent. Lanes are a throughput knob only, so capping them is always safe.
+    // SPIRECTL_SPINE_CLIP_MAX_COMPOSITE_WIDTH overrides.
+    // Lane-cap kill switch (default ON; SPIRECTL_SPINE_CLIP_LANE_CAP=0 restores the legacy
+    // "always lay out SpineClipBatchSize lanes" behaviour).
     private static readonly bool SpineClipLaneCapEnabled =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_CLIP_LANE_CAP") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
@@ -153,7 +153,7 @@ public sealed partial class Sts2AssetExtractProvider : IAssetExtractProvider
             ? parsedMaxCompositeWidth
             : 4096;
 
-    // R19 texture render-size honouring (default ON; SPIRECTL_TEXTURE_RENDER_RESIZE=0 restores the pre-R19
+    // Texture render-size honouring (default ON; SPIRECTL_TEXTURE_RENDER_RESIZE=0 restores the earlier
     // behaviour where a texture extract ignores RenderWidth/RenderHeight outright and always returns the
     // source resolution). A request that leaves both null is byte-identical either way — the resize is
     // reached only when a caller asks for a specific pixel size. See ApplyRequestedTextureResize.
@@ -193,12 +193,12 @@ public sealed partial class Sts2AssetExtractProvider : IAssetExtractProvider
         // only when the scene/node address does not resolve offline (a dynamically-spawned spine — the treasure
         // chest). Null → scene-addressed render only. Validated to a res:// prefix at parse time.
         string? SkelResPath = null,
-        // `&mat=<signature>` (R9): the SHADER-MATERIAL signature the producer minted for the addressed LIVE node
+        // `&mat=<signature>`: the SHADER-MATERIAL signature the producer minted for the addressed LIVE node
         // (Sts2SpineMaterialKey). It has always ridden the clip URL as a cache discriminator; the render now also
         // RESOLVES it (Sts2SpineLiveMaterials) to recover the live uniform values, so the tint the clip is cached
-        // under is the tint it is rendered with. Null / unknown → the offline scene material (round-8 behaviour).
+        // under is the tint it is rendered with. Null / unknown → the offline scene material.
         string? MaterialKey = null,
-        // `&t=<seconds>` (R10): the animation time a STILL should sample, overriding Sts2SpineStillFrame's mid/end
+        // `&t=<seconds>`: the animation time a STILL should sample, overriding Sts2SpineStillFrame's mid/end
         // heuristic. A client sends it only for a track the game has PAUSED (SetTimeScale(0)) — the treasure chest
         // frozen at t=0 of its lid-opening "animation" — where the frozen track time IS the authoritative pose and
         // the mid-clip guess renders a half-open chest on an untouched room. Meaningless for an animated clip (only

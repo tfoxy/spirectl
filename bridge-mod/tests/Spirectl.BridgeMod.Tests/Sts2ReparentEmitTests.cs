@@ -44,7 +44,7 @@ public sealed class Sts2ReparentEmitTests
     public void Deselect_ReparentNoWindow_ShipsTransform()
     {
         // The DESELECT: reparent back to a fresh hand holder, NO tween ⇒ no suppression window → keep the transform
-        // (the client re-parents AND re-places in one upsert; byte-identical to round-3).
+        // (the client re-parents AND re-places in one upsert; byte-identical to the ship-the-transform path).
         Assert.False(Sts2ReparentEmit.OmitTransformOnReparent(enabled: true, parentChanged: true, suppressTransform: false, justAdded: false));
     }
 
@@ -68,7 +68,7 @@ public sealed class Sts2ReparentEmitTests
     [Fact]
     public void Disabled_KillSwitch_NeverOmits()
     {
-        // SPIRECTL_SCENE_WATCH_REPARENT_HOLD_TWEENED=0 → the round-3 ship-the-transform behaviour for every combo.
+        // SPIRECTL_SCENE_WATCH_REPARENT_HOLD_TWEENED=0 → the ship-the-transform behaviour for every combo.
         var bools = new[] { false, true };
         foreach (var parentChanged in bools)
         foreach (var suppressed in bools)

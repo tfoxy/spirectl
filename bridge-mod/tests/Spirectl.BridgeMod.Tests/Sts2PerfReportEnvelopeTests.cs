@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-4: the shared cross-repo `perf-report/1` envelope. The coupling with godot-scene-web's harness
+// The shared cross-repo `perf-report/1` envelope. The coupling with godot-scene-web's harness
 // (packages/perf-harness/src/report.ts) is the JSON SHAPE ONLY — no build dependency either way — so this file
 // is spirectl's half of the contract: every key present, in the agreed spelling, with no threshold/verdict field.
 public sealed class Sts2PerfReportEnvelopeTests
@@ -74,8 +74,8 @@ public sealed class Sts2PerfReportEnvelopeTests
     [InlineData("Host")]
     public void AnEnvKindOutsideTheEnumIsRejectedRatherThanSilentlyEmitted(string kind)
     {
-        // A word outside the enum drops the whole report on the floor over one field — this repo shipped `dev`
-        // for a round and every envelope it produced was invalid. Same guard as `profile`, same reason.
+        // A word outside the enum drops the whole report on the floor over one field. Same guard as `profile`,
+        // same reason.
         var error = Assert.Throws<ArgumentException>(() => Sts2PerfReportEnvelope.Build(
             "producer-walk",
             "producer-walk",
@@ -87,8 +87,7 @@ public sealed class Sts2PerfReportEnvelopeTests
     [Fact]
     public void TheDefaultEnvKindIsHostOffACiRunnerAndCiOnOne()
     {
-        // A live in-process dump is a running game on someone's box. Calling that `ci` was the workaround the
-        // shared enum grew a third value to make unnecessary.
+        // A live in-process dump is a running game on someone's box, so it is `host`, not `ci`.
         Assert.Contains(
             Spirectl.Sts2.Embedding.ProducerWalkProfileReport.DefaultEnvKind(),
             Sts2PerfReportEnvelope.EnvKinds);

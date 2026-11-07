@@ -3,19 +3,18 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R12b producer MAP-POINT PULSE FOLD — PURE and Godot-free (like Sts2DecorEmitSuppress / Sts2RegionEmitCap /
+// Producer MAP-POINT PULSE FOLD — PURE and Godot-free (like Sts2DecorEmitSuppress / Sts2RegionEmitCap /
 // Sts2CosmeticEmitCap) so the math + policy are unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
-// WHY. After WS-D pinned the four purely-decorative animators, ONE per-frame churner was deliberately left running
-// and became the top residual: `ui/normal_map_point ▸ IconContainer`. Measured off the recorded mirror wire, a map
-// screen with the WS-D fix ON still streams ~15-24 deltas/s, and every one of them is a map-point icon container.
+// WHY. With the purely-decorative animators folded, the remaining per-frame churner on a map screen is
+// `ui/normal_map_point ▸ IconContainer`: every travelable map point's icon container streams a delta every frame.
 //
 // ON SCREEN. A travelable map point breathes: its icon container sweeps a UNIFORM scale over 0.95..1.45 on a
 // sine, period 1570.8ms (4 rad/s), each point starting at its own random phase so the map does not pulse in
 // lockstep. It breathes only while the point is enabled, unfocused and input is allowed — hovering it, travelling,
 // or opening the map's drawing mode stops it, and the scale settles back to 1.
 //
-// So — unlike WS-D's four garnish animators — WHICH nodes pulse is GAMEPLAY INFORMATION (it is how the game shows
+// So — unlike the purely decorative animators — WHICH nodes pulse is GAMEPLAY INFORMATION (it is how the game shows
 // you where you may travel next). Pinning it to rest and stopping there would delete a real affordance. This is a
 // REAL FOLD instead: the producer pins the churning channel AND ships a declarative per-node flag
 // (`RuntimeSceneNodeDelta.PinnedLoopAnim = "mapPointPulse"`) that changes only when pulse MEMBERSHIP changes, so
@@ -39,7 +38,7 @@ namespace Spirectl.Sts2.Live;
 // (byte-identical to today), exactly like the mirror's other local-space-only machinery.
 //
 // KNOWN COST, accepted (kill-switch SPIRECTL_MAPPOINT_FOLD=0):
-//   * The 0.3s `OnSelected` shrink-to-rest and the `Lerp(One, 0.5f)` settle are no longer streamed — a node
+//   * The select shrink-to-rest and the settle back to scale 1 are no longer streamed — a node
 //     leaving the travelable set snaps from its client-side pulse straight to rest instead of easing there.
 //   * A client that does NOT consume `PinnedLoopAnim` (today: the native Godot client) renders map points at rest.
 //     Its hook points are `MirrorNode.PinnedLoopAnim` + `CosmeticAnimator.BindingFor`; until then the switch above

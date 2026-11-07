@@ -20,7 +20,7 @@ namespace Spirectl.Sts2.Live;
 /// cross-repo <see cref="Sts2PerfReportEnvelope"/>.
 /// </para>
 /// <para>
-/// Report-only: nothing here compares a number against a budget. The producer walk has historically been ~89% of
+/// Report-only: nothing here compares a number against a budget. The producer walk is the bulk of
 /// headless active-play CPU, so an A/B lever flip (any <c>SPIRECTL_SCENE_WATCH_*</c> kill-switch) wants a
 /// diffable before/after report — never a wall-clock threshold that fails a build.
 /// </para>

@@ -15,12 +15,12 @@ namespace Spirectl.Sts2.Live;
 // the game itself never authored. An embedder (the CouchCoop mod) injects its own Godot UI into the live tree by
 // `AddChild`ing hand-built `Control` subtrees onto a game screen (the host lobby's "Show Couch Co-Op QR Code" button
 // and its QR dialog are added to `NCharacterSelectScreen` / `NMultiplayerLoadGameScreen`). Those nodes are HOST-LOCAL
-// chrome: they exist to be clicked on the TV by the person sitting at the machine, and they are meaningless — worse,
-// actively harmful — on a phone.
+// chrome: they exist to be clicked on the host by the person sitting at the machine, and they are meaningless — worse,
+// actively harmful — on a mirror client.
 //
 // Why this is mandatory rather than cosmetic: mirror clients drive the host with REAL injected input (the action
-// handler warps the host mouse and clicks), so a phone tapping the MIRRORED image of a host-only button would open
-// that dialog on the host's TV, in the middle of somebody else's lobby. Filtering has to happen at the producer, not
+// handler warps the host mouse and clicks), so a mirror client tapping the MIRRORED image of a host-only button would open
+// that dialog on the host, in the middle of somebody else's lobby. Filtering has to happen at the producer, not
 // at each client.
 //
 // Contract (embedder-facing, published — this comment is its specification):

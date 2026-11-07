@@ -1,6 +1,6 @@
 namespace Spirectl.Sts2.Live;
 
-// WS-3 DISCARD→DRAW SHUFFLE CARD FLIGHT — the Godot-free half.
+// DISCARD→DRAW SHUFFLE CARD FLIGHT — the Godot-free half.
 //
 // PURE and Godot-free (like Sts2ReparentEmit / Sts2CancelledTweenResync / Sts2TweenEndpointTuples) so the whole
 // curve/integrator/window algebra is unit-testable without the live host; the Godot-typed Harmony hook that reads
@@ -49,8 +49,8 @@ internal static class Sts2CardFlightMath
 
     // STUCK-WINDOW BACKSTOP, the Sts2RuntimeSceneWatcher.SuppressCapMs idea sized for THIS animation. The watcher's
     // tween cap (2000ms) is far too small here: a legal flight lasts arc + landing + 0.8s of fade, and the window
-    // we open is the analytic upper bound 2*duration + 0.8 (proof below), which at the largest duration observed
-    // (1.75) is 4.3s. This cap therefore only ever fires on a BOGUS captured duration (a torn/garbage field read),
+    // we open is the analytic upper bound 2*duration + 0.8 (proof below), well above any real flight. This cap
+    // therefore only ever fires on a BOGUS captured duration (a torn/garbage field read),
     // which is exactly what a backstop is for.
     //
     // WHY 2*duration + 0.8 BOUNDS THE REAL WALL-CLOCK LIFETIME. The arc ends when the integral of `speed` reaches
@@ -139,7 +139,7 @@ internal static class Sts2CardFlightMath
             && double.IsFinite(scale0) && Math.Abs(scale0) > 1e-6;
 
     // ---------------------------------------------------------------------------------------------------------
-    // R13 HAND→DISCARD FLY (`vfx/vfx_card_fly`). On screen: the card the player just played leaves the hand, arcs
+    // HAND→DISCARD FLY (`vfx/vfx_card_fly`). On screen: the card the player just played leaves the hand, arcs
     // to the discard pile darkening and shrinking to nothing, and drags the same comet behind it. It is the SAME
     // curve and the SAME two-phase integrator as the shuffle sweep above — Bezier, ControlPoint, StepAccelerating,
     // StepConstant, RotationFrom and SuppressWindowMs are all reused unchanged — so only what actually differs

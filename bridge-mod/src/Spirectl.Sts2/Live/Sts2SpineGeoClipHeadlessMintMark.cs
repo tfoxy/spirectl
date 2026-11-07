@@ -7,7 +7,7 @@ namespace Spirectl.Sts2.Live;
 
 /// <summary>
 /// The MINT MARK: how two slots that draw the SAME attachment are told apart when the renderer cannot answer a
-/// colour probe. It rides on <see cref="Sts2SpineGeoClipHeadlessRemint"/> and exists for exactly one measured
+/// colour probe. It rides on <see cref="Sts2SpineGeoClipHeadlessRemint"/> and exists for exactly one
 /// residual of it.
 ///
 /// <para>WHAT IS LEFT AFTER THE RE-MINT. Re-minting the mesh pool at the acquisition pose fixes the headless
@@ -17,8 +17,7 @@ namespace Spirectl.Sts2.Live;
 /// distinguishing colour to one slot, wait a frame, see which mesh's vertex colours moved. Headless that probe is
 /// inert — a colour write changes no triangle INDICES, so spine patches the existing surface's ATTRIBUTE region
 /// in place, and the dummy backend discards an attribute-region update for exactly the reason it discards a
-/// vertex-region one. The ironclad's two <c>hip armor right back</c> slots are the measured case: the probe spent
-/// 224 colour reads and reported both slots "moved no mesh".</para>
+/// vertex-region one, so the probe reports every tied slot as having "moved no mesh".</para>
 ///
 /// <para>THE LEVER, ONE LEVEL UP. The re-mint already forces the CREATE path, and a created surface carries the
 /// colour the slot held AT THAT MOMENT. So the distinguishing colour does not need a probe frame at all: write it
@@ -28,8 +27,8 @@ namespace Spirectl.Sts2.Live;
 /// headless is exactly the write that cannot land (so the mark survives to be read).</para>
 ///
 /// <para>WHICH SLOTS. Only slots that SHARE an attachment name with another drawable slot at the acquisition
-/// pose — the pose-derived shape of the tie, knowable before any mesh exists. On the four knight rigs that is
-/// the ironclad's one pair and nothing else at all, so three of the four rigs are untouched by construction.</para>
+/// pose — the pose-derived shape of the tie, knowable before any mesh exists. A rig with no such pair is
+/// untouched by construction.</para>
 ///
 /// <para>WHY IT CANNOT MIS-PAIR. The mark is a colour this code WROTE to a named ordinal, so the mesh carrying it
 /// is that ordinal's by construction; the arm still runs the same mutual-best-with-margin rule
@@ -43,7 +42,7 @@ internal static class Sts2SpineGeoClipHeadlessMintMark
     /// <summary>
     /// The kill switch. Unset means "follow the re-mint" — the mark is worthless without it and harmful nowhere
     /// with it, so an operator arms one lever, not two. <c>0</c>/<c>off</c>/<c>false</c>/<c>no</c> disarms it and
-    /// restores the re-mint arm exactly as it was measured on 2026-09-09 (ironclad 42 of 44).
+    /// restores the re-mint arm without the mark.
     /// </summary>
     internal const string ArmEnv = "SPIRECTL_SPINE_GEOCLIP_HEADLESS_MINT_MARK";
 

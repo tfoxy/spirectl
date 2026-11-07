@@ -116,12 +116,12 @@ public sealed partial class Sts2AssetExtractProvider
         var sceneResPath = clip.SceneResPath;
         var relPath = clip.NodePath;
 
-        // R9 LIVE-UNIFORM CARRY. `&mat=` is the signature of the LIVE node's `normal_material` uniform values, and
+        // LIVE-UNIFORM CARRY. `&mat=` is the signature of the LIVE node's `normal_material` uniform values, and
         // the producer recorded those values under it (Sts2SpineLiveMaterials). Resolve it ONCE here and hand the
         // resulting material to every lane of BOTH paths below, so the clip is rendered with the very tint its cache
         // key promises. Null (no `&mat=`, unknown/evicted signature, kill switch off) ⇒ every lane falls back to the
-        // offline scene material exactly as in round-8. See TryCaptureSpineNormalMaterial for why that fallback is a
-        // degradation for a `resource_local_to_scene` material like boss_map_point.tscn's.
+        // offline scene material. See TryCaptureSpineNormalMaterial for why that fallback is a degradation for a
+        // `resource_local_to_scene` material like boss_map_point.tscn's.
         var liveMaterial = Sts2SpineLiveMaterials.TryBuildMaterial(clip.MaterialKey, out var liveMaterialNote);
         LogLiveVsOfflineMaterial(clip, liveMaterial);
 
@@ -168,15 +168,14 @@ public sealed partial class Sts2AssetExtractProvider
             ? TryResolvePreferredSkinForSkeleton(skelResPath)
             : clip.SkinName;
 
-        // #8 MATERIAL CAPTURE (round-8): the standalone host below is a BARE `ClassDB.Instantiate("SpineSprite")`
+        // MATERIAL CAPTURE: the standalone host below is a BARE `ClassDB.Instantiate("SpineSprite")`
         // with none of the addressed scene node's own rendering state, so a skeleton whose scene node paints
-        // through a `normal_material` shader used to bake UNSHADED. The boss map point is exactly that: its art is
-        // an R/G/B channel-remap MASK and `boss_map_point.gdshader` turns it into the near-grayscale boss the game
-        // shows (red→act map color, green→white, blue→traveled/untraveled color), so the raw skeleton renders as a
-        // garish colored blob. Resolve the material ONCE, out here, and hand it to every lane.
+        // through a `normal_material` shader would bake UNSHADED. The boss map point is exactly that: its art is
+        // an R/G/B channel-remap MASK that `boss_map_point.gdshader` turns into the displayed colors, so the raw
+        // skeleton would render as a garish colored blob. Resolve the material ONCE, out here, and hand it to every lane.
         //
-        // R9: prefer the LIVE-valued material rebuilt from the `&mat=` signature; the offline scene read is now only
-        // the fallback (see TryCaptureSpineNormalMaterial — it observes the AUTHORED uniforms for a
+        // Prefer the LIVE-valued material rebuilt from the `&mat=` signature; the offline scene read is only the
+        // fallback (see TryCaptureSpineNormalMaterial — it observes the AUTHORED uniforms for a
         // `resource_local_to_scene` material, which is exactly what boss_map_point.tscn declares).
         var normalMaterial = (GodotObject?)liveMaterial ?? TryCaptureSpineNormalMaterial(sceneResPath, relPath);
         var normalMaterialNote = liveMaterial is not null ? liveMaterialNote : null;
@@ -228,7 +227,7 @@ public sealed partial class Sts2AssetExtractProvider
         return WithLeadingNotes(skelResult.Error is null ? skelResult : genericResult, leadingNotes);
     }
 
-    // #8: the `normal_material` the ADDRESSED scene node paints its skeleton through, or null when it has none
+    // The `normal_material` the ADDRESSED scene node paints its skeleton through, or null when it has none
     // (the overwhelmingly common case — this returns null for every creature, so their clips are unchanged).
     //
     // Read by INSTANTIATING the saved scene offline and reading the addressed node's property. That is SAFE:
@@ -236,15 +235,14 @@ public sealed partial class Sts2AssetExtractProvider
     // merchant/axebot crash class was about), and this instance never enters a tree — it is freed immediately. It is
     // also the exact call the scene lane already makes for this same address.
     //
-    // R9 — THIS IS THE FALLBACK, NOT THE PREFERRED SOURCE. Round-8 reasoned that a `.tscn` sub-resource which is not
-    // `resource_local_to_scene` is shared by every instantiation, so the captured object would be the very one
-    // `NBossMapPoint.RefreshColorInstantly` re-tints. `boss_map_point.tscn` declares
-    // `resource_local_to_scene = true` on exactly that ShaderMaterial, so the premise did not hold: each instantiate
-    // gets a PRIVATE copy carrying the AUTHORED uniforms (map_color 0.671,0.58,0.478 / black_layer_color 0,0,0 —
-    // the raw three-tone mask), while the `&mat=` cache key hashed the LIVE act tint. Callers now prefer
-    // Sts2SpineLiveMaterials.TryBuildMaterial and only fall back here (a shader at authored values still beats no
-    // shader at all — the round-8 behaviour, retained behind SPIRECTL_SPINE_LIVE_MATERIAL=0).
-    // Best-effort at every hop: a failure just means today's unshaded render.
+    // THIS IS THE FALLBACK, NOT THE PREFERRED SOURCE. A `.tscn` sub-resource that is not `resource_local_to_scene`
+    // is shared by every instantiation, so the captured object would be the very one the game re-tints.
+    // `boss_map_point.tscn` declares `resource_local_to_scene = true` on its ShaderMaterial, so that premise does
+    // not hold there: each instantiate gets a PRIVATE copy carrying the AUTHORED uniforms, while the `&mat=` cache
+    // key hashed the LIVE act tint. Callers therefore prefer Sts2SpineLiveMaterials.TryBuildMaterial and only fall
+    // back here (a shader at authored values still beats no shader at all; this is the whole behavior when
+    // SPIRECTL_SPINE_LIVE_MATERIAL=0).
+    // Best-effort at every hop: a failure just means an unshaded render.
     //
     // Deliberately does NOT reuse TryLoadSceneAndFindNode: that helper gates on LooksLikeSpinePreviewNode, which
     // asks whether the node already HAS a skeleton — false for exactly the runtime-injected nodes this lane
@@ -294,7 +292,7 @@ public sealed partial class Sts2AssetExtractProvider
     // Apply a resolved `normal_material` to a render host (the standalone skeleton lane's bare SpineSprite, or the
     // scene lane's offline instance). A no-op (and note-free) when there was nothing to resolve, so the
     // byte-identical unshaded render is preserved for every skeleton whose scene node carries no material.
-    // `provenance` (R9) is the live-carry note appended after the generic one when the material was rebuilt from the
+    // `provenance` is the live-carry note appended after the generic one when the material was rebuilt from the
     // `&mat=` signature rather than read off the offline scene instance.
     private static void ApplySpineNormalMaterial(Node node, GodotObject? material, string? provenance, List<string> noteList)
     {
@@ -329,9 +327,9 @@ public sealed partial class Sts2AssetExtractProvider
         }
     }
 
-    // SPIRECTL_SPINE_DEBUG A/B EVIDENCE for the R9 live-uniform carry: for a clip that carries a `&mat=` signature,
+    // SPIRECTL_SPINE_DEBUG A/B EVIDENCE for the live-uniform carry: for a clip that carries a `&mat=` signature,
     // log the LIVE uniform values the bake will now render with next to the AUTHORED ones the offline scene
-    // instantiate would have handed it (round-8 behaviour). The two lines differing IS the defect; them matching
+    // instantiate would have handed it (the fallback behaviour). The two lines differing IS the defect; them matching
     // means the material was genuinely shared and nothing changed. Gated hard on the debug lever — the offline
     // capture it performs costs a scene instantiate, so it must never run on the ordinary bake path.
     private static void LogLiveVsOfflineMaterial(SpineClipRequest clip, ShaderMaterial? liveMaterial)
@@ -468,13 +466,12 @@ public sealed partial class Sts2AssetExtractProvider
             CanvasWidth: still.Width,
             CanvasHeight: still.Height);
 
-        // WS-NEOW still zero-placement fix: forward the still's node-LOCAL clipPlacement (computed by
-        // ExtractEventBackgroundSpineStillAsync from the captured overscan rect + T_node). Without it the wrapped
-        // timeline shipped ClipLocal*=0, so the web min/static tier — which draws the shared canvas at
-        // clipPlacement — rendered scale(0) = invisible. WS5 closed the same gap on the OTHER still lane: the
-        // char-select background still (WarmUpCharacterSelectSceneThenRenderSpineSubtreeAsync) now composes its
-        // placement from the reported TRIM region, so the char-select backdrop is no longer painted at scale(0).
-        // A null placement (a rotated/skewed node, or SPIRECTL_SPINE_CHARSELECT_PLACEMENT=0) still passes through.
+        // Forward the still's node-LOCAL clipPlacement (computed by ExtractEventBackgroundSpineStillAsync from the
+        // captured overscan rect + T_node). Without it the wrapped timeline would ship ClipLocal*=0, so the web
+        // min/static tier — which draws the shared canvas at clipPlacement — would render scale(0) = invisible. The
+        // char-select background still (WarmUpCharacterSelectSceneThenRenderSpineSubtreeAsync) composes its placement
+        // from the reported TRIM region for the same reason. A null placement (a rotated/skewed node, or
+        // SPIRECTL_SPINE_CHARSELECT_PLACEMENT=0) still passes through.
         return BuildTimelineResult(
                 request,
                 [frame],
@@ -485,12 +482,12 @@ public sealed partial class Sts2AssetExtractProvider
             with { Notices = still.Notices };
     }
 
-    // WS-NEOW: the COMPOSED event-background clip lane. Mounts the SCENE ROOT in situ (no DetachSpineForRender /
+    // The COMPOSED event-background clip lane. Mounts the SCENE ROOT in situ (no DetachSpineForRender /
     // StripSpineRenderSubtree — preserving the in-scene container transforms full-bleed event backgrounds need),
     // hides non-subtree siblings, seeks the animation deterministically (timescale 0 + per-frame track time), sizes
     // a render cell to the UNION of the posed skeleton bounds over the whole clip (mapped to scene-root space by
     // T_node), and expresses that cell node-LOCALLY (Local = T_node^-1(union)). The client re-applies the streamed
-    // node+ancestor transforms (SpineSprite 0.58 origin(-390,-57) <- Neow <- AncientBgContainer 0.89) exactly once
+    // node+ancestor transforms exactly once
     // — so the clip lands centered at full raster resolution instead of the generic tight-crop lane's uncentered,
     // creature-downscaled (blurry) render. Ancestor transforms are NEVER baked (that would double-apply). Returns
     // null ONLY for the exotic rotated/skewed-node case (cannot be a simple clip rect) so the caller falls back to
@@ -674,7 +671,7 @@ public sealed partial class Sts2AssetExtractProvider
 
             union = union.Grow(EventBgClipPadding);
 
-            // Capture scale s = min(1, ceiling/maxDim). The neow rig at 0.58x is well under -> s == 1 (full-res).
+            // Capture scale s = min(1, ceiling/maxDim). An event background at its authored scale is well under -> s == 1 (full-res).
             var maxDim = MathF.Max(union.Size.X, union.Size.Y);
             var captureScale = (float)Sts2SpineEventBackgroundClip.ComputeCaptureScale(maxDim, SpineClipCreatureCeiling);
             var cellWidth = Math.Max(1, (int)MathF.Ceiling(union.Size.X * captureScale));
@@ -1117,11 +1114,11 @@ public sealed partial class Sts2AssetExtractProvider
         float webpQuality = 0.85f,
         bool still = false,
         string? skinName = null,
-        // R9: false for the STANDALONE (&skel=) lane — its factory already picked a skin (default-if-renderable,
+        // False for the STANDALONE (&skel=) lane — its factory already picked a skin (default-if-renderable,
         // union only as a fallback), so the per-lane union below must not overwrite that with a stroke/outline halo.
         bool unionSkinsWhenUnknown = true,
-        // R10 `&t=`: the explicit animation time a COLLAPSED still samples (see Sts2SpineStillFrame.ChooseSampleTime).
-        // Null (every request that omits it, and every animated clip) → the mid/end heuristic, byte-identical to R9.
+        // `&t=`: the explicit animation time a COLLAPSED still samples (see Sts2SpineStillFrame.ChooseSampleTime).
+        // Null (every request that omits it, and every animated clip) → the mid/end heuristic.
         float? stillTime = null)
     {
         if (IsRenderingHeadless())
@@ -1314,7 +1311,7 @@ public sealed partial class Sts2AssetExtractProvider
             // one-shots that is the wind-up/entry pose (often near-empty). Sample the MID of the clip instead — and
             // the LAST frame for a terminal die/defeat animation, whose meaningful resting state is the corpse. An
             // ANIMATED clip is unaffected (frameIndex-driven cadence, byte-identical to before).
-            // R10: an explicit `&t=` (a PAUSED track's authoritative frozen time — the closed treasure chest sits at
+            // An explicit `&t=` (a PAUSED track's authoritative frozen time — the closed treasure chest sits at
             // t=0 of its lid-opening "animation") OVERRIDES the heuristic; absent, nothing changes.
             var stillSampleTime = Sts2SpineStillFrame.ChooseSampleTime(animationName, duration, stillTime);
             float SampleTime(int frameIndex) => collapseToStill
@@ -1395,11 +1392,11 @@ public sealed partial class Sts2AssetExtractProvider
                 truncated = false;
             }
 
-            // WS5 COMPOSITE WIDTH CAP. The lanes are laid out side-by-side in ONE SubViewport, so the render
+            // COMPOSITE WIDTH CAP. The lanes are laid out side-by-side in ONE SubViewport, so the render
             // target is `cellWidth * laneCount` wide. A full-bleed background rig fits to MaxSceneSize + 2*Padding
             // = a 2176px cell, and 2 lanes then ask for 4352px — past the ceiling the resize is refused/clamped,
             // GetImage() reads back narrower, and Image.GetRegion silently pads the missing right-hand columns
-            // with transparency (the merchant "left side of the background only" defect). Lanes are a throughput
+            // with transparency. Lanes are a throughput
             // knob only, so retire the excess: a collapsed still needs exactly one, and no composite may exceed
             // SpineClipMaxCompositeWidth. Generic — no per-scene special case.
             var preparedLaneCount = laneCount;
@@ -1479,7 +1476,7 @@ public sealed partial class Sts2AssetExtractProvider
             // cell images in memory. Frames are written into a fixed array by index (no cross-task sharing).
             var frameResults = new AssetExtractFrame[frameCount];
             var encodeTasks = new List<Task>(frameCount);
-            // WS5: set on the first batch whose readback is smaller than the composite it was laid out for
+            // Set on the first batch whose readback is smaller than the composite it was laid out for
             // (see the assertion below); surfaced as a clip note so a truncated bake is self-reporting.
             string? readbackTruncation = null;
             // #14 ENCODE BUDGET. The frame encoders used to fan out to the WHOLE machine (max(2, ProcessorCount)),
@@ -1516,7 +1513,7 @@ public sealed partial class Sts2AssetExtractProvider
                             : "The clip render produced an empty viewport frame.");
                 }
 
-                // WS5 READBACK ASSERTION. Image.GetRegion never fails on an out-of-range slice — it allocates the
+                // READBACK ASSERTION. Image.GetRegion never fails on an out-of-range slice — it allocates the
                 // REQUESTED cell and blits whatever the (possibly smaller) readback has, padding the rest with
                 // transparency. So a render target that came back narrower than the composite ships a silently
                 // half-empty frame. Record it once, loudly, instead of letting it look like a content bug.
@@ -1639,7 +1636,7 @@ public sealed partial class Sts2AssetExtractProvider
             }
             if (effectiveLaneCount < preparedLaneCount)
             {
-                // WS5: self-report the lane retirement so a caller can tell a capped composite apart from a
+                // Self-report the lane retirement so a caller can tell a capped composite apart from a
                 // lane factory that simply failed to clone (the other reason laneCount can be below the batch size).
                 clipNotes.Add(
                     $"Reduced the side-by-side render composite from {preparedLaneCount} to {effectiveLaneCount} lane(s) "
@@ -1750,7 +1747,7 @@ public sealed partial class Sts2AssetExtractProvider
             // never touching the node's `skin` property). Union all skeleton skins so runtime-skinned body slots
             // render instead of collapsing to the setup-pose legs. No-op for single-skin skeletons (guarded).
             //
-            // R9: SKIPPED for the STANDALONE (&skel=) lane, which has already made this decision itself in
+            // SKIPPED for the STANDALONE (&skel=) lane, which has already made this decision itself in
             // TryApplySpineSkinAndPose (default skin if it renders, union only as a fallback) — re-unioning here
             // would overwrite that choice and put the stroke/outline halo straight back on the boss map node.
             TryApplyClipLaneSkinUnion(sprite);
@@ -3027,11 +3024,10 @@ public sealed partial class Sts2AssetExtractProvider
         // matching the cave layers (no container scale is baked into the capture).
         HideNodesOutsideCapturedSubtree(sceneRoot, spineNode);
 
-        // WS-NEOW still zero-placement fix: read the SpineSprite's node-relative transform (invariant to the
-        // capture placement) BEFORE RenderNodeResultAsync repositions the root, so the captured rect can be
-        // expressed node-locally and forwarded as clipPlacement (today the wrapped timeline shipped ClipLocal*=0,
-        // and the web min/static tier — which draws the shared canvas AT clipPlacement — rendered scale(0) =
-        // invisible).
+        // Read the SpineSprite's node-relative transform (invariant to the capture placement) BEFORE
+        // RenderNodeResultAsync repositions the root, so the captured rect can be expressed node-locally and forwarded
+        // as clipPlacement (otherwise the wrapped timeline would ship ClipLocal*=0, and the web min/static tier — which
+        // draws the shared canvas AT clipPlacement — would render scale(0) = invisible).
         var tNode = ComputeNodeRelativeTransform(sceneRoot, spineNode);
 
         if (TryStartSpinePreviewAnimation(spineNode, out var animationName))
@@ -3133,7 +3129,7 @@ public sealed partial class Sts2AssetExtractProvider
             ]).ToArray()
             : notes;
 
-        // R10 OVERSCAN. Capture over the authored container extent (~2816x1320 at a 1920x1080 root viewport)
+        // OVERSCAN. Capture over the authored container extent (~2816x1320 at a 1920x1080 root viewport)
         // instead of the bare viewport, so the raster actually CONTAINS the side art a widened mirror stage
         // re-centres onto. `SpineStillOverscanFrame` shifts the render root by -extent.Position and sizes the
         // SubViewport to the extent, so a render-root point p lands at capture pixel `p - extent.Position` —
@@ -3153,11 +3149,9 @@ public sealed partial class Sts2AssetExtractProvider
             ]).ToArray();
         }
 
-        // WS5 CHAR-SELECT STILL PLACEMENT (the documented latent null). This lane returned NO ClipPlacement, so
-        // WrapStillImageAsTimeline forwarded null, the wire shipped ClipLocalWidth=0, and the web client's
-        // `scale = localWidth / canvasWidth` came out 0 — the char-select background painted at scale(0), i.e.
-        // NOTHING (the menu backdrop showed through; Silent's scene looked "partial" because its plain
-        // TextureRects are streamed as ordinary nodes and still rendered).
+        // CHAR-SELECT STILL PLACEMENT. Without a ClipPlacement, WrapStillImageAsTimeline would forward null,
+        // the wire would ship ClipLocalWidth=0, and the web client's `scale = localWidth / canvasWidth` would come out 0 —
+        // the char-select background painted at scale(0), i.e. NOTHING.
         //
         // Same shape as the event-background still (Local = T_node^-1(captureRect)) with two differences:
         //   * the capture frame is the SYNTHETIC char-select render root (viewport-sized, scale 1, at the origin),
@@ -3704,7 +3698,7 @@ public sealed partial class Sts2AssetExtractProvider
         Action<Image>? postProcessImage = null,
         EncounterRenderDiagnosticsBuilder? encounterDiagnostics = null,
         bool disableProcessDuringCapture = true,
-        // WS5: reports the region of the CAPTURED VIEWPORT (in viewport pixels) that the returned raster
+        // Reports the region of the CAPTURED VIEWPORT (in viewport pixels) that the returned raster
         // actually covers — the transparent-trim rect when trimming is on, the whole image otherwise. A lane
         // that expresses its still as a node-local placement rect needs this, because with trimming the raster
         // is NOT the capture rect. Never invoked on a failure path.
@@ -4084,9 +4078,9 @@ public sealed partial class Sts2AssetExtractProvider
     /// <see cref="Sts2RenderEncodeBudget"/>.
     /// </summary>
     /// <remarks>
-    /// WHY: a 2520x1080 combat background measured 648ms of PNG encode — 87% of the render, and every millisecond
-    /// of it held the Godot main thread, which is the hitch a player on the TV sees when a phone first asks for the
-    /// static background. The captured <see cref="Image"/> is unshared CPU data after the readback (the same
+    /// WHY: PNG-encoding a full-size combat background is most of the render's cost, and doing it inline holds
+    /// the Godot main thread, which shows up as a hitch when a remote client first asks for the static background.
+    /// The captured <see cref="Image"/> is unshared CPU data after the readback (the same
     /// property the clip lane already relies on to encode its frames off-thread), so the encode does not need the
     /// main thread at all. The main thread's own await is recorded as the parked <c>encodeWait</c> phase — the
     /// render's wall time is unchanged, but it stops being a stall.
@@ -4114,13 +4108,10 @@ public sealed partial class Sts2AssetExtractProvider
         using (Sts2RenderPhaseProfile.Measure(Sts2RenderPhaseProfile.Phase.EncodeWait, blocking: false))
         {
             using var encodeLease = await Sts2RenderEncodeBudget.AcquireAsync();
-            // Plain Task.Run. Measured and rejected: a dedicated LongRunning thread, on the theory that the
-            // FIRST render after boot (whose encodeWait runs ~550ms past its own encodeSave) was queued behind
-            // ThreadPool injection. It is not — LongRunning moved that number not at all across three boots.
-            // The extra wait is the CONTINUATION: at boot the host's main loop is ~10x slower (its 3 warmup
-            // frames take ~300ms, not ~30ms), so the hop back onto the Godot context waits on a main thread
-            // busy with the game's own startup. Which is the offload working: that time is the game running
-            // instead of hitching. Warm, the same gap is 12-27ms.
+            // Plain Task.Run, deliberately. A dedicated LongRunning thread was tried and rejected: the first render after boot
+            // waits on the CONTINUATION, not on thread-pool injection — at boot the host's main loop is much slower, so the
+            // hop back onto the Godot context waits on a main thread busy with the game's own startup. That is the offload
+            // working: the time is the game running instead of hitching.
             encoded = await Task.Run(() => EncodeImageBytes(image, plan, encodedNotes, blocking: false));
         }
 

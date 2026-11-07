@@ -1,6 +1,6 @@
 namespace Spirectl.Sts2.Live;
 
-// R13 — the Godot-free half of a card flight's PARKED streaming-suppression window.
+// The Godot-free half of a card flight's PARKED streaming-suppression window.
 //
 // A flight is resolved from a `_Ready` hook, i.e. while the nodes it wants to freeze are still being added to the
 // tree: the watcher has not tracked them yet, so the window is parked here and adopted the first time each node is

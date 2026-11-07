@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-4 producer-walk instrument: the Godot-free half of the live scene watcher's OWN self-profiler
+// Producer-walk instrument: the Godot-free half of the live scene watcher's OWN self-profiler
 // (SPIRECTL_SCENE_WATCH_PROFILE=1). Pins the per-window aggregation the watcher feeds, the derived
 // rates/averages/percentiles, the multi-window fold, reset semantics, and the log-line format + parse round
 // trip that turns the once/sec GD.Print output into something diffable.

@@ -110,8 +110,8 @@ public static class Sts2PerfReportEnvelope
         }
 
         // Same guard as `profile`, for the same reason: env.kind is an ENUM on the validator's side, and a word
-        // outside it drops the whole report on the floor over one field. This repo shipped `dev` for a round and
-        // every producer-walk envelope it produced was invalid — fail at the source instead.
+        // outside it drops the whole report on the floor over one field, invalidating every envelope a producer
+        // emits — fail at the source instead.
         if (!EnvKinds.Contains(env.Kind, StringComparer.Ordinal))
         {
             throw new ArgumentException(

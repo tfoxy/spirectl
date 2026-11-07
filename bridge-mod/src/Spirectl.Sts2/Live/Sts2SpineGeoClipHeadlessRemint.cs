@@ -4,7 +4,7 @@ namespace Spirectl.Sts2.Live;
 
 /// <summary>
 /// ARM SWITCH for the geoclip baker's MESH-POOL RE-MINT, an acquisition-time lever that exists for exactly one
-/// measured problem: under Godot's <c>--headless</c> dummy renderer a geoclip bake reads geometry back from the
+/// problem: under Godot's <c>--headless</c> dummy renderer a geoclip bake reads geometry back from the
 /// pose each slot mesh was CREATED at, never the pose the bake sampled.
 ///
 /// <para>WHY THAT HAPPENS. The spine runtime hands a slot's deformed triangles to the rendering server on the
@@ -24,30 +24,30 @@ namespace Spirectl.Sts2.Live;
 /// <para>SCOPE, AND IT IS ENFORCED, NOT JUST DOCUMENTED. It corrects the mesh pool at the ACQUISITION pose only.
 /// A single-pose bake samples geometry exactly there, so the whole artifact is corrected; a whole-clip bake still
 /// reads every later frame off a mesh nothing re-created. Left unenforced that is a REGRESSION rather than a
-/// no-op, because arming the re-mint is what makes such a bake pass the completeness gate: measured on this
-/// build, an unarmed whole-clip headless bake refuses on all 8 clips (<c>complete=false</c>, so a 404 and nothing
-/// adopted) while an ARMED one is <c>complete=true</c> on 7 of 8, is ADOPTED, gets a <c>.complete</c> marker and
-/// is SERVED — carrying zero of the real renderer's 34 624 per-frame vertex scalars and reference geometry up to
-/// 3 966 px out. So <see cref="WholeClipRefusal"/> refuses that combination outright; see it for where.</para>
+/// no-op, because arming the re-mint is what makes such a bake pass the completeness gate: an unarmed whole-clip
+/// headless bake refuses (<c>complete=false</c>, so a 404 and nothing adopted) while an ARMED one is
+/// <c>complete=true</c>, is ADOPTED, gets a <c>.complete</c> marker and is SERVED — carrying none of the real
+/// renderer's per-frame vertex motion. So <see cref="WholeClipRefusal"/> refuses that combination outright; see
+/// it for where.</para>
 ///
 /// <para>WHY THE DEFAULT IS NOW THE RENDERER, NOT OFF. Left off by default, nobody benefits: a bake worker under
 /// <c>--headless</c> is exactly the caller that cannot know to set a variable, and the shipped <c>/geoclips/</c>
-/// route answered 404 for all four knight rigs there. So the default is DETECTED — the lever arms itself when,
+/// route answers 404 there. So the default is DETECTED — the lever arms itself when,
 /// and only when, this process is running the very rendering backend whose two mesh-update entry points are
 /// empty-bodied. That keeps the change scoped to the broken configuration by construction rather than by an
 /// operator remembering. The environment variable remains, and <c>=0</c> forces it off on either backend.</para>
 ///
 /// <para>THE DETECTION IS THREE SIGNALS, OR-ed, and the arm is safe even when they over-fire — see
 /// <see cref="IsDummyRenderer"/>. The one that actually fires is the DISPLAY SERVER being <c>headless</c>, and
-/// that is a MEASURED fact rather than the obvious one: under <c>--headless</c> on this build the engine still
+/// that is not the obvious one: under <c>--headless</c> the engine still
 /// reports <c>renderingDriver='vulkan' renderingMethod='forward_plus'</c> — the CONFIGURED backend, not the dummy
 /// one it actually installed — so a detector keyed on the driver name alone would have matched nothing and
 /// changed nothing. The two driver-name arms are kept for the configurations that do spell it out
 /// (<c>--rendering-driver dummy</c> under a real display server), and they are what keeps a lavapipe/llvmpipe
 /// software rasterizer under Xvfb OUT: that profile bakes correctly unarmed, reports a real display server, and
-/// has no reason to pay for a skeleton rebuild. A false POSITIVE costs nothing measurable — a lever-on bake on a
-/// real renderer came out byte-identical to a lever-off one through the shipped route, four rigs, twice — while
-/// a false NEGATIVE is the 404 this change exists to remove.</para>
+/// has no reason to pay for a skeleton rebuild. A false POSITIVE is inert — a lever-on bake on a real renderer
+/// is byte-identical to a lever-off one through the shipped route — while a false NEGATIVE is the 404 this
+/// change exists to remove.</para>
 /// </summary>
 internal static class Sts2SpineGeoClipHeadlessRemint
 {
@@ -69,15 +69,15 @@ internal static class Sts2SpineGeoClipHeadlessRemint
     /// case-insensitively and tolerate null/blank, because an engine that declines to answer must read as "not
     /// known to be dummy" and leave the previous behaviour in place.</para>
     /// <para>THE FIRST TWO ARE THE NARROW SIGNALS, and they are NOT the ones that fire under <c>--headless</c>.
-    /// Measured on this build: a <c>--headless</c> process reports <c>renderingDriver='vulkan'</c> and
+    /// A <c>--headless</c> process reports <c>renderingDriver='vulkan'</c> and
     /// <c>renderingMethod='forward_plus'</c>, i.e. the backend it was CONFIGURED for rather than the dummy one it
     /// installed, so neither name says <c>dummy</c> and a detector keyed on them alone would be inert. They are
     /// here for the configuration that does spell it out — an explicit <c>--rendering-driver dummy</c> under a
     /// real display server, which the display-server arm below cannot see — and cost one string compare each.</para>
     /// <para>THE DISPLAY-SERVER ARM is what actually decides, and it is the same signal this assembly already
     /// refuses raster stills on. It is a coarser question than "is the driver dummy", and it is safe in this
-    /// direction only because a false positive is measured inert: a lever-on bake on a REAL renderer came out
-    /// byte-identical to a lever-off one through the shipped route, four rigs, twice. It is also why a software
+    /// direction only because a false positive is inert: a lever-on bake on a REAL renderer is byte-identical to
+    /// a lever-off one through the shipped route. It is also why a software
     /// rasterizer is not matched — lavapipe under Xvfb reports <c>displayServer='X11'</c>, so it keeps the
     /// unarmed path it already bakes correctly on.</para>
     /// </remarks>
@@ -110,17 +110,15 @@ internal static class Sts2SpineGeoClipHeadlessRemint
     /// (<c>Sts2SpineGeoClipRequestLane.IncompletenessReason</c> and couch's independent copy) are frame-blind:
     /// they grade acquisition and ownership, and never look at whether a per-frame vertex track exists. So on the
     /// dummy backend arming turns a whole-clip bake from a SAFE REFUSAL into an ADMITTED artifact whose frames
-    /// are all the acquisition pose. Measured, four knight rigs, `--headless`, this build: unarmed refuses 8 of
-    /// 8 clips; armed publishes 7 of 8, with ZERO per-frame vertex scalars against the real renderer's 180 208
-    /// over the same 221 frames, per-frame slot transforms up to 5 783 px out, and reference geometry itself up
-    /// to 3 966 px out (<c>refVerts</c> is sampled at <c>refFrame</c>, which need not be the acquisition
-    /// frame — so not even the corrected pose survives into the artifact intact). Two
-    /// headless processes produce that same wrong artifact byte-for-byte, so nothing downstream can tell it from
-    /// a good bake.</para>
+    /// are all the acquisition pose: no per-frame vertex track, per-frame slot transforms far off the real
+    /// renderer's, and reference geometry off too (<c>refVerts</c> is sampled at <c>refFrame</c>, which need not
+    /// be the acquisition frame — so not even the corrected pose survives into the artifact intact). Headless
+    /// processes produce that same wrong artifact byte-for-byte, so nothing downstream can tell it from a good
+    /// bake.</para>
     /// <para>IT IS NOT ENOUGH THAT THE PRODUCT ROUTE ASKS FOR ONE FRAME TODAY. Couch's geoclip store key does
     /// NOT carry the frame count: a <c>frames=16</c> bake and a <c>frames=1</c> bake of the same rig land in the
-    /// SAME content-addressed directory. Measured: seed a store with the whole-clip headless artifact and the
-    /// ordinary single-pose route request serves it verbatim in 2 ms without baking. One caller asking for a
+    /// SAME content-addressed directory, so a store seeded with the whole-clip headless artifact serves it
+    /// verbatim to the ordinary single-pose route request without baking. One caller asking for a
     /// clip on a headless host is therefore enough to poison the single-pose lane too, which is why this refuses
     /// at the producer rather than relying on every caller to keep asking for one frame.</para>
     /// <para>THE SINGLE-POSE PATH IS UNTOUCHED BY CONSTRUCTION — <paramref name="poseOnly"/> true returns null

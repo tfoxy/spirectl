@@ -142,7 +142,7 @@ public sealed class Sts2TweenEndpointMathTests
         Assert.Equal(new double[] { 1.25, 0, 0, 1.25, 140, 50 }, gEnd);
     }
 
-    // ---- Local-transform re-basing (Workstream A): parent⁻¹ · global -------------------------------
+    // ---- Local-transform re-basing: parent⁻¹ · global -------------------------------
 
     private static void AssertTupleApprox(double[] expected, double[] actual, int precision = 6)
     {
@@ -482,7 +482,7 @@ public sealed class Sts2TweenEndpointMathTests
         Assert.Null(change.Value.StartGlobalPositionX);
     }
 
-    // ---- WS-ANIM: IMPLICIT start (sampled at tween creation, no `.From(...)`) -----------------------
+    // ---- IMPLICIT start (sampled at tween creation, no `.From(...)`) -----------------------
 
     // A step carrying ONLY an implicit start (the value GetIndexed sampled at TweenProperty registration time).
     private static Sts2TweenRecorderHooks.StepRecord PropStepImplicit(

@@ -160,7 +160,7 @@ public sealed class Sts2EmbeddableAssetProviderTests
         Assert.Null(extract.LastRequest.CompositionSelector);
     }
 
-    // R21 encoder knobs, same additive contract as the render size above: present => threaded through verbatim,
+    // Encoder knobs, same additive contract as the render size above: present => threaded through verbatim,
     // ABSENT => null/false, which is what makes "a request that omits them is byte-identical to before" checkable.
     [Fact]
     public void Sts2EmbeddableAssetProviderThreadsImageQualityAndOpacityIntoSnapshot()

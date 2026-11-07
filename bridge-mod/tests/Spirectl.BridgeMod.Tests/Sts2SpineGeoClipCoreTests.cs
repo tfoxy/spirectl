@@ -209,7 +209,7 @@ public sealed class Sts2SpineGeoClipCoreTests
 
     // ── The same read, kept as every sum a probe can read a code out of ──────────────────────────────
     //
-    // A readback stalls the device for ~0.26 ms whatever it returns, so summing each colour COMPONENT
+    // A readback stalls the device by the same amount whatever it returns, so summing each colour COMPONENT
     // separately alongside the combined checksum is free — and it is what lets one awaited frame carry a probe
     // bit per component instead of one bit in total. Two things have to hold: the combined sum must not move
     // (it is the alpha arm's predicate, and every recorded association pair was produced under it), and the
@@ -896,18 +896,17 @@ rotate: 90
         Assert.False(hidden.TryGetProperty("xform", out _));
     }
 
-    // ── The Phase-1 fixture ──────────────────────────────────────────────────────────────────────────
+    // ── The recorded-bracket fixture ─────────────────────────────────────────────────────────────────
     //
-    // Every number below was MEASURED against the real game in Phase 1 and is recorded in
-    // `.sts2/research/data/spine-geoclip-phase1/probe-offline/offline-*.json`. They are the reason the split
-    // bracket exists, so they are the fixture the split bracket is tested against: a plan that stops reproducing
-    // window A's shape is a regression against a run nobody can repeat in CI.
+    // Every number below was recorded against the real game with the single-window bracket. They are the reason
+    // the split bracket exists, so they are the fixture the split bracket is tested against: a plan that stops
+    // reproducing window A's shape is a regression against a run nobody can repeat in CI.
     //
     //   * merchant bracket: low = (validator 16204, index 87), mid = (16448, 131)
     //   * merchant recipe-A window: validators 16204..16448 × indices 23..195 = 42 385 candidates → 30 meshes
     //   * those 30 meshes: indices 88..115 plus 129 and 130, on validators 16212..16435
-    //   * 44 merchant slots show an attachment, so 14 meshes were missed; the wide-slack rerun proved the index
-    //     axis innocent, which leaves them ABOVE the mid bracket — predicted indices 132..145
+    //   * 44 merchant slots show an attachment, so 14 meshes were missed; a wider index slack found none of them,
+    //     which leaves them ABOVE the mid bracket — predicted indices 132..145
     //   * byrdonis bracket: low = (18727, 88), mid = (18941, 117); 26 meshes at indices 89..116 for 28 visible
     //     slots, so the 2 missing ones are predicted at indices 118..119
 
@@ -922,8 +921,8 @@ rotate: 90
     private static readonly ulong ByrdonisBracketLow = Rid(18727, 88);
     private static readonly ulong ByrdonisBracketMid = Rid(ByrdonisBracketMidValidator, 117);
 
-    // A probe mesh taken after the acquisition-frame seek. Not a Phase-1 measurement (Phase 1 never took one);
-    // the validator distance is modelled on the recipe-D probe mesh the same run recorded at validator 17456.
+    // A probe mesh taken after the acquisition-frame seek. Not a recorded id (the single-window bracket never
+    // took one); the validator distance is modelled on the recorded recipe-D probe mesh at validator 17456.
     private static readonly ulong MerchantBracketPost = Rid(16948, 160);
     private static readonly ulong ByrdonisBracketPost = Rid(19430, 150);
 
@@ -943,8 +942,9 @@ rotate: 90
 
     // ── Window A: the regression anchor ──────────────────────────────────────────────────────────────
 
-    // Window A is Phase 1's window, byte for byte. If this test ever needs updating, the bake's answer has
-    // silently changed shape and the recorded "30 meshes / 42 385 candidates" stops being a comparable number.
+    // Window A is the single-window bracket's window, byte for byte. If this test ever needs updating, the bake's
+    // answer has silently changed shape and the recorded "30 meshes / 42 385 candidates" stops being a comparable
+    // number.
     [Fact]
     public void PlanWindowA_ReproducesThePhase1MerchantSweepExactly()
     {
@@ -988,8 +988,7 @@ rotate: 90
     }
 
     // The other half of the diagnosis: window A cannot reach the meshes the animation mints, no matter how wide
-    // the index axis is opened. (Phase 1 proved this against the game with an 8× index slack; here it is
-    // arithmetic.)
+    // the index axis is opened. (An 8× index slack showed this against the game; here it is arithmetic.)
     [Fact]
     public void PlanWindowA_CannotReachTheMeshesMintedAfterTheMidBracketAtAnyIndexSlack()
     {
@@ -1146,7 +1145,7 @@ rotate: 90
 
     // ── The tightened mesh filter ────────────────────────────────────────────────────────────────────
 
-    // Phase 1's merchant: skeleton bounds position (-529.3121, -1209.0583) size 875.2423 × 1278.9694, which the
+    // The recorded merchant: skeleton bounds position (-529.3121, -1209.0583) size 875.2423 × 1278.9694, which the
     // probe's JSON records as the min/max corners (-529.3121, -1209.0583) .. (345.9302, 69.9111).
     private static readonly Sts2SpineGeoClipMath.SkeletonBox MerchantBounds =
         Sts2SpineGeoClipMath.SkeletonBox.FromPositionSize(-529.3121, -1209.0583, 875.2423, 1278.9694);
@@ -1303,8 +1302,9 @@ rotate: 90
             LiveMenuBounds,
             strict: true));
 
-    // Non-strict is the ESCAPE HATCH: it must reproduce Phase 1 exactly, so a bake can be compared against the
-    // recorded Phase-1 numbers by flipping one environment variable. Everything strict added is waived.
+    // Non-strict is the ESCAPE HATCH: it must reproduce the original single-window filter exactly, so a bake can
+    // be compared against the original recorded numbers by flipping one environment variable. Everything strict
+    // added is waived.
     [Fact]
     public void IsPlausibleSlotMesh_NonStrictReproducesThePhase1Filter()
     {
@@ -1318,7 +1318,7 @@ rotate: 90
             Facts(uvMin: -0.4845, uvMax: 1.4963), MerchantBounds, strict: false));
         Assert.Null(Sts2SpineGeoClipMath.IsPlausibleSlotMesh(Facts(maxX: 5_000), MerchantBounds, strict: false));
 
-        // …but the three things Phase 1 DID check still reject.
+        // …but the three things the original filter DID check still reject.
         Assert.Equal(
             "surface-count",
             Sts2SpineGeoClipMath.IsPlausibleSlotMesh(Facts(surfaceCount: 2), MerchantBounds, strict: false));
@@ -1590,9 +1590,9 @@ bounds: 100, 200, 120, 140
             Complete: true,
             AtlasFallbackAvailable: true,
             AssociationPairs: [[0, 0], [21, 4]],
-            // P7: the shadow arm and the phase profile are carried HERE rather than left at their defaults, so
-            // the key allowlist below actually walks them. A block only present on some reports would otherwise
-            // ship un-gated the first time a live bake produced one.
+            // The shadow arm and the phase profile are carried HERE rather than left at their defaults, so the key
+            // allowlist below actually walks them. A block only present on some reports would otherwise ship
+            // un-gated the first time a live bake produced one.
             AtlasFirstResolved: 41,
             AtlasFirstAgreed: 38,
             AtlasFirstDisagreed: 3,
@@ -1612,9 +1612,9 @@ bounds: 100, 200, 120, 140
                     new GeoClipPhaseCost(Sts2RenderPhaseProfile.Phase.BakeSweepProbe, 4620.5, 2, true),
                     new GeoClipPhaseCost(Sts2RenderPhaseProfile.Phase.BakeColorRead, 380.25, 1, true),
                 ]),
-            // P7 WS-7: the scene-tree pause, carried here at NON-default values for the same reason the block
-            // above is — a field only present on some reports would otherwise ship un-gated the first time a
-            // paused bake produced one.
+            // The scene-tree pause, carried here at NON-default values for the same reason the block above is — a
+            // field only present on some reports would otherwise ship un-gated the first time a paused bake
+            // produced one.
             BakePaused: true,
             PauseNote: "running -> paused",
             PauseAssertFailed: 0,
@@ -1667,10 +1667,10 @@ bounds: 100, 200, 120, 140
         Assert.Equal([0, 0], bake.GetProperty("associationPairs")[0].EnumerateArray().Select(v => v.GetInt32()));
     }
 
-    // THE SCENE-TREE PAUSE'S MANIFEST SURFACE, pinned by exact key AND exact string. These are what a future
-    // live arm greps for — in a manifest, not in a log that may not have been kept — so a rename here is a
-    // breaking change to the only durable record of whether a bake ran paused, and the assertion is written as
-    // literals rather than against the report's own properties so it cannot agree with a rename.
+    // THE SCENE-TREE PAUSE'S MANIFEST SURFACE, pinned by exact key AND exact string. These are what a later live
+    // check greps for — in a manifest, not in a log that may not have been kept — so a rename here is a breaking
+    // change to the only durable record of whether a bake ran paused, and the assertion is written as literals
+    // rather than against the report's own properties so it cannot agree with a rename.
     [Fact]
     public void Serialize_CarriesTheSceneTreePauseFlagNoteAndAssertCount()
     {
@@ -1684,8 +1684,8 @@ bounds: 100, 200, 120, 140
         Assert.Equal("running -> paused", pausedBake.GetProperty("pauseNote").GetString());
         Assert.Equal(0, pausedBake.GetProperty("pauseAssertFailed").GetInt32());
 
-        // …and the DEFAULT-OFF shape, which is what every artifact baked this round actually carries. The keys
-        // are present and default-valued rather than absent, so a reader never has to distinguish "this baker
+        // …and the DEFAULT-OFF shape, which is what an artifact baked with the lever off carries. The keys are
+        // present and default-valued rather than absent, so a reader never has to distinguish "this baker
         // predates the lever" from "the lever was off" by the absence of a key.
         using var unpaused = JsonDocument.Parse(
             Sts2SpineGeoClipBuilder.Serialize(result.Document with

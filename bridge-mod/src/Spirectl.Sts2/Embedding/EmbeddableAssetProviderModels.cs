@@ -9,7 +9,7 @@ public sealed record EmbeddableAssetRequest(
     //   * combat-background SCENE renders — both the literal res://scenes/backgrounds/<id>/<id>_background.tscn
     //     render and the composed composed://combat-background/<id>/image alias re-center their runtime
     //     BgContainer framing on this CAPTURE VIEWPORT, so the requested pixels are rendered natively;
-    //   * TEXTURE extracts (R19) — a plain Texture2D or an AtlasTexture is RESAMPLED (Lanczos) to this size
+    //   * TEXTURE extracts — a plain Texture2D or an AtlasTexture is RESAMPLED (Lanczos) to this size
     //     after its region crop / margin frame, so a consumer that needs an exact pixel size (a PWA
     //     home-screen icon) does not have to ship the full-resolution source and scale it itself.
     // Both must be positive to take effect; null (or non-positive) => the source resolution for a texture
@@ -31,7 +31,7 @@ public sealed record EmbeddableAssetRequest(
     // Event-backdrop FRAME override for an explicit-size event background render: "x,y,scale" in 1080-design
     // units — the LIVE backdrop container transform the caller probed, which the render re-centers into the
     // requested viewport instead of predicting the game's placement from the recovered aspect lerp (the game's
-    // real constants have drifted from it: measured container y 99.4 vs the lerp's 40 on the shipped Neow).
+    // real constants have drifted from it).
     // Only read by the explicit-size event-background branch. Null (or malformed) => the reference lerp,
     // byte-identical to a request that omits it.
     string? EventBackgroundFrame = null);

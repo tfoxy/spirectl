@@ -6,7 +6,7 @@ using Spirectl.Sts2.Core.Logging;
 namespace Spirectl.Sts2.Live;
 
 /// <summary>
-/// R13: the HAND→DISCARD CARD FLY producer, the twin of <see cref="Sts2CardFlightHooks"/>. A Harmony postfix on
+/// The HAND→DISCARD CARD FLY producer, the twin of <see cref="Sts2CardFlightHooks"/>. A Harmony postfix on
 /// <c>MegaCrit.Sts2.Core.Nodes.Vfx.NCardFlyVfx._Ready</c> reads the scalars the fly has just drawn, hands them to
 /// the scene watcher to be mapped into streamed space (and to open the streaming-suppression windows), and
 /// publishes ONE declarative <see cref="Embedding.CardFlightHint"/> with <c>Kind</c> <c>"discard"</c> on the SAME
@@ -216,7 +216,7 @@ internal static class Sts2DiscardFlightHooks
     }
 
     // The hub-publish tail, shared by BOTH ways a fly reaches the wire: this hook's own deferred resolve, and the
-    // watcher's R14 PARKED-RESOLVE RETRY (see Sts2CardFlightResolvePark and the shuffle twin). `Emitted` is
+    // watcher's PARKED-RESOLVE RETRY (see Sts2CardFlightResolvePark and the shuffle twin). `Emitted` is
     // incremented HERE, once, on whichever path got the hint out.
     internal static void PublishResolvedHint(Embedding.CardFlightHint flightHint, ulong cardInstanceId)
     {

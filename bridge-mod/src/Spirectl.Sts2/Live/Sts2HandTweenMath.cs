@@ -1,6 +1,6 @@
 namespace Spirectl.Sts2.Live;
 
-// WS-4 HAND-LAYOUT LERP → DECLARATIVE HINT — the Godot-free half.
+// HAND-LAYOUT LERP → DECLARATIVE HINT — the Godot-free half.
 //
 // PURE and Godot-free (like Sts2CardFlightMath / Sts2CancelledTweenResync / Sts2TweenEndpointTuples) so the whole
 // settle-time algebra is unit-testable without the live host; the Godot-typed Harmony hook that reads the live
@@ -9,11 +9,8 @@ namespace Spirectl.Sts2.Live;
 // THE MOTION THIS MODELS. A hand card holder is not driven by a Godot `Tween`: each of its three channels
 // (position, angle, scale) is an independent per-process-frame EXPONENTIAL APPROACH toward a target, with a fixed
 // rate and a fixed "close enough, stop" threshold. So there is no tween for Sts2TweenRecorderHooks to capture, no
-// declared duration to forward, and the mirror streamed every intermediate frame of every holder: a 3s
-// start-of-turn draw window measured 369.3 KB / 594 upserts (21.4% of the window) in `Hand/CardHolderContainer`,
-// peaking at 1.03 MB / 2477 upserts in one second. Everything the producer ships has to be DERIVED, which is what
-// this file does. (Behavioural detail — the exact update expressions, the entry points, which of them teleport
-// rather than approach — is in `.sts2/research/hand-holder-animation.md`; see AGENTS.md.)
+// declared duration to forward, and the mirror streamed every intermediate frame of every holder. Everything the
+// producer ships has to be DERIVED, which is what this file does.
 //
 // WHY THIS IS PUBLISHABLE AS AN ORDINARY TWEEN HINT. An exponential approach toward a fixed target and a CSS
 // `transition` with an expo-out timing function are the SAME curve; only the rate constant differs. So the producer
@@ -54,9 +51,9 @@ internal static class Sts2HandTweenMath
     //
     //     d(t) = d0 * (1 - k*dt)^(t/dt) = d0 * e^(-k_eff * t)   with   k_eff = -ln(1 - k*dt) / dt
     //
-    // and `t = ln(d0/eps) / k_eff`. Worked check for the measured start-of-turn draw (d0 = 722 px, k = 7):
+    // and `t = ln(d0/eps) / k_eff`. Worked check for a typical start-of-turn draw (d0 = 722 px, k = 7):
     // continuous gives 940 ms; discrete gives 826 ms at 30 fps, 884 ms at 60 fps, 903 ms at 90 fps, 927 ms at
-    // 240 fps — against an OBSERVED settle of ~800 ms. The discrete model is the one that matches, and it is the
+    // 240 fps. The discrete model is the one that matches the real loop, and it is the
     // one implemented here.
     //
     // The host's real frame delta is used rather than a hard-coded 60 Hz because the settle time is genuinely

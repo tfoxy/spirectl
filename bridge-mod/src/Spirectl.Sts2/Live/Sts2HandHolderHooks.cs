@@ -6,7 +6,7 @@ using Spirectl.Sts2.Core.Logging;
 namespace Spirectl.Sts2.Live;
 
 /// <summary>
-/// WS-4: the HAND-LAYOUT LERP producer. Harmony postfixes on <c>NHandCardHolder</c>'s three target-setting entry
+/// The HAND-LAYOUT LERP producer. Harmony postfixes on <c>NHandCardHolder</c>'s three target-setting entry
 /// points coalesce a hand fan-out into ONE endpoint per holder per frame, resolve it through the scene watcher's
 /// existing <see cref="Sts2RuntimeSceneWatcher.ResolveTweenEndpoint"/> (which also opens the streaming-suppression
 /// window), and publish it as an ORDINARY <see cref="Embedding.TweenAnimationHint"/> on the same
@@ -15,11 +15,9 @@ namespace Spirectl.Sts2.Live;
 /// <para>WHY THIS EXISTS AS A SEPARATE HOOK — the same reason <see cref="Sts2CardFlightHooks"/> does.
 /// <see cref="Sts2TweenRecorderHooks"/> patches Godot <c>Tween</c> construction, and a hand card holder is not
 /// animated by a tween at all: each of its three channels is a per-process-frame exponential approach with a fixed
-/// rate (see <see cref="Sts2HandTweenMath"/>), so the recorder captures nothing and the mirror streamed every
-/// intermediate frame of every holder. A device trace of a
-/// start-of-turn draw measured <c>Hand/CardHolderContainer</c> at 369.3 KB / 594 upserts — 21.4% of a 3 s draw
-/// window, peaking at 1.03 MB / 2477 upserts in one second — because EVERY newly drawn card re-targets EVERY
-/// already-settled holder, so the whole hand re-animates once per card.</para>
+/// rate (see <see cref="Sts2HandTweenMath"/>), so the recorder captures nothing and the mirror would stream every
+/// intermediate frame of every holder. A start-of-turn draw makes that a large share of the wire, because EVERY
+/// newly drawn card re-targets EVERY already-settled holder, so the whole hand re-animates once per card.</para>
 ///
 /// <para>NO NEW WIRE TYPE. The motion is an exponential approach with a known rate and a known
 /// settle test (see <see cref="Sts2HandTweenMath"/>), and an exponential approach and a CSS expo-out transition are
@@ -310,8 +308,7 @@ internal static class Sts2HandHolderHooks
     // CLEARING, not merely "not setting". One layout of a hand can re-target a channel and then teleport it within
     // the SAME frame, and the two land in one coalesced batch — so an instant write has to supersede the earlier
     // re-target's bit rather than leave it standing (Sts2HandTweenMath.Teleport). A LATER re-target of the same
-    // channel re-sets it, because that is a real instruction again. See
-    // `.sts2/research/hand-holder-animation.md`.
+    // channel re-sets it, because that is a real instruction again.
     private static void InstantAnglePostfix(Node __instance)
         => NoteChannel(__instance, HandChannels.Angle, instant: true);
 

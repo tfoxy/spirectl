@@ -60,7 +60,7 @@ public static class Sts2ImageEncodePolicy
 
     /// <summary>
     /// Resolve a request's <c>OutputFormat</c> / <c>ImageQuality</c> / <c>ImageOpaque</c> into one plan. Absent
-    /// quality and opaque reproduce the pre-R21 behaviour exactly: PNG stays PNG, webp stays LOSSLESS, and the
+    /// quality and opaque reproduce the default behaviour exactly: PNG stays PNG, webp stays LOSSLESS, and the
     /// alpha channel is untouched.
     /// </summary>
     public static Plan Resolve(string? outputFormat, float? requestedQuality = null, bool requestedOpaque = false)

@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-A phantom top-left potion — the pure unmapped-SubViewport prune predicate
+// Phantom top-left potion — the pure unmapped-SubViewport prune predicate
 // (Sts2ViewportContentPrune.ShouldPrune). A SubViewport the producer has NO viewport→screen prefix for streams its
 // CanvasItem content at VIEWPORT-LOCAL coordinates, i.e. pinned at ~the design origin; NPotion.DoFlash() duplicates
 // the whole potion subtree into exactly such a viewport (vfx_potion_flash.tscn, sampled only as a CPUParticles2D

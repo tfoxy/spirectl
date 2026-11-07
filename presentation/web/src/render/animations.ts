@@ -67,7 +67,7 @@ const INTENT_BOB = "spirectl-intent-bob";
 // rotate compose variant: an individual `rotate:` sweeps the matrix's translation offset about the origin and
 // ORBITS the node; the mirror spins a self-layer child for the `rotate`/`rock` kinds instead.)
 //
-// Both variants are LEGACY as of the literalization round: they read the bob's two extrema out of inline custom
+// Both variants are LEGACY: they read the bob's two extrema out of inline custom
 // properties, which is exactly what stops Chrome compositing them. They stay for `legacyBobKeyframes`; the default
 // path injects the same two frames with the px baked in (see `ensureBobKeyframes`).
 const INTENT_BOB_COMPOSE = "spirectl-intent-bob-compose";
@@ -136,7 +136,7 @@ const STATE_TRANSITION = "spirectl-state-transition";
 
 /**
  * Per-call knobs for {@link applyAnimationBinding} / {@link applyAnimationBindings}. Every field is optional and
- * additive; the two `legacy*` flags are KILL SWITCHES for this round's compositor fix, so a host can expose them as
+ * additive; the two `legacy*` flags are KILL SWITCHES for the compositor fix, so a host can expose them as
  * a query flag (`?bobLit=off`) and get byte-for-byte the pre-literalization keyframes back without a rebuild.
  */
 export interface PresentationAnimationOptions {
@@ -187,8 +187,7 @@ export function applyAnimationBindings(
 //
 // A keyframe whose declarations contain `var()` or `calc()` is resolved against the ELEMENT's computed style, so
 // Chrome refuses to run it on the compositor and falls back to a main-thread style recalc + paint EVERY FRAME —
-// at 90Hz on a phone that is the single most expensive thing an idle screen does. (Traced on the enemy-intent bob:
-// `compositeFailed` with unsupportedProperties, on every intent, forever.)
+// at 90Hz on a phone that is the single most expensive thing an idle screen does.
 //
 // The fix costs nothing visually: the values are known at apply time, so instead of parameterising ONE shared rule
 // with custom properties we emit one LITERAL rule per distinct value tuple actually requested. A screen has a

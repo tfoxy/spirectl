@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// P4-WS1: the POSE-ONLY geoclip bake, its EXPLICIT placement, and the ON-DEMAND request lane. Everything here is
+// The POSE-ONLY geoclip bake, its EXPLICIT placement, and the ON-DEMAND request lane. Everything here is
 // Godot-free on purpose — the bake itself needs a game, but which pose it samples, where it says the clip sits,
 // what a request plans, and whether the request lane touches the process-global arm claim are all decidable
 // without one, and all four are things a live run would only discover expensively.

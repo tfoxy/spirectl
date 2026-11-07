@@ -38,11 +38,9 @@ namespace Spirectl.Sts2.Live;
 ///
 /// <para>RECIPE B, RETIRED. A third route was tried and is dead: reading the GDExtension instance pointer at
 /// a fixed offset behind the node's native object and scanning its leading 64-bit words for a value that
-/// validates as a one-surface mesh RID. The offset itself is right, but the RID is not an inline word
-/// anywhere in the first pages of the wrapper: the scan found ZERO hits on every node of both offline rigs at
-/// 64 words, and widening it to 512 words only produced FALSE POSITIVES out of neighbouring heap allocations
-/// (one node yielding two "RIDs", which silently corrupted a run). Recipe D replaces it; nothing here reads
-/// native memory any more.</para>
+/// validates as a one-surface mesh RID. The RID is not an inline word in the leading words of the wrapper,
+/// and widening the scan only produced FALSE POSITIVES out of neighbouring heap allocations. Recipe D
+/// replaces it; nothing here reads native memory any more.</para>
 ///
 /// <para>Everything else in the battery measures whether that readback is USABLE: does it track animation
 /// updates with and without a forced draw pass, what coordinate space are the vertices in, which mesh belongs
@@ -118,9 +116,8 @@ internal static class Sts2SpineGeometryProbe
     // Widening the axis costs one candidate per validator row swept; missing the target costs the run.
     private const int LiveIndexSlackFloor = 256;
 
-    // Ceiling on the coarse anchor scan when the operator did not choose a cap. On the Phase-1 window
-    // (14 209 validator rows x 347 indices) the scan plans ~205k candidates at step 24, so this leaves room
-    // for a window twice that size before anything is truncated — and truncation is reported, not silent.
+    // Ceiling on the coarse anchor scan when the operator did not choose a cap. It leaves headroom over the
+    // window sizes a live menu produces before anything is truncated — and truncation is reported, not silent.
     private const int LiveAnchorScanCandidateCeiling = 500_000;
 
     // How far the stride ladder reaches when measuring the progression off the first anchor. 24 is the anchor
@@ -129,8 +126,7 @@ internal static class Sts2SpineGeometryProbe
     private const int LiveStrideLadderMaxDelta = 24;
 
     // The dense fallback's half-width, in RUN WIDTHS, around each anchor that failed to walk. Three is enough
-    // to contain the whole neighbouring-rig cluster the Phase-1 run sat in without approaching the cost of
-    // the full window.
+    // to contain a neighbouring-rig cluster without approaching the cost of the full window.
     private const int LiveDensePassRunWidths = 3;
 
     // How many failed anchors the dense fallback is willing to re-examine. Each one costs a window.
@@ -1424,11 +1420,10 @@ internal static class Sts2SpineGeometryProbe
         Dictionary<string, object?> Diagnostics);
 
     // Which spelling a spine slot's data object exposes its name under is a fact about the GDExtension's hand
-    // written binding, not something derivable, and the first battery guessed wrong: `slotName` came back
-    // empty on every slot of both rigs while `get_index` / `get_blend_mode` on the SAME object answered fine,
-    // which is the signature of a wrong method name rather than a missing hop. So the probe tries the
-    // plausible spellings in order, falls back to the property table, and RECORDS which one answered — and
-    // when none does, dumps the object's own name-ish method names so the next run can stop guessing.
+    // written binding, not something derivable, and a wrong method name reads back as an empty name while
+    // other getters on the SAME object answer fine. So the probe tries the plausible spellings in order,
+    // falls back to the property table, and RECORDS which one answered — and when none does, dumps the
+    // object's own name-ish method names so the next run can stop guessing.
     private static readonly string[] SlotNameAccessors = ["get_slot_name", "get_name", "get_slot_name_string"];
 
     private static readonly string[] SlotNameProperties = ["slot_name", "name"];
@@ -1456,9 +1451,8 @@ internal static class Sts2SpineGeometryProbe
 
         // Draw order is a permutation of the same slots. Identity is the natural key — but only if both
         // getters hand back the SAME wrapper objects, and a binding that mints a fresh wrapper per call would
-        // make every lookup miss and report -1 for every slot, which is exactly what the first battery
-        // produced. So identity is tried first, the slot's own data index second, and the diagnostics say
-        // which one actually resolved the column.
+        // make every lookup miss and report -1 for every slot. So identity is tried first, the slot's own data
+        // index second, and the diagnostics say which one actually resolved the column.
         var drawOrderById = new Dictionary<ulong, int>();
         var drawOrderByDataIndex = new Dictionary<int, int>();
         var hasDrawOrder = TryGet(() => skeletonObject.HasMethod("get_draw_order"));
@@ -1859,8 +1853,8 @@ internal static class Sts2SpineGeometryProbe
         }
     }
 
-    // The runtime `atlas_data` read came back EMPTY on both live rigs while the static inspection said the
-    // property carries the whole text atlas. Three things could produce that, and each is a different fix, so
+    // A runtime `atlas_data` read can come back EMPTY even though the property carries the whole text atlas.
+    // Three things could produce that, and each is a different fix, so
     // the probe tries all of them and records which one answered instead of concluding: (1) the property is
     // there but not a String — a PackedByteArray reads as "" through AsString, which looks exactly like empty;
     // (2) the text is behind a method rather than the property; (3) the resource genuinely drops the source
@@ -2378,9 +2372,9 @@ internal static class Sts2SpineGeometryProbe
         return found;
     }
 
-    // The RICHEST qualifying sprite, not the first. Taking the first is what bound the battery to a menu
-    // backdrop rig on the previous run — the backdrop clears the ten-child bar too, and the tree walk reaches
-    // it before the character. Slot count is the only cheap proxy for "this is the creature", so the sprite
+    // The RICHEST qualifying sprite, not the first. Taking the first can bind the battery to a menu backdrop
+    // rig — the backdrop clears the ten-child bar too, and the tree walk reaches it before the character.
+    // Slot count is the only cheap proxy for "this is the creature", so the sprite
     // with the most mesh children wins; the path tiebreak keeps the choice reproducible between runs.
     private static LiveCandidate? PickLiveSpineCandidate(IReadOnlyList<LiveCandidate> candidates)
         => candidates
@@ -2899,8 +2893,8 @@ internal static class Sts2SpineGeometryProbe
                 report, plan, rootViewport, skeletonBounds, expectedCount, probeIds, indexSlack, logStream);
     }
 
-    // The Phase-1 path, kept verbatim so `SPIRECTL_SPINE_GEOMETRY_PROBE_FULL_SWEEP=1` reproduces that run's
-    // 37 finds exactly: the whole canvas-item window, validator-major, validated by the LOOSE mesh test. It is
+    // The Phase-1 path, kept verbatim so `SPIRECTL_SPINE_GEOMETRY_PROBE_FULL_SWEEP=1` reproduces that run
+    // exactly: the whole canvas-item window, validator-major, validated by the LOOSE mesh test. It is
     // also what an unusable anchor plan falls back to, which is why the fallback is named in the report.
     private static async Task<LiveAcquisition> AcquireByFullWindowSweepAsync(
         Dictionary<string, object?> report,
@@ -2971,7 +2965,7 @@ internal static class Sts2SpineGeometryProbe
 
     // The measured lane: sample the validator axis coarsely until something spine-like answers, measure the
     // progression off it, walk it, and trim what the walk returned down to this rig. An accepted candidate is
-    // only a HYPOTHESIS — the 256x256 quad Phase 1 tripped over passes every plausibility clause there is —
+    // only a HYPOTHESIS — a plain foreign quad can pass every plausibility clause there is —
     // so an anchor is confirmed by whether a run can be walked off it, and a short run sends the scan back to
     // looking rather than declaring victory.
     private static async Task<LiveAcquisition> AcquireByAnchorWalkAsync(
@@ -3377,7 +3371,7 @@ internal static class Sts2SpineGeometryProbe
             }),
         ];
 
-    // The untrimmed run, per mesh, in enough detail that next round can re-derive the trim offline without
+    // The untrimmed run, per mesh, in enough detail that a later run can re-derive the trim offline without
     // another game session: which lattice point, how big the mesh is, where it sits, and what it addresses.
     // The spine-likeness verdict rides along on BOTH acquisition paths — the anchor lane already used it to
     // decide, and the full-window lane (which validates with the loose Phase-1 test, deliberately) gets to

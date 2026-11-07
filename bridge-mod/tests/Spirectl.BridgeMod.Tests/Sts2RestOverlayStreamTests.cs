@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// FIX 4 — rest-site option DESCRIPTION stuck invisible on refocus. The pure overlay-stream predicates
+// Rest-site option DESCRIPTION stuck invisible on refocus. The pure overlay-stream predicates
 // (Sts2RestOverlayStream): IsRestSiteRoomRoot (the depth-sentinel pin point), ExemptFromVisiblePrune (part 1:
 // un-prune a Visible=false node inside the room subtree) and EmitVisible (part 2: flip the overlay-quirk false→true
 // only inside the ACTIVE overlay). Truth tables prove: kill-switch off ⇒ no exemption / no flip; outside the overlay
@@ -15,7 +15,7 @@ public sealed class Sts2RestOverlayStreamTests
     [Fact]
     public void IsRestSiteRoomRoot_MatchesManagedType()
     {
-        // The live NRestSiteRoom node reports node.GetType().FullName as this managed type (verified vs a live capture).
+        // The live NRestSiteRoom node reports node.GetType().FullName as this managed type.
         Assert.True(Sts2RestOverlayStream.IsRestSiteRoomRoot(
             "MegaCrit.Sts2.Core.Nodes.Rooms.NRestSiteRoom", sceneFilePath: null));
     }
@@ -23,7 +23,7 @@ public sealed class Sts2RestOverlayStreamTests
     [Fact]
     public void IsRestSiteRoomRoot_MatchesScenePath()
     {
-        // The instanced-scene root also carries this SceneFilePath (verified vs a live capture); either match pins it.
+        // The instanced-scene root also carries this SceneFilePath; either match pins it.
         Assert.True(Sts2RestOverlayStream.IsRestSiteRoomRoot(
             nodeType: null, sceneFilePath: "res://scenes/rooms/rest_site_room.tscn"));
         // A wrapped/renamed node that only exposes its scene path (nodeType a base class) still pins.
@@ -171,7 +171,7 @@ public sealed class Sts2RestOverlayStreamTests
         }
     }
 
-    // ---- R10 controller-prompt denylist (the "press Y" glyph at the rest site's Continue button) ----------------
+    // ---- Controller-prompt denylist (the "press Y" glyph at the rest site's Continue button) --------------------
 
     [Fact]
     public void IsControllerPromptNode_MatchesTheGamesPromptGlyphNames()
@@ -217,7 +217,7 @@ public sealed class Sts2RestOverlayStreamTests
         Assert.True(Sts2RestOverlayStream.EmitVisible(
             enabled: true, insideRestOverlay: true, restSiteActive: true, localVisible: false,
             promptDenylist: true, nodeName: "ProceedButton"));
-        // An unnamed node (no name plumbed) keeps the pre-R10 flip.
+        // An unnamed node (no name plumbed) keeps the pre-denylist flip.
         Assert.True(Sts2RestOverlayStream.EmitVisible(
             enabled: true, insideRestOverlay: true, restSiteActive: true, localVisible: false,
             promptDenylist: true, nodeName: null));
@@ -256,7 +256,7 @@ public sealed class Sts2RestOverlayStreamTests
                 promptDenylist: true, nodeName: "Description"));
     }
 
-    // The DEFAULT parameters must keep every pre-R10 call site byte-identical (the truth tables above call the
+    // The DEFAULT parameters must keep every pre-denylist call site byte-identical (the truth tables above call the
     // 4-argument overload, which is exactly what proves this).
     [Fact]
     public void EmitVisible_DefaultArguments_MatchThePreR10Behaviour()

@@ -11,23 +11,13 @@ namespace Spirectl.BridgeMod.Tests;
 /// <para>The re-mint corrects the mesh pool at the ACQUISITION pose. On a single-pose bake that is the whole
 /// artifact, and the result is byte-identical to a real renderer's. On a WHOLE-CLIP bake it is one frame of many
 /// — and the damage of arming it there is not "no better", it is WORSE, because acquisition is exactly what the
-/// two admission rules grade. Measured on this build, four knight rigs, `--headless`, eight clips, two headless
-/// processes agreeing byte-for-byte:</para>
+/// two admission rules grade. Unarmed, a headless whole-clip bake refuses (<c>complete=false</c>); armed, it is
+/// admitted while carrying none of the per-frame deformation the real renderer records, with its reference
+/// geometry far out of place.</para>
 ///
-/// <code>
-///   arm                        clips admitted   per-frame vertex scalars   worst per-frame slot xform
-///   real renderer (gamescope)        8 of 8               180 208                       reference
-///   headless, re-mint UNARMED        0 of 8                     0        (refuses: complete=false x8)
-///   headless, re-mint ARMED          7 of 8                     0                       5 782.99 px
-/// </code>
-///
-/// <para>i.e. arming converts seven SAFE 404s into published artifacts that carry none of the deformation the
-/// real renderer records, and whose reference geometry is up to 3 965.83 px out. Through the shipped
-/// `/geoclips/` route with a caller asking for 16 frames, all four rigs answered 200, wrote a `.complete`
-/// marker, and were served on a second request in 1-2 ms. And couch's geoclip store key does not carry the
-/// frame count, so that artifact then answers the ordinary single-pose request too — measured: seeded into a
-/// fresh host's store, the shipped `frames=1` request served the 16-frame headless bytes verbatim without
-/// baking. Evidence: `.sts2/research/data/geoclip-mfguard-*/` in the CouchCoop checkout.</para>
+/// <para>i.e. arming converts SAFE 404s into published artifacts. Through the shipped `/geoclips/` route such an
+/// artifact is marked complete and served on later requests, and the consumer's geoclip store key does not carry
+/// the frame count, so that artifact then answers the ordinary single-pose request too.</para>
 /// </summary>
 public class Sts2SpineGeoClipWholeClipGuardTests
 {

@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-4: the on-demand structured dump. The live watcher publishes each closed profiler window into the
+// The on-demand structured dump. The live watcher publishes each closed profiler window into the
 // Godot-free retained history; an embedder pulls it back through ISpirectlRuntime.GetProducerWalkProfile as a
 // `perf-report/1` envelope. This class owns every test that touches the PROCESS-WIDE retained history, so those
 // tests stay serialized (xunit parallelizes across classes, not within one).

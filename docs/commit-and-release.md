@@ -93,8 +93,8 @@ changes, and `git blame` should land on a commit whose body explains the whole c
    It prints the trailers grouped under Keep a Changelog headings, then lists every `feat`/`fix`/
    `perf` commit with **no** trailer. Decide about each of those before moving on.
 
-2. Rewrite the draft under a new `## [x.y.z] - YYYY-MM-DD` heading in `CHANGELOG.md`. The
-   `release-notes` skill does this step.
+2. Rewrite the draft under a new `## [x.y.z] - YYYY-MM-DD` heading in `CHANGELOG.md`, in the voice
+   of the people who read it.
 
 3. Bump the three versions that [releasing.md](releasing.md) requires to agree — `cli/Cargo.toml`,
    `bridge-mod/Directory.Build.props` (`Version` and `AssemblyVersion`), `npm-wrapper/package.json`
@@ -124,3 +124,22 @@ always explicit; no agent pushes a branch or a tag on its own.
 development history from before this repo was published — 2078 commits, unrelated to `main`'s
 history, in a mix of styles that predates this document. It is kept for archaeology, never
 published, never committed to, and never a model for how to write a commit here.
+
+## Public tree check
+
+This repository is public, and `scripts/check-public-tree.py` keeps internal material out of it.
+It runs as `scripts/validate.sh public-tree`, in the `pre-push` hook that
+`scripts/install-agent-config.sh` wires up, and in the release workflow before anything is built.
+It refuses:
+
+- a tracked `*.md` / `*.mdx` file that is not on the allowlist in `scripts/public-tree.conf`;
+- a path on that file's denylist (research results, handoffs, design notes, ledgers, `private/`),
+  in the tree or added by any commit being pushed;
+- text matching its personal-data patterns (documented placeholders are allowed);
+- on push, a branch that still descends from history from before a rewrite of `main`.
+
+A new public document needs one `allow-md` line in `scripts/public-tree.conf`, in the same change.
+Material for maintainers only (investigations, results, plans, internal agent configuration)
+belongs in the private companion checked out at `private/`, which is gitignored; the installer
+links each worktree's `private` to the main checkout's. Run `bash scripts/test-check-public-tree.sh`
+after changing the check itself.

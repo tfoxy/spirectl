@@ -6,25 +6,22 @@ namespace Spirectl.Sts2.Live;
 // offline-unit-testable, like Sts2SpineSchedule. The Godot-typed callers (Sts2SpineInspector.ReadLive,
 // Sts2SpineAnimationHooks.SetNextStatePostfix) delegate here.
 //
-// WHY (round-8 items 10/11 — "enemy spines loop the wrong animation"): the producer used to answer an
-// unobserved node with `animations[0]` reported as LOOPING. `Sts2SpineInspector.ReadAnimations` sorts the
-// clip names ORDINALLY, so for sneaky_gremlin — [attack, awake_loop, breathe, die, hurt_awake, hurt_stunned,
-// spawn, stunned_loop, wake_up] — `animations[0]` is "attack": the gremlin stood in combat replaying its
+// WHY ("enemy spines loop the wrong animation"): answering an unobserved node with `animations[0]` reported as
+// LOOPING fails twice. `Sts2SpineInspector.ReadAnimations` sorts the clip names ORDINALLY, so for a skeleton
+// with no `idle*` clip `animations[0]` can be "attack", and the creature stands in combat replaying its
 // attack forever. Two independent defects: the ORDINAL guess (fixed by PickDefaultAnimation below) and the
 // hardcoded loop flag (fixed by DefaultAnimationLoops — a guessed one-shot now clamps on its last frame in
 // both clients instead of replaying).
 //
-// WHY (the Regent's permanent daggers): clamping a guessed one-shot on its last frame was still a guess at a pose
-// the game never struck. The Regent's two weapon sprites (regent.tscn, Visuals/Weapons/WeaponAnim*) are authored
-// `preview_animation = "-- Empty --"` on a skeleton whose ENTIRE clip list is attack-shaped (attack/attack1/
-// attack2/attack_end/attack_test): the game applies nothing to them until NRegentVfx.Attack() fires a one-shot on
-// the body's `attack1` spine event, so between swings they are meant to render their SETUP pose — no weapon at
-// all. Nothing loop-shaped exists to pick, so the guess fell through to `animations[0]` = "attack", the client's
-// default still-mode sampled the MIDDLE of it, and every browser viewer saw light daggers frozen mid-swing from
-// the moment combat opened. PickDefaultAnimation now reports NO animation rather than a one-shot: a spine node the
-// game has applied nothing to draws its setup pose, and the client already treats a null current anim as "not a
-// clip node" (isSpineClipNode → false) and tears the spine layer down. Drawing nothing is strictly closer to the
-// setup pose than inventing a frame out of the middle of an attack.
+// WHY (permanent weapon poses): clamping a guessed one-shot on its last frame is still a guess at a pose the game
+// never struck. A weapon sprite authored `preview_animation = "-- Empty --"` on a skeleton whose ENTIRE clip list
+// is attack-shaped gets nothing applied until the game fires a one-shot on it, so between swings it is meant to
+// render its SETUP pose — no weapon at all. With nothing loop-shaped to pick, the guess falls through to
+// `animations[0]` = "attack", the client's default still-mode samples the MIDDLE of it, and viewers see the weapon
+// frozen mid-swing from the moment combat opens. PickDefaultAnimation reports NO animation rather than a
+// one-shot: a spine node the game has applied nothing to draws its setup pose, and the client already treats a
+// null current anim as "not a clip node" (isSpineClipNode → false) and tears the spine layer down. Drawing nothing
+// is strictly closer to the setup pose than inventing a frame out of the middle of an attack.
 internal static class Sts2SpineDefaults
 {
     // Exact names that are unambiguously THE idle loop. Checked first, in this order.
@@ -34,7 +31,7 @@ internal static class Sts2SpineDefaults
     // `<state>_loop` idle (gremlins: awake_loop / stunned_loop) is never answered with a base pose
     // ("breathe" exists on the gremlin skeleton but no AnimState ever plays it) and a single-clip decorative
     // spine still resolves to its one clip: the chest / boss map point / logo name it "animation", the
-    // merchant's hand (merchant_inventory.tscn, observed in .sts2/bench/audit-shop-open.ndjson) names it
+    // merchant's hand (merchant_inventory.tscn) names it
     // "default". These all read as looping in DefaultAnimationLoops too.
     private static readonly string[] SecondaryDefaultAnimations =
         ["breathe", "animation", "default", "loop", "loop_anim"];
@@ -225,10 +222,10 @@ internal static class Sts2SpineDefaults
     ///
     /// <para>This mirrors the game's own gates: <c>SetNextState</c> logs a warning and RETURNS without touching
     /// the track when the head clip is missing from the skeleton, and <c>AddNextState</c> does the same, which
-    /// also ends its recursion — so a missing link truncates the queue. The postfix used to record the head +
-    /// walked chain unconditionally, so a creature whose skeleton lacks the state id had the mirror switch to
-    /// a clip that does not exist (or hand off to a queued idle that was never queued) while the game kept
-    /// playing the previous animation. Returning null means "the game played nothing — leave the recorded
+    /// also ends its recursion — so a missing link truncates the queue. Recording the head + walked chain
+    /// unconditionally would switch the mirror to a clip that does not exist (or hand off to a queued idle that
+    /// was never queued) while the game kept playing the previous animation. Returning null means "the game
+    /// played nothing — leave the recorded
     /// schedule alone".</para>
     /// </summary>
     public static (string Head, bool HeadLooping, string? NextAnim, bool NextLooping)? ResolveRecordableSequence(

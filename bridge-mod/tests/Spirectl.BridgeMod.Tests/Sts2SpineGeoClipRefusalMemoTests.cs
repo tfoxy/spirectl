@@ -10,10 +10,10 @@ namespace Spirectl.BridgeMod.Tests;
 // a refusal is remembered under, and the protocol that turns "already refused" into an O(1) answer.
 //
 // What is actually being protected here is a cost. A bake that runs and still fails to acquire the whole rig is
-// not cheaper than one that succeeds — an embedded host measured a median 1.45s and a p90 4.15s per identity —
-// so a lane that re-derives the same refusal is spending seconds to reach a conclusion it already reached. The
-// tests below pin the two halves that make that safe: the key has to include everything the verdict depends on
-// (or the memo answers a question it was not asked), and nothing but a refusal may ever be recorded.
+// not cheaper than one that succeeds, so a lane that re-derives the same refusal is spending seconds to reach a
+// conclusion it already reached. The tests below pin the two halves that make that safe: the key has to include
+// everything the verdict depends on (or the memo answers a question it was not asked), and nothing but a refusal
+// may ever be recorded.
 public sealed class Sts2SpineGeoClipRefusalMemoTests
 {
     private const string Levers = "probe=UnionSafe/1/Rgb/1;pause=0/Bounds;dense=1";
@@ -328,8 +328,8 @@ public sealed class Sts2SpineGeoClipRefusalMemoTests
     // that validated fewer meshes than there are slots, with no window truncated, has diagnosed itself — its
     // index plan did not cover the rig's own meshes and it completed that plan. Window A's index axis is
     // inferred from two bracket sentinels and holds only while Godot's RID allocator is bump-allocating; one
-    // creature death earlier in the session breaks it (round WS-I: the same four rigs bake 4/4 on a quiet room
-    // and 1/4 after two kills, in virgin processes). Pinning that is pinning noise.
+    // creature death earlier in the session breaks it, and the same rigs bake complete again in a fresh process.
+    // Pinning that is pinning noise.
 
     // The rule, on raw counters. BOTH clauses are load-bearing, and zero is missing evidence rather than a
     // measured shortfall.

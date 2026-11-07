@@ -5,11 +5,10 @@ namespace Spirectl.BridgeMod.Tests;
 
 // The geoclip bake's DRAW BUDGET: which of its awaited engine frames are closed with a RenderingServer.ForceDraw.
 //
-// WHY THIS IS GRADED OFFLINE. A forced draw was measured live at 15.2-16.3 ms per call across four rigs
-// (geoclip-knights-stage2b phase split), and a pose-only bake issued eight to ten of them — 75-85 % of everything
-// the bake blocked the Godot main thread for. The lever removes the ones nothing downstream depends on. The
-// baker itself is Godot-typed and `validate.sh bridge-tests` does not compile it, so the DECISION is kept here,
-// in the Godot-free core, where the schedule it produces can be asserted without a game.
+// WHY THIS IS GRADED OFFLINE. Forced draws are most of what a pose-only bake blocks the Godot main thread for,
+// and the lever removes the ones nothing downstream depends on. The baker itself is Godot-typed and
+// `validate.sh bridge-tests` does not compile it, so the DECISION is kept here, in the Godot-free core, where the
+// schedule it produces can be asserted without a game.
 //
 // The one rule the whole lever rests on: a bake resumes from `SceneTree.ProcessFrame` after every node's
 // `_process` has run but before the engine closes that iteration with its own draw, and the host's main loop
@@ -89,9 +88,8 @@ public sealed class Sts2SpineGeoClipDrawBudgetTests
     }
 
     // A pose read — PASS 1's skeleton state, PASS 3's mesh geometry — needs the awaited frame and nothing else.
-    // The offline geometry probe ran that exact seek-await-read loop both ways and its `no-force-draw` and
-    // `with-force-draw` arms reported identical per-mesh tracking on both recorded rigs, in every round since
-    // Phase 0.
+    // The offline geometry probe ran that exact seek-await-read loop both with and without a forced draw and
+    // reported identical per-mesh tracking on both recorded rigs.
     [Fact]
     public void PoseRead_NeverDrawsWhenArmed()
     {
@@ -138,12 +136,12 @@ public sealed class Sts2SpineGeoClipDrawBudgetTests
         }
     }
 
-    // ── The schedule this round is predicted against ─────────────────────────────────────────────────
+    // ── The pose-only schedule ─────────────────────────────────────────────────────────────────────────
 
     // The bake's frame plan for a POSE-ONLY, single-animation target — the only shape the on-demand geoclip route
-    // ever asks for — written out as the sites it visits in order, so the draw COUNT the round's prediction rests
-    // on is asserted rather than recounted by hand from the baker. Measured baseline: ten forced draws on
-    // ironclad (which pays two colour-probe frames at idle_loop) and eight on the three knights that pay none.
+    // ever asks for — written out as the sites it visits in order, so the draw COUNT is asserted rather than
+    // recounted by hand from the baker: ten forced draws on ironclad (which pays two colour-probe frames at
+    // idle_loop) and eight on the three knights that pay none.
     private static (GeoClipDrawSite Site, int Frames)[] PoseOnlyPlan(int probeFrames) =>
     [
         (GeoClipDrawSite.BracketSettle, 3),   // warmup, ending at `bracketMid`

@@ -11,8 +11,8 @@
 // `DEFAULT_BBCODE_TAGS` declares them as per-character effects carrying the class names below, so
 // godot-scene-web splits their content into `<span class="godot-rich-char" style="--i: N">` elements
 // and the rules here key on that `--i` for the per-character phase. Everything is expressed relative to
-// the run's own font size (`em`, and time), so a host that scales text up for readability — the couch
-// co-op mirror scales it a long way up for phones — keeps the motion in proportion instead of shrinking
+// the run's own font size (`em`, and time), so a host that scales text up for readability — a downstream
+// mirror scales it a long way up for small screens — keeps the motion in proportion instead of shrinking
 // it into invisibility.
 //
 // THE SETTING GATE, AND WHY IT COVERS ONLY TWO OF THE THREE. The game has a Settings -> Text Effects

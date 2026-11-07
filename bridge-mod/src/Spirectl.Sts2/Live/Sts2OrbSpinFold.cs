@@ -4,22 +4,22 @@ using Spirectl.Sts2.Core.SceneInspection;
 
 namespace Spirectl.Sts2.Live;
 
-// R14 producer ENERGY/STAR ORB SPIN FOLD — PURE and Godot-free (like Sts2TopBarFold / Sts2IntentBobFold) so the
+// Producer ENERGY/STAR ORB SPIN FOLD — PURE and Godot-free (like Sts2TopBarFold / Sts2IntentBobFold) so the
 // scene table and the rest pin are unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
 // WHY. The combat energy counter (and, on the characters that have one, the star counter) spins the children of its
 // `%RotationLayers` container EVERY frame, forever, whether or not anything in the fight is happening. Two layers
 // per counter × one counter per seat is a steady per-frame transform stream that keeps a visually IDLE combat wire
-// awake — see Sts2IntentBobFold for the measured idle baseline this fold is one of four parts of.
+// awake — see Sts2IntentBobFold for why an idle combat must go quiet; this fold is one of four parts of that.
 //
 // ON SCREEN. Each counter is a stack of concentric decorative rings that turn forever at constant speed, the outer
 // ring faster than the inner one (the rate scales with the layer's index). The spin is pure garnish — nothing about
 // the fight changes it — and it never stops. Both counter families animate their rings the same way.
 //
 // WHY THE REST ROTATION IS ANALYTIC (0), NOT A SAMPLE. The angle is an UNBOUNDED accumulator, so a first-seen
-// sample is an arbitrary angle that would be frozen forever — the same class of bug WS-D hit on the top bar. 0 is
-// the layers' AUTHORED rotation in every counter scene (none of the six `.tscn` files sets `rotation` on a
-// RotationLayers child) and the only value the node has ever had that is not an accumulation, so the client replay
+// sample is an arbitrary angle that would be frozen forever — the same class of bug a sampled pin has on the top bar
+// (see Sts2TopBarFold). 0 is the layers' AUTHORED rotation in every counter scene (none of the six `.tscn` files
+// sets `rotation` on a RotationLayers child) and the only value the node has ever had that is not an accumulation, so the client replay
 // — a constant-speed `rotate` keyed by the same scene-relative path (`animAttributes.ts`) — can compose from it
 // exactly. The layers are authored pivot-CENTRED (`pivot_offset = (64, 64)` on a 128x128 box in all six scenes),
 // which is what lets the client spin its self-layer about the element's default centre origin.

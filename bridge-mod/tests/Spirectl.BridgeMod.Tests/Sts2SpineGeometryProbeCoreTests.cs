@@ -533,11 +533,11 @@ public sealed class Sts2SpineGeometryProbeCoreTests
 
     // ── Recipe D live acquisition: anchor scan, stride walk, trim ────────────────────────────────────
     //
-    // Everything below is exercised against Phase1LiveRun (bottom of this file): the REAL numbers the Phase-1
-    // live battery recorded off the main menu — 33 meshes on an exact +5/+1 progression, the four contaminants
-    // the full sweep also dragged in, the target's skeleton bounds, and the window the canvas bracket built.
-    // Using the measurement rather than a tidy synthetic is the point: the 256x256 quad that no plausibility
-    // test can reject, and the build-order/bounds disagreement, are both properties of that data.
+    // Everything below is exercised against Phase1LiveRun (bottom of this file): the REAL numbers a live probe
+    // battery recorded off the main menu — 33 meshes on an exact +5/+1 progression, the four contaminants the
+    // full sweep also dragged in, the target's skeleton bounds, and the window the canvas bracket built. Using
+    // recorded data rather than a tidy synthetic is the point: the 256x256 quad that no plausibility test can
+    // reject, and the build-order/bounds disagreement, are both properties of that data.
 
     // ── The anchor step ──────────────────────────────────────────────────────────────────────────────
 
@@ -913,7 +913,7 @@ public sealed class Sts2SpineGeometryProbeCoreTests
 
     // ── The trim: build order ────────────────────────────────────────────────────────────────────────
 
-    // Phase 1's three main-menu rigs, in canvas-validator (= build) order: Bg 7, Fg 26 (the target), Logo 2.
+    // The recorded main menu's three rigs, in canvas-validator (= build) order: Bg 7, Fg 26 (the target), Logo 2.
     // A 33-member run is explained by exactly one contiguous group — Bg + Fg — so the target's block starts 7
     // meshes in. One feasible offset; that is what makes this signal decisive here.
     [Fact]
@@ -944,7 +944,7 @@ public sealed class Sts2SpineGeometryProbeCoreTests
 
     // ── The trim: bounds ─────────────────────────────────────────────────────────────────────────────
 
-    // The Phase-1 score table, reproduced from the recorded bboxes. Three offsets reproduce the skeleton's
+    // The score table, reproduced from the recorded bboxes. Three offsets reproduce the skeleton's
     // reported bounds EXACTLY (L1 0.0) and the build-order answer scores 507.8 — this table is the whole
     // reason the trim is not allowed to trust one signal.
     [Fact]
@@ -991,7 +991,7 @@ public sealed class Sts2SpineGeometryProbeCoreTests
 
     // ── The trim verdict ─────────────────────────────────────────────────────────────────────────────
 
-    // The finding this round is allowed to end on: on the real data the two signals point at different
+    // The case the lane must not paper over: on the real data the two signals point at different
     // windows, and the lane says so instead of choosing. `Trimmed` stays empty and gate (a) fails honestly,
     // with both answers and the untrimmed run in the report so the question can be settled offline.
     [Fact]
@@ -1167,10 +1167,9 @@ public sealed class Sts2SpineGeometryProbeCoreTests
     private const string Vector3 = "PackedVector3Array";
 
     /// <summary>
-    /// The Phase-1 live battery's own measurement, transcribed from
-    /// <c>data/spine-geoclip-phase1/probe-live/live.json</c>: the 37 meshes the 4.93M-candidate full sweep
-    /// validated on the main menu, split into the 33-member +5/+1 run and the four contaminants, plus the
-    /// window the canvas bracket built around them and the three rigs' mesh-child counts in build order.
+    /// A live probe battery's own recording off the main menu: the 37 meshes a full sweep validated, split into
+    /// the 33-member +5/+1 run and the four contaminants, plus the window the canvas bracket built around them and
+    /// the three rigs' mesh-child counts in build order.
     /// </summary>
     private static class Phase1LiveRun
     {

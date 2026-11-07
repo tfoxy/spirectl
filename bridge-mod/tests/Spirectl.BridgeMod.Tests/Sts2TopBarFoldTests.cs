@@ -5,14 +5,14 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R13 producer TOP-BAR ICON FOLD (Sts2TopBarFold) — a pure, Godot-free exercise of the three things the watcher
+// Producer TOP-BAR ICON FOLD (Sts2TopBarFold) — a pure, Godot-free exercise of the three things the watcher
 // leans on: the scene→loop-token map, the open-state gate, and the pivot-anchored rotation-undo.
 //
 // The rotation-undo is the load-bearing part and is checked against Godot's own transform algebra: a Godot
 // Control with pivot p, rotation θ and uniform scale k has transform `M(θ) = T(pos + p) · R(θ) · S(k) · T(-p)`, so
 // the tests BUILD M(θ) exactly the way Godot does, pin it, and assert the result equals M(0) built the same way.
 // That pins the property that actually matters — and, with a NON-ZERO position, it is the direct regression test for
-// the WS-D bug this fold replaces: pinning the whole first-emitted transform froze the deck + settings icons at a
+// the bug a whole-transform pin has: pinning the first-emitted transform freezes the deck + settings icons at a
 // PRE-LAYOUT pose (mispositioned in the browser forever), where dividing out only the rotation cannot move a node.
 public sealed class Sts2TopBarFoldTests
 {
@@ -122,10 +122,10 @@ public sealed class Sts2TopBarFoldTests
         => Assert.Equal(expected, Sts2TopBarFold.IsAnimating(isScreenOpen));
 
     [Theory]
-    // WHICH member yields the open-state is per-button (live-validated 2026-08-05): on the deck and settings
+    // WHICH member yields the open-state is per-button: on the deck and settings
     // buttons the `IsScreenOpen` script VARIABLE tracks the screen exactly. On the MAP button it is never updated
     // and reads false even while the map is open, so its truthful gate is the registered `IsOpen()` METHOD. A wrong
-    // row here silently freezes that icon at rest with no token — exactly the live bug this table was added for.
+    // row here silently freezes that icon at rest with no token.
     [InlineData(Sts2TopBarFold.DeckButtonScene, false)]
     [InlineData(Sts2TopBarFold.SettingsButtonScene, false)]
     [InlineData(Sts2TopBarFold.MapButtonScene, true)]
@@ -156,9 +156,8 @@ public sealed class Sts2TopBarFoldTests
     [Fact]
     public void PinRestRotation_KeepsPositionAndScale_TheMispositioningRegression()
     {
-        // THE regression case. WS-D pinned the whole first-emitted transform, so a Control whose deferred layout had
-        // not settled (the CENTER-anchored deck icon, the GROW_BOTH settings icon at its min-size clamp) was frozen
-        // at a pre-layout POSITION forever. Dividing out only the rotation must leave a NON-ZERO position and a
+        // THE regression case. Pinning the whole first-emitted transform freezes a Control whose deferred layout has
+        // not settled (the deck and settings icons) at a pre-layout POSITION forever. Dividing out only the rotation must leave a NON-ZERO position and a
         // hover scale-up completely untouched — whatever the icon's current angle.
         const double theta = 0.11734;
         const double hoverScale = 1.1; // the icon's hover scale-up

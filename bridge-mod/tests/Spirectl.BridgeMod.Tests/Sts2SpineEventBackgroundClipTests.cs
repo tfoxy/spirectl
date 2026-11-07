@@ -7,10 +7,10 @@ using LaneKind = Spirectl.Sts2.Live.Sts2SpineEventBackgroundClip.SpineClipLaneKi
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-NEOW: the composed event-background spine-clip lane's PURE seams — routing (which lane a spine:// clip
-// resolves to) + node-local placement math (Local = T_node^-1(union)) — plus the still-placement forwarding
-// through the timeline wrapper and the SPCL ClipLocal* wire mapping. All offline (no live host required for the
-// pure cases), pinned against the real neow numbers (SpineSprite scale 0.58 origin(-390,-57)).
+// The composed event-background spine-clip lane's PURE seams — routing (which lane a spine:// clip resolves to) +
+// node-local placement math (Local = T_node^-1(union)) — plus the still-placement forwarding through the timeline
+// wrapper and the SPCL ClipLocal* wire mapping. All offline (no live host required for the pure cases), pinned
+// against the real neow numbers (SpineSprite scale 0.58 origin(-390,-57)).
 public sealed class Sts2SpineEventBackgroundClipTests
 {
     // neow.tscn: SpineSprite is a direct child of the Neow Control root at position (-390,-57) scale (0.58,0.58);
@@ -143,7 +143,7 @@ public sealed class Sts2SpineEventBackgroundClipTests
     [Fact]
     public void ComposeCellPlacement_CaptureScaleInvariant_SubOneFoldStaysCentered()
     {
-        // The phone-memory fallback shrinks the raster (s<1) but the node-local placement is IDENTICAL: a full-res
+        // The low-memory fallback shrinks the raster (s<1) but the node-local placement is IDENTICAL: a full-res
         // s=1 (cell 1000) and a half-res s=0.5 (cell 500) describe the same bone-space rect — so the clip renders at
         // true size + centered either way, only lower resolution.
         var full = Sts2SpineEventBackgroundClip.ComposeCellPlacement(
@@ -224,7 +224,7 @@ public sealed class Sts2SpineEventBackgroundClipTests
         Assert.True(placement.Value.LocalWidth > 1d && placement.Value.LocalHeight > 1d);
     }
 
-    // ---- WS5: the char-select still's TRIMMED capture region -------------------------------------------------
+    // ---- The char-select still's TRIMMED capture region ------------------------------------------------------
 
     // The char-select still lane renders into a synthetic viewport-sized root (frame position (0,0), scale 1) but
     // TRIMS transparent bounds, so the raster is a sub-rect of the capture, not the whole capture. The placement

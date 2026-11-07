@@ -3,14 +3,14 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R12 producer decorative-animator SCENE-IDENTITY TABLE (Sts2DecorEmitSuppress) — a pure, Godot-free exercise of the
-// rule table and the rel-path composer the watcher applies before ApplyIfChanged. Verifies: the five measured
+// Producer decorative-animator SCENE-IDENTITY TABLE (Sts2DecorEmitSuppress) — a pure, Godot-free exercise of the
+// rule table and the rel-path composer the watcher applies before ApplyIfChanged. Verifies: the five known
 // churners route to the fold that owns them; unlisted scenes/paths and the matched nodes' SIBLINGS route to None (so
 // a fold can never leak onto a real animation); and the rel-path composer matches the watcher's descent and stops at
 // MaxRelDepth.
 //
-// R13 note: the table no longer carries the blunt `Transform` / `SelfModulateAlpha` "pin to the first-emitted
-// sample" channels — every rule is now a channel owned by an analytic fold (see Sts2TopBarFoldTests /
+// Note: the table carries no blunt `Transform` / `SelfModulateAlpha` "pin to the first-emitted sample" channels —
+// every rule is a channel owned by an analytic fold (see Sts2TopBarFoldTests /
 // Sts2ProceedGlowTests / Sts2MapPointPulseTests for each one's math and gate).
 public sealed class Sts2DecorEmitSuppressTests
 {
@@ -46,9 +46,8 @@ public sealed class Sts2DecorEmitSuppressTests
     [InlineData(ProceedButton, ".")]
     [InlineData(ProceedButton, "Image")]
     [InlineData(ProceedButton, "Image/Label")]
-    // An UNWATCHED scene that happens to share a path shape with a watched one. (`intent.tscn` used to be the
-    // second example here; R14 added folds for it, so the co-op player-intent scene — which really does mount an
-    // `IntentHolder` and really is not folded — took its place.)
+    // An UNWATCHED scene that happens to share a path shape with a watched one. The co-op player-intent scene
+    // really does mount an `IntentHolder` and really is not folded (`intent.tscn` is).
     [InlineData("res://scenes/ui/top_bar.tscn", "Control/Icon")]
     [InlineData("res://scenes/combat/multiplayer_player_intent.tscn", "IntentHolder")]
     // The map point's SIBLINGS and its pulsing container's CHILDREN (the icons ride the container; they are not it).
@@ -72,8 +71,8 @@ public sealed class Sts2DecorEmitSuppressTests
     public void Channels_AreDisjointBits_SoTheWatcherCanRouteByMask()
     {
         // The watcher tests each rule with `(channels & X) != 0`, so the folds must not share a bit — otherwise
-        // one fold's pin would fire on another fold's node. (R14 added four combat channels; see
-        // Sts2IdleWireFoldTests for their own isolation assertions.)
+        // one fold's pin would fire on another fold's node. (See
+        // Sts2IdleWireFoldTests for the four combat channels' own isolation assertions.)
         var all = Sts2DecorEmitSuppress.Channels.TopBarRotation
                   | Sts2DecorEmitSuppress.Channels.ProceedGlowAlpha
                   | Sts2DecorEmitSuppress.Channels.MapPointPulseScale

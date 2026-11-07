@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R13 producer CONTENT KEY (Sts2ContentKey) — a pure, Godot-free (and STS2-free: the registry keys on `object`)
+// Producer CONTENT KEY (Sts2ContentKey) — a pure, Godot-free (and STS2-free: the registry keys on `object`)
 // exercise of the three properties a client keying on card content depends on: the key is STABLE for one model, two
 // models sharing a card DEFINITION never collide, and the format is the documented `nc:{entry}#{serial}`.
 public sealed class Sts2ContentKeyTests

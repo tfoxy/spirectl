@@ -7,10 +7,9 @@ namespace Spirectl.BridgeMod.Tests;
 // disarm latch, and the liveness assertion that stands between a paused bake and an artifact in which every frame
 // is the same pose. Pure — the engine hops are injected — so all of it runs in the ordinary suite.
 //
-// THE LEVER IS DEFAULT OFF AND IS NOT ARMED THIS ROUND. GeoClipPauseVerdict.ArmingAllowed is false on every bake
-// profile measured so far (blocking 0.30-0.39, parked 0.36-0.57, totals ~290-355 ms), and only a bake short
-// enough to clear GeoClipPauseVerdict.SafeTotalMs could ever open that gate. What is being landed is a tested,
-// documented, env-gated lever for a future where bakes are short enough — not an arm.
+// THE LEVER IS DEFAULT OFF. GeoClipPauseVerdict.ArmingAllowed is false on every bake profile seen so far, and
+// only a bake short enough to clear GeoClipPauseVerdict.SafeTotalMs could ever open that gate. What is landed is a
+// tested, documented, env-gated lever for a future where bakes are short enough — not a default.
 public sealed class Sts2SpineGeoClipPauseTests : IDisposable
 {
     public Sts2SpineGeoClipPauseTests() => GeoClipPauseDisarm.ResetForTests();
@@ -515,7 +514,7 @@ public sealed class Sts2SpineGeoClipPauseTests : IDisposable
             (GeoClipPauseLiveness.Passed, GeoClipPauseAssertMode.Bounds, false),
             // …and an inconclusive one is exactly what buys the two frames.
             (GeoClipPauseLiveness.Inconclusive, GeoClipPauseAssertMode.Bounds, true),
-            // Strict pays regardless, so a live arm can be graded without trusting the cheap check's coverage.
+            // Strict pays regardless, so a live run can be graded without trusting the cheap check's coverage.
             (GeoClipPauseLiveness.Passed, GeoClipPauseAssertMode.Strict, true),
             (GeoClipPauseLiveness.Inconclusive, GeoClipPauseAssertMode.Strict, true),
             // Off is the operator saying they have already answered this on this build.
@@ -610,11 +609,11 @@ public sealed class Sts2SpineGeoClipPauseTests : IDisposable
 
     // ── The arming gate this lever still has to pass ─────────────────────────────────────────────────
 
-    // WHY THE DEFAULT IS OFF, restated against the numbers rather than against an opinion. These are the profiles
-    // measured on both available rigs this round; the gate that would authorize the lever is false on every one
-    // of them, which is the reason this workstream ships a lever and not an arm.
+    // WHY THE DEFAULT IS OFF, restated against the numbers rather than against an opinion. These are observed bake
+    // profiles; the gate that would authorize the lever is false on every one of them, which is the reason the
+    // lever ships default off.
     [Theory]
-    // totalMs, blockingMs, parkedMs — the measured envelope: blocking 0.30-0.39, parked 0.36-0.57.
+    // totalMs, blockingMs, parkedMs.
     [InlineData(290d, 87d, 165d)]
     [InlineData(355d, 138d, 128d)]
     [InlineData(320d, 112d, 148d)]

@@ -74,26 +74,21 @@ internal static class Sts2SpineGeoClipBaker
     private const string StrictMeshFilterEnv = "SPIRECTL_SPINE_GEOCLIP_STRICT_MESH_FILTER";
 
     // The acquisition arm selector. DENSE IS THE DEFAULT, and the walk is opt-IN via
-    // SPIRECTL_SPINE_GEOCLIP_DENSE_SWEEP=0 — the reverse of how this shipped, because measuring it live turned
-    // the walk from a win into a LOSS.
-    //
-    // What was measured (WS-F2, 6 walk-armed bakes, both rigs, every session): the dense fallback fired EVERY
-    // time, so the walk's probes were pure added cost — byrdonis 22 311 probes against dense's 20 929 (+6.6 %),
-    // merchant 59 198 against 49 200 (+20.3 %). Two independent causes, and the first is a design interaction
-    // rather than a tuning value:
+    // SPIRECTL_SPINE_GEOCLIP_DENSE_SWEEP=0, because on live windows the dense fallback still fired, so the
+    // walk's probes were pure added cost. Two independent causes, and the first is a design interaction rather
+    // than a tuning value:
     //
     //   1. `Plan` refuses any window at or below its candidate floor, while `DenseSweepRequired` grades the
-    //      walk's TOTAL across windows against `slotsVisibleAtAcquisition`. byrdonis window B holds 2 196
-    //      candidates and TWO real slot meshes, so the walk is never allowed to look for them, can never reach
-    //      28, and the fallback is guaranteed BEFORE A SINGLE PROBE RUNS. Any rig with one mesh in a small
-    //      window has this shape.
-    //   2. The merchant's window-B walk finds 0 of 14 (8 456 probes, budget exhausted, no run seated, the
-    //      stride ladder never measuring a stride).
+    //      walk's TOTAL across windows against `slotsVisibleAtAcquisition`. A small window holding real slot
+    //      meshes is never walked, so the total can never be reached and the fallback is guaranteed BEFORE A
+    //      SINGLE PROBE RUNS. Any rig with one mesh in a small window has this shape.
+    //   2. A window-B walk can exhaust its budget without seating a run, so the stride ladder never measures a
+    //      stride.
     //
-    // The arm is kept, not deleted: its offline reasoning is sound on recorded id spaces (92-96 % savings) and
-    // its ~40 tests still pass. What the offline fixtures could not falsify is a walk that never seats a
-    // starting column on a LIVE window. Re-arming it wants (1) per-window grading so a small window's meshes
-    // are not charged to the walk's total, and (2) a live answer for why window B seats no column.
+    // The arm is kept, not deleted: its offline reasoning is sound on recorded id spaces and its tests still
+    // pass. What the offline fixtures could not falsify is a walk that never seats a starting column on a LIVE
+    // window. Re-arming it wants (1) per-window grading so a small window's meshes are not charged to the walk's
+    // total, and (2) an answer for why window B seats no column.
     private const string DenseSweepEnv = "SPIRECTL_SPINE_GEOCLIP_DENSE_SWEEP";
 
     // Fuse consecutive ENV-LANE targets that share a (scene, node) into ONE rig bake. Off by default so a spec's
@@ -577,7 +572,7 @@ internal static class Sts2SpineGeoClipBaker
     ///
     /// <para>ONE TARGET IS THE DEGENERATE CASE OF N. Every per-scene step — the scene load, the bracket RID
     /// sweep, the slot↔mesh association, the atlas page export — is a property of the RIG rather than of one
-    /// animation, and a pose-only bake is 90-96 % those steps. So the bake takes a LIST of targets that share a
+    /// animation, and a pose-only bake is almost entirely those steps. So the bake takes a LIST of targets that share a
     /// (scene, node) and pays for them once. With one target it does exactly what it did before: the probe
     /// schedule keeps the natural frame order (see <c>Sts2SpineGeoClipBatch.ProbeOrder</c>), nothing is compared
     /// for attachment drift, and the association pairs are the same pairs.</para>
@@ -860,9 +855,8 @@ internal static class Sts2SpineGeoClipBaker
                 // WHAT IS EXPECTED TO HAPPEN: the signal fires. `ProcessFrame` is emitted by the SceneTree once
                 // per main-loop iteration; `paused` gates whether individual NODES process, not whether the loop
                 // runs. The SubViewport keeps drawing for the same reason — its update mode drives it and
-                // `ForceDraw` is unconditional. This probe exists because "expected" is not "measured", and it
-                // has not been measured: the arming gate that would have put this lever in front of a live game
-                // is closed on every profile taken so far.
+                // `ForceDraw` is unconditional. This probe exists because "expected" is not "measured", and this
+                // has not been measured against a live game.
                 //
                 // The race is safe because the continuation comes back through the bridge's main-thread
                 // dispatcher, whose Timer is ProcessMode.Always (Sts2GodotSynchronizationContext) — it drains on
@@ -908,11 +902,10 @@ internal static class Sts2SpineGeoClipBaker
                     Sts2RenderPhaseProfile.Phase.BakeWarmupWait);
             }
 
-            // Bracket MID (Phase 1 called this one `bracketHigh`, and it is still the upper edge of window A —
-            // the window whose answer the recorded Phase-1 numbers grade). It is NOT the end of mesh creation:
-            // setting an animation is where the skeleton mints the slot meshes it had not needed yet, and a rig
-            // bake sets EVERY requested animation below (14 of the merchant's 44 slots and 2 of byrdonis's 28
-            // are minted exactly there). Window B, below, covers everything above this edge.
+            // Bracket MID (Phase 1 called this one `bracketHigh`, and it is still the upper edge of window A). It
+            // is NOT the end of mesh creation: setting an animation is where the skeleton mints the slot meshes it
+            // had not needed yet, and a rig bake sets EVERY requested animation below. Window B, below, covers
+            // everything above this edge.
             var bracketMid = RenderingServer.MeshCreate();
             probeRids.Add(bracketMid);
 
@@ -935,13 +928,13 @@ internal static class Sts2SpineGeoClipBaker
                     return current;
                 }
 
-                // RIDER 2: the LIVENESS CENSUS, on the one event that can invalidate an association. Setting an
+                // The LIVENESS CENSUS, on the one event that can invalidate an association. Setting an
                 // animation is where the skeleton mints (and could recycle) slot meshes, and `staleMeshFrames`
                 // only notices a recycled RID that reads back EMPTY — a recycled RID that reads back POPULATED
                 // is the same fault with no symptom. Counting how many ASSOCIATED mesh RIDs still resolve, either
                 // side of the switch, is the direct measurement. Skipped silently before an association exists
-                // (PASS 1 has nothing to count), costs no awaited frame, and is a surface-count hop per mesh
-                // (~0.019 µs live); the probes that fail are covered by the armed backtrace suppressor.
+                // (PASS 1 has nothing to count), costs no awaited frame, and is a surface-count hop per mesh;
+                // the probes that fail are covered by the armed backtrace suppressor.
                 var liveBefore = CountLiveMeshes(associatedMeshes);
 
                 // `lanePrepare`, not a bake twin: the render lanes stamp the same "realize a spine lane" step
@@ -1203,8 +1196,7 @@ internal static class Sts2SpineGeoClipBaker
             // may be drawn by a different mesh there, and `staleMeshFrames` only catches that when the old mesh
             // reads back EMPTY rather than stale-but-populated. Only a BATCH is checked: a single-target bake
             // associates at a frame of its own animation, which is the behaviour every recorded association pair
-            // was graded against, and applying a new refusal to it would change answers this round must not
-            // change.
+            // was graded against, and applying a new refusal to it would change those answers.
             var acquisitionAttachments = AttachmentsAt(acquisition.Bake.Poses[acquisition.Frame]);
             if (batched)
             {
@@ -1439,8 +1431,7 @@ internal static class Sts2SpineGeoClipBaker
                 [
                     // BOTH index-recovery strips are resolved HERE rather than from the config, so the two kill
                     // switches bite on BOTH lanes: the on-demand /geoclips/ lane hard-codes its PlanConfig
-                    // (IndexSlack included), which is exactly why the index axis could not be A/B'd live and the
-                    // whole WS-I diagnosis had to run on the env-armed one-shot lane instead.
+                    // (IndexSlack included), so a config-only switch could never be A/B'd on that lane.
                     Sts2SpineGeoClipSweep.PlanWindowA(
                         bracketLow.Id,
                         bracketMid.Id,
@@ -2017,7 +2008,7 @@ internal static class Sts2SpineGeoClipBaker
     /// <summary>
     /// The rig pass's own phase breakdown, on the log line every other bake number arrives on.
     ///
-    /// <para>Through the bake's own logger, so it carries the <c>SPINE_GEOCLIP</c> prefix a research stamp-tailer
+    /// <para>Through the bake's own logger, so it carries the <c>SPINE_GEOCLIP</c> prefix a log tailer
     /// already greps for — a breakdown that only reached the manifest would be invisible during the run, and a
     /// run that aborts before writing a manifest would leave no numbers at all.</para>
     ///
@@ -2727,8 +2718,8 @@ internal static class Sts2SpineGeoClipBaker
     /// <summary>
     /// Acquire every planned window's meshes and merge the finds. The windows are reported SEPARATELY because
     /// that is the only way to tell a fix from a coincidence: window A is Phase 1's window verbatim, so its found
-    /// count has a recorded value to be graded against (30 on the merchant, 26 on byrdonis), and window B's count
-    /// is the yield of the split. A single merged total would hide a regression in either.
+    /// count has a recorded value to be graded against, and window B's count is the yield of the split. A single
+    /// merged total would hide a regression in either.
     ///
     /// <para>THREE PASSES, ONE ANSWER, each cheaper than the next and each armed only by the one before it
     /// coming up short. Every stage is graded on the same number — the size of the UNION of distinct mesh RID ids
@@ -2742,19 +2733,18 @@ internal static class Sts2SpineGeoClipBaker
     /// meshes satisfy the slot count twice over and skips the sweep that would have found the rest. That is the
     /// Phase-1 failure mode with a different cause, so the grade is on ids.</para>
     /// <list type="number">
-    ///   <item>The WALK arm (<see cref="Sts2SpineGeoClipWalk"/>), off by default since it was measured a loss
-    ///   live — a few hundred probes instead of tens of thousands when it is armed and works.</item>
+    ///   <item>The WALK arm (<see cref="Sts2SpineGeoClipWalk"/>), off by default (see <c>DenseSweepEnv</c>) —
+    ///   a small fraction of the dense sweep's probes when it is armed and works.</item>
     ///   <item>The NARROW dense tier: each window's core index band only (see
-    ///   <see cref="Sts2SpineGeoClipSweep.NarrowToCoreBand"/>), which on the recorded plans is 19-42 % of the
-    ///   candidates and holds every mesh either recorded session produced.</item>
+    ///   <see cref="Sts2SpineGeoClipSweep.NarrowToCoreBand"/>), which on the recorded plans is a fraction of the
+    ///   candidates and holds every recorded mesh.</item>
     ///   <item>The WIDE dense tier: the full slacked plan, unchanged, on every window.</item>
     /// </list>
     ///
     /// <para>Each fallback is deliberately blunt: it re-runs ALL windows rather than guessing which one is
     /// deficient, because the shortfall is only observable in the total. The cost of being wrong is therefore one
-    /// wasted pass on top of the status quo, never a missing mesh. That asymmetry is the whole design: Phase 1
-    /// shipped an acquisition that lost 15 of the merchant's 44 slots silently, and it took two rounds to
-    /// notice.</para>
+    /// wasted pass on top of the status quo, never a missing mesh. That asymmetry is the whole design: an
+    /// acquisition that loses slots silently is far harder to notice than one that costs an extra pass.</para>
     /// </summary>
     private static async Task<SweepOutcome> SweepMeshRidsAsync(
         Viewport rootViewport,
@@ -2797,10 +2787,10 @@ internal static class Sts2SpineGeoClipBaker
         // RestoreProbeErrors below, not by the lifetime of this scope — the scope only makes the patch
         // available, and disarms it on every exit path including a throw.
         //
-        // RIDER 1: `armMs=`. Arming is a Harmony patch plus a verification backtrace capture, both one-off and
-        // both on the main thread, and until now the only thing the log said about it was whether it bound. It
-        // is timed HERE rather than threaded into the suppressor's own "ARMED and verified" line, so the
-        // suppressor keeps one `Action<string>` and no knowledge of who is pricing it; the two lines sit
+        // `armMs=`. Arming is a Harmony patch plus a verification backtrace capture, both one-off and both on
+        // the main thread, so the log prices it rather than only saying whether it bound. It is timed HERE rather
+        // than threaded into the suppressor's own "ARMED and verified" line, so the suppressor keeps one
+        // `Action<string>` and no knowledge of who is pricing it; the two lines sit
         // adjacent in the log and carry the same `SPINE_GEOCLIP` prefix.
         var armStopwatch = Stopwatch.StartNew();
         using var backtraceSuppression = Sts2GeoClipDiagnostics.Current.Arm(message => Log(logStream, $"{label}: {message}"));
@@ -3050,15 +3040,15 @@ internal static class Sts2SpineGeoClipBaker
     /// Both halves of the sweep's error suppression, turned on together so they cannot drift apart.
     ///
     /// <para>The print flag and the backtrace gate answer different questions and are NOT interchangeable.
-    /// Turning printing off saves ~135 us per failed probe (the logger, the formatter, the log write); it does
-    /// nothing about the ~27 us the engine spends CAPTURING a C# stack trace before it ever looks at the flag,
-    /// because that capture is an argument to the print call. Turning the gate on saves that 27 us. A stretch
-    /// that wants one wants the other, and a site that set only one would look correct and cost 15x.</para>
+    /// Turning printing off saves the logger, the formatter and the log write per failed probe; it does nothing
+    /// about the time the engine spends CAPTURING a C# stack trace before it ever looks at the flag, because that
+    /// capture is an argument to the print call. Turning the gate on saves that capture. A stretch that wants one
+    /// wants the other, and a site that set only one would look correct and cost many times more.</para>
     ///
-    /// <para>The tiered dense arm made that trap concrete: the toggles that used to sit around ONE window's
-    /// candidate loop now sit around <see cref="Sts2SpineGeoClipSweep.AcquireTieredAsync"/>, which runs BOTH
-    /// tiers of BOTH windows inside a single span, so one missed pairing here would silently cost 15x on the
-    /// whole acquisition rather than on one window.</para>
+    /// <para>The tiered dense arm made that trap concrete: the toggles sit around
+    /// <see cref="Sts2SpineGeoClipSweep.AcquireTieredAsync"/>, which runs BOTH tiers of BOTH windows inside a
+    /// single span, so one missed pairing here would silently pay that cost on the whole acquisition rather than
+    /// on one window.</para>
     /// </summary>
     private static void SuppressProbeErrors()
     {
@@ -3318,9 +3308,9 @@ internal static class Sts2SpineGeoClipBaker
     // ── Slot ↔ mesh association ──────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Which mesh RID draws which slot. Measured, not assumed: child order is NOT slot order (proven on the
-    /// merchant rig), and the bracketed RID set is in id order rather than node order. One slot's colour alpha
-    /// is nudged and the mesh whose vertex colours move is its mesh.
+    /// Which mesh RID draws which slot. Measured, not assumed: child order is NOT slot order, and the bracketed RID
+    /// set is in id order rather than node order. One slot's colour alpha is nudged and the mesh whose vertex
+    /// colours move is its mesh.
     ///
     /// <para>The probe is done at the FIRST frame in which the slot shows an attachment, because a hidden slot
     /// has no vertex colours to move. Slots are grouped by that frame so the track is seeked once per group.
@@ -3616,8 +3606,8 @@ internal static class Sts2SpineGeoClipBaker
             // turns a correct refusal into a silent wrong pairing; the whole argument is on MeshesToRead, and the
             // decode's mesh indices are into THIS list, so nothing below may reach past it for the sweep's own.
             //
-            // ARMED, the read set is narrowed to the UNCLAIMED meshes — the merchant's ~176 metered reads per
-            // probe frame become the handful its residue can still be. That is the optimisation MeshesToRead
+            // ARMED, the read set is narrowed to the UNCLAIMED meshes — a full read set per probe frame becomes
+            // the handful the residue can still be. That is the optimisation MeshesToRead
             // refuses, and it is only sound because of the WIDEN below: every anomaly the narrowing could have
             // manufactured re-runs this group once on the whole set, at exactly the unarmed cost.
             var readMeshes = atlasFirstArmed
@@ -3993,9 +3983,9 @@ internal static class Sts2SpineGeoClipBaker
             return (0, 0);
         }
 
-        // The two arms are gated independently. The passive one has shipped since Sep-08 and keeps its kill
-        // switch; the mint mark's own gate is upstream — no mark was written, so no group can be marked — and it
-        // must stay reachable when someone disarms the passive arm to isolate it.
+        // The two arms are gated independently. The passive one keeps its kill switch; the mint mark's own gate is
+        // upstream — no mark was written, so no group can be marked — and it must stay reachable when someone
+        // disarms the passive arm to isolate it.
         var slotColorArmed = Sts2SpineGeoClipSlotColorIdentity.ArmedFromEnvironment();
         if (!slotColorArmed && mintMarks.Count == 0)
         {
@@ -4249,7 +4239,7 @@ internal static class Sts2SpineGeoClipBaker
     /// per probe position plus a readback per mesh per frame, and it is what `bakeColorRead` above now prices.
     /// The atlas is free by comparison — the uv boxes it needs are already read and cached in the dictionary
     /// this is handed. Whether the cheap evidence could have done DISCOVERY, rather than only tie-breaking behind
-    /// the expensive one, decides whether a later round may narrow the probe. That question cannot be answered
+    /// the expensive one, decides whether the probe may later be narrowed. That question cannot be answered
     /// by argument, and this is the measurement that replaces one.</para>
     ///
     /// <para>IT ACTS ON NOTHING. The real association is already final when this runs; the return value reaches
@@ -4972,8 +4962,8 @@ internal static class Sts2SpineGeoClipBaker
     /// came from, so the page has to ship as-is.
     ///
     /// <para>THREE WAYS TO GET THE BYTES, and the cheap ones are tried first.
-    /// <c>Texture2D.GetImage()</c> → <c>Decompress()</c> → <c>SavePngToBuffer()</c> measured 161 ms for the
-    /// merchant's four pages, on every bake, against a 271 ms budget, so a byte copy is worth reaching for twice:
+    /// <c>Texture2D.GetImage()</c> → <c>Decompress()</c> → <c>SavePngToBuffer()</c> is a large share of a bake's
+    /// budget on every bake, so a byte copy is worth reaching for twice:
     /// <list type="number">
     ///   <item>the SOURCE image, when it is a PNG whose own header agrees with the runtime texture and the atlas
     ///   text (<see cref="Sts2SpineGeoClipPageSource"/>) — which an EXPORTED build never ships, so this one only
@@ -5278,10 +5268,9 @@ internal static class Sts2SpineGeoClipBaker
     /// association throws away, and it does not allocate a <c>float[4]</c> per vertex to hold colours it sums
     /// once. It does NOT skip <c>MeshSurfaceGetArrays</c> itself, because there is no rendering-server call that
     /// returns one array of a surface — and that call, not the marshalling, is where a read's time goes: it is a
-    /// buffer readback per vertex/attribute/index buffer, each of which flushes and stalls the device. Measured
-    /// (spine-geometry-phase0): a whole-skeleton readback is 7.7 ms for the merchant's 30 meshes = ~0.26 ms per
-    /// mesh, on meshes 19 of which have FOUR vertices. Nothing size-proportional can be 0.26 ms on four
-    /// vertices, so the marshalling this removes is single-digit microseconds of it.</para>
+    /// buffer readback per vertex/attribute/index buffer, each of which flushes and stalls the device. A read
+    /// costs about the same on a four-vertex mesh as on a large one, so the cost is not size-proportional and
+    /// the marshalling this removes is a small part of it.</para>
     /// </remarks>
     private static double? TryReadColorChecksum(ulong ridId) => TryReadColorSums(ridId)?.Combined;
 
@@ -5289,7 +5278,7 @@ internal static class Sts2SpineGeoClipBaker
     /// The same single read, kept as the combined checksum AND a per-component sum.
     /// </summary>
     /// <remarks>
-    /// The extra sums are four multiply-adds per vertex against a call that stalls the device for ~0.26 ms, so
+    /// The extra sums are four multiply-adds per vertex against a call that stalls the device, so
     /// they are free — and they are what lets one awaited frame carry one probe bit per colour component
     /// instead of one in total. <see cref="GeoClipColorSums.Combined"/> is accumulated by the same expression
     /// the single-sum path always used, so the alpha arm's answers are bit-for-bit the recorded ones.

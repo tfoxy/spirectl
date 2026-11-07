@@ -152,7 +152,7 @@ Major command areas include `state`, `act`, `game`, `dev`, `test`, `code`, `asse
 - [CLI reference](docs/cli.md)
 - [Testing and fixtures](docs/testing.md)
 - [AI skill and MCP integration](docs/ai-skill.md)
-- [Current shipped status](docs/current-status.md)
+- [Capabilities](docs/capabilities.md) and [known limitations](docs/known-gaps.md)
 - [Architecture](docs/architecture.md)
 - [npm wrapper, Node client, and MCP adapter](npm-wrapper/README.md)
 

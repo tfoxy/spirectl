@@ -1,6 +1,6 @@
 namespace Spirectl.Sts2.Live;
 
-// Godot-free decision core of the late-static SPINE RE-PROBE (round-8 item 13). Always compiled (no Godot
+// Godot-free decision core of the late-static SPINE RE-PROBE. Always compiled (no Godot
 // dependency) so the budget/re-arm truth table is offline-unit-testable, like Sts2SpineDefaults /
 // Sts2SpineMaterialKey. The Godot-typed caller (Sts2RuntimeSceneWatcher.MaybeReprobeSpineAnimations) reads the
 // node's `skeleton_data_res` instance id and applies the decision.

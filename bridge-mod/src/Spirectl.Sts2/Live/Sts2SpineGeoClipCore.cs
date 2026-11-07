@@ -55,17 +55,9 @@ internal sealed record GeoClipTarget(
 /// every window densely, exactly as the baker did before the arm existed — so the two acquisitions can be A/B'd
 /// against the same game session without a rebuild.
 ///
-/// <para>Its default is <see cref="Sts2SpineGeoClipWalk.DenseSweepOnlyDefault"/> — ONE value both lanes take.
-/// The env lane and the on-demand request lane used to carry their own literals and had drifted apart, so a
-/// request-lane bake paid a walk that had been measured a loss and reverted, and then swept densely anyway —
-/// the walk was pure cost on every one of those bakes.</para>
-///
-/// <para>RETRACTED: this used to quote that loss as "+227 ms byrdonis, +485 ms merchant per cold pose". Those
-/// milliseconds were measured against a dense fallback of 38 579 candidates for the merchant's window A, and
-/// the narrow tier now carries that same window for 10 035
-/// (<c>NarrowTierAlone_FindsEveryMerchantCleanMeshFor10035ProbesInsteadOf38579</c>). A wasted walk is charged
-/// against a fallback roughly a quarter the size, so the figures do not transfer and are withdrawn. The
-/// probe-count facts stand and are re-measured by that test rather than quoted from a session.</para>
+/// <para>Its default is <see cref="Sts2SpineGeoClipWalk.DenseSweepOnlyDefault"/> — ONE value both lanes take,
+/// so the env lane and the on-demand request lane cannot drift apart. Separate literals would let one lane pay
+/// for a walk and then sweep densely anyway, making the walk pure cost on every one of its bakes.</para>
 /// </param>
 internal sealed record GeoClipConfig(
     string Owner,
@@ -359,25 +351,20 @@ internal static class Sts2SpineGeoClipAttachmentClassification
 /// <para>WHY THAT CASE IS SOUND. A slot at alpha 0 multiplies its attachment to nothing, so the renderer puts no
 /// pixel on screen for it. The baker already emits such a slot as HIDDEN when it has no associated mesh, and a
 /// hidden slot and a slot drawn at alpha 0 are the same picture — so refusing the whole artifact over it
-/// discards a bake that is pixel-identical to the one that would have been admitted. The live case this was
-/// written for is the spectral knight at <c>anim=attack_sword</c>: two slots sharing the <c>sword swish</c>
-/// attachment, byte-identical uv boxes, overlapping positions and BOTH at <c>(1,1,1,0)</c> at the sampled pose
-/// (measured, not inferred — archived manifest
-/// <c>.sts2/research/data/geoclip-knights-20260908T0500Z/envbake-artifacts/legE-combat/spectral_knight--Visuals--attack_sword/manifest.json</c>,
-/// <c>frames[0].slots["29"]</c> and <c>["30"]</c>; the same two colours are pinned as a fixture in
+/// discards a bake that is pixel-identical to the one that would have been admitted. The case this was written
+/// for is two slots sharing one attachment, with byte-identical uv boxes, overlapping positions and BOTH at
+/// <c>(1,1,1,0)</c> at the sampled pose (the two colours are pinned as a fixture in
 /// <see cref="Sts2SpineGeoClipSlotColorIdentity"/>'s tests). Nothing can separate them — not the atlas, not the
 /// colour nudge, not the slot-colour tie-break — and nothing needs to, because neither draws.</para>
 ///
 /// <para>SCOPED TO A SINGLE-POSE BAKE, AND THE SCOPE IS THE WHOLE SAFETY ARGUMENT. Read this before
-/// generalising it. A standing rule from the 2026-09-06 correction contract
-/// (<c>.sts2/research/data/knights-sequential-20260906T065302Z/report.md</c> §"Correction contract for the next
-/// implementation") says: "Do not infer non-drawing status from a failed search, missing atlas name, zero alpha
-/// or failed association." That rule is RIGHT for a multi-frame clip — a slot transparent at one sampled frame
-/// may be opaque at the next, so its alpha at one sample says nothing about the clip — and it is vacuous for a
-/// bake that sampled exactly ONE pose, where "at another frame" does not exist and the artifact can only ever be
-/// shown at that pose. So the exception fires only when <c>poses.Count == 1</c>. A multi-frame bake keeps every
-/// drawable slot expected, unchanged. DO NOT "simplify" this into the general rule; that is the thing the
-/// contract forbids, and the single-pose guard is what makes this legal.</para>
+/// generalising it. A standing rule says: "Do not infer non-drawing status from a failed search, missing atlas
+/// name, zero alpha or failed association." That rule is RIGHT for a multi-frame clip — a slot transparent at one
+/// sampled frame may be opaque at the next, so its alpha at one sample says nothing about the clip — and it is
+/// vacuous for a bake that sampled exactly ONE pose, where "at another frame" does not exist and the artifact can
+/// only ever be shown at that pose. So the exception fires only when <c>poses.Count == 1</c>. A multi-frame bake
+/// keeps every drawable slot expected, unchanged. DO NOT "simplify" this into the general rule; that is the thing
+/// the rule forbids, and the single-pose guard is what makes this legal.</para>
 ///
 /// <para>THE OTHER THREE CLAUSES OF THAT RULE STAND UNTOUCHED. A failed search, a missing atlas region and a
 /// failed association still leave a slot fully expected — this arm never consults any of them, and cannot: it
@@ -701,10 +688,9 @@ internal sealed record GeoClipBakeWindow(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     GeoClipBakeWalk? Walk = null,
     // WHICH DENSE TIERS ran on this window: `narrow`, `narrow-then-wide`, `wide`, or `none` when the walk arm
-    // carried it. The five numbers beside it are what a later measurement attributes the saving with — the
-    // narrow tier's own band, candidates, probes and finds against the window's `totalCandidates` / `probed`.
-    // Reported per window rather than per bake because the two windows narrow by very different amounts (the
-    // recorded plans: window A keeps 45 of 173 index columns, window B 94 of 225).
+    // carried it. The five numbers beside it are what attributes the saving — the narrow tier's own band,
+    // candidates, probes and finds against the window's `totalCandidates` / `probed`. Reported per window rather
+    // than per bake because the two windows narrow by very different amounts.
     [property: JsonPropertyName("tier")] string Tier = Sts2SpineGeoClipSweep.TierNone,
     [property: JsonPropertyName("coreIndexLow")] uint CoreIndexLow = 0,
     [property: JsonPropertyName("coreIndexHigh")] uint CoreIndexHigh = 0,
@@ -790,9 +776,8 @@ internal sealed record GeoClipBakeReport(
     // trust `meshesValidated` and a reader must not have to walk `windows[]` to discover one. `truncatedNote`
     // says which windows and what cap would have covered them; empty when nothing truncated.
     //
-    // This is the field that closes the round's actual defect. Truncation was already reported per window, but
-    // only ever WARNED about in a log line ("a slot mesh may be missing from the far end of the window") that no
-    // consumer reads, and it is not hypothetical: a recorded live bake lost 13 meshes to it.
+    // Truncation is also reported per window, but a log-line warning ("a slot mesh may be missing from the far
+    // end of the window") reaches no consumer, and a truncated window can genuinely lose meshes.
     [property: JsonPropertyName("truncated")] bool Truncated = false,
     [property: JsonPropertyName("truncatedNote")] string TruncatedNote = "",
     // ── The ATLAS-FIRST SHADOW ARM (report-only; nothing here changed the association above) ──────────
@@ -801,9 +786,9 @@ internal sealed record GeoClipBakeReport(
     // the colour-flip probe as a tie-breaker and a fallback. Measured on the same inputs, after the real
     // association has finished, and thrown away: `associationPairs` and every `by*` counter above are the real
     // arm's, unchanged. The three numbers are the whole question — how many ordinals the atlas resolved on its
-    // own, and of those, how many agreed with the mesh the real arm chose. A later round decides whether the
-    // colour probe (which costs most of a bake's blocking time) can be narrowed; it cannot decide that on a
-    // hypothesis, and this is the measurement that replaces one.
+    // own, and of those, how many agreed with the mesh the real arm chose. Whether the colour probe (which costs
+    // most of a bake's blocking time) can be narrowed must not be decided on a hypothesis; this is the
+    // measurement that replaces one.
     [property: JsonPropertyName("atlasFirstResolved")] int AtlasFirstResolved = 0,
     [property: JsonPropertyName("atlasFirstAgreed")] int AtlasFirstAgreed = 0,
     [property: JsonPropertyName("atlasFirstDisagreed")] int AtlasFirstDisagreed = 0,
@@ -910,7 +895,7 @@ internal sealed record GeoClipBakeProfile(
     [property: JsonPropertyName("phases")] IReadOnlyList<GeoClipPhaseCost> Phases,
     // WHICH SCHEDULE this profile was measured under, carried beside the draw count rather than left to be
     // inferred. `forceDraws` alone cannot distinguish a bake whose draw budget elided six from one whose rig
-    // simply needed six fewer frames, and the two have very different blocking numbers — so a cross-round
+    // simply needed six fewer frames, and the two have very different blocking numbers — so a cross-bake
     // comparison of `blockingMs` is only readable with this beside it. See GeoClipDrawBudget.
     //
     // LAST and DEFAULTED, out of report order, on purpose: every existing construction site — the projection
@@ -920,9 +905,8 @@ internal sealed record GeoClipBakeProfile(
     [property: JsonPropertyName("drawsElided")] long DrawsElided = 0,
     // THE TWO DENOMINATORS. Their phases (`bakeColorRead`, `bakeSweepProbe`) already carry a total ms and a
     // `calls` count, but `calls` counts the ARM — one sweep, one probe pass — not the work inside it, so a
-    // phase alone cannot answer "what did one probe cost?". The sweep is now the largest single term in the
-    // rig that still loses the blocking gate, and a cost-per-probe number is what tells you whether to attack
-    // the candidate count or the per-candidate cost. Same kind as the counters above: scalars about what the
+    // phase alone cannot answer "what did one probe cost?". A cost-per-probe number is what tells you whether to
+    // attack the candidate count or the per-candidate cost. Same kind as the counters above: scalars about what the
     // baker did, carrying nothing about the rig.
     [property: JsonPropertyName("colorReads")] long ColorReads = 0,
     [property: JsonPropertyName("sweepProbes")] long SweepProbes = 0)
@@ -1038,8 +1022,8 @@ internal static class GeoClipPhaseDoctrine
 /// reading of "worth pausing for AND nobody feels it", not an oversight, and it is asserted in the tests so a
 /// later reader meets it as a rule rather than as a puzzling empty result.</para>
 ///
-/// <para>NOTHING CONSUMES THIS YET. It is the gate a later workstream's arm has to pass, stated and tested here
-/// so the arm is graded against a rule that existed before its numbers did.</para>
+/// <para>NOTHING CONSUMES THIS YET. It is the gate a pause lever has to pass, stated and tested here so the
+/// lever is graded against a rule that existed before its numbers did.</para>
 /// </summary>
 internal static class GeoClipPauseVerdict
 {
@@ -1386,19 +1370,19 @@ internal static class Sts2SpineGeoClipMath
     ///
     /// <para>The sweep enumerates an id space, not a node list, so anything the engine happened to mint in the
     /// same window is a candidate: other subsystems' 3D geometry, a full-page quad, a UI mesh. Phase 1's filter
-    /// was "one surface, some vertices, triangle indices, a uv channel of matching length", which is why its live
-    /// arm picked up 230-vertex <c>PackedVector3Array</c> meshes and a 256×256 quad. STRICT adds the four checks
+    /// was "one surface, some vertices, triangle indices, a uv channel of matching length", which admits 3D
+    /// <c>PackedVector3Array</c> meshes and full-page quads. STRICT adds the four checks
     /// that a Spine slot mesh satisfies by construction: 2D vertices, a uv channel that actually addresses an
     /// atlas page (in the unit square), a positive triangle count, and a bounding box inside the skeleton's own
     /// bounds.</para>
     ///
-    /// <para>KNOWN BLIND SPOT, deliberately not fixed here: a 256×256 quad whose uvs span [0,1] and whose box sits
+    /// <para>KNOWN BLIND SPOT, deliberately not fixed here: a full-page quad whose uvs span [0,1] and whose box sits
     /// inside the skeleton's bounds passes every one of these checks. Nothing about a single quad distinguishes
     /// it from a legitimate region attachment; separating those needs the run/stride evidence the live arm
     /// gathers, not a per-mesh predicate. The test suite pins this rather than pretending otherwise.</para>
     ///
     /// <para><paramref name="strict"/> false reproduces Phase-1 behaviour EXACTLY, so a bake can be compared
-    /// against the recorded Phase-1 numbers by flipping one environment variable.</para>
+    /// against Phase-1 behaviour by flipping one environment variable.</para>
     /// </summary>
     internal static string? IsPlausibleSlotMesh(
         SlotMeshFacts facts,
@@ -1484,7 +1468,7 @@ internal static class Sts2SpineGeoClipMath
 /// use, and is available only as a final recovery pass after the established passes remain short.
 ///
 /// <para>So the fix is a SECOND window rather than a wider first one: window A stays exactly what Phase 1 swept
-/// (its found count is the regression anchor — 30 on the merchant, 26 on byrdonis), and window B covers
+/// (its found count is the regression anchor), and window B covers
 /// (bracketMid, bracketPost], where bracketPost is a probe mesh created after the acquisition-frame seek. The two
 /// are reported separately for that reason.</para>
 ///
@@ -1560,13 +1544,9 @@ internal static class Sts2SpineGeoClipSweep
     /// THE CEILING'S PROBE BUDGET, in candidates, per window per bake. The floor strip needs no budget — it is
     /// bounded below by index 0, the bottom of the address space — but nothing bounds a ceiling, so this does.
     ///
-    /// <para>WHY 32 768. It is the largest floor strip this acquisition has already been measured paying live:
-    /// arm H2's flail strip planned 31 706 candidates and cost 0.05 s (round WS-N,
-    /// <c>.sts2/research/data/geoclip-live-confirm-20260909T020500Z/evidence/index-bands.txt</c>). So a ceiling
-    /// strip costs at most what a floor strip has already been measured costing, rather than what a fresh number
-    /// guesses. At the round's measured 1.26–1.96 µs per rendering-server probe that is 41–64 ms per window and
-    /// at most 83–128 ms per rig with both windows firing, against the 266 747 candidates / 0.52 s that the
-    /// rejected blanket <c>IndexSlack=1024</c> widen cost on ironclad's window A alone.</para>
+    /// <para>WHY 32 768. It is about the size of the largest floor strip this acquisition already pays live, so a
+    /// ceiling strip costs at most what a floor strip already costs, rather than what a fresh number guesses —
+    /// and a small fraction of what the rejected blanket <c>IndexSlack=1024</c> widen costs.</para>
     ///
     /// <para>It also sits BELOW the request lane's hard-coded 50 000 candidate cap, and the budgeted REACH is
     /// trimmed to fit whichever of the two is smaller, so the reach this budget buys can never truncate. (The
@@ -1582,18 +1562,14 @@ internal static class Sts2SpineGeoClipSweep
     /// The furthest the ceiling reaches above a window's hull, in index columns, however cheap the window is.
     ///
     /// <para>WHY 1 024. That is <c>IndexSlack=1024</c>, the blanket widen this design exists to avoid paying for —
-    /// and it is the only configuration MEASURED to recover every missing mesh (WS-I arm SlackB: spectral 22/22,
-    /// magi 16/16; WS-N's SlackFix1024 leg baked all four rigs complete). So the ceiling reaches exactly as far
-    /// as the setting that is known to be sufficient, wherever the validator span makes that affordable, and
-    /// never further: the same leg swept indices 0..1206 on window A and 0..1129 on window B and found nothing at
-    /// all above the ordinary tops, so reach beyond 1 024 columns has no evidence behind it and would only widen
-    /// the foreign-geometry surface.</para>
+    /// and the configuration known to recover every missing mesh. So the ceiling reaches exactly as far as the
+    /// setting that is known to be sufficient, wherever the validator span makes that affordable, and never
+    /// further: reach beyond 1 024 columns has no evidence behind it and would only widen the foreign-geometry
+    /// surface.</para>
     ///
-    /// <para>The two bounds bite in opposite places, which is the point: a WIDE validator span (window A, 86–221
-    /// rows) is trimmed by the budget to 148–381 columns, and a NARROW one (window B, 1–72 rows) reaches the full
-    /// 1 024 for 1 024–32 760 candidates. Every residual this round measured sits within a few tens of columns of
-    /// its window's top, and every index ever recorded live on any of the four rigs — sentinel or mesh — is under
-    /// 305.</para>
+    /// <para>The two bounds bite in opposite places, which is the point: a WIDE validator span (typically window A)
+    /// is trimmed by the budget, and a NARROW one (typically window B) reaches the full 1 024. Residuals sit just
+    /// above their window's top, well inside that reach.</para>
     /// </summary>
     internal const int IndexCeilingRecoveryMaxColumns = 1_024;
 
@@ -1626,7 +1602,7 @@ internal static class Sts2SpineGeoClipSweep
     /// <para><c>CoreIndexLow/High</c> is an ORDERING HINT: the sub-band of the index axis the window's meshes
     /// are most likely to sit in, so the walk arm's column scan tries those columns first. It does not narrow
     /// the PLAN — the dense sweep still validates every id on the whole slacked axis, because narrowing coverage
-    /// on an index guess is exactly the Phase-1 bug that lost 14 of the merchant's meshes.</para>
+    /// on an index guess is exactly the Phase-1 bug that lost meshes.</para>
     ///
     /// <para>Read the hint's real strength honestly, though: the walk arm's probe budget means a rig parked far
     /// outside the hinted band is not reached before the budget runs out, so for THAT arm the hint is closer to
@@ -1666,8 +1642,8 @@ internal static class Sts2SpineGeoClipSweep
         /// <summary>
         /// The recovery strips this window would sweep, in order: DOWN from the hull's floor first, then UP past
         /// its top. Floor first because it is the cheaper half on the window that carries the wide validator span
-        /// (window A's floor is bounded by the hull's own low edge, 25–166 columns live; its ceiling is bounded by
-        /// the budget, 148–381) and because it is where four of the six recoveries this round measured were found.
+        /// (window A's floor is bounded by the hull's own low edge; its ceiling is bounded by the budget) and
+        /// because it is where most recoveries are found.
         /// The driver stops as soon as the shortfall closes, so the order is a cost decision, not a coverage one.
         /// </summary>
         internal IEnumerable<Sts2SpineGeometryMath.RidCandidatePlan> IndexRecoveryPlans
@@ -1688,13 +1664,11 @@ internal static class Sts2SpineGeoClipSweep
     }
 
     /// <summary>
-    /// Window A: Phase 1's plan, unchanged. Any edit here is a regression against the recorded numbers
-    /// (merchant validators 16204..16448 × indices 23..195 = 42 385 candidates → 30 meshes).
+    /// Window A: Phase 1's plan, unchanged. Any edit here is a regression against its established found counts.
     ///
-    /// <para>Its core index band is the bracket's OWN index range, un-slacked. Measured on both rigs and in both
-    /// recorded sessions, every window-A mesh sits strictly inside it (merchant bracket 87..131, meshes 88..130;
-    /// byrdonis bracket 88..117, meshes 89..116) — the slack is defensive padding, so it is the last place to
-    /// look rather than the first.</para>
+    /// <para>Its core index band is the bracket's OWN index range, un-slacked. Every recorded window-A mesh sits
+    /// strictly inside it — the slack is defensive padding, so it is the last place to look rather than the
+    /// first.</para>
     /// </summary>
     /// <param name="indexFloorRecovery">
     /// Whether to attach the index-floor recovery strip below the hull — see
@@ -1733,9 +1707,8 @@ internal static class Sts2SpineGeoClipSweep
             Math.Clamp(Math.Min(lowIndex, midIndex), plan.IndexLow, plan.IndexHigh),
             Math.Clamp(Math.Max(lowIndex, midIndex), plan.IndexLow, plan.IndexHigh),
             // Window A, ALONE, may bound a dense pass on its core band. The band is the bracket's own un-slacked
-            // index range and the claim is recorded on both rigs in both offline sessions AND live: across 65
-            // recorded live bakes the narrow pass found every mesh the wide pass then found on window A in 56 of
-            // them, and in the other 9 the wide tier fired and recovered the rest. See the tier note below.
+            // index range and the claim rests on recorded ids; when the narrow pass does come up short, the wide
+            // tier fires and recovers the rest. See the tier note below.
             CoreBandBoundsSweep: true,
             IndexFloorRecoveryPlan: indexFloorRecovery ? PlanWindowAIndexFloorRecovery(plan) : null,
             // Window A's own sentinels bound its hull, so with the ceiling disarmed this is always null — the
@@ -1756,42 +1729,30 @@ internal static class Sts2SpineGeoClipSweep
     /// <c>IndexSlack</c>, and that hull is an INFERENCE about where the rig's meshes landed. The validator axis
     /// is not: a validator comes from one process-global monotonic counter, so every RID minted inside the
     /// bracket has one inside the span, exactly. The index comes from the per-type RID allocator, and the hull
-    /// is only sound while that allocator is BUMP-allocating. Once anything frees a mesh RID — a creature death
-    /// is the trigger measured — later allocations are served out of order, the rig's own meshes land at indices
+    /// is only sound while that allocator is BUMP-allocating. Once anything frees a mesh RID — a creature death,
+    /// for one — later allocations are served out of order, the rig's own meshes land at indices
     /// outside the hull, and they are NEVER PROBED. <c>meshesValidated</c> falls below <c>slotsEverVisible</c>,
     /// <c>unassociated</c> is defined as the difference, and the bake refuses with no association fault
     /// anywhere in it.</para>
     ///
-    /// <para>WHAT IS MEASURED (round WS-I, `.sts2/research/data/geoclip-driven-combat-20260909T002811Z/`;
-    /// ten single-variable arms, virgin process each). Idle, 180 s elapsed, a mirror client attached, eight
-    /// concurrent /spines/ bakes and two full rounds of card play with NO deaths all bake 4 of 4 rigs complete.
-    /// Two kills alone refuse 3 of 4. Pausing the scene tree for the whole bake — which stops all foreign RID
-    /// allocation inside the bracket — changes nothing, because the damage is in the allocator before the bake
-    /// starts. In every shortfall <c>associated == meshesValidated</c> exactly and <c>truncated=False</c>.</para>
+    /// <para>The shortfall follows RID frees, not elapsed time, load or a mirror client. Pausing the scene tree for
+    /// the whole bake — which stops all foreign RID allocation inside the bracket — changes nothing, because the
+    /// damage is in the allocator before the bake starts. In such a shortfall <c>associated == meshesValidated</c>
+    /// exactly and <c>truncated=False</c>.</para>
     ///
-    /// <para>WHY THE FLOOR AND NOT A WIDER SLACK. In the matched post-death pair (arms SlackA/SlackB: same
-    /// process state, same core bands, only the index axis differing) <c>IndexSlack=1024</c> recovers every
-    /// missing mesh — spectral 17/22 → 22/22, magi 10/16 → 16/16 — at 0.20–0.53 s of extra probing per rig,
-    /// which would hand back the per-request blocking budget this lane just won. The strip buys the same
-    /// recovery for the low side alone: spectral 64 columns × 119 validators = 7 616 candidates against
-    /// slack-1024's 137 683, magi 65 × 86 = 5 590 against 101 910 — 18× cheaper, ~10–15 ms at the measured
-    /// ~1.3–2.0 µs per probe. Both numbers were then measured LIVE, to the unit, in six independent processes.</para>
+    /// <para>WHY THE FLOOR AND NOT A WIDER SLACK. <c>IndexSlack=1024</c> also recovers every missing mesh, but at
+    /// a cost per rig that would hand back the per-request blocking budget. The strip buys the same recovery for
+    /// the low side alone at a small fraction of the candidates.</para>
     ///
-    /// <para>RETRACTED — the scoping claim, not the strip. This used to say the high side of the hull was empty,
-    /// on four controls: "raising window B's index top from ~165–225 to ~1123–1185 across the same four rigs found
-    /// not one extra mesh, and extending window A's top from 196 to 288 on spectral found none either". Those
-    /// controls are real and they DO NOT GENERALISE. Round WS-N drove real fights on the request lane and every
-    /// residual the strip could not close sits above a hull TOP: 3 of 4 rigs admitted, with ironclad 4 short in
-    /// window B and flail 2 short above window A's own top, and the strip firing and finding ZERO on both, in
-    /// every arm. Growing the hull upward is what closes them. See <see cref="PlanIndexCeilingRecovery"/>, which
-    /// is this strip's mirror on the same gate — nothing about the floor changed.</para>
+    /// <para>The high side of the hull is covered by <see cref="PlanIndexCeilingRecovery"/>, this strip's mirror
+    /// on the same gate.</para>
     ///
     /// <para>WHY A RECOVERY STRIP AND NOT A DETECTION PROBE. The alternative considered was minting extra
     /// sentinels and widening when their indices come back non-consecutive. That triggers on a whole-allocator
-    /// property inferred from engine behaviour nobody has read out of the process, and it OVER-fires: in the
-    /// post-death arms ironclad and flail bake 44/44 and 37/37 with the free list demonstrably active, so a
-    /// detector would have widened all four rigs to fix two. This strip triggers on the MEASURED shortfall
-    /// instead — the same <c>found &lt; expected</c> grade the wide tier and window B's own recovery already
+    /// property inferred from engine behaviour nobody has read out of the process, and it OVER-fires: rigs can
+    /// bake complete with the free list active, so a detector would widen bakes that needed nothing. This strip
+    /// triggers on the MEASURED shortfall instead — the same <c>found &lt; expected</c> grade the wide tier and
+    /// window B's own recovery already
     /// use — and it is the same mechanism, in the same driver loop, rather than a second one beside it.</para>
     ///
     /// <para>Null when the hull already reaches index 0 (nothing below it to sweep), which is also what window B
@@ -1822,16 +1783,15 @@ internal static class Sts2SpineGeoClipSweep
     /// <para>Window A's span IS the bracket the skeleton's meshes were minted inside, so unlike the probe's
     /// recipe-D canvas bracket there is no "far end where the meshes are known not to be" for a cap to discard.
     /// Enumeration is validator-major, so a cap truncates the TOP of the validator axis — exactly where a
-    /// late-minted mesh sits. Recorded live: window A on the menu background planned 77 074 candidates against
-    /// the 50 000 cap and returned 8 meshes, while the same window's NARROWER core-band pass — same validator
-    /// span, a strict subset of the index axis, small enough not to truncate — returned 21. A superset plan
-    /// found 13 fewer meshes, which is only possible if the cap cut the sweep off before it reached them.</para>
+    /// late-minted mesh sits. A truncated plan can find FEWER meshes than the same window's narrower core-band
+    /// pass — same validator span, a strict subset of the index axis, small enough not to truncate — which is
+    /// only possible because the cap cut the sweep off before it reached them.</para>
     ///
     /// <para>The ceiling is what stops a mis-detected bracket spanning a whole scene load from planning a sweep
-    /// measured in minutes. It can afford to be generous now: the merchant sweep this cap was sized for cost
-    /// ~1 690 ms when 50 000 was chosen and costs ~130 ms today, so the arithmetic that justified the old number
-    /// no longer holds. A window that truncates ANYWAY still arms the wide tier and still says so in the bake
-    /// report — the cap is a budget, not the thing keeping the acquisition honest.</para>
+    /// measured in minutes. It can afford to be generous: the per-candidate sweep cost has fallen far enough that
+    /// the arithmetic which justified the old 50 000 no longer holds. A window that truncates ANYWAY still arms the
+    /// wide tier and still says so in the bake report — the cap is a budget, not the thing keeping the acquisition
+    /// honest.</para>
     /// </summary>
     internal static (int Cap, string Source, int From, int To) ChooseWindowACap(
         long totalCandidates,
@@ -1887,12 +1847,9 @@ internal static class Sts2SpineGeoClipSweep
             // bound itself here either.
             //
             // WHY IT IS ONLY AN ORDERING HINT: it was believed to be a containment bound — "the lazily minted
-            // meshes sit AT OR ABOVE the mid bracket's own index" — and live it is false. Across 65 recorded
-            // bakes the window-B core band lost meshes the full axis then found in 62 of them: on the merchant,
-            // 13 of 14 window-B meshes sit BELOW the mid bracket index (band 187..253 found 1, axis 0..253 found
-            // 14, in 25 arms); on byrdonis BOTH of its 2 do (band 172..237 found 0, axis 0..237 found 2, in 31
-            // arms). Bounding a pass here reproduces the Phase-1 defect almost exactly — that one lost 14 of the
-            // merchant's meshes to an index guess, this one lost 13.
+            // meshes sit AT OR ABOVE the mid bracket's own index" — and live it is false: most of a rig's
+            // window-B meshes can sit BELOW the mid bracket index. Bounding a pass here reproduces the Phase-1
+            // defect — meshes lost to an index guess.
             Math.Clamp(midIndex, plan.IndexLow, plan.IndexHigh),
             plan.IndexHigh,
             IndexCeilingRecoveryPlan: ceilingPlan);
@@ -1905,29 +1862,21 @@ internal static class Sts2SpineGeoClipSweep
     /// <see cref="PlanWindowAIndexFloorRecovery"/>, on the same gate, in the same driver loop, under the same tier
     /// name.
     ///
-    /// <para>WHY IT EXISTS, AND WHAT IT OVERTURNS. The floor strip was scoped on a control that said the high side
-    /// of the hull was empty — "raising window B's index top from ~165–225 to ~1123–1185 across all four rigs
-    /// found not one extra mesh". That held in the processes it was measured in and DOES NOT GENERALISE. Round
-    /// WS-N (<c>.sts2/research/data/geoclip-live-confirm-20260909T020500Z/</c>) drove real fights on the request
-    /// lane and every surviving residual sits ABOVE a hull top, not below a floor: ironclad's window A finds the
-    /// same 30 meshes at slack 64 and at slack 1024 while its window B goes 10 → 14 as its top moves 165 → 1129,
-    /// and flail's two missing meshes sit above window A's own top (arm Hkills: wide 26..166 finds 35, the floor
-    /// strip 0..25 finds 0). In six independent processes the floor strip fired on those two rigs and found
-    /// exactly ZERO. Raising the tops is the only thing that recovers them.</para>
+    /// <para>WHY IT EXISTS. The floor strip alone assumes the high side of the hull is empty, and that does not
+    /// generalise: on the request lane during real fights, residual shortfalls sit ABOVE a hull top, not below a
+    /// floor, where the floor strip finds nothing. Raising the tops is the only thing that recovers them.</para>
     ///
     /// <para>THE CAUSE IS THE SAME ONE. A free list hands recycled slots back in last-freed-first-reused order,
     /// so a rig's meshes scatter across the whole range of slots the allocator is currently recycling — which has
-    /// no relation to where the three bracket sentinels happen to land. That is measured, not assumed: in arm H
-    /// the FIRST sentinel came back at index 181 and the second at 99, so the bracket's own endpoints are already
-    /// out of order, and in arm H2 flail's meshes span 0..302 around sentinels at 230 and 238. Scatter is
-    /// symmetric; the floor covered one side of it.</para>
+    /// no relation to where the three bracket sentinels happen to land — the bracket's own endpoints can come
+    /// back out of order. Scatter is symmetric; the floor covered one side of it.</para>
     ///
     /// <para>WHY IT IS BOUNDED AND THE FLOOR IS NOT. <c>[0, hull floor)</c> needs no budget — index 0 is the
     /// bottom of the address space. Upward there is no such endpoint, so two bounds are chosen and both are
     /// calibrated on measurements rather than invented: <see cref="IndexCeilingRecoveryBudget"/> caps the
-    /// candidates at the largest floor strip already measured live, and
+    /// candidates at the size of a floor strip already paid live, and
     /// <see cref="IndexCeilingRecoveryMaxColumns"/> caps the reach at the <c>IndexSlack=1024</c> widen that is
-    /// the only configuration measured to recover everything. The budget trims the REACH and never the validator
+    /// known to recover everything. The budget trims the REACH and never the validator
     /// span, because enumeration is validator-major and a cap would discard the top of the validator axis — where
     /// a late-minted mesh sits.</para>
     ///
@@ -1937,9 +1886,7 @@ internal static class Sts2SpineGeoClipSweep
     /// inside the same MeshCreate bracket as the rig's own meshes — the population the whole sweep is defined
     /// over. Widening the index axis changes how much of that population the sweep SEES, never which population
     /// it is. Everything past that is the mesh filter's and the ownership proof's job, and neither is touched
-    /// here. Live: the floor strip already widened window A by up to 166 columns × 191 validators with
-    /// <c>foreignMeshes=0</c> on all 27 admitted bakes, and the SlackFix1024 leg swept 0..1206 and 0..1129 — 3–7×
-    /// further than this ceiling ever reaches — and baked all four rigs complete with <c>unassociated=0</c>.</para>
+    /// here.</para>
     ///
     /// <para>WINDOW B'S OLD COMPLEMENT IS THE DEGENERATE CASE, not a second mechanism beside this one. Window B's
     /// ordinary plan takes its top from the POST sentinel, and when the discarded MIDDLE sentinel sat higher the
@@ -2062,30 +2009,23 @@ internal static class Sts2SpineGeoClipSweep
     // ── The two dense TIERS ──────────────────────────────────────────────────────────────────────────
     //
     // A window's INDEX axis is almost entirely padding. Window A widens the bracket's own index range by
-    // `indexSlack` (64 each way) and window B floors its axis at 0, and the recorded plans show what that costs:
-    // byrdonis window A is 143 validators × 158 indices = 22 594 candidates for 25 meshes, the merchant's
-    // 222 × 154 = 34 188 for 13. The sweep is 70-76 % of a pose-only bake and most of it is proving empty
-    // padding empty.
+    // `indexSlack` (64 each way) and window B floors its axis at 0, so the sweep is a large share of a pose-only
+    // bake and most of it is proving empty padding empty.
     //
-    // In all four recorded id spaces every WINDOW-A mesh sits STRICTLY INSIDE the un-padded band — merchant
-    // bracket 87..131 with meshes at 88..130, byrdonis bracket 88..117 with meshes at 89..116 — in both sessions.
-    // So the sweep runs in two tiers: NARROW (that band only, across the window's whole validator span) and then,
-    // only if the narrow tier came up short, WIDE (the full slacked plan, unchanged).
+    // Every recorded WINDOW-A mesh sits STRICTLY INSIDE the un-padded band. So the sweep runs in two tiers: NARROW
+    // (that band only, across the window's whole validator span) and then, only if the narrow tier came up short,
+    // WIDE (the full slacked plan, unchanged).
     //
-    // WINDOW A ONLY. The narrow tier first shipped bounding BOTH windows on their core bands, and live that made
-    // the whole thing pure cost: across 65 recorded bakes the wide tier fired every single time, so every rig paid
-    // narrow + wide. The cause was window B, not the grade — window A's narrow pass found every mesh its wide pass
-    // then found in 56 of the 65, while window B's lost 13 of the merchant's 14 and both of byrdonis's 2, in
-    // effectively every arm. The grade itself was reachable all along and the wide tier hit it EXACTLY (merchant
-    // 44/44, byrdonis 28/28), which is what rules out the other suspect: no slot sharing a mesh, no region
-    // attachment without one, no mesh that is never minted. So the band is now a coverage bound only where a
-    // window has earned it (`SweepWindow.CoreBandBoundsSweep`), and window B is swept at full width in tier one.
+    // WINDOW A ONLY. Bounding BOTH windows on their core bands makes the narrow tier pure cost: window B's meshes
+    // routinely fall outside its band, so the wide tier fires every time and every rig pays narrow + wide, while
+    // window A's narrow pass usually finds everything its wide pass would. So the band is a coverage bound only
+    // where a window has earned it (`SweepWindow.CoreBandBoundsSweep`), and window B is swept at full width in
+    // tier one.
     //
-    // The offline gate could not have caught this. Window B's mesh IDS were never dumped by the probe, so the
-    // fixture that "proved" its core band was safe was CONSTRUCTED on the +5/+1 progression above the mid bracket
-    // index — i.e. built out of the very assumption the band encodes, and unable to fail. Its own comment said so.
-    // The window-B spaces below are now calibrated on the LIVE split instead (how many meshes fall either side of
-    // the mid index), which is measured rather than assumed.
+    // An offline fixture cannot prove window B's core band safe: one CONSTRUCTED on the +5/+1 progression above
+    // the mid bracket index is built out of the very assumption the band encodes, and unable to fail. The
+    // window-B spaces below are calibrated on the LIVE split instead (how many meshes fall either side of the mid
+    // index), which is measured rather than assumed.
     //
     // The shortfall is graded on the UNION of RID ids across both windows AND both arms, by the same predicate
     // the walk arm is graded by (Sts2SpineGeoClipWalk.DenseSweepRequired), because that is the only level at
@@ -2095,9 +2035,9 @@ internal static class Sts2SpineGeoClipSweep
     // never to bound the last one.
     //
     // A UNION and not a sum of counts, because the two arms sweep the SAME ids. The walk's column order starts at
-    // `window.CoreIndexLow` and the narrow tier sweeps exactly that core band, so on every recorded id space the
-    // walk's finds are a SUBSET of the narrow tier's. Adding the two counts made a rig look complete at twice its
-    // real coverage and skipped the wide sweep — a silently incomplete artifact, which is the one failure this
+    // `window.CoreIndexLow` and the narrow tier sweeps exactly that core band, so the walk's finds are a SUBSET
+    // of the narrow tier's. Adding the two counts would make a rig look complete at twice its real coverage and
+    // skip the wide sweep — a silently incomplete artifact, which is the one failure this
     // acquisition exists to prevent.
 
     /// <summary>
@@ -2185,8 +2125,8 @@ internal static class Sts2SpineGeoClipSweep
     ///
     /// <para>A window that does NOT claim <c>CoreBandBoundsSweep</c> is returned unchanged as well, and that is
     /// the load-bearing clause rather than an optimisation: window B's core band is an ordering hint for the walk
-    /// arm, and narrowing a dense pass onto it threw away 13 of the merchant's 14 window-B meshes on every live
-    /// bake. The band is allowed to say "look here first". Only window A may say "and nowhere else".</para>
+    /// arm, and narrowing a dense pass onto it throws away window-B meshes. The band is allowed to say "look here
+    /// first". Only window A may say "and nowhere else".</para>
     /// </summary>
     internal static SweepWindow NarrowToCoreBand(SweepWindow window)
     {
@@ -2339,9 +2279,8 @@ internal static class Sts2SpineGeoClipSweep
         // RE-GRADED BETWEEN STRIPS, unlike the ordinary tiers. A wide tier re-sweeps every window because the
         // shortfall is only observable in the total and it cannot know which window is deficient; a recovery
         // strip is answering a shortfall that a previous strip may already have closed, and the strips are the
-        // expensive part of a short bake. Live, this is what keeps a rig the FLOOR rescues from also paying for
-        // two ceilings: spectral's and magi's floor strips close their shortfall at 7 616 and 5 590 candidates
-        // and nothing runs behind them, which is the cost the round measured and this must not regress.
+        // expensive part of a short bake. This is what keeps a rig the FLOOR rescues from also paying for two
+        // ceilings: once a floor strip closes the shortfall, nothing runs behind it.
         if (expectedRunLength > 0 && found.Count < expectedRunLength)
         {
             foreach (var window in windows)
@@ -2413,47 +2352,47 @@ internal static class Sts2SpineGeoClipSweep
 // ── The walk arm: acquire a window's meshes without sweeping it ──────────────────────────────────────
 
 /// <summary>
-/// The bake's CHEAP acquisition arm. The dense two-window sweep above validates every id in the window — 46 145
-/// candidates on the merchant, ~1 650 ms at ~33 µs per rendering-server round trip, about half a pose-only
-/// bake. This arm finds the same meshes by exploiting the structure the ids actually have, and the dense sweep
-/// stays armed behind it (see <c>SweepMeshRidsAsync</c>) for whenever it does not.
+/// The bake's CHEAP acquisition arm. The dense two-window sweep above validates every id in the window, one
+/// rendering-server round trip each, which is a large share of a pose-only bake. This arm finds the same meshes by
+/// exploiting the structure the ids actually have, and the dense sweep stays armed behind it (see
+/// <c>SweepMeshRidsAsync</c>) for whenever it does not.
 ///
-/// <para>WHAT THE RECORDED IDS SAY. Both rigs' window-A meshes were dumped by the geometry probe in two
-/// sessions, and the two axes behave completely differently:</para>
+/// <para>WHAT THE RECORDED IDS SAY. Window-A meshes dumped by the geometry probe show the two axes behaving
+/// completely differently:</para>
 /// <list type="bullet">
-///   <item>The INDEX axis is exact. It advances by +1 per mesh in all four datasets, over a contiguous band
-///   (merchant 88..130, byrdonis 89..116) that sits strictly inside the bracket's own index range.</item>
-///   <item>The VALIDATOR axis is NOT dependable. In the later session it advances by a clean +5 per mesh; in the
-///   earlier one the same rigs' deltas run 12, 15, 24, 8, 8, 7, 6, 8, 5, 9, 7, 5 … because something else was
-///   minting RIDs during the skeleton build. The stride is a property of the SESSION, not of the rig.</item>
+///   <item>The INDEX axis is exact. It advances by +1 per mesh, over a contiguous band that sits strictly inside
+///   the bracket's own index range.</item>
+///   <item>The VALIDATOR axis is NOT dependable. In a clean capture it advances by a constant +5 per mesh; in an
+///   irregular one the same rig's deltas vary because something else was minting RIDs during the skeleton build.
+///   The stride is a property of the game process, not of the rig.</item>
 /// </list>
 ///
 /// <para>So the arm is: <b>column scan → stride ladder → two walks</b>.</para>
 /// <list type="number">
 ///   <item><b>Anchor by COLUMN.</b> Sweep every validator at ONE index, starting from the core band's low edge.
-///   A column costs the window's validator span (223 candidates on the merchant's window A, 72 on its window B)
-///   and the measured index bands are dense enough that the second column tried is a hit on every recorded rig.
+///   A column costs the window's validator span, and the index bands are dense enough that one of the first
+///   columns tried is a hit.
 ///   This replaces the live probe's step-24 LATTICE, which is the right anchor for a window with no index
 ///   structure and the wrong one here: the lattice needs the validator stride it is trying to find, and it costs
 ///   several times a column.</item>
 ///   <item><b>Measure the stride</b> off the anchor with the probe's ladder — never assume it. The assumed +5 is
 ///   only ever used to seed the ladder's fallback.</item>
 ///   <item><b>Walk twice from the same anchor and union the results.</b> The LINE sweep steps the measured
-///   stride to both window edges with no miss budget, because the merchant's run has a THIRTEEN-point hole in it
-///   (indices 116..128 mint meshes that never validate) and a walk that stops on consecutive misses loses the
-///   two meshes beyond it. The INDEX walk steps index ±1 and searches a bounded validator reach for each step,
-///   which is what recovers a run whose validator deltas are irregular. Neither alone covers both recorded
-///   sessions; together they do.</item>
+///   stride to both window edges with no miss budget, because a run can have a long hole in it (indices that
+///   mint meshes that never validate) and a walk that stops on consecutive misses loses the meshes beyond it.
+///   The INDEX walk steps index ±1 and searches a bounded validator reach for each step, which is what recovers
+///   a run whose validator deltas are irregular. Neither alone covers both clean and irregular captures;
+///   together they do.</item>
 ///   <item><b>Stop at the band edge.</b> Once a run is accepted, columns inside its index extent are skipped (the
-///   line sweep already visited them) and the scan stops one column past each end. That is what turns window A
-///   from 31 889 candidates into roughly 700.</item>
+///   line sweep already visited them) and the scan stops one column past each end. That is what shrinks window
+///   A to a small fraction of its dense candidate count.</item>
 /// </list>
 ///
 /// <para>CORRECTNESS IS NOT THIS CLASS'S JOB. Every acceptance rule here is a heuristic about where meshes are,
 /// and each one can be wrong on a rig nobody has measured. What makes that safe is the caller's rule: if the arm
 /// delivers fewer meshes than there are slots showing an attachment, the dense sweep runs anyway and its answer
-/// is unioned in. Phase 1 shipped a silently incomplete acquisition (29 of 44 slots) and it cost two rounds to
-/// find; an arm that is merely SLOW when it is wrong is a different class of bug from one that is quiet.</para>
+/// is unioned in. A silently incomplete acquisition is hard to notice; an arm that is merely SLOW when it is wrong
+/// is a different class of bug from one that is quiet.</para>
 /// </summary>
 internal static class Sts2SpineGeoClipWalk
 {
@@ -2504,11 +2443,11 @@ internal static class Sts2SpineGeoClipWalk
     internal const uint AssumedIndexStride = Sts2SpineGeometryMath.DefaultLiveIndexStride;
 
     /// <summary>
-    /// How many meshes a walked run must hold before it is believed. THE ONE THING THAT EXCLUDES THE 256×256
-    /// QUAD: the live battery found a four-vertex quad at index 33 whose uvs are exactly [0,1] and whose box sits
-    /// inside the skeleton's bounds, and no per-mesh predicate can reject it — it is excluded only because
-    /// nothing walks off it. Six is the number that exclusion was recorded at, and it is flat rather than scaled
-    /// off the rig's slot count so that it cannot drift away from the case it was chosen for.
+    /// How many meshes a walked run must hold before it is believed. THE ONE THING THAT EXCLUDES A FULL-PAGE
+    /// QUAD: a four-vertex quad whose uvs are exactly [0,1] and whose box sits inside the skeleton's bounds
+    /// cannot be rejected by any per-mesh predicate — it is excluded only because nothing walks off it. The
+    /// count is flat rather than scaled off the rig's slot count so that it cannot drift away from the case it
+    /// was chosen for.
     /// </summary>
     internal const int MinimumRunLength = 6;
 
@@ -2516,8 +2455,8 @@ internal static class Sts2SpineGeoClipWalk
     internal const int StrideLadderMaxDelta = 24;
 
     /// <summary>
-    /// How many validators past the last hit the INDEX walk searches for the next index. The largest per-mesh
-    /// validator delta in the recorded sessions is 24; 48 leaves the same margin again.
+    /// How many validators past the last hit the INDEX walk searches for the next index: twice the largest
+    /// per-mesh validator delta observed, leaving the same margin again.
     /// </summary>
     internal const uint DefaultIndexWalkReach = 48;
 
@@ -2530,8 +2469,8 @@ internal static class Sts2SpineGeoClipWalk
 
     /// <summary>
     /// Below this many candidates a window is swept densely without trying the walk at all. A window this small
-    /// costs ~100 ms dense (byrdonis's window B is 2 184 candidates), which is less than the walk can save and
-    /// less than one failed acquisition would cost — and a window this small is exactly where a run too short to
+    /// is cheap to sweep densely — less than the walk can save and less than one failed acquisition would
+    /// cost — and a window this small is exactly where a run too short to
     /// clear <see cref="MinimumRunLength"/> lives.
     /// </summary>
     internal const int DefaultDenseFloorCandidates = 4_096;
@@ -2645,22 +2584,19 @@ internal static class Sts2SpineGeoClipWalk
     ///
     /// <para>WHY ALTERNATION, AND NOT A DIRECTION. This used to run UPWARD from the seed to the top of the axis
     /// and wrap round to <c>IndexLow</c> only after it. That is not an ordering, it is a containment claim —
-    /// "this window's meshes sit at or above the seed" — and on window B the claim is false. The live split is
-    /// recorded on <see cref="Sts2SpineGeoClipSweep.PlanWindowB"/> and not repeated here: the merchant has 13 of
-    /// its 14 window-B meshes BELOW the mid bracket index and 1 at or above it, and byrdonis has both of its 2
-    /// below. Everything under the seed therefore sat behind a wrap the arm could not afford to reach — an empty
-    /// column costs a whole validator-span scan, so <see cref="DefaultProbeBudget"/> buys roughly 26 columns of
-    /// window B against the ~100 the wrap needed — and the single mesh above the seed cannot clear
-    /// <see cref="MinimumRunLength"/> on its own. The arm recovered NOTHING from the window that exists to catch
-    /// those meshes.</para>
+    /// "this window's meshes sit at or above the seed" — and on window B the claim is false (see
+    /// <see cref="Sts2SpineGeoClipSweep.PlanWindowB"/>): most of its meshes can sit BELOW the mid bracket index.
+    /// Everything under the seed therefore sat behind a wrap the arm could not afford to reach — an empty column
+    /// costs a whole validator-span scan, so <see cref="DefaultProbeBudget"/> buys only a fraction of the columns
+    /// the wrap needed — and a lone mesh above the seed cannot clear <see cref="MinimumRunLength"/> on its own. The
+    /// arm recovered NOTHING from the window that exists to catch those meshes.</para>
     ///
     /// <para>CONSIDERED AND REJECTED: seeding downward first, and choosing the direction per window off
     /// <see cref="Sts2SpineGeoClipSweep.SweepWindow.CoreBandBoundsSweep"/>. Both are the original mistake with
     /// the sign flipped or with a switch bolted onto it. A direction is a claim about where a window's meshes
     /// are; this arm has already been wrong about exactly that claim once, window B's core band is flagged as an
-    /// ordering hint precisely because nothing predicts the answer, and the two rigs do not even agree on it
-    /// (13-of-14 below against 2-of-2 below). Alternation asserts nothing: at worst it pays twice the columns a
-    /// correct guess would have, and it cannot be wrong about the side.</para>
+    /// ordering hint precisely because nothing predicts the answer. Alternation asserts nothing: at worst it pays
+    /// twice the columns a correct guess would have, and it cannot be wrong about the side.</para>
     ///
     /// <para>THE RESIDUAL — this makes the arm CORRECT about the side, not sufficient. Alternation reaches
     /// window B's sub-seed run and the walk keeps all 13 of it, but the ISOLATED mesh above the seed is still
@@ -2856,7 +2792,7 @@ internal static class Sts2SpineGeoClipWalk
                 // outside it the band is over. There is deliberately NO margin past the extent: the index walk
                 // has already looked `IndexWalkMissBudget + 1` columns past each end of the run, so a margin
                 // here would re-probe exactly the columns the walk just cleared. Without this rule the arm
-                // proves the empty half of a 173-column index axis empty, 223 probes at a time, and saves
+                // proves the empty half of the index axis empty, a whole validator span at a time, and saves
                 // nothing at all.
                 if (column >= extentLow && column <= extentHigh)
                 {
@@ -2888,7 +2824,7 @@ internal static class Sts2SpineGeoClipWalk
                         var anchor = new Sts2SpineGeometryMath.RidPoint(validator, column);
 
                         // Re-measured until it succeeds rather than once: the first hypothesis can be a false
-                        // positive (the 256×256 quad is exactly that), and a ladder that found nothing off a
+                        // positive (a full-page quad is exactly that), and a ladder that found nothing off a
                         // non-member says nothing about the rig's real progression.
                         if (!string.Equals(strideSource, StrideMeasured, StringComparison.Ordinal))
                         {
@@ -2920,12 +2856,11 @@ internal static class Sts2SpineGeoClipWalk
                         }
 
                         // REFINE FROM THE RUN'S OWN ENDS. The ladder measures the progression off ONE anchor,
-                        // and on the session whose validator deltas are irregular the anchor sits in the
+                        // and on a capture whose validator deltas are irregular the anchor can sit in the
                         // irregular head: the ladder finds nothing, the line sweep degenerates to the anchor
-                        // alone, and the two meshes past the merchant's thirteen-point hole are lost. The run
-                        // the index walk built, however, states its own progression — take the modal per-mesh
-                        // delta from it and sweep that line from each end. That recovers those two, and it
-                        // costs one line sweep.
+                        // alone, and the meshes past a long hole in the run are lost. The run the index walk
+                        // built, however, states its own progression — take the modal per-mesh delta from it
+                        // and sweep that line from each end. That recovers them, and it costs one line sweep.
                         for (var round = 0; round < MaxRunRefinements; round += 1)
                         {
                             var refined = RefineRun(run, runSet, validate, plan, out var refineLine, out var refineIndex);
@@ -3011,12 +2946,13 @@ internal static class Sts2SpineGeoClipWalk
     /// <summary>
     /// The progression a WALKED RUN states about itself: the most common per-mesh validator delta between its
     /// members, taken in index order. A pair contributes <c>Δvalidator / Δindex</c> only when that divides
-    /// exactly, so a pair straddling a hole (the merchant's Δ70 over 14 indices) votes for the same 5 as its
-    /// neighbours instead of for 70.
+    /// exactly, so a pair straddling a hole (say Δ70 over 14 indices) votes for the same 5 as its neighbours
+    /// instead of for 70.
     ///
     /// <para>This is a strictly better estimator than the ladder for the case that matters: the ladder sees three
-    /// points near one anchor, and on the session whose deltas run 12, 11, 5, 5, 5 … the anchor lands in the
-    /// irregular head and the ladder measures nothing at all. Twenty-nine pairs vote 5.</para>
+    /// points near one anchor, and when a run's deltas start irregular before settling, an anchor in the
+    /// irregular head makes the ladder measure nothing at all, while the run's regular pairs still vote for the
+    /// stride.</para>
     /// </summary>
     internal static uint ModalStride(IReadOnlyList<ulong> run, uint fallback)
     {
@@ -3157,9 +3093,8 @@ internal static class Sts2SpineGeoClipWalk
 
     /// <summary>
     /// Step the INDEX axis ±1 from the anchor, searching a bounded validator reach for each step. The axis this
-    /// walks is the one that is exact in every recorded session; the validator is only ever searched, never
-    /// assumed. That is what recovers a run whose per-mesh validator delta wanders between 5 and 24, which the
-    /// constant-stride line sweep cannot see at all.
+    /// walks is the one that is exact; the validator is only ever searched, never assumed. That is what recovers
+    /// a run whose per-mesh validator delta wanders, which the constant-stride line sweep cannot see at all.
     ///
     /// <para>A missed index widens the search proportionally (index +2 is looked for over twice the reach,
     /// because the mesh at +1 may exist as an id and simply fail the predicate), so the miss budget stays small:
@@ -3807,9 +3742,9 @@ internal static class Sts2SpineGeoClipAtlas
 /// texture, and what a page's bytes are NAMED.
 ///
 /// <para>WHY. <c>ExportPages</c> costs <c>Texture2D.GetImage()</c> → <c>Decompress()</c> → <c>SavePngToBuffer()</c>
-/// per atlas page — measured at 161 ms for the merchant's four pages, on every bake, against a 271 ms budget. The
-/// pages are IMPORTED from source images that are still on disk (it is how the atlas TEXT is read at all: through
-/// the resource's <c>.import</c> sidecar), so when the source is already a PNG the bytes can simply be copied.
+/// per atlas page — a large share of a bake's budget, paid on every bake. The pages are IMPORTED from source images
+/// that are still on disk (it is how the atlas TEXT is read at all: through the resource's <c>.import</c> sidecar),
+/// so when the source is already a PNG the bytes can simply be copied.
 /// Lossless, and near-free.</para>
 ///
 /// <para>WHY IT IS GUARDED THIS HARD. A page is addressed by the parts' src rects in PAGE PIXELS, and the store
@@ -4061,11 +3996,11 @@ internal static class Sts2SpineGeoClipPageSource
 /// The atlas page's bytes taken out of the <c>.ctex</c> the <c>.import</c> sidecar names, instead of out of a
 /// source <c>.png</c> an exported build does not contain.
 ///
-/// <para>WHY THIS EXISTS AND <see cref="Sts2SpineGeoClipPageSource"/> IS NOT ENOUGH. The source passthrough
-/// declined 401 times out of 401 on <c>source-unreadable</c>, and the reason is structural rather than a bug: a
-/// Godot EXPORT strips source images. The shipped pck holds exactly one <c>.png</c> in 12 327 entries (the app
-/// icon); what it ships instead, for every imported texture, is <c>res://.godot/imported/&lt;name&gt;.png-&lt;hash&gt;.ctex</c>
-/// — and that container's payload is, for a lossless import, ALREADY a WebP. So the page can still be copied
+/// <para>WHY THIS EXISTS AND <see cref="Sts2SpineGeoClipPageSource"/> IS NOT ENOUGH. In an exported build the
+/// source passthrough declines on <c>source-unreadable</c>, and the reason is structural rather than a bug: a
+/// Godot EXPORT strips source images. What it ships instead, for every imported texture, is
+/// <c>res://.godot/imported/&lt;name&gt;.png-&lt;hash&gt;.ctex</c> — and that container's payload is, for a
+/// lossless import, ALREADY a WebP. So the page can still be copied
 /// rather than decoded and re-encoded; the file to copy from is just one indirection further in.</para>
 ///
 /// <para>WHY IT IS SAFE IN A WAY THE SOURCE PASSTHROUGH IS NOT. A <c>.ctex</c> is POST-import: whatever the
@@ -4124,14 +4059,13 @@ internal static class Sts2SpineGeoClipCtexSource
     /// DEFAULT ARMED, with the same polarity as <see cref="Sts2SpineGeoClipPageSource.ParseMode"/>: an unset or
     /// unrecognised value takes the passthrough, and only an explicit off-word declines it.
     ///
-    /// <para>Armed on the phase-6 WS-5 gate measurement: over 16 product-lane arms per condition, on the live
-    /// <c>/geoclips/</c> route, the passthrough fired 80/80 pages with no declines and cut the merchant's page
-    /// phase from 174 ms to 21 ms and its whole bake from 440 ms to 300 ms (byrdonis 395 -> 335). Every one of
-    /// those 16 artifacts decoded to pixels identical to the phase-4 reference, with <c>parts</c> — the drawn
-    /// geometry — unchanged, so the only thing that moved is the container.</para>
+    /// <para>Armed by default because, on the live <c>/geoclips/</c> route, the passthrough fires on every page
+    /// with no declines and cuts the page phase substantially, and its artifacts decode to pixels identical to the
+    /// re-encoded reference with <c>parts</c> — the drawn geometry — unchanged, so the only thing that moves is
+    /// the container.</para>
     ///
     /// <para><c>1</c>/<c>on</c>/<c>webp</c> are kept as explicit spellings rather than folded into the default,
-    /// because they are what the measurement arms and the docs already say, and a value that used to arm the
+    /// because they are what existing configurations and the docs already say, and a value that used to arm the
     /// feature must not silently become the one that disables it.</para>
     /// </summary>
     internal static Mode ParseMode(string? raw)
@@ -4410,7 +4344,7 @@ internal static class Sts2SpineGeoClipColorChecksum
 /// </summary>
 /// <remarks>
 /// <para>THE POINT. A readback is a <c>RenderingDevice::buffer_get_data</c> that flushes and stalls the device
-/// — ~0.26 ms on the merchant's meshes, 19 of 30 of which have four vertices, so the cost is per-CALL. Five
+/// — and on a rig's typically small meshes the cost is per-CALL, not per vertex. Five
 /// sums out of one call cost four extra multiply-adds per vertex and buy up to four INDEPENDENT probe bits per
 /// awaited frame instead of one, which divides both the reads and the frames by the channel count.</para>
 /// <para>An unread surface is <see cref="NotRead"/> — every sum NaN — because the probe's moved/not-moved
@@ -4466,7 +4400,7 @@ internal static class Sts2SpineGeoClipPageId
 /// <summary>
 /// The pure decisions behind baking every requested animation of one (scene, node) in a single scene load.
 ///
-/// <para>WHY IT IS WORTH DOING. A pose-only bake is 90-96 % per-SCENE work — the bracket RID sweep and the
+/// <para>WHY IT IS WORTH DOING. A pose-only bake is almost entirely per-SCENE work — the bracket RID sweep and the
 /// slot↔mesh association — and N poses of one rig pay it N times because the baker starts from
 /// <c>TryLoadSceneAndFindNode</c> per target. Slot→mesh is a property of the RIG, so one sweep and one
 /// association can serve every pose, leaving only PASS 1 + PASS 3 + the manifest write per pose.</para>
@@ -4548,7 +4482,7 @@ internal static class Sts2SpineGeoClipBatch
     /// </summary>
     /// <remarks>
     /// <para>A SINGLE-ANIMATION bake keeps the natural frame order, byte for byte. That is not tidiness: the
-    /// round's acceptance criterion is that association PAIRS are identical to the pre-change bake, and moving
+    /// acceptance criterion is that association PAIRS are identical to the pre-change bake, and moving
     /// which frame a slot is probed at can change which mesh moves.</para>
     /// <para>A BATCH puts the acquisition stop first, so the pose that shows the most slots claims them in ONE
     /// probe group and the remaining stops only pay for whatever they add. On a rig whose widest pose covers
@@ -4632,8 +4566,8 @@ internal static class Sts2SpineGeoClipBatch
     /// slot draws, a foreign mesh says the sweep validated geometry no probed slot answered for. The first is a
     /// property of the runtime, the second of the content, the third of the batch itself.</para>
     /// <para>THE FOREIGN ARM IS ABOUT NOT BEING HARSHER THAN THE PATH IT REPLACES. A rig bake sets EVERY
-    /// requested animation before the bracket closes — that is the point, it is where a third of the merchant's
-    /// slot meshes come from — so it can validate meshes that belong to a pose nothing probed at, and those come
+    /// requested animation before the bracket closes — that is the point, it is where many of a rig's slot
+    /// meshes come from — so it can validate meshes that belong to a pose nothing probed at, and those come
     /// back UNCLAIMED. `foreignMeshes` is fatal downstream, so a batch that inflated it would refuse poses a
     /// per-target bake accepts, and the coverage loss would look like a property of the rig rather than of the
     /// batching. Whether this actually happens depends on something not measurable offline (whether the runtime
@@ -4705,9 +4639,7 @@ internal enum GeoClipProbeCodeScheme
 /// <para>A probe position used to be a frame. It is now a (frame, component) pair, because one readback already
 /// yields a per-component sum (<see cref="GeoClipColorSums"/>) and the components are driven independently: the
 /// vertex colours a Spine slot writes are its slot colour, component for component. That is measured, not
-/// assumed — the merchant's one non-white slot sits at <c>(0.61960787, 0.61960787, 0.61960787, 1)</c> and the
-/// mesh it drives reads back exactly that, while the other 67 slots and their meshes are white
-/// (<c>spine-geometry-phase0-aug27</c>, offline dumps).</para>
+/// assumed: a non-white slot's mesh reads back exactly its slot colour.</para>
 /// <para>WHY ALPHA IS NOT IN THE DEFAULT. The probe reads a mesh's own CPU-side vertex-COLOUR array back out of
 /// <c>RenderingServer.MeshSurfaceGetArrays</c> — the values the Spine runtime WROTE into the surface, not
 /// anything a canvas item does with them afterwards. So the renderer's blend mode is downstream of this
@@ -4720,17 +4652,15 @@ internal enum GeoClipProbeCodeScheme
 /// cost of being wrong about alpha is a group with no answers, the cost of leaving it out is one extra awaited
 /// frame.</para>
 /// <para>WHAT DECIDES IT, PER RIG. spine-godot gates its premultiply path on the ATLAS's own <c>pma</c> flag,
-/// which this repo already parses (<c>SpineAtlasPage.PremultipliedAlpha</c>, Sts2SpineGeometryMath.cs
-/// ~1230/1351). It is therefore a property of the rig being probed and not of the engine. Census over the shipped
-/// content, counted this round: of the 169 <c>.atlas</c> files in the game's pck exactly ONE declares
-/// <c>pma:true</c> (the tough_egg monster); every other file omits the field entirely, which is spine's default
-/// of false. Neither rig this round is measured against — byrdonis, ironclad_shop — declares it.</para>
+/// which this repo already parses (<c>SpineAtlasPage.PremultipliedAlpha</c>, Sts2SpineGeometryMath.cs). It is
+/// therefore a property of the rig being probed and not of the engine. Almost no shipped atlas declares
+/// <c>pma:true</c>; the rest omit the field entirely, which is spine's default of false.</para>
 /// <para>SO WHY IS RGBA STILL AN ARM. Because "the atlas does not ask for premultiplication" is an argument, not
 /// a measurement: nothing has yet run an rgba probe on a live rig and checked that the association PAIRS it
 /// produces are the same ones the RGB probe produces. Until that arm is run, <see cref="Rgba"/> stays opt-in
 /// behind <c>SPIRECTL_SPINE_GEOCLIP_PROBE_CHANNELS=rgba</c>. If it holds, the honest shape is not a flipped
 /// default either — it is a <c>ChooseProbeChannels(settings, atlas)</c> that reads the flag the runtime reads and
-/// takes the fourth bit on the 168 rigs that can carry it while leaving the one that cannot on RGB.</para>
+/// takes the fourth bit on the rigs that can carry it while leaving those that cannot on RGB.</para>
 /// </remarks>
 internal enum GeoClipProbeChannels
 {
@@ -4744,8 +4674,8 @@ internal enum GeoClipProbeChannels
     Rgb,
 
     /// <summary>
-    /// Four bits per frame. Only sound on a rig whose atlas does not ask for premultiplied alpha, which is all
-    /// but one of the shipped ones — but unmeasured on a live rig, so an A/B arm and not the default.
+    /// Four bits per frame. Only sound on a rig whose atlas does not ask for premultiplied alpha, which is almost
+    /// all of the shipped ones — but unmeasured on a live rig, so an A/B arm and not the default.
     /// </summary>
     Rgba,
 }
@@ -5010,7 +4940,7 @@ internal static class Sts2SpineGeoClipProbe
     /// </summary>
     /// <remarks>
     /// <para>THE OPTIMISATION THIS EXISTS TO REFUSE. Re-reading a mesh some earlier group already paired looks
-    /// like pure waste: a readback is a device stall (~0.26 ms per mesh), it happens once per mesh per probe
+    /// like pure waste: a readback is a device stall, it happens once per mesh per probe
     /// FRAME, and the answer for a claimed mesh cannot change the pairing it already has. Filtering
     /// <paramref name="claimed"/> out of the read set would be the obvious saving, and it is wrong.</para>
     /// <para>WHY. Take a mesh M that two slots drive at once — S1 in an earlier group, which claimed it, and S2
@@ -5346,11 +5276,10 @@ internal sealed record GeoClipProbeSettings(
     /// <c>0</c>/<c>off</c>/<c>false</c>/<c>no</c> disables it, anything else — absent, empty or misspelt —
     /// arms it.
     ///
-    /// <para>Armed on measurement, not on the hypothesis this knob was added to test. Four live arms produced
-    /// <c>parts</c> and page pixels identical to BOTH earlier references on both rigs, with zero widen events
-    /// and the merchant's bake 38 ms and byrdonis's 157 ms faster at the median while the raster control lane
-    /// stayed flat. What licenses defaulting it, though, is the UNARMED evidence: over two legs the shadow arm
-    /// disagreed with the measured association zero times on every unarmed run. An armed run agreeing with
+    /// <para>Armed on measurement, not on the hypothesis this knob was added to test: armed bakes produced
+    /// <c>parts</c> and page pixels identical to the earlier references, with zero widen events and faster bakes.
+    /// What licenses defaulting it, though, is the UNARMED evidence: the shadow arm never disagreed with the
+    /// measured association on an unarmed run. An armed run agreeing with
     /// itself proves nothing, so no armed agreement is counted here.</para>
     ///
     /// <para>The off-word path is not a new mode — it IS the old default. Spelling it restores exactly the
@@ -5359,7 +5288,7 @@ internal sealed record GeoClipProbeSettings(
     ///
     /// <para>It used to read the other way round, on the argument that a knob choosing WHICH algorithm
     /// discovers the pairing should read a typo as "keep the measured one". The affirmative spellings still
-    /// arm it, so every recorded measurement arm means what it did; the argument is answered rather than
+    /// arm it, so every recorded configuration means what it did; the argument is answered rather than
     /// dropped, because the two algorithms have now been shown to agree.</para>
     /// </summary>
     internal const string AtlasFirstEnv = "SPIRECTL_SPINE_GEOCLIP_ASSOC_ATLAS_FIRST";
@@ -5453,10 +5382,9 @@ internal sealed record GeoClipFrameBudget(bool RaiseMaxFps, int MaxFpsTarget)
 /// WHICH of the bake's awaited engine frames are closed with a <c>RenderingServer.ForceDraw</c>.
 /// </summary>
 /// <remarks>
-/// <para>A forced draw is the bake's single largest main-thread cost: measured live it is 15.2-16.3 ms per call
-/// (geoclip-knights-stage2b phase split, four rigs), and a pose-only bake issued eight to ten of them, which is
-/// 75-85 % of everything the bake blocked the game for. That price is a whole synchronous scene render, so the
-/// only way to cut it is to issue fewer — never to make one cheaper.</para>
+/// <para>A forced draw is the bake's single largest main-thread cost, and a pose-only bake issues several of
+/// them. That price is a whole synchronous scene render, so the only way to cut it is to issue fewer — never to
+/// make one cheaper.</para>
 ///
 /// <para>WHAT A FORCED DRAW BUYS, and therefore where one is load-bearing. A bake resumes from
 /// <c>SceneTree.ProcessFrame</c> INSIDE the emission, i.e. after every node's <c>_process</c> has run for that
@@ -5467,11 +5395,9 @@ internal sealed record GeoClipFrameBudget(bool RaiseMaxFps, int MaxFpsTarget)
 ///   frame and nothing else.</description></item>
 ///   <item><description>A MESH SURFACE readback is current there too. That is not an assumption: the offline
 ///   geometry probe (<c>Sts2SpineGeometryProbe</c>) runs the same seek-then-read loop twice, once with the extra
-///   forced draw and once without, and the two arms have reported identical per-mesh tracking on both recorded
-///   rigs in every round since Phase 0 — 25/26 meshes and 171/182 changed transitions on byrdonis, 29/30 and
-///   203/210 on the ironclad rig, no-draw and with-draw alike. The reason is the one the probe states itself:
-///   the host's own main loop keeps rendering between two awaits, so eliding the forced draw removes an EXTRA
-///   draw, never the only one.</description></item>
+///   forced draw and once without, and the two arms report identical per-mesh tracking. The reason is the one the
+///   probe states itself: the host's own main loop keeps rendering between two awaits, so eliding the forced draw
+///   removes an EXTRA draw, never the only one.</description></item>
 ///   <item><description>What the extra draw DOES buy is IMMEDIACY, and exactly one thing in the bake needs it:
 ///   a RID BRACKET. <c>bracketMid</c> and <c>bracketPost</c> are taken as the upper edge of a window that must
 ///   contain every mesh the rig has minted so far, and a mesh minted by the frame just awaited is only certain
@@ -5685,7 +5611,7 @@ internal enum GeoClipPauseAssertMode
 
     /// <summary>
     /// Always pay the two-frame checksum, even when the free check already passed. Costs two engine frames per
-    /// rig and exists so a live arm can be graded without trusting the cheap check's coverage.
+    /// rig and exists so a live run can be graded without trusting the cheap check's coverage.
     /// </summary>
     Strict,
 }
@@ -5696,10 +5622,9 @@ internal enum GeoClipPauseAssertMode
 ///
 /// <para>DEFAULT OFF, and the default is not a placeholder. The gate this lever has to pass is
 /// <see cref="GeoClipPauseVerdict.ArmingAllowed"/>, which needs a bake that is both mostly-parked and short
-/// enough that the freeze is beneath notice; the profiles measured on both available rigs are neither (blocking
-/// share 0.30-0.39, parked 0.36-0.57, totals ~290-355 ms), so the verdict is false on every measurement that
-/// exists. The lever is built, tested and documented anyway, for a future where the bake is short enough — not
-/// armed on a hypothesis.</para>
+/// enough that the freeze is beneath notice; the bake profiles measured so far are neither, so the verdict is
+/// false on every measurement that exists. The lever is built, tested and documented anyway, for a future where the
+/// bake is short enough — not armed on a hypothesis.</para>
 ///
 /// <para>WHAT PAUSING WOULD BUY, and why the assertion below is not optional: a paused tree stops running the
 /// game between the bake's awaited frames, so the bake's PARKED milliseconds go away. It buys nothing if the
@@ -6479,9 +6404,8 @@ internal static class Sts2SpineGeoClipBuilder
 /// of them addresses one identical uv box, so <see cref="Sts2SpineGeoClipAtlas.MatchMeshToAttachmentRegion"/>
 /// scores them all at zero against each other and correctly answers
 /// <see cref="Sts2SpineGeoClipAtlas.MatchAmbiguous"/>: there is nothing in the atlas that distinguishes them.
-/// The colour NUDGE cannot separate them either, and the measured reason is instructive — a live
-/// <c>fight KNIGHTS_ELITE</c> bake spent 264 colour reads on the flail's three and reported "43 of 43 meshes
-/// never moved", because those slots are exactly the ones the animation's own colour timeline rewrites every
+/// The colour NUDGE cannot separate them either, and the reason is instructive — a probe over them reports no
+/// mesh moving, because those slots are exactly the ones the animation's own colour timeline rewrites every
 /// frame, which overwrites the nudge before the next frame can be read.</para>
 ///
 /// <para>AND THAT IS THE OPENING. The timeline that defeats the nudge is itself the discriminator: it gives the
@@ -6678,11 +6602,11 @@ internal static class Sts2SpineGeoClipSlotColorIdentity
 ///
 /// <para>WHY A PROOF AND NOT A MESH COUNT. The admission rule used to read <c>foreignMeshes == 0</c> — no
 /// validated mesh inside the RID bracket left unclaimed — as a proxy for "every claim is sound". It is a bad
-/// proxy in a live process, where other rigs and VFX mint meshes continuously, and a measured counter-example
-/// exists: an Ironclad at <c>anim=attack</c> baked <c>complete=true</c> with all 44 drawable slots associated and
-/// 8 unclaimed meshes in the bracket, and was thrown away. The 8 were the rig's OWN geometry, minted by the
-/// offline instance for attachments that are not drawable at the sampled pose. Nothing about them could have
-/// corrupted a claim, and the artifact was correct.</para>
+/// proxy in a live process, where other rigs and VFX mint meshes continuously, and it has a real
+/// counter-example: a bake can be <c>complete=true</c> with every drawable slot associated and still leave
+/// unclaimed meshes in the bracket that are the rig's OWN geometry, minted by the offline instance for
+/// attachments that are not drawable at the sampled pose. Nothing about them can corrupt a claim, and such an
+/// artifact is correct.</para>
 ///
 /// <para>THE QUESTION THE PROXY WAS REALLY ASKING is per claim, not per bake: could THIS pairing have gone to a
 /// mesh that is not ours? Two provenances answer no on their own terms:</para>
@@ -6902,7 +6826,7 @@ internal sealed record GeoClipBakeOutcome(
 /// <param name="ElapsedMs">
 /// The WHOLE rig's wall time, summed across every pass it took — not one pose's. A per-pose figure would be the
 /// time up to that pose within a shared pass, which understates what the rig cost and cannot be divided to get
-/// the amortized number this round is graded on.
+/// the amortized number a rig bake is graded on.
 /// </param>
 internal sealed record GeoClipRigBakeOutcome(
     IReadOnlyList<GeoClipBakeOutcome> Poses,
@@ -6947,8 +6871,8 @@ internal static class Sts2SpineGeoClipRequestLane
     /// <param name="foreignCandidateDiagnosticsLimit">
     /// The log-only foreign-candidate lever, PASSED IN rather than read here. Both lanes drive one bake, so a
     /// diagnostic that only the env lane could turn on made the lane that actually serves <c>/geoclips/</c>
-    /// unable to explain its own refusals — a live round had to construct a separate env-lane bake shaped like
-    /// the route to get candidate provenance at all. It is a parameter, trailing and optional, because this
+    /// unable to explain its own refusals — getting candidate provenance at all meant constructing a separate
+    /// env-lane bake shaped like the route. It is a parameter, trailing and optional, because this
     /// method's purity is the invariant that lets a test prove the request lane never consults
     /// <c>Sts2OneShotArmClaim</c>; reading an environment variable here would spend that to save a caller one
     /// line. The caller resolves it from the same variable, parse and cap the env lane uses. Zero is off, which
@@ -7186,8 +7110,8 @@ internal static class Sts2SpineGeoClipRequestLane
     /// <para>THE THIRD ARM IS OWNERSHIP, not a mesh count. Because the two arms above it have already fired,
     /// the third is only ever reached by a bake that COMPLETED with every drawable slot associated — so the
     /// question it is really asking is whether those claims are sound, and unclaimed leftovers were only ever a
-    /// proxy for it. A measured counter-example retired the proxy (see <see cref="Sts2SpineGeoClipOwnership"/>):
-    /// a complete, fully associated Ironclad bake was discarded over 8 leftovers that were its own geometry.
+    /// proxy for it. A counter-example retired the proxy (see <see cref="Sts2SpineGeoClipOwnership"/>): a
+    /// complete, fully associated bake can carry leftovers that are its own geometry.
     /// The arm now fires when the bracket holds leftovers AND at least one claim rests on something weaker than
     /// a colour flip or an exact atlas match — i.e. when contamination could actually have corrupted a claim.
     /// Leftovers alone no longer sink an otherwise perfect bake; they stay a first-class reported counter.</para>
@@ -7307,11 +7231,10 @@ internal static class Sts2SpineGeoClipRequestLane
     // it completed that plan. Window A's index axis is inferred from two bracket sentinels, and that inference
     // is sound only while Godot's RID allocator is bump-allocating; a creature death anywhere earlier in the
     // session populates its free list, the rig's meshes land at recycled indices outside the hull, and they are
-    // never probed. Measured (round WS-I): the SAME four rigs bake 4/4 complete on a quiet room and 1/4 after
-    // two kills, in virgin processes, with `associated == meshesValidated` exactly in every shortfall.
+    // never probed. In such a shortfall `associated == meshesValidated` exactly.
     //
     // So it is a property of ALLOCATOR STATE AT ONE INSTANT, not of the rig, and pinning it is pinning noise.
-    // Today one unlucky bake refuses the identity for the life of the process — and, through couch-coop's
+    // Pinned, one unlucky bake would refuse the identity for the life of the process — and, through a host's
     // durable receipt, for the life of the install. The index-floor recovery strip above closes most of the
     // cause; this closes the consequence, because "most" is not "all" and the next allocator surprise should
     // cost a re-bake rather than a permanently missing creature.

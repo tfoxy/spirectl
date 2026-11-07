@@ -3,7 +3,7 @@ namespace Spirectl.Sts2.Live;
 // Producer reparent-emit transform-omission decision — PURE and Godot-free (like Sts2RegionEmitCap /
 // Sts2CosmeticEmitCap / Sts2TweenEndpointTuples) so it is unit-testable without the Godot-coupled watcher.
 //
-// Background (P2 discard-select flash). The round-3 reparent force-emit (Sts2SceneWatcher: parentChanged →
+// Background (discard-select flash). The reparent force-emit (Sts2SceneWatcher: parentChanged →
 // wholesale re-attach) ships the node's CURRENT streamed transform. When the reparent coincides with a
 // streaming-suppression window (the mirror is REPLAYING a tween on this node or an ancestor — e.g. a hand card
 // selected for discard reparents into a fresh NSelectedHandCardHolder under the centre container WHILE that
@@ -28,7 +28,7 @@ namespace Spirectl.Sts2.Live;
 //   * !justAdded     — a brand-new node (JustAdded) has no last-known transform to hold, so it MUST ship its
 //                       initial placement; omitting it would strand the fresh node at the origin.
 //
-// DEFAULT ON; SPIRECTL_SCENE_WATCH_REPARENT_HOLD_TWEENED=0 seeds it OFF (restoring the round-3 ship-the-transform
+// DEFAULT ON; SPIRECTL_SCENE_WATCH_REPARENT_HOLD_TWEENED=0 seeds it OFF (restoring the ship-the-transform
 // behaviour). Read on the game main thread in the capture loop; a one-tick stale read is harmless.
 internal static class Sts2ReparentEmit
 {

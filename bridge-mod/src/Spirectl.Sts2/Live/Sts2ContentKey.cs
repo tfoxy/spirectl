@@ -4,7 +4,7 @@ using System.Threading;
 
 namespace Spirectl.Sts2.Live;
 
-// R13 producer CONTENT KEY — PURE and Godot-free (like Sts2TopBarFold / Sts2ProceedGlow / Sts2MapPointPulse) so the
+// Producer CONTENT KEY — PURE and Godot-free (like Sts2TopBarFold / Sts2ProceedGlow / Sts2MapPointPulse) so the
 // identity rule and the serial registry are unit-testable without the Godot-coupled Sts2RuntimeSceneWatcher.
 //
 // WHY. Card visual nodes are POOLED. `NCard` implements `IPoolable`: the game keeps ~30 instances alive and

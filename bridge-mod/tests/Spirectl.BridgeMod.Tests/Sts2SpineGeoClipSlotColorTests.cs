@@ -7,26 +7,23 @@ namespace Spirectl.BridgeMod.Tests;
 
 // Separating meshes the ATLAS CANNOT TELL APART, by the colour each side already carries.
 //
-// THE DEFECT, MEASURED. A live `fight KNIGHTS_ELITE` on a real GPU (evidence archived at
-// `.sts2/research/data/geoclip-knights-20260908T0500Z/`; host log `legE-envbake-combat-vfx/spine-geoclip.log`
-// lines 122-138 and 184-198, reproduced identically in the quiet control leg) refused two of the four rigs at
-// their attack animations, both for the same reason:
+// THE DEFECT. A combat bake of the knights refused two of the four rigs at their attack animations, both for the
+// same reason:
 //
 //   flail_knight   anim=attack_flail   associated 40/43   ambiguousAtlasRegion=3   3 slots share `circ_rotator`
 //   spectral_knight anim=attack_sword  associated 19/21   ambiguousAtlasRegion=2   2 slots share `sword swish`
 //
 // The leftover candidates carry a BYTE-IDENTICAL uv box in each case, because the slots genuinely draw the same
 // attachment. `MatchMeshToAttachmentRegion` scores them at zero against each other and answers `ambiguous`,
-// which is correct — there is nothing in the atlas that separates them — and the colour NUDGE could not separate
-// them either: the flail's group cost 264 colour reads and reported "43 of 43 meshes never moved", because those
-// slots are exactly the ones the animation's own colour timeline rewrites every frame.
+// which is correct — there is nothing in the atlas that separates them — and the colour NUDGE cannot separate
+// them either, because those slots are exactly the ones the animation's own colour timeline rewrites every
+// frame.
 //
 // WHAT SEPARATES THEM. The timeline that defeats the nudge is the discriminator. At the sampled pose the flail's
-// three slots carry three different colours (archived manifest
-// `envbake-artifacts/legE-combat/flail_knight--Visuals--attack_flail/manifest.json`, `frames[0].slots`), and the
-// renderer writes each slot's colour into its mesh's vertices — so the pairing reads off directly, with no
-// nudge and no extra device read. The spectral's two both sit at (1,1,1,0) and therefore DO NOT separate, which
-// is the negative half of this file and is measured, not invented.
+// three slots carry three different colours (the attack manifest's `frames[0].slots`), and the renderer writes
+// each slot's colour into its mesh's vertices — so the pairing reads off directly, with no nudge and no extra
+// device read. The spectral's two both sit at (1,1,1,0) and therefore DO NOT separate, which is the negative half
+// of this file and comes from the same recording, not invented.
 //
 // Every colour, uv box, page size and mesh order below is that recording's. Where the recording's log prints a
 // number to three decimals, the fixture carries the integer page-pixel box those three decimals round to, and

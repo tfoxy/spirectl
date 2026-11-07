@@ -4,8 +4,8 @@ using Xunit;
 namespace Spirectl.BridgeMod.Tests;
 
 // The geoclip bake's PHASE PROFILE: the manifest-facing projection of a render-phase snapshot, the doctrine
-// that says which side of the blocking/parked split each bake phase belongs on, and the pause verdict a later
-// workstream's arm has to pass. Pure — no live host, no Godot — so these run in the ordinary suite.
+// that says which side of the blocking/parked split each bake phase belongs on, and the pause verdict the pause
+// lever has to pass. Pure — no live host, no Godot — so these run in the ordinary suite.
 //
 // Shares the profiler's collection (and its Reset discipline) because the ambient recorder is process-wide:
 // two of these running beside a Sts2RenderPhaseProfileTests case would stamp into each other's render.

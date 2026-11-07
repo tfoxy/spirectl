@@ -9,8 +9,8 @@ namespace Spirectl.Sts2.Live;
 // Stateful, incremental scene-tree watcher — the high-frequency transport behind the live "mirror".
 //
 // Why it exists: the stateless Sts2RuntimeSceneProvider.GetTree rebuilds the WHOLE tree (paths +
-// reflection + properties) every call. Running that ~30-60×/s on the game main thread drops the game to
-// ~20fps. This watcher instead:
+// reflection + properties) every call. Running that ~30-60×/s on the game main thread costs the game a large
+// part of its frame rate. This watcher instead:
 //   - Caches STATIC per-node data (id/name/type/parent), keyed by node instance id, refreshed only when
 //     the structure changes (driven by SceneTree node_added/node_removed/tree_changed signals).
 //   - Per tick reads ONLY cheap LOCAL volatile fields (global rect, local visible, modulate alpha,
@@ -129,7 +129,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     // re-allocated per capture (the walk is allocation-sensitive). Only populated/read in local mode.
     private readonly List<Transform2D> _emittedGlobalByDepth = [];
 
-    // R15 arm C flip flush: every node of an arm-C-suppressed subtree the walk read THIS capture, root first, in
+    // Arm C flip flush: every node of an arm-C-suppressed subtree the walk read THIS capture, root first, in
     // pre-order (Sts2SpineAnchorFold.FlipFlushRecorder owns the region and position bookkeeping and the decision;
     // HiddenFoldTarget applies it to the watcher's state). Reused across captures and reset at the start of each,
     // so an idle combat whose only arm-C region is one anchor and its hidden child appends two structs per tick.
@@ -162,7 +162,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SCENE_WATCH_ELIDE_FROZEN_SPINE") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R10 ORDER/UPSERT CONTRACT (default ON; SPIRECTL_SCENE_WATCH_ORDER_EMITTED_ONLY=0 restores the pre-R10 array).
+    // ORDER/UPSERT CONTRACT (default ON; SPIRECTL_SCENE_WATCH_ORDER_EMITTED_ONLY=0 restores the every-node array).
     // ON: OrderedIds carries only nodes that have actually been emitted, and a node's FIRST emit re-ships the order
     // even without a tree-shape change. See the orderedIds build in Capture for why both halves are one feature.
     private static readonly bool OrderEmittedOnly =
@@ -179,31 +179,29 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
     // Resolve PROCEDURAL ramp sampler uniforms (Gradient/Curve) to their authored data on the shader-parameter
     // snapshot (default ON; SPIRECTL_SCENE_WATCH_SHADER_PARAM_GRADIENTS=0 emits the resource PATH only, as before).
-    // STS2's VFX particle shaders colour every texel through a `lut` GradientTexture1D
-    // (`COLOR = vec4(texture(lut, texture_color.rr).rgb, erosion) * vertex_color`), so a client holding only the
+    // STS2's VFX particle shaders colour every texel through a `lut` GradientTexture1D, so a client holding only the
     // sampler path renders the raw red-channel MASK (the energy orb / hit streaks as a red-orange square). The
     // stops are read ONCE, on the static add walk (ToShaderParams), off the per-tick volatile path.
     private static readonly bool EmitShaderParamGradients =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SCENE_WATCH_SHADER_PARAM_GRADIENTS") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // #7 (creature death shrink): honor a SubViewport's `size_2d_override` when flattening its content (default
-    // ON; SPIRECTL_SCENE_WATCH_VIEWPORT_SIZE_OVERRIDE=0 restores the pre-fix behavior). A SubViewport that renders
-    // at a higher pixel `Size` than its 2D coordinate space (`size_2d_override`) supersamples: its child transforms
-    // live in `size_2d_override` space, but the ViewportTexture the consumer draws is `Size` pixels. The
-    // MonsterDeathVfx uses exactly this (`Size = 2·num`, `size_2d_override = num`) so its "Visual" Sprite2D can
-    // display a crisp, dissolving corpse at the creature's normal on-screen size. TryComputeViewportPrefix measured
-    // the fit against `Size` and dropped the `Size / size_2d_override` factor, so the flattened creature was emitted
-    // at half scale — the reported "creature gets small before disappearing". Composing the supersample factor back
+    // Honor a SubViewport's `size_2d_override` when flattening its content (default ON;
+    // SPIRECTL_SCENE_WATCH_VIEWPORT_SIZE_OVERRIDE=0 ignores it). A SubViewport that renders at a higher pixel `Size`
+    // than its 2D coordinate space (`size_2d_override`) supersamples: its child transforms live in
+    // `size_2d_override` space, but the ViewportTexture the consumer draws is `Size` pixels. The MonsterDeathVfx
+    // supersamples this way so its "Visual" Sprite2D can display a crisp, dissolving corpse at the creature's normal
+    // on-screen size. Fitting against `Size` alone drops the `Size / size_2d_override` factor and emits the
+    // flattened creature at reduced scale (it shrinks before disappearing); composing the supersample factor back
     // restores its true on-screen size. Only SubViewports that actually set size_2d_override are affected (the
     // card-intent viewport does not), so this is a no-op for every existing case.
     private static readonly bool HonorViewportSizeOverride =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SCENE_WATCH_VIEWPORT_SIZE_OVERRIDE") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R11 producer region-emit cap (default 100ms = 10Hz; SPIRECTL_REGION_EMIT_CAP_MS=0 disables). A Sprite2D playing
+    // Producer region-emit cap (default 100ms = 10Hz; SPIRECTL_REGION_EMIT_CAP_MS=0 disables). A Sprite2D playing
     // an AtlasTexture flip-book (the Tezcatara candle flames) swaps its TextureRegion crop EVERY tick → a per-frame
-    // TextureRegion delta per flame floods producer→wire→client (the 9-14fps signature). This paces a PURE same-size
+    // TextureRegion delta per flame floods producer→wire→client. This paces a PURE same-size
     // frame swap (a real Draw — a size-changing swap — is NEVER capped) to at most one emit per window per node: within
     // the window the previously-emitted region is substituted before the change test so the swap is invisible to the
     // signature; the window then elapses and the newest crop ships (icons/flames keep animating — paced, never frozen).
@@ -221,27 +219,25 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         return int.TryParse(raw.Trim(), out var v) && v >= 0 ? v : 100;
     }
 
-    // R11 producer cosmetic-emit cap (DEFAULT OFF; set SPIRECTL_COSMETIC_EMIT_CAP_MS=100 for 10Hz pacing, 0 disables).
-    // The Tezcatara rest-site fire VFX animate their TRANSFORM every frame (a continuous flicker) — the recorded wire
-    // shows transform is the ONLY per-tick-changing channel, ~97 upserts/drain × ~30 drains/s (~6 MB/s). This paces
+    // Producer cosmetic-emit cap (DEFAULT OFF; set SPIRECTL_COSMETIC_EMIT_CAP_MS=100 for 10Hz pacing, 0 disables).
+    // The Tezcatara rest-site fire VFX animate their TRANSFORM every frame (a continuous flicker), and transform is
+    // their only per-tick-changing channel. This paces
     // SUSTAINED per-frame transform churn (a node whose transform has moved for >= CosmeticChurnTicks consecutive ticks)
     // to at most one emit per window per node: within the window the previously-emitted transform is substituted before
     // the change test (invisible to the signature; children re-base against the pinned global so an emitting child stays
     // placed), then the window elapses and the newest transform ships. One-shot moves (card plays, reparents) never
     // reach the streak so they stream instantly; a node leaving churn settles to its exact final transform.
     //
-    // DEFAULT OFF because a replay A/B (tezca-defaultbridge.ndjson through the real wide-screen client) showed the
-    // Tezcatara 9-14fps is NOT bounded by the upsert flood: stripping even 98% of the transform upserts moved fps only
-    // 11→12 (frameMs 89.6→81), while the frame is dominated by ~166 client-side particle/shader nodes the browser
-    // re-simulates every frame (render[continuous=166]) — which the producer cap cannot touch. The cap remains a ready,
-    // correct BANDWIDTH/GC lever (43% churn reduction cut client GC allocMb 404→292 and gcPause 156→104ms — useful for
-    // phone/low-end clients) with no fps regression; enable it where wire/GC pressure matters. See the cosmetic-cap
+    // DEFAULT OFF because the client frame rate on that scene is NOT bounded by the upsert flood: the frame is
+    // dominated by the client-side particle/shader nodes the browser re-simulates every frame, which the producer cap
+    // cannot touch. The cap remains a ready, correct BANDWIDTH/GC lever for low-end clients with no fps regression;
+    // enable it where wire/GC pressure matters. See the cosmetic-cap
     // block in the capture loop + Tracked.PrevRealTransform/CosmeticChurnStreak/LastCosmeticEmitAtMs and
     // Sts2CosmeticEmitCap.
     private static readonly int CosmeticEmitCapMs = ParseCosmeticEmitCapMs();
 
-    // Consecutive ticks of continuous (full-precision) transform churn before pacing engages. Chosen from the recording:
-    // one-shot moves last 1-2 ticks; the fire VFX churn for the whole event — K=10 (~0.33s at 30Hz) cleanly protects the
+    // Consecutive ticks of continuous (full-precision) transform churn before pacing engages. One-shot moves last
+    // 1-2 ticks; the fire VFX churn for the whole event — K=10 (~0.33s at 30Hz) cleanly protects the
     // former while paying the warmup only once per continuous flame. SPIRECTL_COSMETIC_CHURN_TICKS overrides.
     private static readonly int CosmeticChurnTicks = ParseCosmeticChurnTicks();
 
@@ -267,11 +263,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         return int.TryParse(raw.Trim(), out var v) && v >= 1 ? v : 10;
     }
 
-    // R12 decorative-animator folds MASTER switch (default ON; SPIRECTL_DECOR_EMIT_SUPPRESS=0 restores the pre-fix
+    // Decorative-animator folds MASTER switch (default ON; SPIRECTL_DECOR_EMIT_SUPPRESS=0 restores plain
     // streaming for all of them). A handful of always-mounted UI nodes run an INFINITE purely-decorative per-frame
     // animator (the top-bar deck/map/settings icon rock-or-spin, the Proceed button's pulsing glow alpha) whose churn
-    // alone keeps a VISUALLY IDLE screen emitting 25-60 deltas/s — on the map and the treasure/proceed screens it is
-    // the SOLE churner, i.e. 100% of the wire. For a node matched by scene identity the producer divides the ONE
+    // alone keeps a VISUALLY IDLE screen emitting every frame — on the map and the treasure/proceed screens it is
+    // the SOLE churner. For a node matched by scene identity the producer divides the ONE
     // churning channel analytically back out of the stream and names the loop on the wire
     // (`RuntimeSceneNodeDelta.PinnedLoopAnim`) so the client replays it on its own clock. See Sts2DecorEmitSuppress
     // for the rule table and Sts2TopBarFold / Sts2ProceedGlow / Sts2MapPointPulse for each animation's own notes.
@@ -279,31 +275,31 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         (System.Environment.GetEnvironmentVariable("SPIRECTL_DECOR_EMIT_SUPPRESS") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R13 TOP-BAR ICON FOLD (default ON; SPIRECTL_TOPBAR_FOLD=0 restores plain streaming for the three icons). Also
+    // TOP-BAR ICON FOLD (default ON; SPIRECTL_TOPBAR_FOLD=0 restores plain streaming for the three icons). Also
     // gated by the master switch above. See Sts2TopBarFold: while a button's screen is open the icon's ROTATION is
-    // divided back out of the streamed transform (position + scale keep streaming — which is what fixes the WS-D
-    // mispositioning bug) and the per-button loop token is shipped for the client to replay.
+    // divided back out of the streamed transform (position + scale keep streaming, so the icon stays correctly
+    // placed) and the per-button loop token is shipped for the client to replay.
     private static readonly bool TopBarFold =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_TOPBAR_FOLD") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R13 PROCEED-GLOW FOLD (default ON; SPIRECTL_PROCEED_FOLD=0 restores plain streaming for the glow). Also gated
+    // PROCEED-GLOW FOLD (default ON; SPIRECTL_PROCEED_FOLD=0 restores plain streaming for the glow). Also gated
     // by the master switch. See Sts2ProceedGlow: while the infinite glow tween runs, self_modulate's ALPHA is
     // substituted with the loop's analytic 0.75 (RGB keeps streaming) and "proceedGlow" is named on the wire.
     private static readonly bool ProceedFold =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_PROCEED_FOLD") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R13 CONTENT KEY (default ON; SPIRECTL_CONTENT_KEY=0 stops emitting the field). Independent of the folds above
+    // CONTENT KEY (default ON; SPIRECTL_CONTENT_KEY=0 stops emitting the field). Independent of the folds above
     // (it costs nothing per tick — it rides the STATIC block only) but kept switchable like every other wire
     // addition. See Sts2ContentKey: a stable `nc:{entry}#{serial}` identity for the POOLED card visuals.
     private static readonly bool ContentKeys =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_CONTENT_KEY") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R12b MAP-POINT PULSE FOLD (default ON; SPIRECTL_MAPPOINT_FOLD=0 restores the pre-fix streaming). The one
-    // per-frame animator WS-D deliberately left running — the travelable map node's icon-scale sweep — is the top
-    // residual churner: a map screen still emits ~15-24 deltas/s and every one of them is a map point. It cannot be
+    // MAP-POINT PULSE FOLD (default ON; SPIRECTL_MAPPOINT_FOLD=0 restores plain streaming). The one per-frame
+    // animator the decorative folds deliberately leave running — the travelable map node's icon-scale sweep — is the
+    // top residual churner on a map screen. It cannot be
     // pinned-and-forgotten like the four garnish animators (WHICH nodes pulse is how the game shows you where you
     // may travel), so this is a REAL fold: divide the pulse's uniform scale back out of the streamed transform AND
     // ship a declarative `PinnedLoopAnim` flag that changes only on pulse MEMBERSHIP changes, which the client
@@ -313,11 +309,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         (System.Environment.GetEnvironmentVariable("SPIRECTL_MAPPOINT_FOLD") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R14 IDLE-WIRE COMBAT FOLDS. Four more always-mounted decorative animators, all in COMBAT, which is why an
-    // idle combat kept streaming ~30 msgs/s (measured: 898 messages / 30s, longest gap 91ms) after R12/R13 had
-    // silenced the map and the dialog screens. Each has its own switch; all four are ALSO gated by the master
-    // SPIRECTL_DECOR_EMIT_SUPPRESS above. See Sts2IntentBobFold / Sts2IntentGlyphFold / Sts2OrbSpinFold /
-    // Sts2EndTurnGlowFold for each animation's shape, the analytic rest values and the accepted costs.
+    // IDLE-WIRE COMBAT FOLDS. Four more always-mounted decorative animators, all in COMBAT, that would otherwise
+    // keep an idle combat streaming once the map and dialog screens are silent. Each has its own switch; all four
+    // are ALSO gated by the master SPIRECTL_DECOR_EMIT_SUPPRESS above. See Sts2IntentBobFold / Sts2IntentGlyphFold /
+    // Sts2OrbSpinFold / Sts2EndTurnGlowFold for each animation's shape, the analytic rest values and the accepted
+    // costs.
 
     // The enemy-intent holder's per-frame sine POSITION, subtracted back out so the client's path-keyed `bob`
     // replay composes to the exact on-screen motion. SPIRECTL_INTENT_BOB_FOLD=0 restores streaming.
@@ -344,10 +340,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         (System.Environment.GetEnvironmentVariable("SPIRECTL_ENDTURN_GLOW_FOLD") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R15 CREATURE SPINE-ANCHOR FOLD (default ON; SPIRECTL_SPINE_ANCHOR_FOLD=0 restores plain streaming for the
-    // anchors). Also gated by the master SPIRECTL_DECOR_EMIT_SUPPRESS above. After R14 landed, a live 6s capture of
-    // an IDLE combat measured 52.8 msg/s across EIGHT node ids: four `SpineSlotNode` creature anchors plus their
-    // emitter children — 100% of the wire. Unlike every fold above this one substitutes NOTHING and names no loop:
+    // CREATURE SPINE-ANCHOR FOLD (default ON; SPIRECTL_SPINE_ANCHOR_FOLD=0 restores plain streaming for the
+    // anchors). Also gated by the master SPIRECTL_DECOR_EMIT_SUPPRESS above. With the folds above in place, the
+    // `SpineSlotNode` creature anchors and their emitter children are what keep an IDLE combat streaming. Unlike
+    // every fold above this one substitutes NOTHING and names no loop:
     // an anchor paints no pixel of its own, so while it provably cannot move anything on screen (no descendants at
     // all, or only idle particle emitters) the watcher simply WITHHOLDS its transform through the same
     // SuppressTransformUntil depth sentinel that streaming tween-suppression uses — which silences the emitter
@@ -356,7 +352,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_ANCHOR_FOLD") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
 
-    // R15 arm C, HIDDEN-DESCENDANT anchors (default ON; SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD=0 restores arms A+B only).
+    // Arm C, HIDDEN-DESCENDANT anchors (default ON; SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD=0 restores arms A+B only).
     // Also gated by both switches above. Withholds a paintless anchor whose every descendant is inert or locally
     // hidden (the Ironclad's `EyeSlot` over its hidden `EyeFire`), and flushes the anchor's live pose in the same
     // delta when one of them turns visible. See Sts2SpineAnchorFold arm C and HiddenFoldTarget.
@@ -383,12 +379,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     // `NProceedButton._shouldPulse` — the third gate of the glow loop (see Sts2ProceedGlow).
     private static readonly StringName ProceedShouldPulseProp = "_shouldPulse";
 
-    // `NEndTurnButton._isShiny` — the single, exact gate of the end-turn glow's infinite pulse loop: it is set true
-    // immediately before `GlowPulse()` (its only caller) and false immediately before the kill. See
+    // `NEndTurnButton._isShiny` — the single, exact gate of the end-turn glow's infinite pulse loop. See
     // Sts2EndTurnGlowFold.
     private static readonly StringName EndTurnShinyProp = "_isShiny";
 
-    // Streaming suppression (Part C, default ON): while the mirror REPLAYS a tween on a node, the client pins that
+    // Streaming suppression (default ON): while the mirror REPLAYS a tween on a node, the client pins that
     // subtree's transform and DISCARDS every streamed transform for it — so suppressing those transform-only deltas
     // producer-side is pure bandwidth/CPU savings with no on-screen change (see ResolveTweenEndpoint + the capture
     // loop). Kept as a kill-switch for A/B + safety. Now a RUNTIME-adjustable knob on Sts2SceneWatchRuntimeSettings
@@ -396,7 +391,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     // "send tween properties vs per-frame node properties" live.
     private static bool SuppressTweenedTransforms => Sts2SceneWatchRuntimeSettings.SuppressTweenedTransforms;
 
-    // Opacity streaming suppression (Part C Stage 4, default ON). While the mirror REPLAYS a modulate/self_modulate
+    // Opacity streaming suppression (default ON). While the mirror REPLAYS a modulate/self_modulate
     // fade the client PINS the target's opacity, so every per-frame streamed opacity delta for it is discarded —
     // dropping them producer-side is pure savings. Unlike transform suppression, opacity is emitted PER-NODE-LOCAL
     // (ReadVolatile reads each node's OWN modulate/self_modulate), so a parent fade changes only the parent's local
@@ -407,7 +402,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     // A tween-suppression window can never exceed this — a stuck-window backstop if a captured duration is bogus.
     private const long SuppressCapMs = 2000;
 
-    // WS-3: how many not-yet-tracked card-flight windows may be parked at once. A shuffle spawns one flight per
+    // How many not-yet-tracked card-flight windows may be parked at once. A shuffle spawns one flight per
     // shuffled card and each parks at most 4 ids (flight node + trail root + its two NCardTrail strokes), so this
     // covers a ~30-card reshuffle with headroom; past it the oldest-deadline entries are dropped and those nodes
     // simply keep streaming (fail-open, exactly like every other producer suppression).
@@ -888,7 +883,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
     private RuntimeSceneDelta? Capture(bool subscriberFullRequested)
     {
-        // R15 arm C: nothing recorded by an earlier capture (one that threw, or returned early) may reach this one.
+        // Arm C: nothing recorded by an earlier capture (one that threw, or returned early) may reach this one.
         _hiddenFold.Reset();
         _capturePhase = CapturePhaseResolveRoot;
         _captureCursorTracked = null;
@@ -910,10 +905,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             _rootId = rootId;
             _registry.Clear();
             _ordered.Clear();
-            // WS-3: a whole-scene rebuild also drops any parked card-flight window — the nodes those deadlines named
+            // A whole-scene rebuild also drops any parked card-flight window — the nodes those deadlines named
             // belong to the scene that just went away, and holding them would freeze whatever reuses their ids.
             _animations.Reset();
-            // R14: and any resolve still waiting for its mover to be tracked. That mover belonged to the scene that
+            // And any resolve still waiting for its mover to be tracked. That mover belonged to the scene that
             // just went away, so no future reconcile can satisfy it — and a node reusing its instance id must not
             // inherit someone else's flight.
 
@@ -939,7 +934,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             _capturePhase = CapturePhaseReconcile;
             Reconcile(root, removedIds);
             _captureCursorNode = null;
-            // R14: the registry has just been refilled — this is the ONE instant in the tick where a card-flight
+            // The registry has just been refilled — this is the ONE instant in the tick where a card-flight
             // resolve that missed the registry can newly succeed, so retry the parked ones here, before the emission
             // walk below reads the suppression windows a successful retry opens. Deliberately NOT inside
             // ReconcileNode: a node's Depth/ParentId/PrefixChain are still unassigned while it is being reconciled,
@@ -958,7 +953,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         }
 
         var upserts = new List<RuntimeSceneNodeDelta>();
-        // R10 ORDER/UPSERT CONTRACT: set when any node emits for the FIRST time this capture (see Tracked.EverEmitted
+        // ORDER/UPSERT CONTRACT: set when any node emits for the FIRST time this capture (see Tracked.EverEmitted
         // and the orderedIds build below). Cheap — one bool, written at most once per node per session.
         var firstEmitThisPass = false;
         var skipDepth = int.MaxValue;
@@ -968,40 +963,40 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // root; a node deeper than it is inside its subtree.
         var now = System.Environment.TickCount64;
         var suppressDepth = int.MaxValue;
-        // Frozen spine-skeleton elision context (Stage B): while inside a frozen + stationary SpineSprite root's
+        // Frozen spine-skeleton elision context: while inside a frozen + stationary SpineSprite root's
         // subtree, skeleton-leaf descendants are read-elided. frozenRootDepth = the active root's depth (-1 = none).
         var frozenRootDepth = -1;
         var frozenRootStationary = false;
-        // FIX 4 rest-site overlay stream. A depth sentinel pinned at the NRestSiteRoom root: while inside its subtree
+        // Rest-site overlay stream. A depth sentinel pinned at the NRestSiteRoom root: while inside its subtree
         // (restOverlayDepth >= 0), a Visible=false node is EXEMPT from the prune gate and — only while the rest room
         // is the ACTIVE screen — has the overlay-quirk `visible` flipped false→true (see Sts2RestOverlayStream).
         // Both flags are read once here (main thread; a one-tick stale read is harmless). restSiteActive gates the
         // visible-flip so a BACKGROUNDED rest room isn't resurrected; the exemption alone rides insideRestOverlay.
         var restOverlayEnabled = Sts2SceneWatchRuntimeSettings.RestOverlayStream;
-        // R10: read alongside restOverlayEnabled (same once-per-pass discipline) — narrows the visible-flip so a
+        // Read alongside restOverlayEnabled (same once-per-pass discipline) — narrows the visible-flip so a
         // gamepad-prompt glyph the game hides on its own input state is never resurrected onto a touch mirror.
         var restOverlayPromptDenylist = Sts2SceneWatchRuntimeSettings.RestOverlayPromptDenylist;
         var restSiteActive = string.Equals(_screenType, Sts2SupportedScreenIds.RestSiteRoomScreenId, StringComparison.Ordinal);
         var restOverlayDepth = -1;
-        // WS-2 Line2D stroke geometry (map quill annotations). Read ONCE per pass like the rest-overlay flag above
+        // Line2D stroke geometry (map quill annotations). Read ONCE per pass like the rest-overlay flag above
         // (main thread; a one-tick stale read is harmless). Off ⇒ no signature is computed and no geometry is ever
-        // attached, so the wire is byte-identical to the pre-feature producer. WS4 scoped the DEFAULT to the map
+        // attached, so the wire is byte-identical to the pre-feature producer. The DEFAULT is scoped to the map
         // strokes; `all` is the A/B lever that restores the type-only behaviour.
         var lineGeometryScope = Sts2SceneWatchRuntimeSettings.Line2DGeometryScope;
         // Enemy-intent glyph frame sets discovered THIS pass, keyed by the glyph Sprite2D's instance id. Populated
         // when an NIntent is visited (pre-order → the parent is reached before its `%Intent` child), consumed when
         // that child glyph node is emitted a few iterations later. Lazily allocated (no combat = no dictionary).
         Dictionary<ulong, RuntimeSceneIntentFramesSnapshot>? intentFramesByGlyph = null;
-        // R15: the depth of the spine-anchor fold root (any arm) whose subtree the walk is in (int.MaxValue = none).
+        // The depth of the spine-anchor fold root (any arm) whose subtree the walk is in (int.MaxValue = none).
         // Kept apart from `suppressDepth`, which tween windows share: it marks the nodes whose pose the FOLD left
         // stale on the client (Tracked.AnchorPoseWithheld), which the frozen-spine elision must not skip.
         var anchorFoldDepth = int.MaxValue;
-        // R15: the depth of the nearest open client-replayed tween window (SuppressTransformUntil) above or at the
+        // The depth of the nearest open client-replayed tween window (SuppressTransformUntil) above or at the
         // current node, IGNORING the fold's own sentinel. `suppressDepth` cannot answer that inside a fold region:
         // there the fold's root owns the sentinel and a descendant's own window never opens a new one. The flip
         // flush must not put a transform on a node the client is replaying a tween for (it would pin it).
         var tweenWindowDepth = int.MaxValue;
-        // INDEXED (not foreach) so the R15 spine-anchor fold can scan a candidate anchor's SUBTREE — the entries
+        // INDEXED (not foreach) so the spine-anchor fold can scan a candidate anchor's SUBTREE — the entries
         // that follow it in this pre-order list while their Depth exceeds its own — without a per-node child list.
         _capturePhase = CapturePhaseWalk;
         for (var orderIndex = 0; orderIndex < _ordered.Count; orderIndex++)
@@ -1015,7 +1010,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 frozenRootStationary = false;
             }
 
-            // R15: left the fold root's subtree → clear the context. Arm C's own region (for the flip flush) is
+            // Left the fold root's subtree → clear the context. Arm C's own region (for the flip flush) is
             // tracked by the recorder, which must see every visited node for the same reason.
             if (anchorFoldDepth != int.MaxValue && tracked.Depth <= anchorFoldDepth)
             {
@@ -1034,10 +1029,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             {
                 tweenWindowDepth = int.MaxValue;
             }
-            // R15 arm A withheld this (childless) node this capture — see the AnchorPoseWithheld update below.
+            // Arm A withheld this (childless) node this capture — see the AnchorPoseWithheld update below.
             var foldedChildless = false;
 
-            // FIX 4: maintain the rest-site overlay depth sentinel. Reset on subtree exit (depth back to/above the
+            // Maintain the rest-site overlay depth sentinel. Reset on subtree exit (depth back to/above the
             // pinned root), then (re-)pin on the NRestSiteRoom root. Root detection reads only cached strings
             // (nodeType / sceneFilePath) — no Godot call, no Visible read — so it is safe before the skip/prune gates.
             // Pinning at the room root makes the WHOLE ChoicesScreen subtree (+ ProceedButton + future panels) stream.
@@ -1065,7 +1060,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // skeleton-leaf CLASSES (bones/slots/meshes) — the SpineSprite root and bone-attached non-spine VFX
             // children are separate entries and stay fully read, so nothing hook-driven or rendered is dropped.
             //
-            // R15 exemption: a leaf whose pose the spine-anchor fold withheld while the skeleton still moved is STALE on
+            // Exemption: a leaf whose pose the spine-anchor fold withheld while the skeleton still moved is STALE on
             // the client; if it has descendants they keep being read and placed against its live pose. It takes the
             // normal read path instead, where the fold lets its pose ship once (see Sts2SpineAnchorFold
             // .ShouldElideFrozenLeaf / DecideArm's frozen-root rule) — the same read this elision would skip, not a
@@ -1146,7 +1141,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 }
             }
 
-            // R13 SELF-ONLY transform suppression, checked for EVERY node (a self window is armed independently of
+            // SELF-ONLY transform suppression, checked for EVERY node (a self window is armed independently of
             // the subtree one above, and unlike it never opens the depth sentinel — descendants keep streaming).
             // Its settle re-emit is ORed in with the subtree window's for the same reason that one exists: the
             // per-frame deltas were withheld, so the one tick after the window closes must ship the live transform
@@ -1163,7 +1158,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
             // Opacity suppression is TARGET-ONLY (no depth propagation): opacity is emitted per-node-local, so a
             // fade changes only the target's own modulate/self_modulate → only the target ever needs suppressing.
-            // R15: tween suppression in effect for this node apart from the fold (see tweenWindowDepth). Read before
+            // Tween suppression in effect for this node apart from the fold (see tweenWindowDepth). Read before
             // the fold below can open its own sentinel; only the flip flush and the withheld-pose bit consult it.
             if (tweenWindowDepth == int.MaxValue && tracked.SuppressTransformUntil > now)
             {
@@ -1213,7 +1208,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             {
                 StoreEmittedGlobal(tracked.Depth, streamedGlobal);
             }
-            // FIX 4: neutralize the rest-site overlay quirk's false `visible` (flip false→true) for a node inside the
+            // Neutralize the rest-site overlay quirk's false `visible` (flip false→true) for a node inside the
             // ACTIVE rest-site overlay — right after ReadVolatile and BEFORE ApplyIfChanged so diff/emit/LastVisible
             // stay consistent and the prune gate below (which reads read.Visible) sees the same value. The TRUE
             // modulate.a is streamed untouched (an unfocused description still fades transparent); only the structural
@@ -1221,7 +1216,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // outside the rest overlay or with the kill-switch off. Guarded so combat/map/shop/event never call in.
             if (insideRestOverlay)
             {
-                // R10: the flip skips gamepad-prompt glyphs (%ControllerIcon …) — the game hides those on its own
+                // The flip skips gamepad-prompt glyphs (%ControllerIcon …) — the game hides those on its own
                 // input state, so flipping them showed a "press Y" prompt on a mouse/touch mirror. `tracked.Name` is
                 // the cached static name (no Godot call). Kill switch REST_OVERLAY_PROMPT_DENYLIST.
                 var overlayVisible = Sts2RestOverlayStream.EmitVisible(
@@ -1236,7 +1231,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                     read = read with { Visible = overlayVisible };
                 }
             }
-            // R15: remember when this emitter was last actually emitting, so a spine anchor above it can tell a
+            // Remember when this emitter was last actually emitting, so a spine anchor above it can tell a
             // burst that ENDED THIS INSTANT (whose particles are still on screen and still following the emitter)
             // from one that finished long ago. One assignment for particle nodes, nothing for anything else.
             // Pre-order puts an anchor BEFORE its emitters, so an anchor reads a timestamp one capture old — which
@@ -1247,7 +1242,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 tracked.LastEmittingAtMs = now;
             }
 
-            // ---- R15 CREATURE SPINE-ANCHOR FOLD ---------------------------------------------------------------
+            // ---- CREATURE SPINE-ANCHOR FOLD -------------------------------------------------------------------
             // Withhold the transform of a spine skeleton anchor that provably cannot move a pixel right now: it
             // paints nothing itself (the client's `placementBox` returns null for it) and it either has no
             // descendants at all (arm A — structural, corpus-wide), its whole subtree is idle particle emitters
@@ -1261,7 +1256,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // paced. Setting `suppressDepth` here still covers the subtree: the sentinel is only consulted on the
             // NEXT iteration, which is this node's first child.
             //
-            // Not gated on localMode, unlike the R12-R14 transform folds: those substitute a rest pose the client
+            // Not gated on localMode, unlike the decorative transform folds: those substitute a rest pose the client
             // must compose a replay against (only meaningful for parent-relative locals), whereas this one just
             // stops sending — in global mode the subtree simply keeps its last-known globals, which is equally
             // correct. Never applied on a node's first appearance (JustAdded), whose upsert carries the static
@@ -1327,7 +1322,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             {
                 _profile.RecordSuppressOpacityDrop(); // an opacity change withheld because this node is mid-fade (profiler only)
             }
-            // R11 region-emit cap: a pure same-size atlas-frame swap (a Sprite2D flip-book flame) is paced to one emit
+            // Region-emit cap: a pure same-size atlas-frame swap (a Sprite2D flip-book flame) is paced to one emit
             // per RegionEmitCapMs per node. PIN → substitute the previously-emitted region so it's invisible to the
             // change signature (BuildNodeDelta reads the same substituted `read`, so the wire and tracked.LastTexture-
             // Region stay consistent — no phantom re-emit). EMIT → the window elapsed, let this frame through and
@@ -1342,7 +1337,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                     break;
             }
 
-            // R11 cosmetic-emit cap: pace SUSTAINED per-frame transform churn (the fire-VFX flicker) to one emit per
+            // Cosmetic-emit cap: pace SUSTAINED per-frame transform churn (the fire-VFX flicker) to one emit per
             // CosmeticEmitCapMs per node. Runs on the REAL transform (not the tween-suppressed path — a client-pinned
             // tween already owns its subtree). PIN → substitute the last-emitted transform so the swap is invisible to
             // the change signature AND re-base children against the pinned (client-shown) global so an emitting child
@@ -1379,15 +1374,15 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 tracked.PrevRealTransform = read.Transform;
             }
 
-            // R13 top-bar icon fold: while a top-bar button's screen is OPEN, divide its icon's ROTATION back out of
+            // Top-bar icon fold: while a top-bar button's screen is OPEN, divide its icon's ROTATION back out of
             // the streamed transform (position + scale keep streaming) and name the loop on the wire so the client
             // replays it. See Sts2TopBarFold. Runs AFTER the caps above so the folded node's transform is the pinned
             // rest pose, not a paced one.
             //
-            // Note what is NOT here any more: WS-D pinned the icon's WHOLE first-emitted transform, which froze the
-            // deck + settings icons at a PRE-LAYOUT pose (deck is center-anchored, settings is GROW_BOTH at its
-            // min-size clamp) and rendered them misplaced for the rest of the run. Rotation is the only channel the
-            // animators write, so folding only rotation is both sufficient and structurally incapable of that bug.
+            // Note what is NOT pinned: the icon's WHOLE first-emitted transform. That would freeze the deck +
+            // settings icons at a PRE-LAYOUT pose and render them misplaced for the rest of the run. Rotation is the
+            // only channel the animators write, so folding only rotation is both sufficient and structurally
+            // incapable of that bug.
             //
             // SCREEN CLOSED → no pin, no token: the hover / press-down / unhover one-shots are then the only rotation
             // writers and they stream live, so the icons still tilt under the pointer for free.
@@ -1418,7 +1413,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 }
             }
 
-            // R13 proceed-glow fold: while the infinite glow tween runs, substitute the loop's ANALYTIC alpha into
+            // Proceed-glow fold: while the infinite glow tween runs, substitute the loop's ANALYTIC alpha into
             // self_modulate (RGB keeps streaming, so a real colour/state change still ships) and name the loop. Every
             // non-loop state — the focus flash to alpha 1, the fade-to-0 stop, the disabled hold — fails the gate and
             // streams live at its true value, which matters because alpha 0 is MEANINGFUL here. See Sts2ProceedGlow.
@@ -1434,7 +1429,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 };
             }
 
-            // R12b map-point pulse fold: divide the travelable-node icon pulse's UNIFORM scale back out of this
+            // Map-point pulse fold: divide the travelable-node icon pulse's UNIFORM scale back out of this
             // node's transform (rotation/placement keep streaming — the per-point tilt is a one-off random value)
             // and name the loop on the wire so the client replays it. See Sts2MapPointPulse.
             //
@@ -1447,10 +1442,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             {
                 if (node is Control pulseControl)
                 {
-                    // NOTE (deliberate, load-bearing): unlike the emit CAPS above — but exactly like the two R13 folds
-                    // — this pin does NOT re-base descendants against the pinned value (a cap's pinned value is what
-                    // the client SHOWS; a fold's is what the client's replay multiplies back up). The icons' own
-                    // locals are constant (the pulse is the
+                    // NOTE (deliberate, load-bearing): unlike the emit CAPS above — but exactly like the top-bar
+                    // and proceed-glow folds — this pin does NOT re-base descendants against the pinned value (a
+                    // cap's pinned value is what the client SHOWS; a fold's is what the client's replay multiplies
+                    // back up). The icons' own locals are constant (the pulse is the
                     // CONTAINER's scale), so leaving the REAL streamed global in the depth scratch keeps them
                     // constant → they never emit either. The client then composes pinned-container × constant-icon =
                     // the whole group at REST, and its CSS pulse multiplies the container by the SAME
@@ -1470,12 +1465,12 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             }
 
             // The enemy-intent glyph frame set stashed when this glyph's parent NIntent was visited earlier this
-            // pass (pre-order DFS guarantees the parent came first). Hoisted ABOVE the R14 folds because the
+            // pass (pre-order DFS guarantees the parent came first). Hoisted ABOVE the idle-wire folds because the
             // flip-book fold substitutes FRAME 0 of this very set; the emit block below reuses the same lookup.
             RuntimeSceneIntentFramesSnapshot? stashedIntentFrames = null;
             intentFramesByGlyph?.TryGetValue(tracked.Id, out stashedIntentFrames);
 
-            // ---- R14 idle-wire combat folds -------------------------------------------------------------------
+            // ---- Idle-wire combat folds -----------------------------------------------------------------------
             // Four always-mounted combat animators whose per-frame churn alone keeps a VISUALLY IDLE combat wire
             // awake. Each divides/substitutes ONE analytic channel; everything else about these nodes streams
             // untouched. All four run AFTER the emit caps above, so a folded node's transform is the pinned rest
@@ -1575,14 +1570,14 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             {
                 RecordNodeProfile(tracked, read, node, System.Diagnostics.Stopwatch.GetTimestamp() - profStart);
             }
-            // The stashed frame set (resolved above, before the R14 folds) drives its own emit trigger: the
+            // The stashed frame set (resolved above, before the idle-wire folds) drives its own emit trigger: the
             // animation changes on the CombatStateChanged signal even while the node is frozen (so the frozen
             // glyph's own volatile read may not change), and the frame set re-ships ONLY on keyframe/add or that
             // change (carried forward by MergeVolatile otherwise).
             var intentAnimChanged = stashedIntentFrames is not null
                 && !string.Equals(tracked.LastIntentAnim, stashedIntentFrames.AnimationName, StringComparison.Ordinal);
 
-            // WS-2 Line2D stroke geometry (the map quill annotations), on exactly the intentFrames side-channel
+            // Line2D stroke geometry (the map quill annotations), on exactly the intentFrames side-channel
             // pattern above. A stroke grows by `AddPoint` under `…/MapDrawing/DrawViewport`; NOTHING the volatile
             // diff reads changes when it does (a Line2D has no texture, no text, and its transform is fixed), so
             // like an intent-animation change this needs its own emit trigger.
@@ -1605,7 +1600,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             var parentChanged = Sts2SceneWatchRuntimeSettings.EmitReparents
                 && !string.Equals(tracked.ParentIdStr, tracked.LastEmittedParentId, StringComparison.Ordinal);
 
-            // R15 arm C: whether this node's upsert was appended this tick, and what it carried.
+            // Arm C: whether this node's upsert was appended this tick, and what it carried.
             var emitted = false;
             var emittedTransform = false;
             if (full || changedNow || intentAnimChanged || lineSigChanged || spineReprobeUpgraded || parentChanged)
@@ -1632,7 +1627,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                     intentFrames = stashedIntentFrames;
                     tracked.LastIntentAnim = stashedIntentFrames.AnimationName;
                 }
-                // WS-2: the ONLY place a stroke's full point array is ever marshalled — on a keyframe/add, or on the
+                // The ONLY place a stroke's full point array is ever marshalled — on a keyframe/add, or on the
                 // tick its signature actually changed. Deferred-work philosophy, same as intentFrames above: the
                 // per-tick path stays a count+tip probe, and a resting map (dozens of finished strokes) pays nothing.
                 LineGeometry? lineGeometry = null;
@@ -1641,12 +1636,12 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                     lineGeometry = strokeGeometry;
                     tracked.LastLineSig = lineSig;
                 }
-                // P2 discard-select flash: when this emit is a REPARENT force-emit AND the node is inside an open
+                // Discard-select flash: when this emit is a REPARENT force-emit AND the node is inside an open
                 // streaming-suppression window (the mirror is replaying a tween on it or an ancestor), OMIT the
-                // transform payload. Otherwise the round-3 reparent emit ships the node's transition-START local
+                // transform payload. Otherwise the reparent emit ships the node's transition-START local
                 // (the card mid-reparent ≈ global bottom-centre) which the client PINS for the rest of the window,
                 // flashing it off-centre until the settle resync. With Transform=null the client holds the node's
-                // last-known placed local (Q6 HasPlacedTransform) — (0,0) under the new centre holder ⇒ rendered at
+                // last-known placed local (HasPlacedTransform) — (0,0) under the new centre holder ⇒ rendered at
                 // centre immediately, riding the container's tween, with the settle re-emit unchanged. The re-attach
                 // still carries parentId + static so the client re-parents. Un-suppressed reparents (deselect) keep
                 // shipping their transform. Kill-switch REPARENT_HOLD_TWEENED (default ON).
@@ -1659,7 +1654,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 upserts.Add(BuildNodeDelta(tracked, emitRead, includeStatic, intentFrames, lineGeometry, includeTextWrap));
                 emitted = true;
                 emittedTransform = emitRead.Transform is not null;
-                // R10: this node's FIRST appearance on the wire. Its id was withheld from OrderedIds until now
+                // This node's FIRST appearance on the wire. Its id was withheld from OrderedIds until now
                 // (see Tracked.EverEmitted), so the order must be re-shipped this capture or the client would
                 // merge the node with no structure trigger and never build an element for it.
                 if (!tracked.EverEmitted)
@@ -1672,7 +1667,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 tracked.LastEmittedParentId = tracked.ParentIdStr;
             }
 
-            // R15 arm C: record this region node as read THIS tick, for the flip flush. `read` is the value the change
+            // Arm C: record this region node as read THIS tick, for the flip flush. `read` is the value the change
             // test just used; a flush ships exactly this transform, so nothing is ever re-read. The descendant's kind
             // is taken from this tick's own `visible` (the anchor's scan used last capture's). Called right after this
             // node's own emit step: the recorder takes its pre-order position from the upsert list.
@@ -1693,7 +1688,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                     tweenWindow: tweenWindow);
             }
 
-            // R15: is this node's pose, as the client holds it, stale because the fold withheld it? Read by the
+            // Is this node's pose, as the client holds it, stale because the fold withheld it? Read by the
             // frozen-spine elision above on later captures; cleared only when the pose actually reaches the client
             // (here, or by the flip flush). See Sts2SpineAnchorFold.PoseStillWithheld for the rule.
             tracked.AnchorPoseWithheld = Sts2SpineAnchorFold.PoseStillWithheld(
@@ -1717,7 +1712,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
             // Prune hidden subtrees on incremental ticks only — a keyframe must carry every node so the
             // client's retained map matches OrderedIds. The client hides descendants via the parent chain.
-            // FIX 4: EXEMPT a Visible=false node inside the NRestSiteRoom subtree from the prune so its focus fade-in
+            // EXEMPT a Visible=false node inside the NRestSiteRoom subtree from the prune so its focus fade-in
             // is read/diffed/emitted instead of skipped (the description-stuck-invisible cure). Merely un-pruning
             // would let ChoicesScreen ship its overlay `visible:false` and hide the whole rest-site UI — but the
             // neutralization above already flipped an ACTIVE overlay's false→true, so an exempted node is only
@@ -1730,9 +1725,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             }
         }
 
-        // R15 arm C flip flush: BEFORE the empty check and the orderedIds build, so a flushed node's first emit (if it
-        // ever were one) still re-ships the order under the R10 contract. A flush only ever fires alongside an upsert
-        // of the descendant that flipped, so it never turns an empty capture into a non-empty one.
+        // Arm C flip flush: BEFORE the empty check and the orderedIds build, so a flushed node's first emit (if it
+        // ever were one) still re-ships the order under the order/upsert contract. A flush only ever fires alongside
+        // an upsert of the descendant that flipped, so it never turns an empty capture into a non-empty one.
         _captureCursorTracked = null;
         _capturePhase = CapturePhaseFlipFlush;
         if (_hiddenFold.Count > 0)
@@ -1748,13 +1743,13 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             return null; // nothing changed → emit nothing (natural dedup)
         }
 
-        // R10 ORDER/UPSERT CONTRACT (kill switch SPIRECTL_SCENE_WATCH_ORDER_EMITTED_ONLY=0 restores the pre-R10
+        // ORDER/UPSERT CONTRACT (kill switch SPIRECTL_SCENE_WATCH_ORDER_EMITTED_ONLY=0 restores the every-node
         // array verbatim). TWO coupled halves, both required:
         //   1. The array carries only nodes the client has actually RECEIVED. A pruned hidden subtree's ids used to
         //      ride the order while their upserts never did, so the client held order entries for nodes it had no
         //      state for — which BOTH broke the compact order patch (SceneOrderDiff's self-verification can't
         //      reconstruct an order containing ids the structure index skips, so every structural send fell back to
-        //      the full ~52KB array) AND, worse, meant the id was ALREADY in the order when the node finally
+        //      the full array) AND, worse, meant the id was ALREADY in the order when the node finally
         //      emitted.
         //   2. Because of that, a first emit must re-ship the order even when the tree shape did not change:
         //      `state.orderedIds !== lastOrderedIds` is the client's only structural-walk trigger, so a node that
@@ -1778,9 +1773,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             TransformSpace: localMode ? "local" : "global");
     }
 
-    // The emitted draw order. R10: only nodes the client actually holds (Tracked.EverEmitted); with the kill switch
-    // off, the pre-R10 array (every registered node, including pruned hidden subtrees the client has no state for).
-    // Allocation is unchanged in kind — the pre-R10 build already materialised a fresh array per structural send.
+    // The emitted draw order: only nodes the client actually holds (Tracked.EverEmitted); with the kill switch
+    // off, the every-node array (every registered node, including pruned hidden subtrees the client has no state
+    // for). Allocation is the same in kind — the every-node build also materialises a fresh array per structural send.
     private string[] BuildOrderedIds()
         => OrderEmittedOnly
             ? _ordered.Where(t => t.EverEmitted).Select(t => t.IdStr).ToArray()
@@ -1887,10 +1882,10 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 var prefixComputable = TryComputeViewportPrefix(subViewport, out var fit);
 
                 // No prefix ⇒ this viewport's content has no place on screen: it would stream at VIEWPORT-LOCAL
-                // coordinates, i.e. pinned at ~the design origin. That is the phantom potion — NPotion.DoFlash()
-                // duplicates the potion subtree into the 60x60 SubViewport of vfx_potion_flash.tscn, which is only
-                // ever sampled as a CPUParticles2D texture (no Control/Sprite2D consumer to resolve), and under the
-                // headless permanent particle freeze the one-shot never finishes so the VFX never QueueFrees. Skip
+                // coordinates, i.e. pinned at ~the design origin. That is the phantom potion — the potion flash
+                // renders into the SubViewport of vfx_potion_flash.tscn, which is only ever sampled as a
+                // CPUParticles2D texture (no Control/Sprite2D consumer to resolve), and under the headless permanent
+                // particle freeze the one-shot never finishes so the VFX is never freed. Skip
                 // the subtree entirely; Reconcile's stale sweep emits the removals, and re-admission is symmetric
                 // (absent from _registry ⇒ re-added JustAdded ⇒ full static-bearing upsert). SubViewportContainer
                 // content is NEVER pruned — it is genuinely displayed in-game. See Sts2ViewportContentPrune.
@@ -1936,7 +1931,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             };
             _registry[id] = tracked;
 
-            // WS-3: adopt a card-flight suppression window parked before this node was ever tracked (the flight VFX
+            // Adopt a card-flight suppression window parked before this node was ever tracked (the flight VFX
             // and its trail are hooked in their own `_Ready`, i.e. one reconcile before they land here). Entries are
             // one-shot — removed on adoption — so a later node that happens to reuse the instance id can't inherit
             // a stale freeze, and an already-expired deadline is simply dropped.
@@ -1963,7 +1958,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             }
         }
 
-        // R12 decorative-animator suppression: resolve this node's SCENE IDENTITY (nearest instanced-scene root +
+        // Decorative-animator suppression: resolve this node's SCENE IDENTITY (nearest instanced-scene root +
         // the path below it) from its parent's, which pre-order DFS guarantees is already resolved. Re-resolved on
         // add AND on a reparent (the only two ways a node's scene-relative path can change), so a cached scope can
         // never go stale. The IsWatchedScene probe at each scene root is what keeps this near-free: outside the few
@@ -1987,7 +1982,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         }
     }
 
-    // R12: resolve one node's decorative-suppression scope from its parent's. A node carrying a SceneFilePath is an
+    // Resolve one node's decorative-suppression scope from its parent's. A node carrying a SceneFilePath is an
     // instanced-scene ROOT — it starts a fresh scope (rel path ".") only when the table has rules for that scene;
     // otherwise it CLEARS the scope, so a nested unwatched scene inside a watched one can't inherit the wrong
     // identity. A node without a SceneFilePath extends its parent's rel path (null past MaxRelDepth). Resetting the
@@ -1998,7 +1993,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         {
             tracked.DecorSceneFile = Sts2DecorEmitSuppress.IsWatchedScene(sceneFile) ? sceneFile : null;
             tracked.DecorRelPath = tracked.DecorSceneFile is null ? null : Sts2DecorEmitSuppress.RootRelPath;
-            // R12b: the scene-instance ROOT is where a scoped node's game-side STATE lives (the map point's
+            // The scene-instance ROOT is where a scoped node's game-side STATE lives (the map point's
             // travelable/focused/input gates hang off NNormalMapPoint, not off its icon container). Remember it as an
             // ID, not a Node reference, so a freed root can never be dereferenced — the capture path resolves it
             // through the registry, which pre-order DFS guarantees is populated before any descendant is read.
@@ -2020,12 +2015,12 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         tracked.DecorChannels = Sts2DecorEmitSuppress.Lookup(tracked.DecorSceneFile, tracked.DecorRelPath);
     }
 
-    // ---- R15 creature spine-anchor fold: the three facts the walk feeds Sts2SpineAnchorFold ------------------
+    // ---- Creature spine-anchor fold: the three facts the walk feeds Sts2SpineAnchorFold ----------------------
 
     /// <summary>
     /// Does this node contribute a browser-visible field OF ITS OWN? A spine anchor contributes none — it has no
     /// rect (it is a Node2D, not a Control), no texture, no text, no fill, no range, no shader uniforms and no
-    /// spine clip of its own — which is exactly why the client's `placementBox` (`nodeStyles.ts:256`) returns null
+    /// spine clip of its own — which is exactly why the client's `placementBox` returns null
     /// for it and its element is a bare grouping div. Anything that DOES report one is a node the client places, so
     /// withholding its transform would strand it on screen: the fold refuses.
     /// </summary>
@@ -2167,14 +2162,14 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     private sealed class HiddenFoldTarget(Sts2RuntimeSceneWatcher owner)
         : Sts2SpineAnchorFold.IFlushTarget<HiddenFoldNode, RuntimeSceneNodeDelta>
     {
-        // R10: set when a ship was some node's first emit, so the capture re-ships the order.
+        // Order contract: set when a ship was some node's first emit, so the capture re-ships the order.
         public bool FirstEmit;
 
         public RuntimeSceneNodeDelta BuildShip(in HiddenFoldNode node)
         {
             // A volatile upsert like any per-tick emission. A region node is never JustAdded (that one always emits)
-            // and so has always been shipped before; the R10 bookkeeping is kept anyway so the order contract cannot
-            // break if that ever stops being true.
+            // and so has always been shipped before; the first-emit bookkeeping is kept anyway so the order contract
+            // cannot break if that ever stops being true.
             var tracked = node.Tracked;
             var firstEmit = !tracked.EverEmitted;
             var delta = BuildNodeDelta(tracked, node.Read, includeStatic: firstEmit);
@@ -2206,7 +2201,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         }
     }
 
-    // R15 arm C: a pre-order view of `_ordered` starting at a candidate anchor, classified from last capture.
+    // Arm C: a pre-order view of `_ordered` starting at a candidate anchor, classified from last capture.
     private readonly struct OrderedSubtreeView(List<Tracked> ordered, int anchorIndex) : Sts2SpineAnchorFold.ISubtreeView
     {
         public int Count => ordered.Count - anchorIndex;
@@ -2216,7 +2211,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         public Sts2SpineAnchorFold.DescendantKind KindAt(int index) => LastDescendantKind(ordered[anchorIndex + index]);
     }
 
-    // R15 arm C: what the flush needs about one recorded node — the node and the value the walk read for it.
+    // Arm C: what the flush needs about one recorded node — the node and the value the walk read for it.
     private readonly record struct HiddenFoldNode(Tracked Tracked, VolatileRead Read);
 
     /// <summary>
@@ -2256,12 +2251,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     private Node? ResolveDecorScopeRoot(Tracked tracked)
         => tracked.DecorScopeRootId is { } rootId && _registry.TryGetValue(rootId, out var root) ? root.Node : null;
 
-    // R13: is this top-bar button's icon loop RUNNING right now? Read off the SCENE ROOT, no System.Reflection.
+    // Is this top-bar button's icon loop RUNNING right now? Read off the SCENE ROOT, no System.Reflection.
     //
-    // NOT one uniform read (live-validated 2026-08-05): on the deck and settings buttons the registered script
-    // variable `IsScreenOpen` tracks the screen exactly, so `Get(IsScreenOpen)` is the gate. On the MAP button that
-    // variable is never updated and stays false forever even while the map is open and the icon is rocking — the
-    // rock is driven from the map screen instead — so the truthful live gate there is the button's registered
+    // NOT one uniform read: on the deck and settings buttons the registered script variable `IsScreenOpen` tracks
+    // the screen exactly, so `Get(IsScreenOpen)` is the gate. On the MAP button that variable stays false even while
+    // the map is open and the icon is rocking, so the truthful live gate there is the button's registered
     // `IsOpen()` method, invoked via Godot `Call`, the same pattern as the map point's `IsInputAllowed`.
     // See Sts2TopBarFold.
     private static bool ReadTopBarScreenOpen(Node? sceneRoot, string? sceneFile)
@@ -2280,7 +2274,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         return Sts2TopBarFold.IsAnimating(sceneRoot.Get(TopBarScreenOpenProp).AsBool());
     }
 
-    // R13: is the Proceed button's infinite glow tween RUNNING right now? Reads the three gates off the SCENE ROOT
+    // Is the Proceed button's infinite glow tween RUNNING right now? Reads the three gates off the SCENE ROOT
     // (an NProceedButton); all three are registered Godot script members, so this is Get — no System.Reflection.
     // Ordered cheapest-and-most-selective first: a Proceed button is DISABLED on most screens/ticks, so the other
     // two reads only run for a button that is actually showing. See Sts2ProceedGlow.
@@ -2306,19 +2300,18 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         return Sts2ProceedGlow.IsLooping(isEnabled, shouldPulse, sceneRoot.Get(ClickableFocusedProp).AsBool());
     }
 
-    // R14: is the end-turn button's infinite glow pulse RUNNING right now? ONE registered script member off the
-    // SCENE ROOT (an NEndTurnButton), so this is Get — no System.Reflection, no allocation. `_isShiny` is set
-    // immediately before `GlowPulse()` (its only caller) and cleared immediately before the kill, so the flag and
-    // the loop are the same fact. See Sts2EndTurnGlowFold.
+    // Is the end-turn button's infinite glow pulse RUNNING right now? ONE registered script member off the
+    // SCENE ROOT (an NEndTurnButton), so this is Get — no System.Reflection, no allocation. `_isShiny` tracks the
+    // loop exactly, so the flag and the loop are the same fact. See Sts2EndTurnGlowFold.
     private static bool ReadEndTurnGlowLooping(Node? sceneRoot)
         => sceneRoot is not null
            && GodotObject.IsInstanceValid(sceneRoot)
            && Sts2EndTurnGlowFold.IsLooping(sceneRoot.Get(EndTurnShinyProp).AsBool());
 
-    // R12b: is this map point's icon pulse RUNNING right now? Reads the pulse's three gates off the map point's
+    // Is this map point's icon pulse RUNNING right now? Reads the pulse's three gates off the map point's
     // SCENE ROOT. All three are registered Godot script members, so this is Get/Call — no System.Reflection, no
-    // per-tick allocation. Ordered cheapest-and-most-selective first: the enabled flag is false for the ~57 of 61
-    // map points that are not travelable, so the other two reads (and the HasMethod probe) only run for the handful
+    // per-tick allocation. Ordered cheapest-and-most-selective first: the enabled flag is false for every map
+    // point that is not travelable, so the other two reads (and the HasMethod probe) only run for the handful
     // that could actually be pulsing.
     private static bool ReadMapPointPulsing(Node? sceneRoot)
     {
@@ -2663,14 +2656,14 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     // forces a keyframe-style upsert. A no-op for every node that isn't a spine root with a still-empty list, so
     // it stays off the hot path for normal creatures.
     //
-    // ROUND-8 (#13, "the treasure chest isn't visible until it opens"): the attempt budget used to be spent one
-    // per TICK while the list was empty, so a node whose skeleton is injected more than 30 ticks after the watcher
-    // first saw it (the chest / the boss map point — both get their skeleton resource assigned only once the node
-    // enters the tree, and the room screen can be tracked well before that) burned the whole budget and then
-    // reported 0 animations + no `skelResPath` FOREVER. Both clients bail without an anim, and the skeleton path
-    // the `&skel=` bake fallback needs never arrives.
+    // #13 ("the treasure chest isn't visible until it opens"): a budget spent one attempt per TICK while the list
+    // is empty runs out for a node whose skeleton is injected more than 30 ticks after the watcher first saw it
+    // (the chest / the boss map point — both get their skeleton resource assigned only once the node enters the
+    // tree, and the room screen can be tracked well before that), which then reports 0 animations + no
+    // `skelResPath` FOREVER. Both clients bail without an anim, and the skeleton path the `&skel=` bake fallback
+    // needs never arrives.
     //
-    // The budget is now spent per SKELETON, not per tick: a cheap one-native-Get gate (ReadSkeletonDataInstanceId)
+    // So the budget is spent per SKELETON, not per tick: a cheap one-native-Get gate (ReadSkeletonDataInstanceId)
     // skips — free, and WITHOUT consuming an attempt — as long as the skeleton-data resource is unchanged and
     // still absent, and RE-ARMS the full budget on every skeleton_data_res TRANSITION. So the wait for a runtime
     // injection is unbounded in time (and ~free), while the retries against a freshly-assigned-but-not-yet-loaded
@@ -3439,11 +3432,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
     // localized Transform even across a viewport-prefix boundary. Identity when the node has no emitted parent (root).
     private double[] EmittedParentGlobalTuple(Tracked tracked)
     {
-        // Q3 (P2): resolve the emitted parent from the LIVE tree (nearest CanvasItem ancestor) so a reparent+tween
+        // Resolve the emitted parent from the LIVE tree (nearest CanvasItem ancestor) so a reparent+tween
         // same frame can't localize the endpoint against a STALE registry ParentId (freed old parent → identity
         // fallback shipping a global as local = the lower-right double-apply; live old parent → wrong re-base). The
         // pure Sts2TweenParentResolver owns the precedence; the registry ParentId is the fallback. Kill-switch
-        // TWEEN_PARENT_LIVE (default ON) — OFF leaves the live chain empty so the registry fallback (round-3) runs.
+        // TWEEN_PARENT_LIVE (default ON) — OFF leaves the live chain empty so the registry fallback runs.
         var liveNodes = new List<Node>();
         var candidates = new List<Sts2TweenParentResolver.Candidate>();
         if (Sts2SceneWatchRuntimeSettings.TweenParentLive && GodotObject.IsInstanceValid(tracked.Node))
@@ -3652,7 +3645,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             RangeMax: rangeMax,
             TextureRegion: textureRegion,
             TextureMargin: textureMargin,
-            // Re-read NUMERIC (and, R9, COLOR) shader uniforms each tick (cheap GetShaderParameter lookups; the
+            // Re-read NUMERIC (and COLOR) shader uniforms each tick (cheap GetShaderParameter lookups; the
             // uniform LIST was discovered once on add) so re-parameterised shaders — e.g. the screen-transition
             // dissolve's threshold/alpha, or a map point's per-act/travel-state tint — update instead of freezing at
             // their add-time values. Sampler/vector uniforms are still reused from the static snapshot.
@@ -3719,7 +3712,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                     continue;
                 }
 
-                // R9: COLOR uniforms used to freeze at their add-time values, so a shader the game re-tints on a
+                // COLOR uniforms used to freeze at their add-time values, so a shader the game re-tints on a
                 // state change (the map points' act/travel colors — the same class of live re-parameterisation the
                 // spine `&mat=` signature exists for) kept streaming its first-seen tint forever. Same shape as the
                 // numeric branch: one cheap GetShaderParameter + an equality check, and the snapshot list is only
@@ -3755,7 +3748,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         => LogNonFinite(
             canvasItem.GetInstanceId().ToString(), () => DescribeNode(canvasItem), "shader." + uniform, value, "kept-last");
 
-    // SPIRECTL_SHADER_COLOR_REFRESH: escape hatch for the R9 per-tick COLOR uniform refresh above. Default ON;
+    // SPIRECTL_SHADER_COLOR_REFRESH: escape hatch for the per-tick COLOR uniform refresh above. Default ON;
     // `0`/`false`/`off`/`no` restores the numbers-only refresh (colors frozen at add) for an A/B, in case a shipped
     // shader turns out to animate a color per frame and churns the wire. Read once — env vars are process-stable.
     private static readonly bool ShaderColorRefreshEnabled =
@@ -3985,7 +3978,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // Paused flips when the game freezes/resumes a track (#13: the chest sits at frame 0 of "animation"
             // until it is opened) → the client must stop/start free-running the clip.
             || tracked.LastSpinePaused != read.SpinePaused
-            // R12b: a pinned loop starting or stopping (the map point became travelable / was travelled to) is its
+            // A pinned loop starting or stopping (the map point became travelable / was travelled to) is its
             // OWN trigger — the fold's whole premise is that nothing else about the node changes while it pulses,
             // so without this the client would never learn about a membership change.
             || !string.Equals(tracked.LastPinnedLoopAnim, read.PinnedLoopAnim, StringComparison.Ordinal)
@@ -4243,12 +4236,12 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             // Static (add/keyframe only): BoxContainer orientation + packing alignment. Probed once on add in
             // DescribeStaticStyle; MergeVolatile carries it forward. Null for non-BoxContainer nodes.
             ContainerLayout: includeStatic ? style.ContainerLayout : null,
-            // VOLATILE (R12b): the declarative infinite animation the producer pinned on this node, for the client
+            // VOLATILE: the declarative infinite animation the producer pinned on this node, for the client
             // to replay. It only ever changes when the animation starts/stops, so shipping it on every emission is
             // free — and it MUST ride the volatile block so a stop (null) reaches a client that already heard the
             // start. Null for every node without a pinned loop.
             PinnedLoopAnim: read.PinnedLoopAnim,
-            // Static (add/keyframe only, R13): a stable identity for the CONTENT this node shows (today: which card).
+            // Static (add/keyframe only): a stable identity for the CONTENT this node shows (today: which card).
             // Resolved on every static emission rather than cached on the tracked node, because NCard visuals are
             // POOLED — the same instance id is a Strike now and a Bash after the next recycle, so an id-keyed cache
             // would go stale silently. MergeVolatile carries it forward between static emissions like every other
@@ -4274,7 +4267,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             TextParsedText: includeStatic || includeTextWrap ? style.TextParsedText : null,
             TextLineSourceLength: includeStatic || includeTextWrap ? style.TextLineSourceLength : null,
             TextLineSourceHash: includeStatic || includeTextWrap ? style.TextLineSourceHash : null,
-            // WS-2 Line2D stroke geometry — non-null ONLY on the stroke deltas the capture loop chose to (re)ship it
+            // Line2D stroke geometry — non-null ONLY on the stroke deltas the capture loop chose to (re)ship it
             // on (keyframe/add or a changed stroke signature). All three ride together or not at all: a half-shipped
             // stroke (new points at the old width) would render wrong, and the client's MergeVolatile carries the
             // retained unit forward when they are null. An EMPTY LinePoints list is meaningful (the stroke was
@@ -4509,7 +4502,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // property bridge. Probed once on add; the per-tick path performs a Get only when this is true.
         public readonly bool FocusCapable = HasBoolProperty(node, ClickableFocusedProp);
 
-        // R10 ORDER/UPSERT CONTRACT: has this node EVER been shipped to clients? A node born inside a hidden
+        // ORDER/UPSERT CONTRACT: has this node EVER been shipped to clients? A node born inside a hidden
         // subtree is registered (so it sits in `_ordered`) but PRUNED from every incremental capture, so it has no
         // upsert on the wire — while its id still rode the OrderedIds array. That array is the client's ONLY
         // structure trigger (`state.orderedIds !== lastOrderedIds` selects a structural walk), so the id was already
@@ -4540,7 +4533,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // carry no hook-driven state, so they are the safe scope for read-elision under a frozen, stationary root.
         public readonly bool IsSpineSkeletonLeafType = IsSpineSkeletonLeaf(node, style);
 
-        // WS-2/WS4: the two structural facts the stroke-geometry stream is gated on, packed into ONE field so the
+        // The two structural facts the stroke-geometry stream is gated on, packed into ONE field so the
         // native probes run exactly once per add. Computed via the NATIVE class — like IsSpineSkeletonLeafType, and
         // for the same two reasons: class strings are invariant (so it is freeze-timing-independent) and IsClass sees
         // through a script-attached wrapper whose managed type is the SCRIPT's base (a card trail's Line2D IS
@@ -4620,13 +4613,13 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             }
         }
 
-        // Streaming suppression (Part C): while this deadline (Environment.TickCount64) is in the future, the node's
+        // Streaming suppression: while this deadline (Environment.TickCount64) is in the future, the node's
         // TRANSFORM deltas are suppressed because the mirror is REPLAYING a tween on it (or an ancestor) and pins the
         // transform client-side — so streaming it is pure waste. Set by ResolveTweenEndpoint for the tween's duration;
         // propagated to the subtree by depth in the capture loop. Never suppresses non-transform changes. 0 = off.
         public long SuppressTransformUntil;
 
-        // R13 SELF-ONLY transform suppression. Same deadline semantics as SuppressTransformUntil, but TARGET-ONLY:
+        // SELF-ONLY transform suppression. Same deadline semantics as SuppressTransformUntil, but TARGET-ONLY:
         // the node's OWN transform writes are withheld and its DESCENDANTS are untouched — no depth sentinel, so
         // everything below it keeps streaming exactly as before. The precedent is SuppressOpacityUntil (also
         // target-only, for the same reason: what is suppressed is written per-node). Set for a node whose own
@@ -4635,7 +4628,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // both, and each window arms its own settle re-emit. 0 = off.
         public long SuppressTransformSelfUntil;
 
-        // Opacity streaming suppression (Part C Stage 4): while this deadline is in the future, the node's OWN alpha
+        // Opacity streaming suppression: while this deadline is in the future, the node's OWN alpha
         // deltas are suppressed because the mirror is REPLAYING a fade on it and pins the opacity client-side. Set by
         // ResolveTweenEndpoint for the fade's duration. TARGET-ONLY (opacity is per-node-local — no subtree
         // propagation, unlike SuppressTransformUntil). SuppressOpacityIsSelf picks the channel: false = modulate
@@ -4674,11 +4667,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         public RuntimeSceneTransform2DSnapshot? LastTransform;
         public RuntimeSceneRect2Snapshot? LastLocalRect;
         public RuntimeSceneRect2Snapshot? LastTextureRegion;
-        // R11 region-emit cap: the TickCount64 at which this node last let a same-size TextureRegion swap (a flame
+        // Region-emit cap: the TickCount64 at which this node last let a same-size TextureRegion swap (a flame
         // flip-book frame) THROUGH. The cap pins same-size swaps in between, so the atlas frame ships at most once per
         // RegionEmitCapMs (10Hz default) instead of every tick. 0 = never emitted a region yet (first swap ships).
         public long LastRegionEmitAtMs;
-        // R11 cosmetic-emit cap state. PrevRealTransform is the REAL (unsubstituted) transform read last tick — the
+        // Cosmetic-emit cap state. PrevRealTransform is the REAL (unsubstituted) transform read last tick — the
         // churn detector compares it to this tick's real read at full precision (finer than the 2-dp emit test) so a
         // continuously-flickering flame is seen as churning every tick even between 2-dp crossings. CosmeticChurnStreak
         // counts consecutive churn ticks (pacing engages at CosmeticChurnTicks; a stationary tick resets it, which is
@@ -4687,7 +4680,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         public RuntimeSceneTransform2DSnapshot? PrevRealTransform;
         public int CosmeticChurnStreak;
         public long LastCosmeticEmitAtMs;
-        // R12 decorative-animator folds (Sts2DecorEmitSuppress). DecorSceneFile/DecorRelPath are this node's SCENE
+        // Decorative-animator folds (Sts2DecorEmitSuppress). DecorSceneFile/DecorRelPath are this node's SCENE
         // IDENTITY (nearest instanced-scene root + path below it), resolved in ReconcileNode ONLY while inside one of
         // the few watched scenes (null everywhere else, so the whole feature costs one dictionary probe per scene
         // root for the rest of the tree). DecorChannels is the resulting rule — which fold owns this node. No REST
@@ -4696,11 +4689,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         public string? DecorSceneFile;
         public string? DecorRelPath;
         public Sts2DecorEmitSuppress.Channels DecorChannels;
-        // R12b: instance id of the node's scene-instance ROOT while it is inside a watched scene (null otherwise).
+        // Instance id of the node's scene-instance ROOT while it is inside a watched scene (null otherwise).
         // Every fold's gates live on that root (NNormalMapPoint / NTopBarButton / NProceedButton), not on the
         // animated child itself.
         public ulong? DecorScopeRootId;
-        // R12b: the loop name last EMITTED for this node (`RuntimeSceneNodeDelta.PinnedLoopAnim`), so a loop
+        // The loop name last EMITTED for this node (`RuntimeSceneNodeDelta.PinnedLoopAnim`), so a loop
         // starting/stopping is its own emit trigger — the whole point of a fold is that nothing else about the
         // node changes while it runs.
         public string? LastPinnedLoopAnim;
@@ -4710,18 +4703,18 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         public double LastRangeValue = double.NaN;
         public string LastShaderParamSig = string.Empty;
         public bool LastParticleEmitting;
-        // R15 spine-anchor fold: the TickCount64 of the last capture at which this node read `Emitting == true`.
+        // Spine-anchor fold: the TickCount64 of the last capture at which this node read `Emitting == true`.
         // A spine anchor above it refuses to fold until every emitter below it has been quiet for its own burst
         // tail, so a burst that ended THIS INSTANT — whose particles are still alive and still follow their
         // emitter's element — never has its mouth frozen out from under it. 0 = never seen emitting (the common
         // case: the tail check then passes immediately, since TickCount64 is uptime).
         public long LastEmittingAtMs;
-        // R15 spine-anchor fold: does this node paint nothing of its own (so an ancestor anchor may freeze)? A
+        // Spine-anchor fold: does this node paint nothing of its own (so an ancestor anchor may freeze)? A
         // NATIVE class probe, resolved lazily the first time this node is scanned under a candidate anchor and
         // cached forever after (class strings are invariant). Unknown until then, so nodes outside every anchor
         // subtree — i.e. almost all of them — never pay the probe at all.
         public byte AnchorInertKind = InertUnknown;
-        // R15: the client holds a STALE pose for this node because the spine-anchor fold withheld it (as an anchor or
+        // The client holds a STALE pose for this node because the spine-anchor fold withheld it (as an anchor or
         // inside one's subtree) while it still moved. Exempts it (when it has descendants) from the frozen-spine
         // read-elision, so its pose can ship once before the elision takes over. Cleared whenever its pose ships.
         public bool AnchorPoseWithheld;
@@ -4814,7 +4807,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         double? AnchorLeft,
         double? AnchorRight,
         bool? Focused,
-        // R12b: the declarative infinite animation the producer pinned on this node (null for all but a pulsing
+        // The declarative infinite animation the producer pinned on this node (null for all but a pulsing
         // map point). Appended with a default so ReadVolatile's construction site is unchanged — only the
         // map-point fold's `with` expression ever sets it.
         string? PinnedLoopAnim = null);

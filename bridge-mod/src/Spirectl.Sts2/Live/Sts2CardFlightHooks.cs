@@ -6,7 +6,7 @@ using Spirectl.Sts2.Core.Logging;
 namespace Spirectl.Sts2.Live;
 
 /// <summary>
-/// WS-3: the DISCARD→DRAW SHUFFLE CARD FLIGHT producer. A Harmony postfix on
+/// The DISCARD→DRAW SHUFFLE CARD FLIGHT producer. A Harmony postfix on
 /// <c>MegaCrit.Sts2.Core.Nodes.Vfx.NCardFlyShuffleVfx._Ready</c> reads the scalars the flight has just drawn,
 /// hands them to the scene watcher to be mapped into streamed space (and to open the streaming-suppression
 /// windows), and publishes ONE declarative <see cref="Embedding.CardFlightHint"/> on the SAME
@@ -15,9 +15,8 @@ namespace Spirectl.Sts2.Live;
 /// <para>WHY THIS EXISTS AS A SEPARATE HOOK. <see cref="Sts2TweenRecorderHooks"/> patches Godot <c>Tween</c>
 /// construction, and this animation is not a tween: it advances once per RENDERED frame, and only its trailing
 /// 0.8s alpha fade is a real tween. So there is literally nothing
-/// for the recorder to capture, and the mirror was left streaming every frame of every flight — a 34.8s wire
-/// recording measured 598 KB (45%) of a shuffle's 1340 KB of upserts, and 1852 of its 3469 upserts, in this one
-/// subtree, the only part of a shuffle that scales with the number of cards shuffled.</para>
+/// for the recorder to capture, and without this hook the mirror streams every frame of every flight — a large
+/// share of a shuffle's upserts, and the only part of a shuffle that scales with the number of cards shuffled.</para>
 ///
 /// <para>Discipline, matching every other telemetry hook here: installed unconditionally but INERT unless a hint
 /// subscriber is attached (one volatile-bool read on the disabled path), never blocking, and never allowed to throw
@@ -209,7 +208,7 @@ internal static class Sts2CardFlightHooks
     }
 
     // The hub-publish tail, shared by BOTH ways a flight reaches the wire: this hook's own deferred resolve, and the
-    // watcher's R14 PARKED-RESOLVE RETRY (a resolve that missed the node registry is re-attempted right after the
+    // watcher's PARKED-RESOLVE RETRY (a resolve that missed the node registry is re-attempted right after the
     // next reconcile and published from there — see Sts2CardFlightResolvePark). The hub reference and the emit
     // counter live here, so the retry hands its finished hint back rather than cloning either.
     //
@@ -257,7 +256,7 @@ internal readonly record struct Sts2CardFlightResolveRequest(
     double Accel,
     double Duration,
     double Scale0,
-    // INTENTIONALLY UNUSED by the resolver as of R14, and kept only as the spawn-time record of what the node's own
+    // INTENTIONALLY UNUSED by the resolver, and kept only as the spawn-time record of what the node's own
     // angle was. The hint's basis divides the mover's rotation out of its streamed transform, and BOTH must be read
     // at the same instant or the basis is skewed by whatever the animation wrote in between — which is exactly what
     // a parked resolve retried after a later reconcile would do with a value captured back at `_Ready`. So the

@@ -4,14 +4,13 @@ using System.Globalization;
 
 namespace Spirectl.Sts2.Live;
 
-// WS-2 producer rules for streaming `Line2D` STROKE GEOMETRY (the map quill annotations) — PURE and Godot-free (like
+// Producer rules for streaming `Line2D` STROKE GEOMETRY (the map quill annotations) — PURE and Godot-free (like
 // Sts2RegionEmitCap / Sts2RichRoleFontEmit) so the change signature and the wire rounding are unit-testable without
 // the Godot-coupled Sts2RuntimeSceneWatcher.
 //
 // Background. A map annotation is a `Line2D` instanced from `res://scenes/screens/map/map_line_draw.tscn` (pen) or
-// `..._erase.tscn` (eraser) and appended LIVE as a direct child of `…/MapDrawing/DrawViewport`, a 960x1620
-// SubViewport. Points are pushed with `AddPoint(pos * 0.5)` at >= 2px spacing while the finger/mouse drags. The
-// watcher already streams those nodes (with the correct viewport-prefix x2 fit transform), but a `Line2D` carries NO
+// `..._erase.tscn` (eraser) and appended LIVE as a direct child of `…/MapDrawing/DrawViewport`, a SubViewport, with
+// points added while the finger/mouse drags. The watcher already streams those nodes (with the correct viewport-prefix x2 fit transform), but a `Line2D` carries NO
 // texture and NO rect the generic walk understands — its whole appearance IS `points` + `width` + `default_color` —
 // so every client rendered nothing. This adds those three as `linePoints` / `lineWidth` / `lineColor`.
 //
@@ -36,31 +35,30 @@ namespace Spirectl.Sts2.Live;
 // <see cref="FlattenRounded"/>. That is what keeps an idle map (dozens of finished strokes) at zero cost.
 //
 // PERF ENVELOPE. An ACTIVELY-DRAWN stroke changes its signature on most ticks, so it re-ships its WHOLE point array
-// each time: ~4-6 KB of JSON at 300 points, for the ~seconds one drag lasts, for the ONE stroke being drawn. At rest
+// each time, for the seconds one drag lasts, for the ONE stroke being drawn. At rest
 // (finger up, or merely viewing the map) it is exactly zero — the signature is stable, so nothing is read or sent.
 // The documented drop-in follow-up if that burst ever matters is a `LineEmitCapMs` throttle in the
 // <see cref="Sts2RegionEmitCap"/> shape (pin the last-emitted signature inside the window, let one array through per
 // window, always let a COUNT DROP — clear/undo — through immediately). Deliberately NOT implemented now: it trades
 // stroke-tip latency for bandwidth and nothing has yet shown the trade is needed.
 //
-// SCOPE (WS4, Aug-10). The first cut gated on TYPE ALONE (`node.IsClass("Line2D")`), which is wrong: a Line2D is a
-// generic Godot primitive and the game uses it for VFX too — most visibly `card_trail_<character>.tscn`, whose
-// `Trails/OuterTrail` (width 96) + `Trails/InnerTrail` (width 64) ride EVERY flying card. Those trails get their
-// entire look from a `width_curve` taper, an alpha `gradient`, a stretched `trail.png` and an ADDITIVE material —
-// all four of which this emit deliberately drops (see SKIPPED BY DESIGN above) — so streaming their points made a
-// client paint a thick solid bar behind every card instead of the comet the game draws. Worse, they are the exact
-// worst case for the "re-ship the whole array on every changed tick" policy: a discard→draw reshuffle spawns 2
-// GROWING strokes PER CARD at once.
+// SCOPE. Gating on TYPE ALONE (`node.IsClass("Line2D")`) is wrong: a Line2D is a generic Godot primitive and the
+// game uses it for VFX too — most visibly `card_trail_<character>.tscn`, whose `Trails/OuterTrail` +
+// `Trails/InnerTrail` ride EVERY flying card. Those trails get their look from a width taper, an alpha gradient, a
+// stretched texture and an ADDITIVE material — all of which this emit deliberately drops (see SKIPPED BY DESIGN
+// above) — so streaming their points makes a client paint a thick solid bar behind every card instead of the comet
+// the game draws. Worse, they are the exact worst case for the "re-ship the whole array on every changed tick"
+// policy: a discard→draw reshuffle spawns GROWING strokes for every card at once.
 //
 // So the stream is scoped to the nodes the feature was written for — the MAP QUILL strokes — by scene identity
 // (`map_line_draw.tscn` / `map_line_erase.tscn`), with a structural fallback for a stroke built in code (direct
-// child of `DrawViewport`). Every other Line2D is back to its pre-Aug-7 wire, and card trails are reconstructed
+// child of `DrawViewport`). Every other Line2D keeps the pre-feature wire, and card trails are reconstructed
 // CLIENT-SIDE from the trail node's own streamed motion (its local transform is the exact inverse of the flying
-// card's global one — see the couch-coop mirror's cardTrail module), which needs no geometry on the wire at all.
+// card's global one — see the browser mirror's card-trail module), which needs no geometry on the wire at all.
 //
 // DEFAULT `map` (map strokes only); SPIRECTL_SCENE_WATCH_LINE2D_GEOMETRY=0 seeds it OFF, which restores the
 // pre-feature wire BYTE-IDENTICALLY (all three fields stay null ⇒ omitted by WhenWritingNull, and no signature is
-// ever computed); `=all` restores the Aug-7 type-only behaviour, kept as the A/B lever for measuring what the
+// ever computed); `=all` streams every Line2D (type-only scoping), kept as the A/B lever for measuring what the
 // unscoped stream costs. See Sts2SceneWatchRuntimeSettings.Line2DGeometryScope.
 internal static class Sts2Line2DGeometryEmit
 {
@@ -70,7 +68,7 @@ internal static class Sts2Line2DGeometryEmit
     // scene are excluded by construction.
     private const string MapStrokeScenePrefix = "map_line_";
 
-    // The live parent a stroke is appended under: `…/MapDrawing/DrawViewport`, a 960x1620 SubViewport. Used ONLY as a
+    // The live parent a stroke is appended under: `…/MapDrawing/DrawViewport`, a SubViewport. Used ONLY as a
     // fallback for a stroke that carries no SceneFilePath (i.e. one built with `new Line2D()` instead of instanced
     // from the authored scene) — a card trail's Line2D parent is `Trails`, so this cannot re-admit one.
     private const string MapStrokeParentName = "DrawViewport";
@@ -85,7 +83,7 @@ internal static class Sts2Line2DGeometryEmit
         // DEFAULT: only the map quill strokes (the nodes this feature exists for).
         MapStrokes = 1,
 
-        // Every Line2D in the game (the Aug-7 type-only behaviour). Kept as a measurement lever, not a product mode:
+        // Every Line2D in the game (type-only scoping). Kept as a measurement lever, not a product mode:
         // it re-introduces the solid-bar card trails and the reshuffle marshal storm.
         All = 2,
     }

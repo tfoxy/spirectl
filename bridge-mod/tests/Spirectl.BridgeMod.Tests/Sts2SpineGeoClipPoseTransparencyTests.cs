@@ -7,32 +7,27 @@ namespace Spirectl.BridgeMod.Tests;
 
 // NOT EXPECTING A SLOT THAT DRAWS NOTHING — and the single-pose boundary that is the whole safety argument.
 //
-// THE DEFECT, MEASURED. A live `fight KNIGHTS_ELITE` on a real GPU refused the spectral knight at
-// `anim=attack_sword` on the FIRST admission arm: `complete=false`, `associated 19/21`, `ambiguousAtlasRegion=2`
-// (evidence `.sts2/research/data/geoclip-knights-stage2a-20260908T150649Z/legs/leg2-attack/`
-// `03-spectral_knight-attack_sword.spine-geoclip.log`, reproduced in an independent process in
-// `legs/legR-repeat-instB/` and in the Stage-0 control `geoclip-knights-20260908T0500Z/legF-quiet-control/`).
-// The two unassociated slots are ordinals 29 and 30, both showing the `sword swish` attachment.
+// THE DEFECT. A combat bake refused the spectral knight at `anim=attack_sword` on the FIRST admission arm:
+// `complete=false`, `associated 19/21`, `ambiguousAtlasRegion=2`. The two unassociated slots are ordinals 29 and
+// 30, both showing the `sword swish` attachment.
 //
-// WHAT THE TWO SLOTS ACTUALLY CARRY, read rather than inferred. The archived manifest for that bake —
-// `geoclip-knights-20260908T0500Z/envbake-artifacts/legE-combat/spectral_knight--Visuals--attack_sword/`
-// `manifest.json`, `frames[0].slots` — records `"29": {"part": null, "color": [1,1,1,0]}` and the same for
-// `"30"`. That `[1,1,1,0]` is a READ colour and cannot be a capture failure: an unreadable slot colour is
-// recorded as WHITE, `[1,1,1,1]`, so an alpha of 0 could only have come off the skeleton. (The same two colours
-// were already pinned independently as a fixture in Sts2SpineGeoClipSlotColorTests, from the same recording.)
+// WHAT THE TWO SLOTS ACTUALLY CARRY, read rather than inferred. That bake's manifest, `frames[0].slots`, records
+// `"29": {"part": null, "color": [1,1,1,0]}` and the same for `"30"`. That `[1,1,1,0]` is a READ colour and
+// cannot be a capture failure: an unreadable slot colour is recorded as WHITE, `[1,1,1,1]`, so an alpha of 0
+// could only have come off the skeleton. (The same two colours are pinned independently as a fixture in
+// Sts2SpineGeoClipSlotColorTests, from the same recording.)
 //
 // SO THE REFUSAL IS OVER GEOMETRY THAT WOULD HAVE DRAWN NOTHING. Alpha 0 multiplies the attachment away; the
 // baker already emits both slots as hidden ("slot 29 shows attachment 'sword swish' but has no associated mesh,
 // so it is baked as hidden for every frame"), and a hidden slot and a slot drawn at alpha 0 are the same
 // picture. The artifact being thrown away is pixel-identical to the one that would have been kept.
 //
-// AND THE BOUNDARY THAT KEEPS THIS LEGAL. The 2026-09-06 correction contract
-// (`.sts2/research/data/knights-sequential-20260906T065302Z/report.md`) says: "Do not infer non-drawing status
-// from a failed search, missing atlas name, zero alpha or failed association." Every clause of that still holds
-// here except the alpha one, and only for a bake that sampled exactly ONE pose — because "transparent here,
-// opaque at the next frame" is a real thing for a clip and is not a thing that exists for a single frozen pose.
-// The multi-frame case is therefore the test in this file that matters most: same shape, more than one pose,
-// still refused.
+// AND THE BOUNDARY THAT KEEPS THIS LEGAL. The standing rule is: "Do not infer non-drawing status from a failed
+// search, missing atlas name, zero alpha or failed association." Every clause of that still holds here except
+// the alpha one, and only for a bake that sampled exactly ONE pose — because "transparent here, opaque at the
+// next frame" is a real thing for a clip and is not a thing that exists for a single frozen pose. The
+// multi-frame case is therefore the test in this file that matters most: same shape, more than one pose, still
+// refused.
 public sealed class Sts2SpineGeoClipPoseTransparencyTests
 {
     // ---- (1) The recorded spectral shape, at ONE pose ---------------------------------------------------------
@@ -83,8 +78,8 @@ public sealed class Sts2SpineGeoClipPoseTransparencyTests
         Assert.False(expectation.SinglePose);
     }
 
-    // …and it therefore still REFUSES, on the same first arm and with the same counters the live bake reported.
-    // This is the assertion a later agent's "simplification" has to break in order to land.
+    // …and it therefore still REFUSES, on the same first arm and with the same counters the recorded bake
+    // reported. This is the assertion a later "simplification" has to break in order to land.
     [Fact]
     public void TheSameShapeAsAMultiFrameBakeStillRefusesOnTheFirstArm()
     {
@@ -196,9 +191,9 @@ public sealed class Sts2SpineGeoClipPoseTransparencyTests
     // ---- (6) THE OTHER THREE RIGS ARE UNTOUCHED ---------------------------------------------------------------
 
     // Every other bake in the recording is opaque at its sampled pose, so this arm subtracts nothing from any of
-    // them and their counters are the ones the live legs reported. The shapes: ironclad/idle_loop 44/44,
-    // flail/idle_loop 37/37, magi/idle_loop 16/16, flail/attack_flail 43/43 — the last one being the rig whose
-    // OWN three-way tie was resolved by the slot-colour arm rather than by anything here.
+    // them and their counters are the recorded ones. The shapes: ironclad/idle_loop 44/44, flail/idle_loop 37/37,
+    // magi/idle_loop 16/16, flail/attack_flail 43/43 — the last one being the rig whose OWN three-way tie was
+    // resolved by the slot-colour arm rather than by anything here.
     [Theory]
     [InlineData(44)]
     [InlineData(37)]
@@ -227,14 +222,13 @@ public sealed class Sts2SpineGeoClipPoseTransparencyTests
 
     // ---- (7) WHAT THE RECORDED SPECTRAL BAKE THEN DOES AT THE ADMISSION RULE ----------------------------------
 
-    // MEASURED, NOT HOPED FOR, and the part of this round that does NOT finish the job. With the first arm
-    // satisfied the recording's own remaining counters carry it to the THIRD arm and it is refused there:
-    // `foreignMeshes=3` unclaimed meshes in the bracket alongside `claimsUnproven=3` — the three claims the host
-    // log records as `atlas:containment=3`, which is an atlas match that merely lands INSIDE the region the
-    // slot's attachment names rather than identifying it. That is a pre-existing, independent weakness in the
-    // spectral's atlas matching; this change removes one of the two blockers on that address, not both.
+    // WHAT THIS DOES NOT FINISH. With the first arm satisfied the recording's own remaining counters carry it to
+    // the THIRD arm and it is refused there: `foreignMeshes=3` unclaimed meshes in the bracket alongside
+    // `claimsUnproven=3` — three claims made by `atlas:containment`, an atlas match that merely lands INSIDE the
+    // region the slot's attachment names rather than identifying it. That is a pre-existing, independent weakness
+    // in the spectral's atlas matching; this change removes one of the two blockers on that address, not both.
     //
-    // Pinned as a test so the next round starts from the measured arm rather than from an assumption about it.
+    // Pinned as a test so later work starts from the recorded arm rather than from an assumption about it.
     [Fact]
     public void TheRecordedSpectralBakeThenReachesTheOwnershipArm()
     {
@@ -273,8 +267,8 @@ public sealed class Sts2SpineGeoClipPoseTransparencyTests
             ownershipProofArmed: true));
     }
 
-    // …while the UNCHANGED bake — the one this round did not touch — is still refused on the first arm, so the
-    // difference between the two verdicts is attributable to this change and to nothing else.
+    // …while the UNCHANGED bake is still refused on the first arm, so the difference between the two verdicts is
+    // attributable to this change and to nothing else.
     [Fact]
     public void TheUnchangedSpectralBakeIsStillRefusedOnTheFirstArm()
     {

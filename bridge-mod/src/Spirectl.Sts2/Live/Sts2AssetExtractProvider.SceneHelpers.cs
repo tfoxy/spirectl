@@ -672,16 +672,15 @@ public sealed partial class Sts2AssetExtractProvider
         return root;
     }
 
-    // R10 CHAR-SELECT OVERSCAN EXTENT — the authored full-bleed rect of a character-select background, expressed
+    // CHAR-SELECT OVERSCAN EXTENT — the authored full-bleed rect of a character-select background, expressed
     // in the SYNTHETIC render root's own space (the space CreateCharacterSelectBackgroundRenderRoot builds, which
-    // reproduces the live screen 1:1: the container's global transform there is origin(-516,-140) scale 1.1,
-    // exactly what `dev scene tree --computed-transform` reports for the live `AnimatedBg`).
+    // reproduces the live screen 1:1: the container's global transform there is origin(-516,-140) scale 1.1).
     //
     // It is the rendered rect of that container: a Control maps p -> position + pivot + scale*(p - pivot), so
     //   min  = position + pivot*(1 - scale)      = (-516, -140) at a 1920x1080 root viewport
     //   size = size * scale                      = (2816, 1320)
     //
-    // WHY THIS EXISTS. The lane used to capture at the bare ROOT VIEWPORT (1920x1080), i.e. a strict SUBSET of
+    // WHY THIS EXISTS. Capturing at the bare ROOT VIEWPORT (1920x1080) would take a strict SUBSET of
     // the authored rig: ~516px of art on the left and ~380px on the right are simply not in the raster. At 16:9
     // that is invisible (the game clips there too), but a mirror stage wider than 16:9 re-centres the background
     // subtree by the same +0.55*delta the game's own anchors apply, and a 1920-wide still then leaves bare stage
@@ -2001,9 +2000,9 @@ public sealed partial class Sts2AssetExtractProvider
     private static bool TryApplySpineSkinAndPose(Node node, Resource skeletonData, List<string> noteList, string? preferredSkinName = null)
         => TryApplySpineSkinAndPose(node, skeletonData, noteList, out _, preferredSkinName);
 
-    // SPIRECTL_SPINE_SKEL_DEFAULT_SKIN: escape hatch for the R9 "keep the skeleton's own default skin when it
+    // SPIRECTL_SPINE_SKEL_DEFAULT_SKIN: escape hatch for the "keep the skeleton's own default skin when it
     // renders" preference in the STANDALONE (&skel=) lane. Default ON; `0`/`false`/`off`/`no` restores the
-    // unconditional skin union (round-8 behaviour, halo and all). Read once — env vars are process-stable.
+    // unconditional skin union (halo and all). Read once — env vars are process-stable.
     private static readonly bool PreferSkeletonDefaultSkin =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SPINE_SKEL_DEFAULT_SKIN") ?? string.Empty)
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
@@ -2067,11 +2066,10 @@ public sealed partial class Sts2AssetExtractProvider
                 appliedNamedSkin = true;
             }
 
-            // R9: try the skeleton's OWN default skin first. A fresh MegaSprite already wears it after
+            // Try the skeleton's OWN default skin first. A fresh MegaSprite already wears it after
             // SetSkeletonDataRes, and it is exactly what the game renders for a node that never calls SetSkin —
-            // the boss map point never does, so the union below was adding a stroke/outline skin the game never
-            // shows (a thick white halo around the boss map node:
-            // the game frame has ZERO pixels brighter than the parchment, the union bake had ~7% pure white).
+            // the boss map point never does, so the union below added a stroke/outline skin the game never
+            // shows (a thick white halo around the boss map node).
             // Only when that default renders NOTHING (a rig whose attachments all live in named skins — the
             // Fossil Stalker class the union exists for) do we fall back to the union. Kill switch:
             // SPIRECTL_SPINE_SKEL_DEFAULT_SKIN=0 restores the unconditional union.
@@ -2573,7 +2571,7 @@ public sealed partial class Sts2AssetExtractProvider
     private static Image CropToVisiblePixels(Image image, int padding)
         => CropToVisiblePixels(image, padding, out _);
 
-    // WS5 overload: also report WHERE the kept raster sits inside the captured viewport. A lane that expresses
+    // Overload: also report WHERE the kept raster sits inside the captured viewport. A lane that expresses
     // its raster as a placement rect (the char-select background still) must account for the trim, or it would
     // claim the whole capture rect for an image that only covers part of it.
     private static Image CropToVisiblePixels(Image image, int padding, out Rect2I region)

@@ -13,13 +13,11 @@ namespace Spirectl.BridgeMod.Tests;
 // COMPLETED with every drawable slot associated: a correct artifact, thrown away over geometry that had nothing
 // to do with any of its claims.
 //
-// The counter-example is measured, not argued. A live `fight KNIGHTS_ELITE` on a real GPU (evidence archived at
-// `.sts2/research/data/geoclip-knights-20260908T0500Z/`, receipt
-// `legF-quiet-control/receipts/8213fbb1….json`, host log `legF-quiet-control/01-ironclad-attack.spine-geoclip.log`)
-// baked an Ironclad at `anim=attack` to `complete=true`, `associated 44/44`, `byAtlasRegion=37 byColorFlip=7
-// byElimination=0 ambiguousAtlasRegion=0` — and refused it on `arm=foreign foreignMeshes=8`. The same rig's
-// `idle_loop` bakes clean at `foreign=0` in the same session, and a completely quiet combat reproduced the 8
-// exactly, so the leftovers are the rig's own geometry for attachments that are not drawable at the sampled pose.
+// The counter-example is recorded, not argued. A combat bake baked an Ironclad at `anim=attack` to
+// `complete=true`, `associated 44/44`, `byAtlasRegion=37 byColorFlip=7 byElimination=0 ambiguousAtlasRegion=0`
+// — and refused it on `arm=foreign foreignMeshes=8`. The same rig's `idle_loop` bakes clean at `foreign=0`, and
+// a completely quiet combat reproduced the 8 exactly, so the leftovers are the rig's own geometry for
+// attachments that are not drawable at the sampled pose.
 //
 // So the rule now grades the CLAIMS. The numbers below are that recording's, and the negative cases are the same
 // recording with one claim's provenance weakened — because a rule that admits everything would pass the positive
@@ -180,8 +178,8 @@ public sealed class Sts2SpineGeoClipOwnershipTests
     // leftovers the claims exhaust the validated mesh pool, so there is no unclaimed mesh a weak claim could have
     // taken instead — an elimination over an exhausted pool is forced, not guessed. It is also the direction that
     // cannot regress a bake this rule was never asked about: every `foreign=0` artifact admitted before this
-    // change is still admitted after it. The strict reading is reported as a shadow log line by the baker so a
-    // later round can measure what enforcing it would cost, rather than arguing for it.
+    // change is still admitted after it. The strict reading is reported as a shadow log line by the baker so what
+    // enforcing it would cost can be measured rather than argued.
     [Fact]
     public void AWeakClaimWithNoLeftoversIsStillAdmitted()
     {

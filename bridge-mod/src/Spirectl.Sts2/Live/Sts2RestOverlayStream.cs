@@ -1,6 +1,6 @@
 namespace Spirectl.Sts2.Live;
 
-// FIX 4 — rest-site option DESCRIPTION stuck invisible on refocus — PURE and Godot-free (like Sts2ReparentEmit /
+// Rest-site option DESCRIPTION stuck invisible on refocus — PURE and Godot-free (like Sts2ReparentEmit /
 // Sts2CancelledTweenResync / Sts2RegionEmitCap) so the routing truth-table is offline-unit-testable without the
 // Godot-coupled watcher. The Godot-typed watcher (Sts2RuntimeSceneWatcher) reads nodeType/sceneFilePath/_screenType
 // and consumes these three predicates in the capture walk.
@@ -40,7 +40,7 @@ internal static class Sts2RestOverlayStream
     private static readonly string RestSiteRoomManagedType = "MegaCrit.Sts2.Core.Nodes.Rooms.NRestSiteRoom";
 
     // The scene file path of the instanced rest-site room root scene (Node.SceneFilePath — non-empty only on an
-    // instanced-scene root, which the NRestSiteRoom node is). Cached; verified against a live capture.
+    // instanced-scene root, which the NRestSiteRoom node is). Cached.
     private static readonly string RestSiteRoomScenePath = "res://scenes/rooms/rest_site_room.tscn";
 
     // True when this tracked node is the rest-site room root (the pin point for the overlay depth sentinel). Matches
@@ -55,16 +55,14 @@ internal static class Sts2RestOverlayStream
     internal static bool ExemptFromVisiblePrune(bool enabled, bool insideRestOverlay, bool localVisible)
         => enabled && insideRestOverlay && !localVisible;
 
-    // ── R10: the flip's collateral, and its denylist ───────────────────────────────────────────────────────────
+    // ── The flip's collateral, and its denylist ────────────────────────────────────────────────────────────────
     //
     // EmitVisible flips EVERY hidden node in the room, which is more than the quirk it was written for. The
     // rest site's ProceedButton owns a `%ControllerIcon` TextureRect holding the gamepad face-button glyph, and the
     // game hides it — genuinely, globally, on its own input state — whenever no controller is attached. That hidden
     // flag is NOT the overlay quirk, so flipping it streamed a "press Y" prompt onto a mouse/touch mirror sitting
-    // next to a game that shows none. (Evidence: in `.sts2/bench/audit-rest-refocus-postfix.ndjson`, the SIX
-    // ControllerIcon nodes elsewhere in the run — map Back, settings BackButton, the three top-bar buttons, the
-    // potion shortcut — all stream `visible:false`; only `RestSiteRoom/ProceedButton/ControllerIcon` streams visible,
-    // and the only thing different about it is that it sits inside the flip's blast radius.)
+    // next to a game that shows none. The same ControllerIcon nodes elsewhere in the game stream `visible:false`;
+    // the rest-site one differs only in sitting inside the flip's blast radius.
     //
     // The distinguishing property is the node NAME: STS2 names every controller-prompt glyph in the game with one of
     // these, and each is hidden by a real game decision (`InputManager` device state), never by the compositing quirk
@@ -74,7 +72,7 @@ internal static class Sts2RestOverlayStream
     // the fix was written for.
     //
     // Kill switch: SPIRECTL_SCENE_WATCH_REST_OVERLAY_PROMPT_DENYLIST=0 seeds it OFF (flip everything, i.e. the
-    // pre-R10 behaviour) for an A/B.
+    // pre-denylist behaviour) for an A/B.
     private static readonly string[] ControllerPromptNodeNames =
     [
         "ControllerIcon",
@@ -107,8 +105,8 @@ internal static class Sts2RestOverlayStream
 
     // Part 2: the emitted `visible` for a node — flips the overlay-quirk false→true ONLY inside the ACTIVE rest-site
     // overlay. A truly-visible node stays visible; outside the active overlay (kill-switch off, outside the room, or
-    // a backgrounded room) the live value passes through untouched (so a backgrounded room isn't resurrected). R10:
-    // a controller-prompt glyph (see above) is never flipped when `promptDenylist` is on — its hidden flag is the
+    // a backgrounded room) the live value passes through untouched (so a backgrounded room isn't resurrected). A
+    // controller-prompt glyph (see above) is never flipped when `promptDenylist` is on — its hidden flag is the
     // game's own answer to "is a gamepad attached", not the compositing quirk.
     internal static bool EmitVisible(
         bool enabled,

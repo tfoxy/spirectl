@@ -30,8 +30,8 @@ public static class Sts2MapDrawingTransform
     // live Drawings-node globalPosition to get each node's NMapDrawings-LOCAL center, halve it to reach
     // Line2D-point space, cluster into the 7-column x 16-row grid, and least-squares fit
     //   mapNodeX(col) = ScaleX*(localX) + OffsetX ,  mapNodeY(row) = ScaleY*(localY) + OffsetY .
-    // (Drawings node measured Size=(1920,3240), so ToNetPosition divides X by 960 and Y by 3240.)
-    // Fit residual ~10-12px mean: the IRREDUCIBLE mismatch between our synthetic node grid (even 127px
+    // (The Drawings node is Size=(1920,3240), so ToNetPosition divides X by 960 and Y by 3240.)
+    // The fit leaves a residual: the IRREDUCIBLE mismatch between our synthetic node grid (even 127px
     // rows via mapNodeY) and the game's real, slightly-staggered ~152px-local layout — no single affine
     // removes it, and it is well within a 56px node. Read (NetToContent) and write (ContentToNet/
     // ContentToLocal) MUST share these constants so a stroke drawn at content C reads back as C.

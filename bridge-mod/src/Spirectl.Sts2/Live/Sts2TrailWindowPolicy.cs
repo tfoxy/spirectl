@@ -1,6 +1,6 @@
 namespace Spirectl.Sts2.Live;
 
-// R14 — the Godot-free rule deciding whether a card flight opens the SELF-ONLY suppression window on its trail
+// The Godot-free rule deciding whether a card flight opens the SELF-ONLY suppression window on its trail
 // VFX root (the window that stops the root re-sending its own transform for the flight's analytic lifetime).
 //
 // Two levers and the emit mode decide it:

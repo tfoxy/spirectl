@@ -4,7 +4,7 @@ using CellPlacement = Spirectl.Sts2.Live.Sts2SpineEventBackgroundClip.SpineClipC
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-SPINESTREAM (FIX 2b) — the OFFLINE seamless-swap proof. FIX 2b paints a cheap 1-frame STILL first, then hot-swaps
+// The OFFLINE seamless-swap proof. The lane paints a cheap 1-frame STILL first, then hot-swaps
 // the full animated clip. The swap is seamless because placement is CELL-INVARIANT: a scene-root point lands at the
 // same node-local position regardless of the raster cell size / capture scale / union top-left / padding. So the
 // still-frame-0 and the clip-frame-0 land at the SAME node-local, and the client's canvas draw shows no edge jump.
@@ -73,14 +73,14 @@ public sealed class Sts2SpineStillSwapPlacementTests
 
     // ---- Creature (generic tight-crop lane) cell-invariance ---------------------------------------------------------
 
-    // The generic lane's node-local placement (Sts2AssetExtractProvider.RenderAssets.cs:1208-1213 +
-    // SceneHelpers.FrameFromBoundsFitted:215-227): fitScale f = maxDim>2048 ? 2048/maxDim : 1;
+    // The generic lane's node-local placement (Sts2AssetExtractProvider.RenderAssets.cs +
+    // SceneHelpers.FrameFromBoundsFitted): fitScale f = maxDim>2048 ? 2048/maxDim : 1;
     // cell = ceil(size*f) + 2*Padding; nodePos = Padding - boundsPos*f; clipPlacement: LocalX = -nodePos/f,
     // LocalWidth = cell/f. A creature STILL (collapseToStill = frame 0) shares the SAME cell as its clip, so both map a
     // skeleton point identically; the invariance is that a skeleton-local point recovers to ITSELF regardless of
     // fitScale / padding / cell (the cell term cancels EXACTLY, even under the integer ceil). Modeled here because the
     // generic lane has no pure extractable seam (unlike ComposeCellPlacement).
-    private const int Padding = 64;          // Sts2AssetExtractProvider.cs:20
+    private const int Padding = 64;          // Sts2AssetExtractProvider.cs
     private const double MaxSceneSize = 2048d; // Sts2AssetExtractProvider.cs:19
 
     private readonly record struct GenericPlacement(double LocalX, double LocalWidth, int CellWidth, double FitScale, double NodePosX);

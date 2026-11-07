@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-A `[b]` renders un-bold in the browser mirror — the pure per-role rich-text font emit gates
+// `[b]` renders un-bold in the browser mirror — the pure per-role rich-text font emit gates
 // (Sts2RichRoleFontEmit). Godot renders a `[b]` span by swapping the RichTextLabel to its `bold_font` THEME ITEM (a
 // different font FILE: res://fonts/kreon_bold.ttf), never by synthesising bold; the wire carried one font per node,
 // so the mirror's <strong> inherited the label's single-face normal font. These are the decisions that keep the

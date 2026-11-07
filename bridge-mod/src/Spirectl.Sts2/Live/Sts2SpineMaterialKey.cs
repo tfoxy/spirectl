@@ -3,14 +3,14 @@ using System.Text;
 
 namespace Spirectl.Sts2.Live;
 
-// Godot-free core of the SPINE MATERIAL DISCRIMINATOR (round-8 item 8). Always compiled (no Godot dependency)
+// Godot-free core of the SPINE MATERIAL DISCRIMINATOR. Always compiled (no Godot dependency)
 // so the signature is offline-unit-testable, like Sts2SpineSchedule / Sts2SpineDefaults. The Godot-typed reader
 // (Sts2SpineInspector.ReadMaterialKey) collects the shader path + uniform values and delegates here.
 //
 // WHY: a SpineSprite can carry a `normal_material` ShaderMaterial the game re-parameterises at RUNTIME — the
 // boss map point applies `res://shaders/boss_map_point.gdshader` (an R/G/B channel-remap MASK: red→map_color,
-// green→white, blue→black_layer_color) and `NBossMapPoint.RefreshColorInstantly` pushes the current act's
-// MapBgColor / MapTraveled|UntraveledColor into it. The bake now applies that material (else the raw colored
+// green→white, blue→black_layer_color) and the game pushes the current act's map colours into it. The bake
+// applies that material (else the raw colored
 // mask renders instead of the game's near-grayscale boss), so the RENDERED PIXELS depend on values that are NOT
 // part of the (scene, node, anim, skin, skel) clip address. Without a discriminator the first-baked variant is
 // cached forever under that address: an unshaded pre-fix blob, or act 1's colors on act 2's map, or the
@@ -21,7 +21,7 @@ namespace Spirectl.Sts2.Live;
 // byte-identical and their caches stay valid.
 internal static class Sts2SpineMaterialKey
 {
-    // How many DISTINCT signatures a single node may report before the value latches (round-8 safety valve).
+    // How many DISTINCT signatures a single node may report before the value latches (a safety valve).
     // A uniform animated per-frame would otherwise mint a fresh clip URL every tick — an unbounded re-bake
     // storm. No shipped SpineSprite normal_material does that (they are set on state changes), so the latch
     // should never engage; it exists so the worst case degrades to "one slightly stale tint" instead of

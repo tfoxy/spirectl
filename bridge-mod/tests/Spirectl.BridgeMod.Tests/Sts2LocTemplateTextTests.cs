@@ -3,11 +3,10 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-S "one localization-error log + crash-reporter capture per card per poll" — the pure template predicate
+// "One localization-error log + crash-reporter capture per card per poll" — the pure template predicate
 // (Sts2LocTemplateText.HasUnsourceableSelector) that lets the model catalog return a card body's RAW text instead
-// of asking the game to format a template it cannot source. Truth table derived from the shipped card-body corpus
-// (all 14 languages: 8,237 bodies, 7,309 token-bearing, zero escapes, zero non-named-only bodies — counts and
-// method in `.sts2/research/`), so the cases below are the real token GRAMMAR, not invented shapes.
+// of asking the game to format a template it cannot source. Truth table derived from the shipped card-body corpus,
+// so the cases below are the real token GRAMMAR, not invented shapes.
 public sealed class Sts2LocTemplateTextTests
 {
     // The three card bodies behind the observed log lines: a plain damage body, a plain block body, and a

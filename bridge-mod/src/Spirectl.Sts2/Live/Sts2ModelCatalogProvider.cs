@@ -682,7 +682,6 @@ public sealed class Sts2ModelCatalogProvider : IModelCatalogProvider
     // crash-reporter capture, after which the game hands back exactly this raw text. Since `state actions` polls
     // the card family, that was one log line and one capture PER CARD PER POLL for a string we already had.
     // Token-free bodies keep the formatting call: they are cheap, silent, and the formatter still owns escapes.
-    // Evidence + corpus counts: `.sts2/research/` (see AGENTS.md).
     private static string? ResolveCardDescription(LocString? description)
     {
         var raw = ResolveLocStringRaw(description);

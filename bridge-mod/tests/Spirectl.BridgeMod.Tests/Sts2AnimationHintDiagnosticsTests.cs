@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R13 hint-emission observability. The hint hooks decline SILENTLY by design, so these counters are the only
+// Hint-emission observability. The hint hooks decline SILENTLY by design, so these counters are the only
 // evidence a host has for "which gate ate the hint". Two properties matter and both are asserted here: an increment
 // is never lost under concurrency (the hooks run on the game main thread but an embedder reads from its own
 // background thread), and the families are independent so a stalled producer can be diagnosed against a live one.
@@ -105,7 +105,7 @@ public sealed class Sts2AnimationHintDiagnosticsTests
     [Fact]
     public void TheResolveNullAttributionBucketsMoveIndependentlyOfTheLegacyBucket()
     {
-        // R14. The five attribution buckets EXPLAIN a resolve miss; they do not replace it. The hooks still record
+        // The five attribution buckets EXPLAIN a resolve miss; they do not replace it. The hooks still record
         // the legacy ResolveNull on every one of these paths, so a reader comparing an old host against a new one
         // sees the same ResolveNull count either way — which is why these have to be separate counters and why
         // recording one must never touch it.
@@ -204,7 +204,7 @@ public sealed class Sts2AnimationHintDiagnosticsTests
 
         Sts2AnimationHintDiagnostics.CardFlight.RecordEmitted();
         Sts2AnimationHintDiagnostics.CardFlight.RecordResolveNull();
-        // R14: a shuffle flight's parked retry must not be charged to the discard family, which shares the whole
+        // A shuffle flight's parked retry must not be charged to the discard family, which shares the whole
         // park + drain implementation with it.
         Sts2AnimationHintDiagnostics.CardFlight.RecordResolveParked();
         Sts2AnimationHintDiagnostics.CardFlight.RecordResolveRetryHit();

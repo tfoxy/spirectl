@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// R13 — the parked card-flight suppression window (Sts2PendingFlightWindow). A window is armed from a `_Ready`
+// The parked card-flight suppression window (Sts2PendingFlightWindow). A window is armed from a `_Ready`
 // hook, before the nodes it names have ever been reconciled, so it waits in one slot per node until the watcher
 // first sees them. These tests pin the two properties the watcher relies on when two requests collide in that slot:
 // the freeze is never made SHORTER, and it is never made NARROWER.

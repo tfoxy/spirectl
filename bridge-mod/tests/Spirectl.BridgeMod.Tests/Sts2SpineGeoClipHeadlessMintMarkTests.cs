@@ -9,7 +9,7 @@ namespace Spirectl.BridgeMod.Tests;
 // offline is (a) that the plan is a function of the pose and nothing else, (b) that its ladder clears the
 // tie-break's own margin, and (c) that it is unreachable unless the re-mint is armed.
 //
-// WHY IT EXISTS, measured. With the re-mint armed and no mark, the ironclad bakes 42 of its 44 parts headless:
+// WHY IT EXISTS. With the re-mint armed and no mark, the ironclad bakes 42 of its 44 parts headless:
 // slots 25 and 26 both draw `hip armor right back`, the atlas correctly refuses that tie (on a real renderer
 // too), and the colour-flip probe that breaks it there cannot work headless — a colour write changes no triangle
 // indices, so it takes the attribute-region path the dummy backend discards. The mark rides on the re-mint's
@@ -63,7 +63,7 @@ public class Sts2SpineGeoClipHeadlessMintMarkTests
     public void NothingIsMarkedWhenNoAttachmentIsShared()
     {
         // Flail, spectral and magi are this case at `idle_loop`: no two drawable slots name one attachment, so
-        // the arm is a no-op on them by construction and their measured 37/22/16 cannot move.
+        // the arm is a no-op on them by construction and their 37/22/16 cannot move.
         var plan = Sts2SpineGeoClipHeadlessMintMark.For(
             [Slot(0, "head"), Slot(1, "cape"), Slot(2, "l shoulder")]);
         Assert.Empty(plan.Marks);
@@ -73,7 +73,7 @@ public class Sts2SpineGeoClipHeadlessMintMarkTests
     [Fact]
     public void SharedAttachmentGetsOneLadderStepPerMember()
     {
-        // The ironclad's measured case, in miniature.
+        // The ironclad's case, in miniature.
         var plan = Sts2SpineGeoClipHeadlessMintMark.For(
         [
             Slot(24, "torso"),

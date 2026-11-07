@@ -26,7 +26,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
         public bool TryTakePendingWindow(ulong id, out Sts2PendingFlightWindow window)
             => _pendingFlightWindows.Remove(id, out window);
 
-        // WS-3 card-flight suppression windows for nodes that were NOT YET in the registry when the flight was resolved.
+        // Card-flight suppression windows for nodes that were NOT YET in the registry when the flight was resolved.
         // The `NCardFlyShuffleVfx._Ready` hook fires while the node is being ADDED to the tree, one reconcile before the
         // watcher has ever seen it (and its trail VFX is attached in the same `_Ready`), so the ordinary
         // "write tracked.SuppressTransformUntil" path would silently miss the very frames the window exists to cover.
@@ -36,7 +36,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
         // its deadline (see Sts2PendingFlightWindow) — a trail root is parked SELF-ONLY, everything else subtree-wide.
         private readonly Dictionary<ulong, Sts2PendingFlightWindow> _pendingFlightWindows = [];
 
-        // R14 card-flight RESOLVE park — the same "the hook fired before the walk had seen the node" race one level up.
+        // Card-flight RESOLVE park — the same "the hook fired before the walk had seen the node" race one level up.
         // The parked windows above cover a flight whose HINT resolved but whose nodes were not tracked yet; this covers
         // the flight whose hint could not be built AT ALL, because the mover itself was untracked when the deferred
         // `_Ready` publish ran. Instead of losing that hint for good, the request waits here and is retried by
@@ -50,11 +50,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher
         internal Action<Embedding.CardFlightHint, ulong>? ShuffleFlightPublisher;
         internal Action<Embedding.CardFlightHint, ulong>? DiscardFlightPublisher;
 
-        // Part C declarative tween replay: resolve a captured tween's END state into the watcher's STREAMED transform
+        // Declarative tween replay: resolve a captured tween's END state into the watcher's STREAMED transform
         // space, reading the live node on the game main thread. Called from the tween hook's DEFERRED (idle-frame)
         // Finalize — the same thread as the capture walk, so the Godot reads are legal. Returns null when the target
         // isn't a tracked CanvasItem or the change resolves to nothing. Only READS the node (never mutates), so it
-        // cannot affect gameplay. Handles combined position + scale + rotation (Stage 2); modulate:a fades are Stage 4.
+        // cannot affect gameplay. Handles combined position + scale + rotation, and modulate:a fades.
         // `durationMs` is the tween's duration (the client's CSS-transition length); when a transform endpoint resolves we
         // open a suppression window of that length so the redundant per-frame transform deltas the client would pin-and-
         // discard aren't streamed (see SuppressTweenedTransforms + the capture loop). Window starts here (≈ tween_start +
@@ -122,7 +122,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
                 var pp = parentCanvas is not null ? vp * parentCanvas.GetGlobalTransformWithCanvas() : vp;
 
                 // Read the node's CURRENT transform components; TransformEndGlobal overrides the tween-driven ones and
-                // reconstructs the end LOCAL transform (Stage 2: combined position + scale + rotation). Pivot only
+                // reconstructs the end LOCAL transform (combined position + scale + rotation). Pivot only
                 // applies to Controls; a Node2D pivots at its origin.
                 var pos0 = tracked.Node.Get("position").AsVector2();
                 var rot0 = tracked.Node.Get("rotation").AsSingle();
@@ -131,7 +131,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
 
                 transform = Sts2TweenEndpointMath.TransformEndGlobal(gNow, pp, pos0, rot0, scale0, pivot, change);
 
-                // Fix 2: if the tween DECLARED a start (`.From(...)`), compute the START global the same way (live base for
+                // If the tween DECLARED a start (`.From(...)`), compute the START global the same way (live base for
                 // untweened axes, the declared From for tweened ones) and ship it so the client primes the element there
                 // before transitioning — a re-anchored/primed node's live sample is a stale transient, not its real start.
                 // Additive: the END tuple above is unchanged; only a new start tuple is produced when a start exists.
@@ -159,7 +159,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
             // `modulate` guards against the LIVE modulate.a, `self_modulate` against the LIVE self_modulate.a (both ≈1/255
             // tolerance). The end alpha rides the same TweenEndpoint.Opacity either way; the client tells them apart from
             // the hint's own `property` string.
-            // Fix 2: guard the fade against the tween's DECLARED start (`.From(...)`) when it has one, else the LIVE alpha.
+            // Guard the fade against the tween's DECLARED start (`.From(...)`) when it has one, else the LIVE alpha.
             // A re-anchored/shared node (the reticle) is stale at the PREVIOUS option's alpha (≈1), so a real fade-in
             // `From(0)→1` would read |1−1|<tol against the live value and be wrongly rejected; comparing against the
             // declared start (0) resolves it. When no start was declared, this is the original live-sample behavior.
@@ -276,9 +276,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher
             return new double[] { gNow.X.X, gNow.X.Y, gNow.Y.X, gNow.Y.Y, origin.X, origin.Y };
         }
 
-        // WS-3 DISCARD→DRAW SHUFFLE CARD FLIGHT. Resolve one `NCardFlyShuffleVfx`'s closed-form animation into the
+        // DISCARD→DRAW SHUFFLE CARD FLIGHT. Resolve one `NCardFlyShuffleVfx`'s closed-form animation into the
         // watcher's STREAMED space and open the streaming-suppression windows that make the hint actually pay: the hint
-        // alone changes nothing on the wire — it is this window that stops ~60 transform deltas/s per shuffled card.
+        // alone changes nothing on the wire — it is this window that stops each card's per-frame transform deltas.
         //
         // Called from the `_Ready` hook's DEFERRED (idle-frame) callback — the same thread as the capture walk, so the
         // Godot reads below are legal — and only READS the scene, so it cannot affect gameplay.
@@ -296,8 +296,8 @@ internal sealed partial class Sts2RuntimeSceneWatcher
         // MUST be read at the same instant as the transform it is divided out of (see ResolveTrackedCardFlight).
         //
         // Returns null (⇒ no hint, no window, today's streamed behaviour) when the kill-switch is off, the flight node
-        // is not a tracked CanvasItem, its global transform is singular, or the drawn scalars are not integrable. R14:
-        // the "not tracked yet" case is no longer terminal — it PARKS for a retry after the next reconcile (see
+        // is not a tracked CanvasItem, its global transform is singular, or the drawn scalars are not integrable. The
+        // "not tracked yet" case is not terminal — it PARKS for a retry after the next reconcile (see
         // DrainParkedFlightResolves); this call still returns null, so the caller's behaviour is unchanged.
         public Embedding.CardFlightHint? ResolveCardFlight(
             ulong flightInstanceId,
@@ -310,7 +310,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
             double accel,
             double duration,
             double scale0,
-            // R14: intentionally NOT consumed — the basis is computed from the node's LIVE angle in
+            // Intentionally NOT consumed — the basis is computed from the node's LIVE angle in
             // ResolveTrackedCardFlight. Kept in the signature (and in the request record) as the spawn-time record.
             double nodeRotation)
         {
@@ -328,7 +328,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
 
             if (!_registry.TryGetValue(flightInstanceId, out var flight))
             {
-                // THE RACE (R14): the deferred `_Ready` publish beat the capture walk to this node. Park the request and
+                // THE RACE: the deferred `_Ready` publish beat the capture walk to this node. Park the request and
                 // retry it after the next reconcile instead of losing the flight. Nothing is published on this pass, so
                 // the hook records its resolve-miss exactly as before — the park buckets say what became of it.
                 ParkFlightResolve(new Sts2ParkedFlightResolve(
@@ -368,7 +368,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
         // The tracked half of a shuffle resolve: everything that reads the LIVE node. Both entry points funnel through
         // here — the immediate resolve above and the parked retry — so the basis is computed in exactly one place.
         //
-        // WHY THAT MATTERS (R14). The streamed basis and the angle divided out of it must be sampled at the SAME instant.
+        // WHY THAT MATTERS. The streamed basis and the angle divided out of it must be sampled at the SAME instant.
         // A retry runs one or more frames after the flight was created, by which time the animation may have written a
         // fresh angle into the node; dividing out the value captured back at `_Ready` would leave the difference folded
         // into the basis and the replayed card would fly tilted. So the angle is re-read here, next to the transform,
@@ -433,7 +433,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
                 Scale0: scale0);
         }
 
-        // R13 HAND→DISCARD CARD FLY. Resolve one `NCardFlyVfx`'s closed-form animation into the watcher's STREAMED
+        // HAND→DISCARD CARD FLY. Resolve one `NCardFlyVfx`'s closed-form animation into the watcher's STREAMED
         // space and open the streaming-suppression windows, exactly as ResolveCardFlight does for the shuffle sweep —
         // same curve, same integrator, same space map, same window policy. Called from the `_Ready` hook's DEFERRED
         // (idle-frame) callback, on the same thread as the capture walk, and only READS the scene.
@@ -442,7 +442,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
         // a frame ago; this resolves against the CARD, which the player has been looking at all along. Two consequences:
         //
         //   * the registry lookup is a REAL gate. A card the watcher has never tracked is a card the consumer is not
-        //     painting, so there is nothing to replay and nothing to freeze — fail open, keep streaming. (R14: "never
+        //     painting, so there is nothing to replay and nothing to freeze — fail open, keep streaming. ("Never
         //     tracked" is only decided after the parked retry has had its chances — see DrainParkedFlightResolves.)
         //
         //   * the basis is stripped of its FULL streamed rotation, not just the node's own. The replayed rotation
@@ -473,7 +473,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
 
             if (!_registry.TryGetValue(cardInstanceId, out var card))
             {
-                // THE RACE (R14), same as the shuffle's: park and retry after the next reconcile rather than lose the
+                // THE RACE, same as the shuffle's: park and retry after the next reconcile rather than lose the
                 // fly. Rarer here — the card has usually been tracked for many ticks before it is played — but a card
                 // that flies on the same frame it is created (a reward flying into the deck) hits exactly this.
                 ParkFlightResolve(new Sts2ParkedFlightResolve(
@@ -589,13 +589,13 @@ internal sealed partial class Sts2RuntimeSceneWatcher
                 Rot0: rot0);
         }
 
-        // R14 — half one of the parked-resolve retry: hold a resolve whose mover the walk has not tracked yet.
+        // Half one of the parked-resolve retry: hold a resolve whose mover the walk has not tracked yet.
         //
         // The only outcomes are "parked" and "refused at the cap", and both are counted, because this is the point where
         // a lost hint used to become invisible: the producer would return null, the hook would record one anonymous
         // resolve-miss, and nothing would say whether the node was missing, the draw was degenerate, or the wiring was
         // wrong. A refusal means the park is full of live entries, i.e. the drain is not keeping up — that flight keeps
-        // streaming, which is the pre-R14 behaviour.
+        // streaming, as it would with no park at all.
         private void ParkFlightResolve(Sts2ParkedFlightResolve entry)
         {
             var counters = FlightCountersFor(entry.Family);
@@ -608,7 +608,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
             counters.RecordResolveRetryDropped();
         }
 
-        // R14 — half two: retry every parked resolve, immediately after the reconcile that may have made it resolvable.
+        // Half two: retry every parked resolve, immediately after the reconcile that may have made it resolvable.
         //
         // ONE SHOT PER TRACKING. An entry whose mover is still untracked stays parked (that is the whole point) and is
         // tried again next reconcile until its TTL runs out. An entry whose mover IS tracked leaves the park either way:
@@ -739,12 +739,11 @@ internal sealed partial class Sts2RuntimeSceneWatcher
         //     identity by construction and the mirror synthesizes the ribbon from the flight's motion, not from their
         //     transform.
         //
-        //   * the trail VFX ROOT, SELF-ONLY (R13) — its own transform writes and nothing below it. The root is a
+        //   * the trail VFX ROOT, SELF-ONLY — its own transform writes and nothing below it. The root is a
         //     boxless container, and the mirror only places nodes that have a box (Control rect / sprite / particle /
         //     line / spine — see the client's `placementBox`), so no pixel is ever painted from the root's own
-        //     transform: it reached the screen only by being re-sent ~60 times a second. Measured on the R12 capture
-        //     that was 1158 of the ~1.9k trail-subtree writes a 30-card shuffle produced — pure waste, and an order of
-        //     magnitude more than the "one upsert per card per frame" this was previously estimated to cost.
+        //     transform: it reached the screen only by being re-sent every frame, a large share of the trail subtree's
+        //     writes and pure waste.
         //
         //   * NOT the root's `Sprites` branch, deliberately. The sparks trailing the card are placed from that branch's
         //     OWN stream, so it has to keep flowing or the comet strands at the pile while the card flies on. That is
@@ -767,7 +766,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
             // down its emitted parent chain and so must place the frozen root itself, from the declarative flight hint.
             // That lever is default-OFF and an embedder raises it only for a process whose viewers can all do that (the
             // CouchCoop server couples it to a unanimous viewer capability vote); otherwise this fails open — no window,
-            // R12 behaviour, the root keeps streaming. Note the freeze stays confined to the root's OWN writes in either
+            // the root keeps streaming. Note the freeze stays confined to the root's OWN writes in either
             // mode: the capture walk stores every read node's REAL global for its children to re-base against, whether
             // or not that node emitted, so the sparks below are unaffected by the root going quiet.
             if (Sts2TrailWindowPolicy.ShouldOpenTrailSelfWindow(
@@ -857,7 +856,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
             }
         }
 
-        // Fix 1: a recorded tween was KILLED/STOPPED (interrupted or superseded). For each of its target nodes still in
+        // A recorded tween was KILLED/STOPPED (interrupted or superseded). For each of its target nodes still in
         // the registry, collapse any OPEN streaming-suppression window to the "just elapsed" sentinel (1): the next
         // capture tick treats it as window-closed (WindowClosed(1, now) is true for any real TickCount64), which un-pins
         // the node and forces exactly one settle re-emit shipping its LIVE transform/opacity. Without this, a tween
@@ -878,7 +877,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher
                     tracked.SuppressTransformUntil = 1;
                 }
 
-                // WS-REST: a killed fade-IN never opened an opacity window, so the collapse-open-window branch below is a
+                // A killed fade-IN never opened an opacity window, so the collapse-open-window branch below is a
                 // no-op for it. `forceOpacityResync` sets the just-elapsed sentinel (1) UNCONDITIONALLY so the next tick's
                 // WindowClosed(1, now) forces exactly one settled opacity re-emit of the node's live alpha — un-sticking a
                 // client whose hide-latch would otherwise clamp the plain resting-alpha re-show to 0.

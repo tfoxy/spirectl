@@ -59,7 +59,7 @@ public sealed class Sts2TweenParentResolverTests
     public void NoLiveCanvasItemAncestor_FallsBackToRegistry()
     {
         // Live walk disabled (empty chain) or no CanvasItem ancestor present → the registry ParentId fallback (the
-        // round-3 behaviour) when it resolves a valid CanvasItem.
+        // registry-ParentId behaviour) when it resolves a valid CanvasItem.
         var pickEmpty = Sts2TweenParentResolver.Resolve(
             new List<Sts2TweenParentResolver.Candidate>(), registryFallbackResolves: true);
         Assert.Equal(Sts2TweenParentResolver.Source.RegistryFallback, pickEmpty.Source);

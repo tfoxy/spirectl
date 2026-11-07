@@ -3,29 +3,25 @@ using System.Collections.Generic;
 
 namespace Spirectl.Sts2.Live;
 
-// R15 producer CREATURE SPINE-ANCHOR FOLD — PURE and Godot-free (like Sts2OrbSpinFold / Sts2IntentBobFold) so the
+// CREATURE SPINE-ANCHOR FOLD — PURE and Godot-free (like Sts2OrbSpinFold / Sts2IntentBobFold) so the
 // scene table, the class allowlist and the whole decision table are unit-testable without the Godot-coupled
 // Sts2RuntimeSceneWatcher.
 //
-// WHY. After R14 silenced the orb spin, the intent bob/flip-book and the end-turn glow, a VISUALLY IDLE combat was
-// still not a QUIET combat: a live 6.003s capture off the phone (four phantasmal gardeners, no input, nothing else
-// moving) measured 52.81 msg/s, 83.29 KB/s and EIGHT node ids — all four `phantasmal_gardener.tscn`
-// `Visuals/SpewSlotNode` anchors plus their four `SpewParticles` children, i.e. 100% of the wire. Max gap between
-// messages 46.7ms; not one 200ms window of silence (the Aug-7 round's success criterion for a fold). The Aug-6
-// recording shows the same shape one encounter earlier: `sludge_spinner.tscn`'s `MouthSpraySlot`,
-// `MouthDribbleBoneNode` and `testBone` in 868 of 868 messages.
+// WHY. With the orb spin, the intent bob/flip-book and the end-turn glow folded, a VISUALLY IDLE combat was
+// still not a QUIET combat: creature spine anchors that position particle emitters kept streaming their skeleton-
+// driven transforms (and their emitter children's re-based locals) every tick, which was the whole idle wire.
 //
 // WHAT THESE NODES ARE. `SpineSlotNode` / `SpineBoneNode` are spine-godot GDExtension `Node2D`s (registered by
 // `addons/spine/spine_godot_extension.gdextension`, so they have no `MegaCrit.Sts2.*` script). Each binds one
 // skeleton attachment by name and the extension WRITES ITS OWN position/rotation/scale from the skeleton's live
 // pose every frame. They set no texture, no size, no rect, no content of any kind — pure transform carriers. That
 // is the same class the watcher's frozen-spine read-elision already calls "browser-inert" (see
-// Tracked.IsSpineSkeletonLeafType), and the mirror client agrees: `placementBox` (`nodeStyles.ts:256`) returns null
-// for them, so the anchor's own element is a bare grouping div with no transform of its own.
+// Tracked.IsSpineSkeletonLeafType), and the mirror client agrees: it places no box for them, so the anchor's own
+// element is a bare grouping div with no transform of its own.
 //
-// BUT THE TRANSFORM IS NOT DEAD WEIGHT — this is the constraint the whole fold is shaped around. CouchCoop streams
-// `transformSpace: "local"`, and the renderer composes a running global down the tree
-// (`mirrorRenderer.ts:9023-9033`), so an anchor's local IS a factor in its children's composed global. Its only
+// BUT THE TRANSFORM IS NOT DEAD WEIGHT — this is the constraint the whole fold is shaped around. The stream uses
+// `transformSpace: "local"`, and the mirror renderer composes a running global down the tree, so an anchor's
+// local IS a factor in its children's composed global. Its only
 // screen effect is positioning a child emitter. Withholding a MOVING anchor's transform therefore drags that child
 // with it — which is why arm B below is gated on the emitters being idle, and why the fold must resume the instant
 // one starts (a particle burst has to come out of the right mouth).
@@ -34,10 +30,8 @@ namespace Spirectl.Sts2.Live;
 //
 //   A. CHILDLESS anchor — STRUCTURAL, no scene table. An anchor with no tracked descendants cannot be a factor in
 //      anybody's composed global, and paints nothing itself, so its transform provably cannot move a pixel under
-//      ANY condition. 70 of the corpus's 236 anchors are childless pure measurement/targeting probes
-//      (`sludge_spinner.tscn`'s `testBone` / `HoverHeightAdjust` / `TargetingDistanceBone` bind `oil_barf_bone`,
-//      `hover_target_bone`, `attack_target_bone` — the game reads their global position in C#; the browser has no
-//      use for them at all). No table can be justified here: the proof is structural and re-checked EVERY tick, so
+//      ANY condition. Many anchors are childless measurement/targeting probes the browser has no use for at all.
+//      No table can be justified here: the proof is structural and re-checked EVERY tick, so
 //      an anchor that GAINS a runtime-attached VFX child stops qualifying on the very capture the child appears in
 //      (pre-order DFS puts the child in `_ordered` before the anchor is read).
 //
@@ -52,9 +46,8 @@ namespace Spirectl.Sts2.Live;
 //   C. HIDDEN-DESCENDANT anchor — STRUCTURAL again, no table (switch SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD, default on,
 //      under both masters). Every descendant is either an inert class or a CanvasItem whose OWN `visible` is false;
 //      a hidden descendant's subtree is pruned, not scanned, because nothing below a hidden CanvasItem paints and
-//      the client composes visibility down the same chain. The measured case after R15 was the Ironclad's
-//      `Visuals/EyeSlot` (a `SpineSlotNode`) whose only child `EyeFire` (a `TextureRect`) is hidden: about 35
-//      transform deltas per second, nearly the whole idle-combat wire, for a pose nothing on screen used. Arms A
+//      the client composes visibility down the same chain. The typical case is a slot anchor whose only child is
+//      a hidden `TextureRect`: its pose streams every tick while nothing on screen uses it. Arms A
 //      and B both miss it (it has a child; the child is neither inert nor an emitter). The fact is built from what
 //      the walk already holds — each descendant's last-read `visible` and its cached class — so it adds no read.
 //
@@ -75,18 +68,17 @@ namespace Spirectl.Sts2.Live;
 // (DecideArm): the pose ships once, and the elision takes over from the next capture. Which poses count as withheld
 // is PoseStillWithheld: the mark survives any other suppression (a tween window) until the pose really ships.
 //
-// SUPPRESSION, NOT SUBSTITUTION. Unlike every R12-R14 fold this one pins NOTHING and names no `PinnedLoopAnim`:
-// there is no analytic rest pose to substitute (the skeleton owns the value) and nothing for the client to replay
-// (it paints no pixel). The watcher simply withholds the transform via the same `Tracked.SuppressTransformUntil`
-// machinery + depth sentinel that streaming tween-suppression uses, which is also what silences the CHILD emitters
-// for free — their re-based local wobbles in the 4th decimal every tick as the parent moves (measured: 53-81
-// distinct values per child over 6s, crossing the emit test's 2-dp rounding ~150 times), and a suppressed subtree
-// stops re-sending it.
+// SUPPRESSION, NOT SUBSTITUTION. Unlike the earlier pinned-loop folds this one pins NOTHING and names no
+// `PinnedLoopAnim`: there is no analytic rest pose to substitute (the skeleton owns the value) and nothing for the
+// client to replay (it paints no pixel). The watcher simply withholds the transform via the same
+// `Tracked.SuppressTransformUntil` machinery + depth sentinel that streaming tween-suppression uses, which is also
+// what silences the CHILD emitters for free — their re-based local wobbles in the 4th decimal every tick as the
+// parent moves, repeatedly crossing the emit test's 2-dp rounding, and a suppressed subtree stops re-sending it.
 //
 // AND IT SELF-HEALS ON THE EDGE. While suppressed, `ApplyIfChanged` does not advance `LastTransform`, so the moment
 // any gate stops holding — an emitter starts, a VFX child is attached, the creature's own paint appears — the live
 // transform differs from the stale last-emitted one and the node emits immediately, on that same capture. The
-// membership edge is its own change trigger, exactly like `PinnedLoopAnim` is for the R12b map-point fold.
+// membership edge is its own change trigger, exactly like `PinnedLoopAnim` is for the map-point fold.
 //
 // KNOWN COST, accepted (kill switches: SPIRECTL_SPINE_ANCHOR_FOLD=0, or the master SPIRECTL_DECOR_EMIT_SUPPRESS=0;
 // arm C alone: SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD=0): while a creature idles, its emitters' spawn points sit at the
@@ -101,20 +93,16 @@ internal static class Sts2SpineAnchorFold
     /// are deliberately ABSENT: arm A handles them structurally, corpus-wide, and listing them here would imply the
     /// table is the thing keeping them safe.
     ///
-    /// <para>SCOPE: `scenes/creature_visuals/` — the measured problem is the COMBAT idle floor, and a creature is
-    /// the only thing mounted for a whole fight. Background/merchant/rest-site spines have anchors too (236 across
-    /// 80 scenes corpus-wide); they are out of scope for arm B until something measures them, while arm A already
-    /// covers their childless probes.</para>
+    /// <para>SCOPE: `scenes/creature_visuals/` — the problem is the COMBAT idle floor, and a creature is
+    /// the only thing mounted for a whole fight. Background/merchant/rest-site spines have anchors too; they are
+    /// out of scope for arm B, while arm A already covers their childless probes.</para>
     ///
-    /// <para>DERIVATION (reproducible): every `SpineSlotNode`/`SpineBoneNode` in
-    /// `.sts2/toolchain/recovered-project/scenes/creature_visuals/*.tscn` whose authored subtree is non-empty,
-    /// contains at least one `GPUParticles2D`/`CPUParticles2D`, and contains NOTHING but those plus plain `Node2D`
-    /// grouping nodes — i.e. every anchor that positions only emitters. Anchors whose subtree holds a `Line2D`
-    /// (architect's trail, kin_follower's boomerangs, soul_nexus's paths), a `Sprite2D`/`TextureRect`/`ColorRect`
-    /// (necrobinder's head, spectral_knight's head fire, queen's eyes), a `MeshInstance2D` (the decimillipede's
-    /// fx nodes, cubex's laser) or a nested `SpineSprite` (regent's weapons, test_subject's burn VFX) are EXCLUDED
-    /// by construction — those paint, so their anchor's motion is on screen. The runtime subtree scan re-proves the
-    /// same property per tick, so a stale row can only ever fail closed.</para>
+    /// <para>DERIVATION: every `SpineSlotNode`/`SpineBoneNode` in `scenes/creature_visuals/*.tscn` whose authored
+    /// subtree is non-empty, contains at least one `GPUParticles2D`/`CPUParticles2D`, and contains NOTHING but
+    /// those plus plain `Node2D` grouping nodes — i.e. every anchor that positions only emitters. Anchors whose
+    /// subtree holds a `Line2D`, a `Sprite2D`/`TextureRect`/`ColorRect`, a `MeshInstance2D` or a nested
+    /// `SpineSprite` are EXCLUDED by construction — those paint, so their anchor's motion is on screen. The
+    /// runtime subtree scan re-proves the same property per tick, so a stale row can only ever fail closed.</para>
     /// </summary>
     internal static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> EmitterAnchorPathsByScene =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
@@ -169,7 +157,6 @@ internal static class Sts2SpineAnchorFold
                 ["Visuals/ScytheVfxSlot2", "Visuals/ScytheVfxSlot1"],
             ["res://scenes/creature_visuals/parafright.tscn"] =
                 ["Visuals/ParticlesSlot"],
-            // The measured case: four instances of this one anchor were 100% of a 6s idle wire.
             ["res://scenes/creature_visuals/phantasmal_gardener.tscn"] =
                 ["Visuals/SpewSlotNode"],
             ["res://scenes/creature_visuals/phrog_parasite.tscn"] =
@@ -184,7 +171,6 @@ internal static class Sts2SpineAnchorFold
                 ["Visuals/ParticleSlot1", "Visuals/ParticleSlot2", "Visuals/ParticleSlot3"],
             ["res://scenes/creature_visuals/slimed_berserker.tscn"] =
                 ["Visuals/ParticleSlotNodeL", "Visuals/ParticleSlotNodeR", "Visuals/ParticleSlotNodeVomit"],
-            // The Aug-6 recording's always-on pair (its `testBone` is arm A's).
             ["res://scenes/creature_visuals/sludge_spinner.tscn"] =
                 ["Visuals/MouthSpraySlot", "Visuals/MouthDribbleBoneNode"],
             ["res://scenes/creature_visuals/test_subject.tscn"] =
@@ -248,7 +234,7 @@ internal static class Sts2SpineAnchorFold
     /// arm refuses then, because the client WOULD place such a node and a withheld transform would strand it.</para>
     ///
     /// <para><paramref name="hiddenArmEnabled"/> is the SPIRECTL_SPINE_ANCHOR_HIDDEN_FOLD switch (the watcher only
-    /// reaches this call at all under the two R15 master switches), and <paramref name="descendantsHiddenOrInert"/>
+    /// reaches this call at all under the two master switches), and <paramref name="descendantsHiddenOrInert"/>
     /// is <see cref="DescendantsHiddenOrInert{TView}"/>'s verdict.</para>
     ///
     /// <para><paramref name="frozenStationaryRoot"/>: the anchor sits under a frozen, stationary SpineSprite root
@@ -749,11 +735,10 @@ internal static class Sts2SpineAnchorFold
     /// anchor streaming indefinitely.
     ///
     /// <para>WHY IT MATTERS, concretely: the browser runtime simulates every particle INSIDE its emitter's element
-    /// — `localCoords` reaches its config and nothing reads it (godot-scene-web `particles/state.ts`,
-    /// `particles/config.ts`) — so a live burst tracks whatever transform that element last received, even for the
-    /// STS2 emitters authored `local_coords = false`. Freezing the anchor the instant `Emitting` clears would
-    /// therefore leave a dying burst hanging at a stale mouth. Waiting out the tail costs a fraction of a second of
-    /// streaming per burst and removes the whole failure class.</para>
+    /// — it does not honour `localCoords` — so a live burst tracks whatever transform that element last received,
+    /// even for the STS2 emitters authored `local_coords = false`. Freezing the anchor the instant `Emitting`
+    /// clears would therefore leave a dying burst hanging at a stale mouth. Waiting out the tail costs a fraction
+    /// of a second of streaming per burst and removes the whole failure class.</para>
     /// </summary>
     internal static long BurstTailMs(double lifetimeSeconds, double explosiveness)
     {

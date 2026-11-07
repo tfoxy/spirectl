@@ -27,8 +27,7 @@ namespace Spirectl.Sts2.Live;
 /// 2. <b>Parked main loop.</b> The larger stall is engine-level. The engine draws every iteration and
 ///    takes a swapchain image with an unbounded wait; when a compositor stops compositing an
 ///    invisible surface it also stops releasing that surface's buffers, so the acquire never returns
-///    and the entire main thread parks inside it — measured as 0% CPU in <c>poll()</c> with zero
-///    protocol traffic — until the window is visible again. Everything on that thread (this bridge's
+///    and the entire main thread parks inside it until the window is visible again. Everything on that thread (this bridge's
 ///    dispatcher, the embedder's producer, the game's own action queue) stops with it, which is why
 ///    the backlog replays in a burst on un-hide.
 ///    <para>
@@ -37,8 +36,7 @@ namespace Spirectl.Sts2.Live;
 ///    (not sent by every compositor generation), or its legacy emulated-vsync path, which it enables
 ///    only when vertical sync is ON and the compositor has no fifo protocol. So the cure is
 ///    counter-intuitive: pin vsync ON. With vsync OFF neither route is available, the engine keeps
-///    drawing into a surface nobody will release, and it hangs. This was measured on the reporting
-///    machine — vsync off froze on every hide; vsync on did not.
+///    drawing into a surface nobody will release, and it hangs.
 ///    </para>
 ///    The frame limit still comes from the game's own setting, so this does not change the frame rate
 ///    while the window is visible, and nothing is persisted (the saved graphics setting is untouched).

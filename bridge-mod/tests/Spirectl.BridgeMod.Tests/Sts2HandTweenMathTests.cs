@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Spirectl.BridgeMod.Tests;
 
-// WS-4 HAND-LAYOUT LERP — the duration model the producer publishes as a tween hint (Sts2HandTweenMath).
+// HAND-LAYOUT LERP — the duration model the producer publishes as a tween hint (Sts2HandTweenMath).
 //
 // Every expectation below is derived INDEPENDENTLY of the implementation: the reference loop below reproduces how
 // the hand actually settles — each of position, angle and scale eases a fixed FRACTION OF THE REMAINING distance
@@ -36,7 +36,7 @@ public sealed class Sts2HandTweenMathTests
     [InlineData(1.0 / 144.0)]
     public void PositionSettle_MatchesASimulationOfTheSettleLoop(double dt)
     {
-        // The measured start-of-turn draw: 722 px of travel, k = 7, snap at DistanceSquaredTo < 1 (i.e. distance 1).
+        // A typical start-of-turn draw: 722 px of travel, k = 7, snap at DistanceSquaredTo < 1 (i.e. distance 1).
         var simulated = SimulateSeconds(Sts2HandTweenMath.PositionRate, 722, Sts2HandTweenMath.PositionEpsilon, dt);
         var modelled = Sts2HandTweenMath.PositionSettleMs(722, dt) / 1000.0;
 
@@ -62,7 +62,7 @@ public sealed class Sts2HandTweenMathTests
     [Fact]
     public void DiscreteModel_IsFasterThanTheContinuousOne_AtEveryFrameRate()
     {
-        // The whole reason the plan's `t = ln(d)/k` was corrected: the loop steps by a factor (1 - k*dt) per frame
+        // The whole reason the naive continuous `t = ln(d)/k` is corrected: the loop steps by a factor (1 - k*dt) per frame
         // and (1 - k*dt) < e^(-k*dt), so the real loop converges FASTER than the continuous model predicts. This is
         // a property of the model, not a tuned constant, so it must hold across the clamp band.
         var continuous = Sts2HandTweenMath.ContinuousSettleSeconds(Sts2HandTweenMath.PositionRate, 722, 1.0);
@@ -82,14 +82,14 @@ public sealed class Sts2HandTweenMathTests
     [Fact]
     public void PositionSettle_SitsInTheDocumentedBand_ForTheMeasuredDraw()
     {
-        // The band the clamp guarantees for the measured d0 = 722 px: 826 ms at the 30 fps floor, 927 ms at the
+        // The band the clamp guarantees for d0 = 722 px: 826 ms at the 30 fps floor, 927 ms at the
         // 240 fps ceiling. This is the claim the model note makes, pinned so it cannot silently drift.
         Assert.InRange(Sts2HandTweenMath.PositionSettleMs(722, 1.0 / 30.0), 820, 832);
         Assert.InRange(Sts2HandTweenMath.PositionSettleMs(722, 1.0 / 60.0), 878, 890);
         Assert.InRange(Sts2HandTweenMath.PositionSettleMs(722, 1.0 / 90.0), 897, 909);
         Assert.InRange(Sts2HandTweenMath.PositionSettleMs(722, 1.0 / 240.0), 921, 933);
 
-        // The clamp keeps every reachable duration under the continuous model's 940 ms, which is the plan's
+        // The clamp keeps every reachable duration under the continuous model's 940 ms, which is the continuous
         // (overestimating) formula and the upper bound of this whole family.
         Assert.True(
             Sts2HandTweenMath.PositionSettleMs(722, 1.0 / 240.0)

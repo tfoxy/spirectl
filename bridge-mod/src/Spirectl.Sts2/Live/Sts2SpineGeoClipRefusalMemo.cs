@@ -8,9 +8,8 @@ namespace Spirectl.Sts2.Live;
 // tried and already refused, so it does not re-derive the same refusal from scratch.
 //
 // WHAT IT IS FOR. A bake that runs to completion and still fails to acquire the whole rig
-// (Sts2SpineGeoClipRequestLane.IncompletenessReason) costs exactly as much as one that succeeds — an embedded
-// host measured a median of 1.45 s and a p90 of 4.15 s per identity, on a catalog where roughly half of them
-// land there. Nothing about that verdict changes between two identical requests in one process, so paying for
+// (Sts2SpineGeoClipRequestLane.IncompletenessReason) costs exactly as much as one that succeeds. Nothing about
+// that verdict changes between two identical requests in one process, so paying for
 // it twice is paying for a computation whose answer is already known. A host with its own persistent store
 // (couch-coop has one) sidesteps this; every other embedder re-pays it on every request, and every host re-pays
 // it on the first request after a launch.

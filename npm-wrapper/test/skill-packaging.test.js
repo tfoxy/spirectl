@@ -16,7 +16,7 @@ test("repo skill packaging stays aligned across the skill and public docs", () =
   const runtimeReference = readRepoFile("skills/spirectl/references/cli-runtime.md");
   const libraryReference = readRepoFile("skills/spirectl/references/library-integration.md");
   const aiSkillDoc = readRepoFile("docs/ai-skill.md");
-  const currentStatus = readRepoFile("docs/current-status.md");
+  const capabilities = readRepoFile("docs/capabilities.md");
   const npmReadme = readRepoFile("npm-wrapper/README.md");
   const readme = readRepoFile("README.md");
 
@@ -41,8 +41,8 @@ test("repo skill packaging stays aligned across the skill and public docs", () =
   assert.match(aiSkillDoc, /https:\/\/github\.com\/<owner>\/<repo>\/tree\/main\/skills\/spirectl/);
   assert.match(aiSkillDoc, /sts2 skill install/);
 
-  assert.match(currentStatus, /repo-native self-contained skill pack/i);
-  assert.match(currentStatus, /npx skills add <owner>\/<repo> --skill spirectl/);
+  assert.match(capabilities, /repo-native self-contained skill pack/i);
+  assert.match(capabilities, /npx skills add <owner>\/<repo> --skill spirectl/);
 
   assert.match(npmReadme, /command -v sts2 >/);
   assert.match(npmReadme, /npx @spirectl\/sts2/);
