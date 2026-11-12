@@ -1641,10 +1641,19 @@ fn deploy_bridge(
         json!({ "reason": reason, "contentHash": content_hash }),
     );
     if installed {
+        let endpoint_file = layout.mod_dir.join(crate::endpoint::ENDPOINT_FILE_NAME);
+        let endpoint_bytes = match fs::read(&endpoint_file) {
+            Ok(bytes) => Some(bytes),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(io_lifecycle_error(command_name)(error)),
+        };
         if layout.mod_dir.exists() {
             fs::remove_dir_all(&layout.mod_dir).map_err(io_lifecycle_error(command_name))?;
         }
         copy_directory(command_name, &stage_dir, &layout.mod_dir)?;
+        if let Some(bytes) = endpoint_bytes {
+            fs::write(&endpoint_file, bytes).map_err(io_lifecycle_error(command_name))?;
+        }
     }
     validate_deployed_bridge_layout(command_name, &layout.mod_dir, semver)?;
     let mod_load_order = update_bridge_mod_load_order(config, command_name, layout)?;

@@ -381,6 +381,12 @@ fn resolve_instance_and_config(
         cli.instance
             .as_deref()
             .or(loaded_config.config.instances.default_name.as_deref());
+    crate::endpoint::apply_override(
+        &mut effective_config,
+        cli.endpoint.as_deref(),
+        std::env::var("SPIRECTL_ENDPOINT").ok().as_deref(),
+        instance_name,
+    )?;
     if cli.isolated_build && instance_name.is_none() {
         return Err(crate::instance::instance_error(
             "isolated_build_requires_instance",
@@ -411,7 +417,7 @@ fn resolve_instance_and_config(
     Ok((loaded_config, effective_config, instance_ctx))
 }
 
-pub fn run_cli(cli: Cli) -> Result<RenderedCommand, AppError> {
+pub fn run_cli(mut cli: Cli) -> Result<RenderedCommand, AppError> {
     crate::progress::set_enabled(cli.progress);
     if !bridge::should_preserve_mock_loaded_fixture_for_next_cli_run() {
         bridge::reset_mock_loaded_fixture_scenario();
@@ -427,6 +433,12 @@ pub fn run_cli(cli: Cli) -> Result<RenderedCommand, AppError> {
     };
     record_usage_command(canonical_usage_command(&cli.command), context);
 
+    if let Commands::Game(crate::GameCommand {
+        command: GameSubcommand::InstallBridge(args),
+    }) = &mut cli.command
+    {
+        args.endpoint = cli.endpoint.clone();
+    }
     dispatch_cli_command(cli.command, context)
 }
 
@@ -631,6 +643,46 @@ mod tests {
         args.extend(extra.iter().map(|value| value.to_string()));
         args.extend(["game".to_string(), "instances".to_string()]);
         Cli::parse_from(args)
+    }
+
+    #[test]
+    fn endpoint_flag_overlays_effective_config_only() {
+        let (_dir, path) = write_config("transport:\n  kind: mock\n");
+        let cli = cli_with_config(&path, &["--endpoint", "tcp:127.0.0.1:1234"]);
+        let (loaded, effective, instance) = resolve_instance_and_config(&cli).unwrap();
+        assert!(matches!(
+            loaded.config.transport.kind,
+            crate::TransportKind::Mock
+        ));
+        assert!(matches!(
+            effective.transport.kind,
+            crate::TransportKind::Tcp
+        ));
+        assert_eq!(
+            effective.transport.tcp_address.as_deref(),
+            Some("127.0.0.1:1234")
+        );
+        assert!(instance.is_none());
+    }
+
+    #[test]
+    fn endpoint_flag_conflicts_with_explicit_and_default_instance() {
+        for (yaml, extra) in [
+            (
+                "transport:\n  kind: ipc\n",
+                vec!["--instance", "alpha", "--endpoint", "unix:/tmp/seat.sock"],
+            ),
+            (
+                "instances:\n  default: alpha\n",
+                vec!["--endpoint", "tcp:127.0.0.1:1234"],
+            ),
+        ] {
+            let (_dir, path) = write_config(yaml);
+            let cli = cli_with_config(&path, &extra);
+            let error = resolve_instance_and_config(&cli).unwrap_err();
+            assert_eq!(error.exit_code, 2);
+            assert_eq!(error.payload["error"]["code"], "endpoint_instance_conflict");
+        }
     }
 
     #[test]

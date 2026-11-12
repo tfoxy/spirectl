@@ -13,6 +13,7 @@ Use this map for Rust CLI UX, config, output, dispatch, and command implementati
 - `cli/src/config.rs`: `AppConfig`, YAML loading/merging, config provenance, and local discovered-game-path cache updates.
 - `cli/src/config_resolve.rs`: `config resolve` — resolves config into absolute install paths with per-key provenance, reusing the `install_paths` resolvers.
 - `cli/src/context.rs`: command runtime context, owned context snapshots, RPC timeout overrides, bridge-client construction, and the optional active `--instance` handle.
+- `cli/src/endpoint.rs`: shared endpoint spec parsing, loopback validation, per-invocation transport overrides, and the installed endpoint file shape.
 - `cli/src/instance.rs`: multi-instance support — `--instance <name>` resolution (deterministic socket/user-dir/mirror derivation, name validation, `auto` allocation), config overlay, isolated-build game mirror, and the `<instances.dir>/<name>/instance.json` registry. See the Multi-Instance section in `docs/cli.md`.
 - `cli/src/error.rs`: `AppError` and structured CLI error payload constructors.
 - `cli/src/output.rs`: `RenderedCommand`, structured rendering, success render helpers, and output write errors.

@@ -27,6 +27,7 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
         examples: &[
             "sts2 state",
             "sts2 --json state",
+            "sts2 --endpoint tcp:127.0.0.1:51173 --json state",
             "sts2 --json state actions",
             "sts2 --json state --watch --max-events 1",
             "sts2 --json state --perspective omniscient --player-id p2",
@@ -840,12 +841,13 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
     },
     CommandInfo {
         name: "game install-bridge",
-        summary: "Build and install only the bridge payload for the installed game build into the configured mods directory.",
+        summary: "Build and install the bridge payload for the installed game build; --endpoint persists its listener address beside the mod, and omission removes that file.",
         status: "implemented",
         read_only: false,
         examples: &[
             "sts2 game install-bridge",
             "sts2 --json game install-bridge",
+            "sts2 game install-bridge --endpoint tcp:127.0.0.1:51173",
         ],
     },
     CommandInfo {

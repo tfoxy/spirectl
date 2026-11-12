@@ -31,7 +31,7 @@ public static class ModEntry
             var mainThreadContext = Sts2GodotMainThreadPump.Install();
             Sts2MainThreadDispatcher.Capture(mainThreadContext);
             Log.Info("[spirectl] Live bridge main-thread dispatcher captured.");
-            var endpoint = BridgeEndpointOptions.Resolve();
+            var endpoint = BridgeEndpointOptions.Resolve(logError: message => Log.Error($"[spirectl] {message}"));
             HostedBridgeServerFactory.ClearNonSelectedEndpointVariables(endpoint);
 
             _host = new HostedBridgeHost(
@@ -52,8 +52,8 @@ public static class ModEntry
             logStream.Write(
                 BridgeLogLevel.Info,
                 "bridge.bootstrap",
-                $"Live {endpoint.EndpointKind} bridge host started.");
-            Log.Info($"[spirectl] Live {endpoint.EndpointKind} bridge host started.");
+                $"Live {endpoint.EndpointKind} bridge host started at {endpoint.EndpointDisplay} (source: {endpoint.Source}).");
+            Log.Info($"[spirectl] Live {endpoint.EndpointKind} bridge host started at {endpoint.EndpointDisplay} (source: {endpoint.Source}).");
         }
         catch (Exception ex)
         {

@@ -107,7 +107,7 @@ public sealed partial class Sts2HostTests
     {
         using var _ = WithoutConfiguredBridgeEndpointEnvironment();
 
-        var endpoint = BridgeEndpointOptions.Resolve();
+        var endpoint = BridgeEndpointOptions.Resolve(isWindows: false);
 
         Assert.Equal("ipc", endpoint.TransportKind);
         Assert.Equal("unix-socket", endpoint.EndpointKind);

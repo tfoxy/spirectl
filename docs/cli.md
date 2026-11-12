@@ -1166,6 +1166,22 @@ keeps its old meaning and stays null when no wrapper is configured.
 
 ### install-bridge Arguments
 
+`--endpoint <spec>` also persists the explicit flag to
+`<mods>/spirectlbridge/spirectl-bridge.endpoint.json`, so Steam and scheduled launches use it
+without endpoint environment variables. For example:
+
+```bash
+sts2 game install-bridge --endpoint tcp:127.0.0.1:51173
+```
+
+The specs match the global flag described under [Transport Config](#transport-config).
+Without an explicit flag, installation removes any existing endpoint file, including when the
+binary copy is skipped. `SPIRECTL_ENDPOINT` changes the invocation's transport but is not persisted.
+Bridge updates through `game deploy` or launch auto-repair preserve the installed endpoint file.
+JSON adds `endpoint.source` (`flag` or `config`) and `endpoint.file` (absolute path or `null`).
+`game launch` continues to supply the selected endpoint through the bridge environment;
+seat-specific endpoint environment variables take precedence over the installed file.
+
 All optional; bare `game install-bridge` builds from a source checkout, or uses
 the version-matched release bridge payload when invoked from a distributed CLI.
 `--no-build` never invokes .NET: it uses a verified cached release payload, or
@@ -1847,6 +1863,20 @@ used to be completely silent. Warnings are informational — the exit code is un
 - `ipc`: executable local IPC bridge transport when the STS2 host adapter is running; use `transport.ipcPath` on Unix-like hosts and `transport.pipeName` on Windows
 - `tcp`: executable standalone framed-protobuf bridge transport over loopback TCP; defaults to `127.0.0.1:51173`
 
+`--endpoint <spec>` overrides transport config for one invocation; `SPIRECTL_ENDPOINT` supplies
+it when the flag is absent. Specs are `tcp:<host:port>`, `pipe:<name>`, or `unix:<path>`;
+TCP must resolve only to loopback addresses and use a non-zero port. Other transport addresses
+are cleared in the effective config. TCP hostnames remain intact for client connections so all
+resolved addresses can be tried. The installed endpoint file uses a literal IP, preferring IPv4
+loopback when available. Neither override writes your CLI config. An endpoint override
+combined with `--instance`, `SPIRECTL_INSTANCE`, or `instances.default` returns a structured
+`endpoint_instance_conflict` usage error (exit 2).
+
+```bash
+sts2 --endpoint tcp:127.0.0.1:51173 --json state
+SPIRECTL_ENDPOINT=unix:/tmp/seat-a.sock sts2 --json state
+```
+
 ## Platform Support
 
 The CLI builds and runs on Linux, Windows, and macOS. Where a capability needs the host's process
@@ -1854,7 +1884,7 @@ table or user-data layout, the coverage differs:
 
 | Capability | Linux | Windows | macOS |
 | --- | --- | --- | --- |
-| Local IPC transport | Unix socket (`transport.ipcPath`) | named pipe (`transport.pipeName`) | Unix socket |
+| Local IPC transport / bridge default | Unix socket (`transport.ipcPath`), `/tmp/spirectl-bridge.sock` | named pipe (`transport.pipeName`), `spirectl-bridge` | Unix socket, `/tmp/spirectl-bridge.sock` |
 | Loopback TCP transport, state, actions, assets, static inspection | yes | yes | yes |
 | `game launch` (incl. detached session) | `setsid` | detached process group | `setsid` |
 | `game close` / `game kill` / `game deploy --restart` | `/proc` + signals | `Get-CimInstance Win32_Process` (falling back to `tasklist`) + `taskkill` | needs `game.stopCommand` |
@@ -1917,6 +1947,7 @@ Notes:
 - `game.launchArgs` may also use array form or shell-word shorthand. Prefer `launchArgs: [--headless, -fastmp, host_standard]`; `launchArgs: "--headless -fastmp host_standard"` is equivalent. Quote arguments that contain spaces, such as `launchArgs: "--profile '/path with spaces/profile.json'"`.
 - `game.assetLoadGuard` (default `false`) is a temporary auto-player workaround. When `true`, `game launch` sets `SPIRECTL_BRIDGE_ASSET_LOAD_GUARD=1` so the bridge mod installs its asset-load crash guards, which prefix the game's texture and forced-Ancient-event loads to return empty placeholders. Those placeholders render as a purple missing-texture grid, so leave it `false` for normal/interactive launches. Only enable it for the auto-player, whose software-rendered (`xvfb`) launch still segfaults on game-side texture loads; it exists only until that crash is root-caused. Setting `SPIRECTL_BRIDGE_ASSET_LOAD_GUARD` directly via `game.launchEnv` works too.
 - `game.disableBackgroundThrottle` (default `false`) keeps a launched instance usable as an automation target while its window sits in the background. Two things otherwise break it. The game lowers its own frame limit on window focus-out, halving every main-thread cadence the bridge depends on. Worse, the engine draws every iteration and takes a swapchain image with an unbounded wait, so on a compositor that stops releasing an invisible surface's buffers the whole main thread parks inside that acquire (0% CPU in `poll()`, zero protocol traffic) until the window is visible again — bridge RPCs time out, live state/scene streaming stops, and queued actions replay in a burst on un-hide. When `true`, `game launch` (and the relaunch inside `game restart` / `game deploy --restart`) sets `SPIRECTL_BRIDGE_DISABLE_BACKGROUND_THROTTLE=1`, and the bridge mod skips the background frame cap and pins vertical sync ON for the session. Pinning vsync ON is the counter-intuitive part and it is the actual cure: the engine only stops drawing a hidden surface once it considers that surface suspended, and it can reach that state either from a compositor that advertises the toplevel as suspended (not sent by every compositor generation) or from its legacy emulated-vsync timeout path, which it enables only when vertical sync is on and the compositor exposes no fifo protocol. With vsync off neither route exists and the instance hangs on every hide. Nothing is persisted — the saved graphics setting is untouched — and the frame limit still comes from the game's own setting. Prefer it for long-lived developer/agent instances and leave it `false` for normal play. Per-launch equivalent: `game launch --disable-background-throttle`. Individual levers can be turned off for bisection with `SPIRECTL_BRIDGE_BACKGROUND_FPS_UNCAP=0` / `SPIRECTL_BRIDGE_BACKGROUND_VSYNC_ON=0`, and setting `SPIRECTL_BRIDGE_DISABLE_BACKGROUND_THROTTLE` directly via `game.launchEnv` works too. Headless instances are unaffected (no window to background).
+- The standalone bridge resolves its endpoint from `SPIRECTL_BRIDGE_PIPE_NAME`, `SPIRECTL_BRIDGE_TCP_ADDRESS`, or `SPIRECTL_BRIDGE_SOCKET_PATH` first (set only one), then `spirectl-bridge.endpoint.json` beside the Host DLL, then the platform default: named pipe `spirectl-bridge` on Windows, `/tmp/spirectl-bridge.sock` elsewhere. The file uses `{"schema":"spirectl-bridge-endpoint/1","kind":"tcp|named-pipe|unix-socket","address":"..."}`. A malformed file logs an error and falls back to the platform default. Startup logs include the endpoint source (`env`, `file`, or `default`).
 - If `transport.pipeName` is unset on Windows, the CLI defaults it to `spirectl-bridge`.
 - If `transport.tcpAddress` is unset, the CLI defaults it to `127.0.0.1:51173` and rejects non-loopback addresses.
 - If `transport.rpcTimeoutMs` is set, direct live bridge calls fail with `bridge_rpc_timeout` when a local transport connection is accepted but the RPC response does not complete before that timeout. `state` and `dev wait-for` also apply a default bounded RPC timeout when no config value is set, and lifecycle commands expose this as `--rpc-timeout-ms`.

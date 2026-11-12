@@ -14,6 +14,29 @@ pub(crate) fn execute_game_install_bridge_json(
             force: args.force,
         },
     )?;
+    let endpoint_file = layout.mod_dir.join(crate::endpoint::ENDPOINT_FILE_NAME);
+    let persisted_file = if let Some(spec) = args.endpoint.as_deref() {
+        let endpoint = crate::endpoint::EndpointSpec::parse(spec)?;
+        fs::write(
+            &endpoint_file,
+            serde_json::to_vec_pretty(&endpoint.file_json()?).expect("endpoint file serializes"),
+        )
+        .map_err(io_lifecycle_error("game install-bridge"))?;
+        Some(endpoint_file.display().to_string())
+    } else {
+        match fs::remove_file(&endpoint_file) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(io_lifecycle_error("game install-bridge")(error)),
+        }
+        None
+    };
+    result["endpoint"]["source"] = json!(if args.endpoint.is_some() {
+        "flag"
+    } else {
+        "config"
+    });
+    result["endpoint"]["file"] = json!(persisted_file);
     if let Some(instance) = context.instance {
         let _ = instance.write_record(
             &crate::instance::InstanceRunUpdate {

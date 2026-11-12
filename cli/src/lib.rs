@@ -109,6 +109,7 @@ mod commands;
 mod config;
 mod config_resolve;
 mod context;
+mod endpoint;
 mod error;
 mod inspect;
 mod instance;

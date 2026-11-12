@@ -50,7 +50,7 @@ if [ "$command_name" = "publish" ]; then
     esac
   done
   mkdir -p "$output_dir"
-  : > "$output_dir/Spirectl.BridgeMod.Sts2Host.dll"
+  printf '%s' "${SPIRECTL_TEST_BRIDGE_CONTENT:-}" > "$output_dir/Spirectl.BridgeMod.Sts2Host.dll"
   : > "$output_dir/Spirectl.BridgeMod.dll"
   exit 0
 fi
@@ -182,6 +182,31 @@ exit 1
             .join("mods/spirectlbridge/spirectlbridge.dll")
             .is_file()
     );
+
+    let endpoint_file = game_dir
+        .path()
+        .join("mods/spirectlbridge/spirectl-bridge.endpoint.json");
+    let endpoint_bytes = b"{\n  \"schema\": \"spirectl-bridge-endpoint/1\", \"kind\": \"tcp\", \"address\": \"127.0.0.1:51173\"\n}\n";
+    fs::write(&endpoint_file, endpoint_bytes).expect("installed endpoint file");
+    let workdir = workspace.path().to_path_buf();
+    let config_path = config.path().to_string_lossy().into_owned();
+    let project_path = project_root.to_string_lossy().into_owned();
+    let prefixed_path = format!("{}:{}", fake_bin_dir.display(), path_value);
+    let replaced = tokio::task::spawn_blocking(move || {
+        run_json_in_dir_with_env(
+            &workdir,
+            &["--json", "--config", &config_path, "game", "deploy", &project_path],
+            &[
+                ("PATH", &prefixed_path),
+                ("SPIRECTL_TEST_BRIDGE_CONTENT", "updated bridge"),
+            ],
+        )
+    })
+    .await
+    .expect("join replacement deploy task");
+    assert_eq!(replaced["bridge"]["installed"], true);
+    assert_eq!(replaced["bridge"]["reason"], "content_changed");
+    assert_eq!(fs::read(&endpoint_file).expect("preserved endpoint"), endpoint_bytes);
     server.abort();
 }
 
@@ -312,11 +337,61 @@ exit 1
     let config_path = config.path().to_string_lossy().into_owned();
     let xdg_data_home = data_root.to_string_lossy().into_owned();
     let payload = tokio::task::spawn_blocking(move || {
-        run_json_in_dir_with_env(
+        let payload = run_json_in_dir_with_env(
             &workdir,
-            &["--json", "--config", &config_path, "game", "install-bridge"],
-            &[("PATH", &prefixed_path), ("XDG_DATA_HOME", &xdg_data_home)],
-        )
+            &[
+                "--json",
+                "--config",
+                &config_path,
+                "game",
+                "install-bridge",
+                "--endpoint",
+                "tcp:127.0.0.1:51173",
+            ],
+            &[
+                ("PATH", &prefixed_path),
+                ("XDG_DATA_HOME", &xdg_data_home),
+                ("SPIRECTL_ENDPOINT", "invalid"),
+            ],
+        );
+        assert_eq!(payload["endpoint"]["source"], "flag");
+        assert_eq!(payload["endpoint"]["address"], "127.0.0.1:51173");
+        let endpoint_file =
+            PathBuf::from(payload["endpoint"]["file"].as_str().expect("endpoint file"));
+        assert_eq!(
+            endpoint_file.file_name().unwrap(),
+            "spirectl-bridge.endpoint.json"
+        );
+        let endpoint: Value =
+            serde_json::from_str(&fs::read_to_string(&endpoint_file).unwrap()).unwrap();
+        assert_eq!(
+            endpoint,
+            serde_json::json!({
+                "schema": "spirectl-bridge-endpoint/1", "kind": "tcp", "address": "127.0.0.1:51173"
+            })
+        );
+        // Repeat the same installation so the content-unchanged path must remove the stale file too.
+        let removed = run_json_in_dir_with_env(
+            &workdir,
+            &[
+                "--json",
+                "--config",
+                &config_path,
+                "game",
+                "install-bridge",
+                "--no-build",
+            ],
+            &[
+                ("PATH", &prefixed_path),
+                ("XDG_DATA_HOME", &xdg_data_home),
+                ("SPIRECTL_ENDPOINT", "tcp:127.0.0.1:51174"),
+            ],
+        );
+        assert_eq!(removed["endpoint"]["source"], "config");
+        assert_eq!(removed["endpoint"]["address"], "127.0.0.1:51174");
+        assert!(removed["endpoint"]["file"].is_null());
+        assert!(!endpoint_file.exists());
+        payload
     })
     .await
     .expect("join install-bridge task");

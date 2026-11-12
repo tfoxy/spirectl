@@ -1120,6 +1120,7 @@ fn inspect_deployed_bridge_layout(
             path.is_file()
                 && path.extension() == Some(OsStr::new("json"))
                 && path.file_name() != Some(OsStr::new(BRIDGE_MANIFEST_NAME))
+                && path.file_name() != Some(OsStr::new(crate::endpoint::ENDPOINT_FILE_NAME))
         })
         .collect::<Vec<_>>();
     unexpected_json.sort();

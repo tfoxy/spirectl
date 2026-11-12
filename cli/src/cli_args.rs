@@ -190,6 +190,14 @@ pub struct Cli {
     #[arg(
         long,
         global = true,
+        value_name = "SPEC",
+        help = "Override the bridge endpoint for this invocation (tcp:<host:port>, pipe:<name>, unix:<path>; env: SPIRECTL_ENDPOINT). With game install-bridge, persist the flag beside the mod. Conflicts with --instance."
+    )]
+    pub endpoint: Option<String>,
+
+    #[arg(
+        long,
+        global = true,
         env = "SPIRECTL_INSTANCE",
         value_name = "NAME",
         help = "Target a named game instance (own bridge socket + Godot user-dir). Use 'auto' to allocate a random name."
@@ -2065,6 +2073,10 @@ pub enum GameSubcommand {
 
 #[derive(Debug, Clone, Args)]
 pub struct GameInstallBridgeArgs {
+    /// Explicit global flag, forwarded by top-level dispatch; environment overrides are not persisted.
+    #[arg(skip)]
+    pub endpoint: Option<String>,
+
     /// Install from a verified cached/release bridge archive instead of rebuilding.
     /// A source checkout may also stage its existing host publish output; this
     /// option never invokes .NET.
@@ -2106,6 +2118,7 @@ pub struct GameInstallBridgeArgs {
 impl Default for GameInstallBridgeArgs {
     fn default() -> Self {
         Self {
+            endpoint: None,
             no_build: false,
             force: false,
             restart: false,
