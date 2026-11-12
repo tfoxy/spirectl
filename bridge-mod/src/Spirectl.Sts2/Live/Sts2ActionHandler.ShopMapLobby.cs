@@ -175,13 +175,13 @@ public sealed partial class Sts2ActionHandler
             return ActionExecutionResult.Failure(
                 kind: request.Kind,
                 code: ActionFailureCode.InvalidAction,
-                message: "select-map-node requires an executable map node id from the current screen.",
+                message: "select-map-node requires map-node:<row>:<col> or map-point:<row>:<col>, or a live map point elementId.",
                 details:
                 [
                     new ActionFailureDetail(
                         Field: "node_id",
                         Value: string.Empty,
-                        Note: "Provide a stable map node id from state.choices[].id or availableActions[].arguments.mapNodeId, or a live map point's elementId."),
+                        Note: "Use integer row and col coordinates from state.run.map.points[].id or state actions args.mapNodeId, or a live map point's elementId."),
                 ]);
         }
 
@@ -242,14 +242,15 @@ public sealed partial class Sts2ActionHandler
                 return elementFailure;
             }
         }
-        else if (!mapContext.NodesById.TryGetValue(nodeId!, out resolvedNode))
+        else if (!Sts2MapIds.TryParseNodeId(nodeId, out var row, out var col)
+            || !mapContext.NodesById.TryGetValue(Sts2MapIds.NodeId(row, col), out resolvedNode))
         {
             return MapActionUnavailable(
                 request.Kind,
-                "select-map-node requires a visible map node id from the current screen.",
+                "Unknown map node id. Expected map-node:<row>:<col> or map-point:<row>:<col> for a current map point.",
                 "node_id",
                 requestedRef,
-                "Provide a stable map node id from state.choices[].id or availableActions[].arguments.mapNodeId.");
+                "Use integer row and col coordinates from state.run.map.points[].id or state actions args.mapNodeId.");
         }
 
         if (!Sts2ActionCatalog.CanSelectMapNode(

@@ -25,7 +25,8 @@ public static class Sts2MapIds
 
         var parts = nodeId.Split(':', StringSplitOptions.TrimEntries);
         if (parts.Length != 3
-            || !string.Equals(parts[0], "map-node", StringComparison.Ordinal)
+            || (!string.Equals(parts[0], "map-node", StringComparison.Ordinal)
+                && !string.Equals(parts[0], "map-point", StringComparison.Ordinal))
             || !int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out row)
             || !int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out col))
         {

@@ -38,7 +38,7 @@
         "mapNodeId": "map-node:3:1"
       },
       "enabled": true,
-      "id": "action:map:select-map-node:map-node:3:1",
+      "id": "action:map:select-map-node:map-point:3:1",
       "kind": "select-map-node",
       "label": "Monster (3,1)",
       "ownerPlayerId": "p1",

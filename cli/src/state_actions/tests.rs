@@ -286,8 +286,8 @@ fn cases() -> Vec<(String, Value, PresentationModels)> {
                 "currentRoom": { "scene": "rooms/map_room" },
                 "map": {
                     "points": [
-                        { "id": "map-node:3:1", "coord": { "row": 3, "col": 1 }, "pointType": "Monster", "travelable": true, "visited": false },
-                        { "id": "map-node:2:1", "coord": { "row": 2, "col": 1 }, "pointType": "Event", "travelable": false, "visited": true }
+                        { "id": "map-point:3:1", "coord": { "row": 3, "col": 1 }, "pointType": "Monster", "travelable": true, "visited": false },
+                        { "id": "map-point:2:1", "coord": { "row": 2, "col": 1 }, "pointType": "Event", "travelable": false, "visited": true }
                     ]
                 }
             }
@@ -411,5 +411,39 @@ fn native_matches_golden() {
             golden, actual,
             "golden mismatch for `{name}` (rebless if intended)"
         );
+    }
+}
+
+#[test]
+fn map_node_args_use_canonical_ids_for_state_points_and_node_ids() {
+    for point_id in ["map-point:3:1", "map-node:3:1"] {
+        let state = json!({
+            "rootScene": "run",
+            "run": {
+                "view": { "playerId": "p1" },
+                "players": [{ "id": "p1" }],
+                "currentRoom": { "scene": "rooms/map_room" },
+                "map": { "points": [
+                    { "id": point_id, "travelable": true },
+                    { "id": "map-point:2:1", "travelable": false }
+                ] }
+            }
+        });
+        let actual = resolve_state_actions_json(
+            &state,
+            &PresentationModels::default(),
+            PerspectiveRequest::default(),
+        );
+        let actions: Vec<_> = actual["actions"]
+            .as_array()
+            .expect("actions array")
+            .iter()
+            .filter(|action| action["kind"] == "select-map-node")
+            .collect();
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0]["kind"], "select-map-node");
+        assert_eq!(actions[0]["args"]["mapNodeId"], "map-node:3:1");
+        assert_eq!(actions[0]["ownerPlayerId"], "p1");
+        assert_eq!(actions[0]["sourcePath"], "run.map.points[0]");
     }
 }

@@ -1148,7 +1148,11 @@ fn surface_map_room(state: &Value, actions: &mut Vec<Value>) -> bool {
                 continue;
             };
             let mut args = Map::new();
-            args.insert("mapNodeId".into(), json!(id));
+            let node_id = match id.strip_prefix("map-point:") {
+                Some(coord) => format!("map-node:{coord}"),
+                None => id.to_string(),
+            };
+            args.insert("mapNodeId".into(), json!(node_id));
             emit_action(
                 actions,
                 "select-map-node",

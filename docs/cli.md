@@ -576,7 +576,7 @@ These semantic actions route through the runtime bridge contract.
 - `choose`: fallback-only compatibility action for generic, modded, or unmodeled visible choices when no modeled `preferredAction` exists; old choose-heavy IDs such as `reward:<player-id>:<rewards-set-index>`, `event-room:<text-key>:<index>`, `treasure-room:relic:<model-id>:<index>`, `rest-site:<player-id>:<option-id>:<index>`, `shop:<player-id>:card:<model-id>:<slot-index>`, `map:back`, `card-selection:card:<model-id>:<index>`, and `reward-flow:skip` may still appear for migration and fallback, but first-party docs should prefer the typed section plus `preferredAction`
 - `confirm-selection`: executable for staged `simple-card-selection` and `deck-card-selection` overlays when the live overlay state exposes a legal follow-through path
 - `cancel-selection`: executable for staged `simple-card-selection` and `deck-card-selection` overlays when the live overlay state exposes a legal staged-selection rollback path
-- `select-map-node`: executable on the map screen for currently travelable node IDs such as `map-node:3:1`
+- `select-map-node`: executable on the map screen for currently travelable node IDs such as `map-node:3:1`; also accepts the equivalent state point ID `map-point:3:1`. Unknown or malformed IDs return `invalid_action` with the accepted `map-node:<row>:<col>` and `map-point:<row>:<col>` formats (integer coordinates).
 - `back-from-map`: executable when the visible map back control is legal
 - `claim-reward` / `skip-rewards`: executable for visible reward entries and visible reward proceed/skip flow
 - `select-card` / `skip-card-selection` / `select-bundle`: executable for supported visible card-selection, simple/deck selection, and bundle-selection flows
@@ -1825,6 +1825,9 @@ Asset references are generic keys, not URLs. Consumers should use `notices[]` to
 
 `state actions` is resolved natively in `cli/src/state_actions.rs` from `state`
 (no CEL, no `actions.json`); `cli/src/state_actions/testdata/` holds the goldens.
+Map-selection actions emit canonical `map-node:<row>:<col>` IDs in `args.mapNodeId`;
+`state.run.map.points[].id` keeps the `map-point:<row>:<col>` form. Both forms are
+accepted by `sts2 act select-map-node --node <id>`.
 
 `state actions` says which seat it answered for. `perspective` carries `playerId` (the seat the
 returned actions belong to, as the state envelope reported it back), `requestedPlayerId` (the
