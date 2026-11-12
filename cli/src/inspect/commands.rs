@@ -848,6 +848,8 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
             "sts2 game install-bridge",
             "sts2 --json game install-bridge",
             "sts2 game install-bridge --endpoint tcp:127.0.0.1:51173",
+            "sts2 game install-bridge --settings-root ./profiles/SlayTheSpire2",
+            "sts2 game install-bridge --skip-mod-load-order",
         ],
     },
     CommandInfo {

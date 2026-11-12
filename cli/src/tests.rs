@@ -1700,6 +1700,8 @@ fn parses_game_install_bridge() {
             command: GameSubcommand::InstallBridge(args),
         }) => {
             // Bare `install-bridge` must keep working: every argument is opt-in.
+            assert!(args.settings_root.is_none());
+            assert!(!args.skip_mod_load_order);
             assert!(!args.no_build);
             assert!(!args.force);
             assert!(!args.restart);
@@ -1742,6 +1744,9 @@ fn parses_game_install_bridge_flags() {
         "--quiescent-stable-samples",
         "4",
         "--require-quiescent",
+        "--settings-root",
+        "profiles/SlayTheSpire2",
+        "--skip-mod-load-order",
     ])
     .expect("expected game install-bridge command to parse");
 
@@ -1749,6 +1754,11 @@ fn parses_game_install_bridge_flags() {
         Commands::Game(GameCommand {
             command: GameSubcommand::InstallBridge(args),
         }) => {
+            assert_eq!(
+                args.settings_root,
+                Some(PathBuf::from("profiles/SlayTheSpire2"))
+            );
+            assert!(args.skip_mod_load_order);
             assert!(args.no_build);
             assert!(args.force);
             assert!(args.restart);

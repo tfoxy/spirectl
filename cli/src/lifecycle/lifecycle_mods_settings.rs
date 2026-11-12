@@ -615,67 +615,104 @@ fn collect_settings_save_candidates(root: &Path, depth: usize, paths: &mut Vec<P
     }
 }
 
+pub(crate) struct ModSettingsReorder {
+    pub(crate) updated_text: Option<String>,
+    pub(crate) before_order: Vec<String>,
+    pub(crate) after_order: Vec<String>,
+    pub(crate) skip_reason: Option<&'static str>,
+}
+
+#[derive(Debug)]
+pub(crate) enum ModSettingsReorderError {
+    Parse(serde_json::Error),
+    Serialize(serde_json::Error),
+}
+
+/// Reorder settings contents without reading a profile or writing a backup.
+/// Unchanged contents are returned as `None` so callers preserve their bytes.
+pub(crate) fn reorder_mod_settings(
+    json_text: &str,
+    dependent_mod_ids: &[String],
+) -> Result<ModSettingsReorder, ModSettingsReorderError> {
+    let mut settings =
+        serde_json::from_str::<Value>(json_text).map_err(ModSettingsReorderError::Parse)?;
+    let mod_settings = settings
+        .get_mut("mod_settings")
+        .and_then(Value::as_object_mut);
+    let skip_reason = if mod_settings.is_none() {
+        Some("mod_settings_missing")
+    } else {
+        None
+    };
+    let Some(mod_list) = mod_settings
+        .and_then(|settings| settings.get_mut("mod_list"))
+        .and_then(Value::as_array_mut)
+    else {
+        return Ok(ModSettingsReorder {
+            updated_text: None,
+            before_order: Vec::new(),
+            after_order: Vec::new(),
+            skip_reason: Some(skip_reason.unwrap_or("mod_list_missing")),
+        });
+    };
+
+    let before_order = mod_list_ids(mod_list);
+    let changed = reorder_mod_list_for_bridge(mod_list, dependent_mod_ids);
+    let after_order = mod_list_ids(mod_list);
+    let updated_text = if changed {
+        Some(
+            serde_json::to_string_pretty(&settings)
+                .map(|contents| format!("{contents}\n"))
+                .map_err(ModSettingsReorderError::Serialize)?,
+        )
+    } else {
+        None
+    };
+    Ok(ModSettingsReorder {
+        updated_text,
+        before_order,
+        after_order,
+        skip_reason: None,
+    })
+}
+
 fn update_settings_mod_load_order(
     command_name: &str,
     settings_path: &Path,
     dependent_mod_ids: &[String],
 ) -> Result<Value, AppError> {
     let contents = fs::read_to_string(settings_path).map_err(io_lifecycle_error(command_name))?;
-    let mut settings = serde_json::from_str::<Value>(&contents).map_err(|source| {
+    let reorder = reorder_mod_settings(&contents, dependent_mod_ids).map_err(|error| {
+        let (code, operation, source) = match error {
+            ModSettingsReorderError::Parse(source) => {
+                ("settings_save_parse_failed", "parse", source)
+            }
+            ModSettingsReorderError::Serialize(source) => {
+                ("settings_save_serialize_failed", "serialize", source)
+            }
+        };
         lifecycle_error(
             4,
-            "settings_save_parse_failed",
+            code,
             command_name,
             &format!(
-                "failed to parse STS2 settings file '{}': {source}",
+                "failed to {operation} STS2 settings file '{}': {source}",
                 settings_path.display()
             ),
         )
     })?;
-
-    let Some(mod_settings) = settings
-        .get_mut("mod_settings")
-        .and_then(Value::as_object_mut)
-    else {
+    if let Some(reason) = reorder.skip_reason {
         return Ok(json!({
             "path": settings_path.display().to_string(),
             "status": "skipped",
-            "reason": "mod_settings_missing",
+            "reason": reason,
             "changed": false
         }));
-    };
+    }
 
-    let Some(mod_list) = mod_settings
-        .get_mut("mod_list")
-        .and_then(Value::as_array_mut)
-    else {
-        return Ok(json!({
-            "path": settings_path.display().to_string(),
-            "status": "skipped",
-            "reason": "mod_list_missing",
-            "changed": false
-        }));
-    };
-
-    let before_order = mod_list_ids(mod_list);
-    let changed = reorder_mod_list_for_bridge(mod_list, dependent_mod_ids);
-    let after_order = mod_list_ids(mod_list);
+    let changed = reorder.updated_text.is_some();
     let mut backup_path = None;
-
-    if changed {
-        let updated = serde_json::to_string_pretty(&settings)
-            .map(|contents| format!("{contents}\n"))
-            .map_err(|source| {
-                lifecycle_error(
-                    4,
-                    "settings_save_serialize_failed",
-                    command_name,
-                    &format!(
-                        "failed to serialize STS2 settings file '{}': {source}",
-                        settings_path.display()
-                    ),
-                )
-            })?;
+    if let Some(updated) = reorder.updated_text {
         let backup = backup_settings_save(command_name, settings_path)?;
         backup_path = Some(backup.display().to_string());
         fs::write(settings_path, updated).map_err(io_lifecycle_error(command_name))?;
@@ -686,8 +723,8 @@ fn update_settings_mod_load_order(
         "status": if changed { "updated" } else { "unchanged" },
         "changed": changed,
         "backupPath": backup_path,
-        "beforeOrder": before_order,
-        "afterOrder": after_order
+        "beforeOrder": reorder.before_order,
+        "afterOrder": reorder.after_order
     }))
 }
 
@@ -1196,7 +1233,7 @@ fn ensure_launch_bridge_layout(
                 BridgeDeployOptions::default(),
             )
             .map(|_| ())
-                .map_err(|source| auto_install_error(command_name, layout, &issue, source))
+            .map_err(|source| auto_install_error(command_name, layout, &issue, source))
         }
     }
 }
@@ -1224,4 +1261,3 @@ fn auto_install_error(
         }),
     }
 }
-

@@ -2,7 +2,7 @@ pub(crate) fn execute_game_install_bridge_json(
     args: GameInstallBridgeArgs,
     context: AppContext<'_>,
 ) -> Result<Value, AppError> {
-    prepare_instance_for_command(context, "game install-bridge")?;
+    prepare_instance_game_mirror(context, "game install-bridge")?;
     let layout = resolve_live_bridge_layout(context.config, "game install-bridge")?;
     cache_lifecycle_paths(context, &layout, true);
     let mut result = deploy_bridge(
@@ -12,6 +12,8 @@ pub(crate) fn execute_game_install_bridge_json(
         BridgeDeployOptions {
             no_build: args.no_build,
             force: args.force,
+            settings_root: args.settings_root.as_deref(),
+            skip_mod_load_order: args.skip_mod_load_order,
         },
     )?;
     let endpoint_file = layout.mod_dir.join(crate::endpoint::ENDPOINT_FILE_NAME);
@@ -49,7 +51,7 @@ pub(crate) fn execute_game_install_bridge_json(
 
     if let Some(object) = result.as_object_mut() {
         if args.restart {
-            let launch = execute_game_launch_explicit_relaunch_json(
+            let launch = execute_game_launch_with_policy_json(
                 GameLaunchArgs {
                     timeout_ms: args.timeout_ms,
                     interval_ms: args.interval_ms,
@@ -65,6 +67,11 @@ pub(crate) fn execute_game_install_bridge_json(
                     launch_args: Vec::new(),
                 },
                 context,
+                LaunchPolicy::ExplicitRelaunch,
+                restart_settings_policy(
+                    args.settings_root.is_some(),
+                    object.get("modLoadOrder"),
+                ),
             )?;
             object.insert(
                 "restart".to_string(),
@@ -85,21 +92,59 @@ pub(crate) fn execute_game_install_bridge_json(
     Ok(result)
 }
 
-/// For an isolated-build instance, create/refresh the per-instance game mirror
-/// (symlinked install + real executable + real `mods/`) before deploy/launch so
-/// the game reads `<game_root>/mods`. No-op for shared instances or no instance.
+/// Seeding policy for the relaunch after `install-bridge --restart`.
+///
+/// The install step deliberately leaves the instance profile alone for an explicit settings root
+/// and for a foreign-platform install; the relaunch must not undo that by copying the host
+/// profile. Every other case (including `--skip-mod-load-order`, which skips only the load-order
+/// rewrite) still seeds a fresh instance, or the bridge would not be enabled on first launch.
+fn restart_settings_policy(
+    explicit_settings_root: bool,
+    mod_load_order: Option<&Value>,
+) -> InstanceSettingsPolicy {
+    let foreign_install = mod_load_order
+        .and_then(|report| report.get("foreignInstall"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if explicit_settings_root || foreign_install {
+        InstanceSettingsPolicy::Preserve
+    } else {
+        InstanceSettingsPolicy::SeedFromHost
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InstanceSettingsPolicy {
+    SeedFromHost,
+    Preserve,
+}
+
+/// Prepare instance user data and the isolated-build game mirror before launch/deploy.
 fn prepare_instance_for_command(
     context: AppContext<'_>,
     command_name: &str,
+    settings_policy: InstanceSettingsPolicy,
 ) -> Result<(), AppError> {
-    let Some(instance) = context.instance else {
+    let Some(_) = context.instance else {
         return Ok(());
     };
     // Seed the per-instance Godot user-data (the XDG_DATA_HOME target) before the
     // game boots so a fresh instance has already accepted the one-time mods
     // warning and carries the bridge-enabled mod list — otherwise STS2 skips every
     // mod, including the bridge. Applies to shared and isolated instances alike.
-    seed_instance_user_data_if_missing(context.config, command_name)?;
+    if settings_policy == InstanceSettingsPolicy::SeedFromHost {
+        seed_instance_user_data_if_missing(context.config, command_name)?;
+    }
+    prepare_instance_game_mirror(context, command_name)
+}
+
+fn prepare_instance_game_mirror(
+    context: AppContext<'_>,
+    command_name: &str,
+) -> Result<(), AppError> {
+    let Some(instance) = context.instance else {
+        return Ok(());
+    };
     if !instance.isolated {
         return Ok(());
     }
@@ -196,14 +241,24 @@ pub(crate) fn execute_game_launch_explicit_relaunch_json(
     args: GameLaunchArgs,
     context: AppContext<'_>,
 ) -> Result<Value, AppError> {
-    execute_game_launch_with_policy_json(args, context, LaunchPolicy::ExplicitRelaunch)
+    execute_game_launch_with_policy_json(
+        args,
+        context,
+        LaunchPolicy::ExplicitRelaunch,
+        InstanceSettingsPolicy::SeedFromHost,
+    )
 }
 
 pub(crate) fn execute_game_launch_with_args_json(
     args: GameLaunchArgs,
     context: AppContext<'_>,
 ) -> Result<Value, AppError> {
-    execute_game_launch_with_policy_json(args, context, LaunchPolicy::AttachOrLaunch)
+    execute_game_launch_with_policy_json(
+        args,
+        context,
+        LaunchPolicy::AttachOrLaunch,
+        InstanceSettingsPolicy::SeedFromHost,
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -547,8 +602,9 @@ fn execute_game_launch_with_policy_json(
     args: GameLaunchArgs,
     context: AppContext<'_>,
     policy: LaunchPolicy,
+    settings_policy: InstanceSettingsPolicy,
 ) -> Result<Value, AppError> {
-    prepare_instance_for_command(context, "game launch")?;
+    prepare_instance_for_command(context, "game launch", settings_policy)?;
     let result = match execute_game_launch_attempt_json(args.clone(), context, policy) {
         Ok(result) => Ok(result),
         Err(first_error) if should_retry_wrapper_launch(&first_error, context.config) => {

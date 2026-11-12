@@ -2,7 +2,7 @@ pub(crate) fn execute_game_deploy_json(
     args: DeployArgs,
     context: AppContext<'_>,
 ) -> Result<Value, AppError> {
-    prepare_instance_for_command(context, "game deploy")?;
+    prepare_instance_for_command(context, "game deploy", InstanceSettingsPolicy::SeedFromHost)?;
     // Read before the context is re-scoped for the RPC timeout: scoped contexts
     // intentionally drop the instance identity.
     let instance = context.instance;
@@ -1497,11 +1497,13 @@ fn assert_deploy_source_fresh(
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-struct BridgeDeployOptions {
+struct BridgeDeployOptions<'a> {
     /// Stage from the existing host publish output instead of rebuilding.
     no_build: bool,
     /// Copy even when the staged bridge is byte-identical to the installed one.
     force: bool,
+    settings_root: Option<&'a Path>,
+    skip_mod_load_order: bool,
 }
 
 const RELEASE_REPOSITORY: &str = "tfoxy/spirectl";
@@ -1527,7 +1529,7 @@ fn deploy_bridge(
     command_name: &str,
     config: &AppConfig,
     layout: &ResolvedLiveBridgeLayout,
-    options: BridgeDeployOptions,
+    options: BridgeDeployOptions<'_>,
 ) -> Result<Value, AppError> {
     let semver = expected_bridge_semver(command_name)?;
     let artifacts_root = absolute_artifacts_dir(config).join("live-bridge");
@@ -1656,7 +1658,13 @@ fn deploy_bridge(
         }
     }
     validate_deployed_bridge_layout(command_name, &layout.mod_dir, semver)?;
-    let mod_load_order = update_bridge_mod_load_order(config, command_name, layout)?;
+    let mod_load_order = update_bridge_mod_load_order(
+        config,
+        command_name,
+        layout,
+        options.settings_root,
+        options.skip_mod_load_order,
+    )?;
 
     Ok(json!({
         "modDir": layout.mod_dir.display().to_string(),
@@ -2251,18 +2259,89 @@ fn installed_bridge_content_hash(mod_dir: &Path) -> Option<String> {
         .map(str::to_string)
 }
 
+fn bridge_install_platforms(game_path: &Path) -> Vec<String> {
+    let Ok(entries) = fs::read_dir(game_path) else {
+        return Vec::new();
+    };
+    let mut platforms = entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .filter_map(|path| {
+            path.file_name()?
+                .to_str()?
+                .strip_prefix("data_sts2_")?
+                .split('_')
+                .next()
+                .filter(|platform| !platform.is_empty())
+                .map(str::to_string)
+        })
+        .collect::<Vec<_>>();
+    platforms.sort();
+    platforms.dedup();
+    platforms
+}
+
 fn update_bridge_mod_load_order(
     config: &AppConfig,
     command_name: &str,
     layout: &ResolvedLiveBridgeLayout,
+    settings_root: Option<&Path>,
+    skip_mod_load_order: bool,
 ) -> Result<Value, AppError> {
-    let seeded = seed_instance_user_data_if_missing(config, command_name)?;
-    let dependent_mod_ids = find_installed_spirectl_sts2_consumers(command_name, &layout.mods_dir)?;
-    let settings_paths = settings_save_candidates_for(config)
-        .into_iter()
-        .filter(|path| path.is_file())
-        .collect::<Vec<_>>();
+    let install_platforms = bridge_install_platforms(&layout.game_path);
+    let install_platform = match install_platforms.as_slice() {
+        [] => None,
+        [platform] => Some(platform.as_str()),
+        _ => Some("mixed"),
+    };
+    let host_platform = match crate::host_paths::current_host_platform() {
+        crate::host_paths::HostPlatform::Linux => "linux",
+        crate::host_paths::HostPlatform::Windows => "windows",
+        crate::host_paths::HostPlatform::MacOs => "macos",
+    };
+    let foreign_install = !install_platforms.is_empty()
+        && !install_platforms
+            .iter()
+            .any(|platform| platform == host_platform);
+    let skip_reason = if skip_mod_load_order {
+        Some("requested")
+    } else if foreign_install && settings_root.is_none() && config.game.user_dir.is_none() {
+        Some("foreign_install")
+    } else {
+        None
+    };
+    let mut report = json!({
+        "searchedModsDir": layout.mods_dir.display().to_string(),
+        "installPlatform": install_platform,
+        "installPlatforms": install_platforms,
+        "foreignInstall": foreign_install,
+        "dependentModIds": [],
+        "seededSettings": null,
+        "settingsFiles": [],
+    });
+    if let Some(reason) = skip_reason {
+        report["status"] = json!("skipped");
+        report["reason"] = json!(reason);
+        return Ok(report);
+    }
 
+    // Explicit roots and foreign profiles must not inherit the host's user data.
+    let seeded = if settings_root.is_none() && !foreign_install {
+        seed_instance_user_data_if_missing(config, command_name)?
+    } else {
+        None
+    };
+    let root = settings_root
+        .map(absolute_lifecycle_path)
+        .or_else(|| sts2_settings_root(config));
+    let dependent_mod_ids = find_installed_spirectl_sts2_consumers(command_name, &layout.mods_dir)?;
+    let mut settings_paths = Vec::new();
+    if let Some(root) = root.as_deref() {
+        collect_settings_save_candidates(root, 0, &mut settings_paths);
+    }
+    settings_paths.sort();
+    settings_paths.dedup();
     let mut settings_reports = Vec::new();
     for settings_path in settings_paths {
         settings_reports.push(update_settings_mod_load_order(
@@ -2272,12 +2351,12 @@ fn update_bridge_mod_load_order(
         )?);
     }
 
-    Ok(json!({
-        "searchedModsDir": layout.mods_dir.display().to_string(),
-        "dependentModIds": dependent_mod_ids,
-        "seededSettings": seeded,
-        "settingsFiles": settings_reports,
-    }))
+    report["status"] = json!("completed");
+    report["settingsRoot"] = json!(root.map(|root| root.display().to_string()));
+    report["dependentModIds"] = json!(dependent_mod_ids);
+    report["seededSettings"] = json!(seeded);
+    report["settingsFiles"] = json!(settings_reports);
+    Ok(report)
 }
 
 fn find_installed_spirectl_sts2_consumers(

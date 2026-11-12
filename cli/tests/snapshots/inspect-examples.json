@@ -901,6 +901,16 @@
       "summary": "Build and install the bridge payload for the installed game build; --endpoint persists its listener address beside the mod, and omission removes that file."
     },
     {
+      "command": "game install-bridge",
+      "example": "sts2 game install-bridge --settings-root ./profiles/SlayTheSpire2",
+      "summary": "Build and install the bridge payload for the installed game build; --endpoint persists its listener address beside the mod, and omission removes that file."
+    },
+    {
+      "command": "game install-bridge",
+      "example": "sts2 game install-bridge --skip-mod-load-order",
+      "summary": "Build and install the bridge payload for the installed game build; --endpoint persists its listener address beside the mod, and omission removes that file."
+    },
+    {
       "command": "game launch",
       "example": "sts2 game launch",
       "summary": "Close any existing configured game process, then launch a fresh one."

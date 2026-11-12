@@ -83,6 +83,490 @@ fn write_settings_save(path: &Path, entries: &[(&str, bool, &str)]) {
 }
 
 #[test]
+fn reorder_mod_settings_preserves_unchanged_contents() {
+    for entries in [
+        vec![("unrelated", true, "workshop")],
+        vec![
+            ("spirectlbridge", false, "mods_directory"),
+            ("consumer", true, "mods_directory"),
+        ],
+    ] {
+        let contents = serde_json::to_string(&settings_save_value(&entries)).unwrap();
+        let result = reorder_mod_settings(&contents, &["consumer".to_string()]).unwrap();
+        assert!(result.updated_text.is_none());
+        assert!(result.skip_reason.is_none());
+        assert_eq!(result.before_order, result.after_order);
+        assert_eq!(
+            result.before_order,
+            entries.iter().map(|entry| entry.0).collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn reorder_mod_settings_moves_bridge_and_preserves_other_fields() {
+    let mut original = settings_save_value(&[
+        ("unrelated", true, "workshop"),
+        ("consumer", true, "mods_directory"),
+        ("spirectlbridge", false, "mods_directory"),
+    ]);
+    original["other_setting"] = json!({"value": 42});
+    let result = reorder_mod_settings(&original.to_string(), &["consumer".to_string()]).unwrap();
+    assert_eq!(
+        result.before_order,
+        ["unrelated", "consumer", "spirectlbridge"]
+    );
+    assert_eq!(
+        result.after_order,
+        ["unrelated", "spirectlbridge", "consumer"]
+    );
+    assert!(result.skip_reason.is_none());
+    let updated = result.updated_text.unwrap();
+    let parsed: Value = serde_json::from_str(&updated).unwrap();
+    assert_eq!(parsed["other_setting"], original["other_setting"]);
+    assert_eq!(
+        parsed["mod_settings"]["mod_list"][1],
+        original["mod_settings"]["mod_list"][2]
+    );
+    assert_eq!(
+        updated,
+        format!("{}\n", serde_json::to_string_pretty(&parsed).unwrap())
+    );
+}
+
+#[test]
+fn reorder_mod_settings_inserts_missing_bridge() {
+    let original = settings_save_value(&[("consumer", true, "mods_directory")]);
+    let result = reorder_mod_settings(&original.to_string(), &["consumer".to_string()]).unwrap();
+    assert_eq!(result.before_order, ["consumer"]);
+    assert_eq!(result.after_order, ["spirectlbridge", "consumer"]);
+    let parsed: Value = serde_json::from_str(&result.updated_text.unwrap()).unwrap();
+    assert_eq!(
+        parsed["mod_settings"]["mod_list"][0],
+        default_bridge_mod_list_entry()
+    );
+}
+
+#[test]
+fn reorder_mod_settings_skips_missing_mod_settings_or_list() {
+    for (contents, reason) in [
+        ("{}", "mod_settings_missing"),
+        (r#"{"mod_settings":null}"#, "mod_settings_missing"),
+        (r#"{"mod_settings":{}}"#, "mod_list_missing"),
+        (r#"{"mod_settings":{"mod_list":null}}"#, "mod_list_missing"),
+    ] {
+        let result = reorder_mod_settings(contents, &["consumer".to_string()]).unwrap();
+        assert!(result.updated_text.is_none());
+        assert_eq!(result.skip_reason, Some(reason));
+        assert!(result.before_order.is_empty());
+        assert!(result.after_order.is_empty());
+    }
+    assert!(matches!(
+        reorder_mod_settings("invalid", &[]),
+        Err(ModSettingsReorderError::Parse(_))
+    ));
+}
+
+#[test]
+fn update_settings_mod_load_order_backs_up_original_bytes_only_when_changed() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("settings.save");
+    let original = settings_save_value(&[("consumer", true, "mods_directory")]).to_string();
+    fs::write(&path, &original).unwrap();
+    let report = update_settings_mod_load_order("test", &path, &["consumer".to_string()]).unwrap();
+    assert_eq!(report["status"], "updated");
+    assert_eq!(
+        fs::read_to_string(report["backupPath"].as_str().unwrap()).unwrap(),
+        original
+    );
+    let updated = fs::read_to_string(&path).unwrap();
+    let report = update_settings_mod_load_order("test", &path, &["consumer".to_string()]).unwrap();
+    assert_eq!(report["status"], "unchanged");
+    assert!(report["backupPath"].is_null());
+    assert_eq!(fs::read_to_string(path).unwrap(), updated);
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 2);
+}
+
+fn mod_load_order_test_layout(game_path: &Path) -> ResolvedLiveBridgeLayout {
+    let consumer_dir = game_path.join("mods/consumer");
+    fs::create_dir_all(&consumer_dir).unwrap();
+    fs::write(consumer_dir.join("Spirectl.Sts2.dll"), []).unwrap();
+    ResolvedLiveBridgeLayout {
+        game_path: game_path.to_path_buf(),
+        assemblies_dir: game_path.join("assemblies"),
+        mods_dir: game_path.join("mods"),
+        mod_dir: game_path.join("mods/spirectlbridge"),
+        endpoint: LiveBridgeEndpoint::Tcp("127.0.0.1:12345".to_string()),
+        used_discovered_game_path: false,
+        derived_assemblies_dir_from_game_path: false,
+    }
+}
+
+#[test]
+fn bridge_mod_load_order_detects_platforms_from_directories_only() {
+    let game = tempfile::tempdir().unwrap();
+    for name in [
+        "data_sts2_windows_x86_64",
+        "data_sts2_windows_arm64",
+        "data_sts2_macos_universal",
+    ] {
+        fs::create_dir(game.path().join(name)).unwrap();
+    }
+    fs::write(game.path().join("data_sts2_linux_x86_64"), []).unwrap();
+    fs::create_dir(game.path().join("unrelated")).unwrap();
+    assert_eq!(bridge_install_platforms(game.path()), ["macos", "windows"]);
+}
+
+#[cfg(target_os = "linux")]
+fn with_fake_profile_home<T>(home: &Path, body: impl FnOnce() -> T) -> T {
+    let _guard = ENV_LOCK.lock().expect("env lock");
+    let original_home = std::env::var_os("HOME");
+    let original_xdg = std::env::var_os("XDG_DATA_HOME");
+    // SAFETY: Serialize and restore the profile environment like with_xdg_data_home.
+    unsafe {
+        std::env::set_var("HOME", home);
+        std::env::remove_var("XDG_DATA_HOME");
+    }
+    let result = body();
+    // SAFETY: See the serialized environment mutation note above.
+    unsafe {
+        match original_home {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        match original_xdg {
+            Some(value) => std::env::set_var("XDG_DATA_HOME", value),
+            None => std::env::remove_var("XDG_DATA_HOME"),
+        }
+    }
+    result
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn bridge_mod_load_order_foreign_install_does_not_read_home_profile() {
+    let home = tempfile::tempdir().unwrap();
+    let game = tempfile::tempdir().unwrap();
+    let layout = mod_load_order_test_layout(game.path());
+    fs::create_dir(game.path().join("data_sts2_windows_x86_64")).unwrap();
+    let profile = home.path().join(".local/share/SlayTheSpire2/steam/123");
+    fs::create_dir_all(&profile).unwrap();
+    let settings_path = profile.join("settings.save");
+    // Invalid JSON makes an accidental read fail instead of silently passing.
+    fs::write(&settings_path, "do not read the CLI host profile").unwrap();
+    let report = with_fake_profile_home(home.path(), || {
+        update_bridge_mod_load_order(&AppConfig::default(), "test", &layout, None, false)
+    })
+    .unwrap();
+    assert_eq!(report["status"], "skipped");
+    assert_eq!(report["reason"], "foreign_install");
+    assert_eq!(report["installPlatform"], "windows");
+    assert_eq!(report["installPlatforms"], json!(["windows"]));
+    assert_eq!(report["settingsFiles"], json!([]));
+    assert_eq!(
+        fs::read_to_string(settings_path).unwrap(),
+        "do not read the CLI host profile"
+    );
+    assert_eq!(fs::read_dir(profile).unwrap().count(), 1);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn bridge_mod_load_order_settings_root_searches_only_explicit_profile() {
+    let home = tempfile::tempdir().unwrap();
+    let game = tempfile::tempdir().unwrap();
+    let profiles = tempfile::tempdir().unwrap();
+    let layout = mod_load_order_test_layout(game.path());
+    fs::create_dir(game.path().join("data_sts2_windows_x86_64")).unwrap();
+    let host_settings = home
+        .path()
+        .join(".local/share/SlayTheSpire2/steam/123/settings.save");
+    fs::create_dir_all(host_settings.parent().unwrap()).unwrap();
+    fs::write(&host_settings, "do not read the CLI host profile").unwrap();
+    let explicit_settings = profiles.path().join("steam/456/settings.save");
+    write_settings_save(&explicit_settings, &[("consumer", true, "mods_directory")]);
+    let unused_user_dir = profiles.path().join("unused-user-dir");
+    let config = AppConfig {
+        game: crate::GameConfig {
+            user_dir: Some(unused_user_dir.display().to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let report = with_fake_profile_home(home.path(), || {
+        update_bridge_mod_load_order(&config, "test", &layout, Some(profiles.path()), false)
+    })
+    .unwrap();
+    assert_eq!(report["status"], "completed");
+    assert_eq!(
+        report["settingsRoot"],
+        profiles.path().display().to_string()
+    );
+    assert_eq!(report["dependentModIds"], json!(["consumer"]));
+    assert!(report["seededSettings"].is_null());
+    let files = report["settingsFiles"].as_array().unwrap();
+    assert_eq!(files.len(), 1);
+    assert_eq!(files[0]["path"], explicit_settings.display().to_string());
+    assert_eq!(files[0]["status"], "updated");
+    assert_eq!(
+        files[0]["afterOrder"],
+        json!(["spirectlbridge", "consumer"])
+    );
+    assert_eq!(
+        fs::read_to_string(host_settings).unwrap(),
+        "do not read the CLI host profile"
+    );
+    assert!(!unused_user_dir.exists());
+}
+
+#[test]
+fn bridge_mod_load_order_skip_takes_precedence_over_settings_root_and_seeding() {
+    let game = tempfile::tempdir().unwrap();
+    let profiles = tempfile::tempdir().unwrap();
+    let layout = mod_load_order_test_layout(game.path());
+    let settings_path = profiles.path().join("settings.save");
+    fs::write(&settings_path, "do not read settings").unwrap();
+    let user_dir = profiles.path().join("unused-user-dir");
+    let config = AppConfig {
+        game: crate::GameConfig {
+            user_dir: Some(user_dir.display().to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let report =
+        update_bridge_mod_load_order(&config, "test", &layout, Some(profiles.path()), true)
+            .unwrap();
+    assert_eq!(report["status"], "skipped");
+    assert_eq!(report["reason"], "requested");
+    assert!(report["seededSettings"].is_null());
+    assert_eq!(report["settingsFiles"], json!([]));
+    assert_eq!(
+        fs::read_to_string(settings_path).unwrap(),
+        "do not read settings"
+    );
+    assert!(!user_dir.exists());
+    assert_eq!(fs::read_dir(profiles.path()).unwrap().count(), 1);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn bridge_mod_load_order_foreign_install_honors_explicit_user_dir() {
+    let game = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let instance = tempfile::tempdir().unwrap();
+    let layout = mod_load_order_test_layout(game.path());
+    fs::create_dir(game.path().join("data_sts2_windows_x86_64")).unwrap();
+    let settings_path = instance
+        .path()
+        .join("SlayTheSpire2/steam/123/settings.save");
+    write_settings_save(&settings_path, &[("consumer", true, "mods_directory")]);
+    let config = AppConfig {
+        game: crate::GameConfig {
+            user_dir: Some(instance.path().display().to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let report = with_fake_profile_home(home.path(), || {
+        update_bridge_mod_load_order(&config, "test", &layout, None, false)
+    })
+    .unwrap();
+    assert_eq!(report["status"], "completed");
+    assert_eq!(report["installPlatform"], "windows");
+    assert_eq!(
+        report["settingsFiles"][0]["path"],
+        settings_path.display().to_string()
+    );
+    assert_eq!(report["settingsFiles"][0]["status"], "updated");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn bridge_mod_load_order_foreign_install_does_not_seed_explicit_user_dir() {
+    let game = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let instance = tempfile::tempdir().unwrap();
+    let layout = mod_load_order_test_layout(game.path());
+    fs::create_dir(game.path().join("data_sts2_windows_x86_64")).unwrap();
+    let host_profile = home.path().join(".local/share/SlayTheSpire2/steam/123");
+    fs::create_dir_all(&host_profile).unwrap();
+    let host_settings = host_profile.join("settings.save");
+    let contents = "do not read or copy the CLI host profile";
+    fs::write(&host_settings, contents).unwrap();
+    fs::write(host_profile.join("other.save"), "host save data").unwrap();
+    let config = AppConfig {
+        game: crate::GameConfig {
+            user_dir: Some(instance.path().display().to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let report = with_fake_profile_home(home.path(), || {
+        update_bridge_mod_load_order(&config, "test", &layout, None, false)
+    })
+    .unwrap();
+
+    assert_eq!(report["status"], "completed");
+    assert!(report["seededSettings"].is_null());
+    assert_eq!(report["settingsFiles"], json!([]));
+    assert_eq!(fs::read_dir(instance.path()).unwrap().count(), 0);
+    assert!(
+        !instance
+            .path()
+            .join("SlayTheSpire2/.spirectl-seeded")
+            .exists()
+    );
+    assert_eq!(fs::read_to_string(host_settings).unwrap(), contents);
+    assert_eq!(fs::read_dir(host_profile).unwrap().count(), 2);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn bridge_mod_load_order_missing_game_path_keeps_default_profile_search() {
+    let game = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let mut layout = mod_load_order_test_layout(game.path());
+    // Explicit mods/assemblies paths can remain usable without the install root.
+    layout.game_path = game.path().join("missing-install");
+    let host_settings = home
+        .path()
+        .join(".local/share/SlayTheSpire2/steam/123/settings.save");
+    write_settings_save(&host_settings, &[("consumer", true, "mods_directory")]);
+
+    let report = with_fake_profile_home(home.path(), || {
+        update_bridge_mod_load_order(&AppConfig::default(), "test", &layout, None, false)
+    })
+    .unwrap();
+
+    assert_eq!(report["status"], "completed");
+    assert_eq!(report["installPlatforms"], json!([]));
+    assert!(report["installPlatform"].is_null());
+    assert_eq!(
+        report["settingsFiles"][0]["path"],
+        host_settings.display().to_string()
+    );
+    assert_eq!(report["settingsFiles"][0]["status"], "updated");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn install_bridge_mod_load_order_restart_preparation_preserves_profile() {
+    let game = tempfile::tempdir().unwrap();
+    let home = tempfile::tempdir().unwrap();
+    let instances = tempfile::tempdir().unwrap();
+    let mut layout = mod_load_order_test_layout(game.path());
+    layout.assemblies_dir = game.path().join("data_sts2_linux_x86_64");
+    fs::create_dir(&layout.assemblies_dir).unwrap();
+    fs::write(layout.assemblies_dir.join("sts2.dll"), []).unwrap();
+    fs::write(layout.assemblies_dir.join("GodotSharp.dll"), []).unwrap();
+    fs::write(game.path().join("game"), "game executable").unwrap();
+    let host_settings = home
+        .path()
+        .join(".local/share/SlayTheSpire2/steam/123/settings.save");
+    let contents = "do not read or copy the CLI host profile";
+    fs::create_dir_all(host_settings.parent().unwrap()).unwrap();
+    fs::write(&host_settings, contents).unwrap();
+    let mut config = AppConfig::default();
+    config.transport.kind = TransportKind::Ipc;
+    config.game.path = game.path().display().to_string();
+    config.game.assemblies_dir = Some(layout.assemblies_dir.display().to_string());
+    config.game.launch_executable = Some(game.path().join("game").display().to_string());
+    config.instances.dir = instances.path().display().to_string();
+    let instance = crate::instance::InstanceContext::resolve(Some("fresh"), true, &config)
+        .unwrap()
+        .unwrap();
+    instance.apply_overlay(&mut config);
+    let origin = crate::ConfigOrigin {
+        uses_default_stack: true,
+        base_dir: game.path().to_path_buf(),
+        config_dir: game.path().to_path_buf(),
+        local_config_path: game.path().join("sts2.local.yaml"),
+        config_dir_source: crate::ConfigDirSource::CurrentDir,
+    };
+    let provenance = crate::ConfigProvenance::default();
+    let context = AppContext {
+        config: &config,
+        config_origin: &origin,
+        config_provenance: &provenance,
+        json_output: true,
+        mode: crate::Mode::Normal,
+        instance: Some(&instance),
+    };
+
+    with_fake_profile_home(home.path(), || {
+        prepare_instance_for_command(context, "game launch", InstanceSettingsPolicy::Preserve)
+    })
+    .unwrap();
+
+    assert!(!instance.user_dir.exists());
+    assert!(instance.launch_executable.is_file());
+    assert!(
+        instance
+            .mods_dir
+            .join("consumer/Spirectl.Sts2.dll")
+            .is_file()
+    );
+    assert!(
+        !instance
+            .user_dir
+            .join("SlayTheSpire2/.spirectl-seeded")
+            .exists()
+    );
+    assert_eq!(fs::read_to_string(&host_settings).unwrap(), contents);
+
+    // Normal launch/deploy preparation still seeds and refreshes the mirror.
+    fs::remove_file(&instance.launch_executable).unwrap();
+    with_fake_profile_home(home.path(), || {
+        prepare_instance_for_command(context, "game launch", InstanceSettingsPolicy::SeedFromHost)
+    })
+    .unwrap();
+
+    assert_eq!(
+        fs::read_to_string(
+            instance
+                .user_dir
+                .join("SlayTheSpire2/steam/123/settings.save")
+        )
+        .unwrap(),
+        contents
+    );
+    assert!(
+        instance
+            .user_dir
+            .join("SlayTheSpire2/.spirectl-seeded")
+            .is_file()
+    );
+    assert!(instance.launch_executable.is_file());
+    assert_eq!(fs::read_to_string(host_settings).unwrap(), contents);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn bridge_mod_load_order_local_and_mixed_layouts_keep_default_profile_search() {
+    for platforms in [vec![], vec!["linux"], vec!["linux", "windows"]] {
+        let home = tempfile::tempdir().unwrap();
+        let game = tempfile::tempdir().unwrap();
+        let layout = mod_load_order_test_layout(game.path());
+        for platform in &platforms {
+            fs::create_dir(game.path().join(format!("data_sts2_{platform}_x86_64"))).unwrap();
+        }
+        let settings_path = home
+            .path()
+            .join(".local/share/SlayTheSpire2/steam/123/settings.save");
+        write_settings_save(&settings_path, &[("consumer", true, "mods_directory")]);
+        let report = with_fake_profile_home(home.path(), || {
+            update_bridge_mod_load_order(&AppConfig::default(), "test", &layout, None, false)
+        })
+        .unwrap();
+        assert_eq!(report["status"], "completed");
+        assert_eq!(report["installPlatforms"], json!(platforms));
+        assert_eq!(report["settingsFiles"][0]["status"], "updated");
+    }
+}
+
+#[test]
 fn launch_process_json_reports_running_process() {
     let payload = launch_process_json(42, None);
 
@@ -1805,5 +2289,34 @@ fn release_bridge_archive_rejects_checksum_mismatch_and_unsafe_or_forbidden_entr
     assert_eq!(
         version_error.payload["error"]["code"],
         "bridge_release_version_mismatch"
+    );
+}
+
+#[test]
+fn install_bridge_restart_preserves_profile_only_when_install_declined_seeding() {
+    let foreign = json!({"foreignInstall": true, "status": "completed"});
+    let skipped = json!({"foreignInstall": false, "status": "skipped", "reason": "requested"});
+    let local = json!({"foreignInstall": false, "status": "completed"});
+
+    assert_eq!(
+        restart_settings_policy(false, Some(&foreign)),
+        InstanceSettingsPolicy::Preserve
+    );
+    assert_eq!(
+        restart_settings_policy(true, Some(&local)),
+        InstanceSettingsPolicy::Preserve
+    );
+    // Skipping the load-order rewrite must still seed a fresh instance on relaunch.
+    assert_eq!(
+        restart_settings_policy(false, Some(&skipped)),
+        InstanceSettingsPolicy::SeedFromHost
+    );
+    assert_eq!(
+        restart_settings_policy(false, Some(&local)),
+        InstanceSettingsPolicy::SeedFromHost
+    );
+    assert_eq!(
+        restart_settings_policy(false, None),
+        InstanceSettingsPolicy::SeedFromHost
     );
 }

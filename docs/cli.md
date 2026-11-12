@@ -1199,6 +1199,28 @@ sources produce different bytes and therefore a different hash. See
 `docs/known-gaps.md`. `--restart`, `--timeout-ms`, `--interval-ms`,
 `--rpc-timeout-ms`, and the quiescence flags are also accepted.
 
+`--settings-root <dir>` searches that STS2 user-data root directly (for example,
+`./profiles/SlayTheSpire2`) for `settings.save`, instead of the root derived from
+`game.userDir` or the CLI host's profile. It never seeds from the host profile.
+`--skip-mod-load-order` skips both profile seeding and load-order updates, and takes
+precedence over `--settings-root`.
+These seeding restrictions also apply to the launch preparation for `--restart`.
+
+If the install has `data_sts2_*` directories and none matches the CLI host OS,
+load-order updates are skipped unless `--settings-root` or `game.userDir` is explicit.
+An explicit `game.userDir` is searched without seeding it from the host profile
+when the install is foreign.
+JSON reports `modLoadOrder.status: "skipped"` with `reason: "foreign_install"`
+(or `"requested"` for `--skip-mod-load-order`), without searching the local profile.
+`modLoadOrder.installPlatform` is the detected OS (`linux`, `windows`, or `macos`),
+`null` when undetected, or `"mixed"` for multiple OSes; `installPlatforms` lists all
+observed platform names. A matching host OS in a mixed install permits the default
+profile search. A missing or unreadable install directory leaves the platform
+undetected and retains the default profile search.
+A completed search reports `status: "completed"`, the searched
+`settingsRoot`, and per-file results in `settingsFiles[]`. Changed files retain a
+`settings.save.spirectl-backup-*` copy; unchanged files retain their original bytes.
+
 The canonical live bridge path is now:
 
 ```bash
@@ -2054,7 +2076,7 @@ sts2 game instances prune                        # drop registry entries for sto
 
 The canonical lifecycle flow is now CLI-native:
 
-- `game install-bridge` builds and stages the bridge artifacts into `<modsDir>/spirectlbridge` without requiring a mod project path, copying the published standalone bridge `.dll` payloads directly from the host project output. It also scans sibling installed mod directories for `Spirectl.Sts2.dll` consumers and, when a Linux `SlayTheSpire2/.../settings.save` contains `mod_settings.mod_list`, moves or inserts `spirectlbridge` before those consumers in that settings load order after writing a `settings.save.spirectl-backup-*` copy. Mod manifests are not changed. JSON output reports `modLoadOrder.dependentModIds` and per-settings-file status under `modLoadOrder.settingsFiles[]`.
+- `game install-bridge` builds and stages the bridge artifacts into `<modsDir>/spirectlbridge` without requiring a mod project path, copying the published standalone bridge `.dll` payloads directly from the host project output. It also scans sibling installed mod directories for `Spirectl.Sts2.dll` consumers and, when a selected STS2 user-data root's `settings.save` contains `mod_settings.mod_list`, moves or inserts `spirectlbridge` before those consumers in that settings load order after writing a `settings.save.spirectl-backup-*` copy. Mod manifests are not changed. JSON output reports `modLoadOrder.dependentModIds` and per-settings-file status under `modLoadOrder.settingsFiles[]`.
 - `game deploy` reuses the same bridge packaging/install path, optionally builds and copies a mod project, and can chain restart + verify.
 - `game mods settings` reads the saved mod list from a configured, overridden, or auto-discovered `settings.save` and reports `enabledIds` / `disabledIds` for easy copy-paste into `game.modLoadout.enabled`.
 - `game mods active` asks the live bridge for `ModManager` state and reports mod ids, names, versions, paths, load states, enabled/active booleans, assemblies, and load errors. It requires `spirectlbridge` to be loaded in the live game.

@@ -2113,6 +2113,14 @@ pub struct GameInstallBridgeArgs {
     /// notice when the --wait-quiescent-ms budget runs out.
     #[arg(long = "require-quiescent")]
     pub require_quiescent: bool,
+
+    /// Search this STS2 user-data root for settings.save instead of the local profile.
+    #[arg(long = "settings-root", value_name = "DIR")]
+    pub settings_root: Option<PathBuf>,
+
+    /// Skip profile seeding and mod load-order updates.
+    #[arg(long = "skip-mod-load-order")]
+    pub skip_mod_load_order: bool,
 }
 
 impl Default for GameInstallBridgeArgs {
@@ -2128,6 +2136,8 @@ impl Default for GameInstallBridgeArgs {
             wait_quiescent_ms: 0,
             quiescent_stable_samples: 3,
             require_quiescent: false,
+            settings_root: None,
+            skip_mod_load_order: false,
         }
     }
 }
