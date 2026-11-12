@@ -104,6 +104,12 @@ public sealed class Sts2ScreenshotProvider : IScreenshotProvider
                 "bridge.artifacts",
                 $"Captured screenshot for screen '{screen.ScreenType}' at {image.GetWidth()}x{image.GetHeight()}.");
 
+            var transform = Sts2InputCoordinates.GetTransform();
+            var canvasSize = rootViewport.ContentScaleSize;
+            if (canvasSize.X <= 0 || canvasSize.Y <= 0)
+            {
+                canvasSize = rootViewport.Size;
+            }
             return ScreenshotCaptureResult.Success(
                 source: DataSourceKind.Live,
                 provisional: false,
@@ -119,7 +125,15 @@ public sealed class Sts2ScreenshotProvider : IScreenshotProvider
                 appliedViewportHeight: image.GetHeight(),
                 restoredViewport: requestedSize.Size is not null && window is not null && originalSize is not null,
                 restoredViewportWidth: requestedSize.Size is not null ? originalSize?.X : null,
-                restoredViewportHeight: requestedSize.Size is not null ? originalSize?.Y : null);
+                restoredViewportHeight: requestedSize.Size is not null ? originalSize?.Y : null,
+                windowWidth: rootViewport.Size.X,
+                windowHeight: rootViewport.Size.Y,
+                canvasWidth: canvasSize.X,
+                canvasHeight: canvasSize.Y,
+                canvasToWindowScaleX: transform.ScaleX,
+                canvasToWindowScaleY: transform.ScaleY,
+                canvasToWindowOffsetX: transform.OffsetX,
+                canvasToWindowOffsetY: transform.OffsetY);
         }
         finally
         {

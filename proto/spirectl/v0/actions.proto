@@ -495,10 +495,24 @@ enum RawMouseButton {
   RAW_MOUSE_BUTTON_MIDDLE = 3;
 }
 
+enum MouseCoordinateSpace {
+  // Legacy requests use canvas coordinates.
+  MOUSE_COORDINATE_SPACE_UNSPECIFIED = 0;
+  MOUSE_COORDINATE_SPACE_CANVAS = 1;
+  MOUSE_COORDINATE_SPACE_WINDOW = 2;
+}
+
+message MouseClickResult {
+  MouseCoordinateSpace coordinate_space = 1;
+  double window_x = 2;
+  double window_y = 3;
+}
+
 message MouseClickAction {
   int32 x = 1;
   int32 y = 2;
   RawMouseButton button = 3;
+  MouseCoordinateSpace coordinate_space = 4;
 }
 
 message ActionResponse {
@@ -508,6 +522,7 @@ message ActionResponse {
   bool accepted = 4;
   bool provisional = 5;
   string message = 6;
+  MouseClickResult mouse_click = 7;
 }
 
 message ActionResponseV0 {

@@ -4,10 +4,11 @@ use super::{
 };
 use crate::{
     ActSubcommand, ConsoleArgs, DevHealArgs, InspectActionsArgs, Mode, MouseButtonArg,
-    MouseSubcommand, PerspectiveScopeArg, TestCommand, TestSubcommand, TransportKind,
-    bridge_client, bridge_error_payload, console_command_json, default_ipc_path, default_pipe_name,
-    inspect_actions_environment_blocked_json, inspect_actions_json, inspect_actions_static_json,
-    inspect_actions_unavailable_json, live_bridge,
+    MouseClickArgs, MouseCoordinateSpaceArg, MouseSubcommand, PerspectiveScopeArg, TestCommand,
+    TestSubcommand, TransportKind, bridge_client, bridge_error_payload, console_command_json,
+    default_ipc_path, default_pipe_name, inspect_actions_environment_blocked_json,
+    inspect_actions_json, inspect_actions_static_json, inspect_actions_unavailable_json,
+    live_bridge,
 };
 use crate::{AppContext, AppError, RenderedCommand, bridge, test_runner};
 use serde_json::{Value, json};
@@ -245,11 +246,7 @@ pub(crate) fn execute_action_json(
                     request_id: "cli-mouse-click".to_string(),
                     perspective: None,
                     action: Some(bridge::proto::action_request::Action::MouseClick(
-                        bridge::proto::MouseClickAction {
-                            x: args.x,
-                            y: args.y,
-                            button: proto_mouse_button(args.button) as i32,
-                        },
+                        mouse_click_action(args),
                     )),
                     ..Default::default()
                 }
@@ -741,14 +738,36 @@ pub(crate) fn execute_action_json(
     };
 
     let response = client.execute_action(request).map_err(AppError::bridge)?;
-    Ok(json!({
+    let mut payload = json!({
         "requestId": response.request_id,
         "actionInstanceId": response.action_instance_id,
         "kind": bridge::action_kind_name(enum_action_kind(response.kind)),
         "accepted": response.accepted,
         "provisional": response.provisional,
         "message": response.message
-    }))
+    });
+    if let Some(click) = response.mouse_click {
+        payload["coordinateSpace"] = json!(match bridge::proto::MouseCoordinateSpace::try_from(
+            click.coordinate_space
+        ) {
+            Ok(bridge::proto::MouseCoordinateSpace::Window) => "window",
+            _ => "canvas",
+        });
+        payload["windowPoint"] = json!({ "x": click.window_x, "y": click.window_y });
+    }
+    Ok(payload)
+}
+
+pub(crate) fn mouse_click_action(args: MouseClickArgs) -> bridge::proto::MouseClickAction {
+    bridge::proto::MouseClickAction {
+        x: args.x,
+        y: args.y,
+        button: proto_mouse_button(args.button) as i32,
+        coordinate_space: match args.space {
+            MouseCoordinateSpaceArg::Canvas => bridge::proto::MouseCoordinateSpace::Canvas,
+            MouseCoordinateSpaceArg::Window => bridge::proto::MouseCoordinateSpace::Window,
+        } as i32,
+    }
 }
 
 pub(crate) fn action_perspective_selector(

@@ -597,16 +597,16 @@ impl StubBridgeService {
                     };
                     Err(error(
                         proto::BridgeErrorCode::InvalidAction,
-                        "mouse-click requires non-negative viewport coordinates.",
+                        "mouse-click requires non-negative coordinates in the selected space.",
                         &[detail(
                             field,
                             &value,
-                            "Use screenshot/viewport pixel coordinates at or above zero.",
+                            "Use non-negative canvas coordinates, or select window space for screenshot pixels.",
                         )],
                     ))
                 } else {
                     let button = mouse_button_name(mouse_click.button);
-                    Ok(action_response_with_provisional(
+                    let mut response = action_response_with_provisional(
                         &request.request_id,
                         proto::ActionKind::MouseClick,
                         &format!(
@@ -614,7 +614,19 @@ impl StubBridgeService {
                             mouse_click.x, mouse_click.y
                         ),
                         true,
-                    ))
+                    );
+                    response.mouse_click = Some(proto::MouseClickResult {
+                        coordinate_space: if mouse_click.coordinate_space
+                            == proto::MouseCoordinateSpace::Window as i32
+                        {
+                            proto::MouseCoordinateSpace::Window
+                        } else {
+                            proto::MouseCoordinateSpace::Canvas
+                        } as i32,
+                        window_x: mouse_click.x as f64,
+                        window_y: mouse_click.y as f64,
+                    });
+                    Ok(response)
                 }
             }
             Some(proto::action_request::Action::EndTurn(_)) => {
@@ -1216,7 +1228,10 @@ impl StubBridgeService {
                     Ok(action_response(
                         &request.request_id,
                         proto::ActionKind::InspectRelic,
-                        &format!("Opened the mock relic-details overlay for '{}'.", inspect_relic.relic_id),
+                        &format!(
+                            "Opened the mock relic-details overlay for '{}'.",
+                            inspect_relic.relic_id
+                        ),
                     ))
                 }
             }
@@ -1376,5 +1391,4 @@ impl StubBridgeService {
             &format!("Executed mock {action_name} '{requested_id}'."),
         ))
     }
-
 }

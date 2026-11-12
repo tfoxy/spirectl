@@ -53,7 +53,7 @@ public sealed partial class Sts2ActionHandler
             });
         });
 
-    private void InjectMouseButton(Vector2 point, MouseButton button, bool pressed, long generation)
+    private bool InjectMouseButton(Vector2 point, MouseButton button, bool pressed, long generation)
         => _injectedInput.Send(generation, $"mouse:{button}", pressed,
             () =>
             {

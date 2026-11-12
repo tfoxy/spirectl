@@ -3262,7 +3262,7 @@
         "Call game_info first, then use screenshot when you need a visual artifact or debugging evidence tied to a known file path."
       ],
       "status": "implemented",
-      "summary": "Capture a bridge-backed PNG screenshot to a file."
+      "summary": "Capture a bridge-backed PNG in window pixels, with canvas-to-window scale and offset metadata."
     },
     {
       "inputSchema": {

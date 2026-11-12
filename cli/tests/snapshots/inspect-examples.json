@@ -102,8 +102,8 @@
     },
     {
       "command": "act mouse click",
-      "example": "sts2 --mode dangerous act mouse click --x 100 --y 200",
-      "summary": "Dangerous raw viewport mouse click fallback routed through the bridge contract."
+      "example": "sts2 --mode dangerous act mouse click --space window --x 100 --y 200",
+      "summary": "Dangerous raw mouse click in canvas (default) or window pixel coordinates; screenshot pixels use --space window."
     },
     {
       "command": "act select-map-node",
@@ -698,17 +698,17 @@
     {
       "command": "dev screenshot",
       "example": "sts2 dev screenshot --output ./.sts2/artifacts/combat.png",
-      "summary": "Capture a bridge-backed PNG screenshot to a file."
+      "summary": "Capture a bridge-backed PNG in window pixels, with canvas-to-window scale and offset metadata."
     },
     {
       "command": "dev screenshot",
       "example": "sts2 dev screenshot --width 1280 --height 720 --output ./.sts2/artifacts/combat-720p.png",
-      "summary": "Capture a bridge-backed PNG screenshot to a file."
+      "summary": "Capture a bridge-backed PNG in window pixels, with canvas-to-window scale and offset metadata."
     },
     {
       "command": "dev screenshot",
       "example": "sts2 dev screenshot --preset desktop-1080p --rpc-timeout-ms 5000 --output ./.sts2/artifacts/combat-1080p.png",
-      "summary": "Capture a bridge-backed PNG screenshot to a file."
+      "summary": "Capture a bridge-backed PNG in window pixels, with canvas-to-window scale and offset metadata."
     },
     {
       "command": "dev screenshot-diff",

@@ -493,11 +493,12 @@ public sealed class Sts2RuntimeSceneProvider : IRuntimeSceneProvider
             ? new Vector2((float)resolved.X, (float)resolved.Y)
             : rect.Position + rect.Size / 2;
         recordProgress?.Invoke(normalizedNodePath, ToSnapshot(hoverPosition));
-        Input.WarpMouse(hoverPosition);
+        var windowPosition = Sts2InputCoordinates.CanvasToWindow(hoverPosition);
+        Input.WarpMouse(windowPosition);
         Input.ParseInputEvent(new InputEventMouseMotion
         {
-            Position = hoverPosition,
-            GlobalPosition = hoverPosition,
+            Position = windowPosition,
+            GlobalPosition = windowPosition,
             Relative = Vector2.Zero,
         });
         Sts2LiveIntrospection.TryInvokeParameterlessMethod(control, "OnFocus");
@@ -761,6 +762,7 @@ public sealed class Sts2RuntimeSceneProvider : IRuntimeSceneProvider
             }
         }
 
+        neutral = Sts2InputCoordinates.CanvasToWindow(neutral);
         Input.WarpMouse(neutral);
         Input.ParseInputEvent(new InputEventMouseMotion
         {

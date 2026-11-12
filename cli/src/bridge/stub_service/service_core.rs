@@ -238,7 +238,7 @@ impl StubBridgeService {
             supported_actions.push(action_descriptor(
                 "mouse-click",
                 proto::ActionKind::MouseClick,
-                "Dispatch a dangerous raw viewport mouse click at explicit coordinates.",
+                "Dispatch a dangerous raw mouse click in canvas (default) or window pixel coordinates.",
                 "sts2 --mode dangerous act mouse click --x 100 --y 200",
                 true,
                 proto::ActionStatus::Implemented,
@@ -247,13 +247,13 @@ impl StubBridgeService {
                         "x",
                         "integer",
                         true,
-                        "Viewport x coordinate, matching screenshot pixel space.",
+                        "X coordinate in the selected space; screenshot pixels require window.",
                     ),
                     action_parameter(
                         "y",
                         "integer",
                         true,
-                        "Viewport y coordinate, matching screenshot pixel space.",
+                        "Y coordinate in the selected space.",
                     ),
                     action_parameter(
                         "button",
@@ -261,6 +261,7 @@ impl StubBridgeService {
                         false,
                         "Optional mouse button: left, right, or middle. Defaults to left.",
                     ),
+                    action_parameter("coordinateSpace", "string", false, "canvas (default) or window; screenshot pixels use window."),
                 ],
             ));
         }

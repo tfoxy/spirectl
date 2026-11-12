@@ -25,7 +25,7 @@ internal static class Sts2ActionDescriptorCatalog
         actions.AddRange(NonCombat());
         if (dangerousMode)
         {
-            actions.Add(A("mouse-click", SemanticActionKind.MouseClick, "Dispatch a dangerous raw viewport mouse click at explicit coordinates.", "sts2 --mode dangerous act mouse click --x 100 --y 200", true, ActionImplementationStatus.Implemented, P("x", true, "Viewport x coordinate, matching screenshot pixel space.", "integer"), P("y", true, "Viewport y coordinate, matching screenshot pixel space.", "integer"), P("button", false, "Optional mouse button: left, right, or middle. Defaults to left.")));
+            actions.Add(A("mouse-click", SemanticActionKind.MouseClick, "Dispatch a dangerous raw mouse click in canvas (default) or window pixel coordinates.", "sts2 --mode dangerous act mouse click --x 100 --y 200", true, ActionImplementationStatus.Implemented, P("x", true, "X coordinate in the selected space; screenshot pixels require window.", "integer"), P("y", true, "Y coordinate in the selected space.", "integer"), P("button", false, "Optional mouse button: left, right, or middle. Defaults to left."), P("coordinateSpace", false, "canvas (default) or window; screenshot pixels use window.")));
         }
         return actions;
     }

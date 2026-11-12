@@ -126,6 +126,13 @@ public enum SemanticActionKind
     ControllerInput,
 }
 
+public enum MouseCoordinateSpaceKind
+{
+    Unspecified,
+    Canvas,
+    Window,
+}
+
 public enum RawMouseButtonKind
 {
     Left,
@@ -328,7 +335,8 @@ public sealed record SemanticActionRequest(
     // rides on KeyPressed above rather than a field of its own (true=down, false=up, null=a full press+release):
     // a request is a key OR a pad input, never both, so a second "pressed" field would only create a way for the
     // two to disagree.
-    string? ControllerInput = null);
+    string? ControllerInput = null,
+    MouseCoordinateSpaceKind MouseCoordinateSpace = MouseCoordinateSpaceKind.Unspecified);
 
 public sealed record ActionExecutionResult(
     bool Accepted,

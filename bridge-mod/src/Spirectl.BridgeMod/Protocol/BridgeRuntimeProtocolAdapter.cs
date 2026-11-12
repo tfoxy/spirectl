@@ -1390,7 +1390,7 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
             ActionRequest.ActionOneofCase.Unready => NewSemantic(request.RequestId, perspective, SemanticActionKind.Unready),
             ActionRequest.ActionOneofCase.SelectCharacter => NewSemantic(request.RequestId, perspective, SemanticActionKind.SelectCharacter, characterId: request.SelectCharacter.CharacterId),
             ActionRequest.ActionOneofCase.UsePotion => NewSemantic(request.RequestId, perspective, SemanticActionKind.UsePotion, potionId: request.UsePotion.PotionId, targetId: BlankToNull(request.UsePotion.TargetId)),
-            ActionRequest.ActionOneofCase.MouseClick => NewSemantic(request.RequestId, perspective, SemanticActionKind.MouseClick, mouseX: request.MouseClick.X, mouseY: request.MouseClick.Y, mouseButton: ToDomainMouseButton(request.MouseClick.Button)),
+            ActionRequest.ActionOneofCase.MouseClick => NewSemantic(request.RequestId, perspective, SemanticActionKind.MouseClick, mouseX: request.MouseClick.X, mouseY: request.MouseClick.Y, mouseButton: ToDomainMouseButton(request.MouseClick.Button), mouseCoordinateSpace: (MouseCoordinateSpaceKind)request.MouseClick.CoordinateSpace),
             ActionRequest.ActionOneofCase.ClaimReward => NewSemantic(request.RequestId, perspective, SemanticActionKind.ClaimReward, values: Values(("rewardId", request.ClaimReward.RewardId), ("playerId", request.ClaimReward.PlayerId))),
             ActionRequest.ActionOneofCase.SkipRewards => NewSemantic(request.RequestId, perspective, SemanticActionKind.SkipRewards, values: Values(("playerId", request.SkipRewards.PlayerId))),
             ActionRequest.ActionOneofCase.SelectCard => NewSemantic(request.RequestId, perspective, SemanticActionKind.SelectCard, cardId: request.SelectCard.CardId, values: Values(("playerId", request.SelectCard.PlayerId), ("rewardId", request.SelectCard.RewardId))),
@@ -1513,6 +1513,13 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
                 Accepted = result.Accepted,
                 Provisional = result.Provisional,
                 Message = result.Message,
+                MouseClick = result.Kind == SemanticActionKind.MouseClick && result.Values is { } values
+                    ? new MouseClickResult
+                    {
+                        CoordinateSpace = values["coordinateSpace"] == "window" ? MouseCoordinateSpace.Window : MouseCoordinateSpace.Canvas,
+                        WindowX = double.Parse(values["windowX"], System.Globalization.CultureInfo.InvariantCulture),
+                        WindowY = double.Parse(values["windowY"], System.Globalization.CultureInfo.InvariantCulture),
+                    } : null,
             }
         };
     }
@@ -1550,7 +1557,8 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
         IReadOnlyDictionary<string, string>? values = null,
         IReadOnlyList<string>? cardIds = null,
         bool? isEraser = null,
-        IReadOnlyList<(double X, double Y)>? strokePoints = null)
+        IReadOnlyList<(double X, double Y)>? strokePoints = null,
+        MouseCoordinateSpaceKind mouseCoordinateSpace = MouseCoordinateSpaceKind.Unspecified)
     {
         return new SemanticActionRequest(
             requestId,
@@ -1569,7 +1577,8 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
             values,
             cardIds,
             isEraser,
-            strokePoints);
+            strokePoints,
+            MouseCoordinateSpace: mouseCoordinateSpace);
     }
 
 

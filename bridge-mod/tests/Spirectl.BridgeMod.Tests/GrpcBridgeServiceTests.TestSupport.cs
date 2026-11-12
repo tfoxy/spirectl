@@ -507,7 +507,13 @@ public sealed partial class GrpcBridgeServiceTests
                 appliedViewportHeight: 720,
                 restoredViewport: true,
                 restoredViewportWidth: 1920,
-                restoredViewportHeight: 1080);
+                restoredViewportHeight: 1080,
+                canvasWidth: 1920,
+                canvasHeight: 1080,
+                canvasToWindowScaleX: 2.0 / 3,
+                canvasToWindowScaleY: 2.0 / 3,
+                canvasToWindowOffsetX: 12,
+                canvasToWindowOffsetY: 24);
         }
     }
 

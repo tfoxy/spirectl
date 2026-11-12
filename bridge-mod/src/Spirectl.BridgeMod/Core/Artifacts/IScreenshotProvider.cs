@@ -28,7 +28,16 @@ public sealed record ScreenshotCaptureResult(
     bool RestoredViewport,
     int? RestoredViewportWidth,
     int? RestoredViewportHeight,
-    ScreenshotCaptureFailure? Error)
+    ScreenshotCaptureFailure? Error,
+    int WindowWidth = 0,
+    int WindowHeight = 0,
+    int CanvasWidth = 0,
+    int CanvasHeight = 0,
+    double CanvasToWindowScaleX = 1,
+    double CanvasToWindowScaleY = 1,
+    double CanvasToWindowOffsetX = 0,
+    double CanvasToWindowOffsetY = 0,
+    string PixelSpace = "window")
 {
     public static ScreenshotCaptureResult Success(
         DataSourceKind source,
@@ -45,7 +54,15 @@ public sealed record ScreenshotCaptureResult(
         int? appliedViewportHeight = null,
         bool restoredViewport = false,
         int? restoredViewportWidth = null,
-        int? restoredViewportHeight = null)
+        int? restoredViewportHeight = null,
+        int? windowWidth = null,
+        int? windowHeight = null,
+        int? canvasWidth = null,
+        int? canvasHeight = null,
+        double canvasToWindowScaleX = 1,
+        double canvasToWindowScaleY = 1,
+        double canvasToWindowOffsetX = 0,
+        double canvasToWindowOffsetY = 0)
         => new(
             Source: source,
             Provisional: provisional,
@@ -62,7 +79,15 @@ public sealed record ScreenshotCaptureResult(
             RestoredViewport: restoredViewport,
             RestoredViewportWidth: restoredViewportWidth,
             RestoredViewportHeight: restoredViewportHeight,
-            Error: null);
+            Error: null,
+            WindowWidth: windowWidth ?? width,
+            WindowHeight: windowHeight ?? height,
+            CanvasWidth: canvasWidth ?? width,
+            CanvasHeight: canvasHeight ?? height,
+            CanvasToWindowScaleX: canvasToWindowScaleX,
+            CanvasToWindowScaleY: canvasToWindowScaleY,
+            CanvasToWindowOffsetX: canvasToWindowOffsetX,
+            CanvasToWindowOffsetY: canvasToWindowOffsetY);
 
     public static ScreenshotCaptureResult Failure(
         DataSourceKind source,

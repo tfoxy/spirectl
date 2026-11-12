@@ -407,7 +407,8 @@ public sealed class SpirectlRuntimeFacade : ISpirectlRuntime, IInjectedInputCont
                 KeyModifiers: request.KeyModifiers,
                 KeyPressed: request.KeyPressed,
                 MousePressed: request.MousePressed,
-                ControllerInput: request.ControllerInput));
+                ControllerInput: request.ControllerInput,
+                MouseCoordinateSpace: request.MouseCoordinateSpace));
             // HoverElement is a high-frequency cursor move (continuous targeting) that changes no committed
             // game state — refreshing the state hub on every hover would be a per-frame broadcast storm. The
             // live SCENE watcher still streams the resulting visual deltas (targeting arrow, tooltips), so the

@@ -42,13 +42,13 @@ public sealed partial class Sts2ActionHandler
                 return ActionExecutionResult.Failure(
                     kind: request.Kind,
                     code: ActionFailureCode.InvalidAction,
-                    message: "mouse-click requires non-negative viewport coordinates.",
+                    message: "mouse-click requires non-negative coordinates in the selected space.",
                     details:
                     [
                         new ActionFailureDetail(
                             Field: request.MouseX < 0 ? "x" : "y",
                             Value: request.MouseX < 0 ? request.MouseX.Value.ToString() : request.MouseY.Value.ToString(),
-                            Note: "Use screenshot/viewport pixel coordinates at or above zero."),
+                            Note: "Use non-negative canvas coordinates, or select window space for screenshot pixels."),
                     ]);
             }
 
@@ -66,21 +66,29 @@ public sealed partial class Sts2ActionHandler
             return ActionExecutionResult.Failure(
                 kind: request.Kind,
                 code: ActionFailureCode.InvalidAction,
-                message: "mouse-click requires explicit viewport coordinates or an element id.",
+                message: "mouse-click requires explicit canvas/window coordinates or an element id.",
                 details:
                 [
                     new ActionFailureDetail(
                         Field: "x",
                         Value: string.Empty,
-                        Note: "Provide viewport coordinates (x/y) or an elementId."),
+                        Note: "Provide coordinates (x/y) with a coordinate space, or an elementId."),
                 ]);
         }
 
         var rawButton = request.MouseButton ?? RawMouseButtonKind.Left;
         var mouseButton = ToGodotMouseButton(rawButton);
-        // The click point is in canvas/GUI space (design coords or a Control's global rect); convert to window
-        // pixels so it lands correctly when the game window != the 1920x1080 base size.
-        var inject = Sts2InputCoordinates.CanvasToWindow(position);
+        if (!Enum.IsDefined(request.MouseCoordinateSpace))
+        {
+            return ActionExecutionResult.Failure(request.Kind, ActionFailureCode.InvalidAction,
+                "Unknown mouse coordinate space.",
+                [new ActionFailureDetail("coordinate_space", request.MouseCoordinateSpace.ToString(), "Use canvas or window.")]);
+        }
+        // Element geometry is always in canvas space, regardless of a raw-coordinate preference.
+        var space = request.MouseX is not null && request.MouseY is not null
+            && request.MouseCoordinateSpace == MouseCoordinateSpaceKind.Window
+            ? MouseCoordinateSpaceKind.Window : MouseCoordinateSpaceKind.Canvas;
+        var inject = Sts2InputCoordinates.ToWindow(position, space);
 
         // COALESCED WHEEL TICKS (`count`, optional). A browser scrolling a long list emits far more wheel notches
         // per second than the input queue can inject one-per-message without falling behind (each injection blocks
@@ -94,40 +102,37 @@ public sealed partial class Sts2ActionHandler
         Input.WarpMouse(inject);
         // MousePressed selects the gesture: null = a full click (down+up); true = press/hold (begins a drag —
         // the button stays down so the following hover/move stream injects as drag-motion); false = release.
-        string gesture;
-        if (request.MousePressed is null)
+        if (!MouseClickInjection.TryInject(
+                () => InjectMotion(inject, HeldMouseMask(), generation),
+                pressed => InjectMouseButton(inject, mouseButton, pressed, generation),
+                request.MousePressed, clickCount))
         {
-            // A motion before the press lets Godot's hover-gated controls register the pointer over them first.
-            InjectMotion(inject, HeldMouseMask(), generation);
-            for (var i = 0; i < clickCount; i++)
-            {
-                InjectMouseButton(inject, mouseButton, true, generation);
-                InjectMouseButton(inject, mouseButton, false, generation);
-            }
-            gesture = clickCount > 1 ? $"click x{clickCount}" : "click";
+            return ActionExecutionResult.Failure(request.Kind, ActionFailureCode.RuntimeFailure,
+                "Mouse input injection was cancelled or suppressed.",
+                [new ActionFailureDetail("input", "dropped", "The injected input lifetime rejected the gesture; retry only after restoring input ownership.")]);
         }
-        else if (request.MousePressed.Value)
+        var gesture = request.MousePressed switch
         {
-            InjectMotion(inject, HeldMouseMask(), generation);
-            InjectMouseButton(inject, mouseButton, true, generation);
-            gesture = "press";
-        }
-        else
-        {
-            // Move to the release point with the button still held (so the drag tracks to here), then release.
-            InjectMotion(inject, HeldMouseMask(), generation);
-            InjectMouseButton(inject, mouseButton, false, generation);
-            gesture = "release";
-        }
+            true => "press",
+            false => "release",
+            null => clickCount > 1 ? $"click x{clickCount}" : "click",
+        };
+        var spaceName = space.ToString().ToLowerInvariant();
 
         var buttonName = rawButton.ToString().ToLowerInvariant();
-        var message = $"Injected raw {buttonName} {gesture} at canvas ({position.X:0},{position.Y:0}) → window ({inject.X:0},{inject.Y:0}).";
+        var message = $"Injected raw {buttonName} {gesture} at {spaceName} ({position.X:0},{position.Y:0}) → window ({inject.X:0},{inject.Y:0}).";
         _logStream.Write(BridgeLogLevel.Info, "bridge.action", message);
         return ActionExecutionResult.Success(
             actionInstanceId: $"action:mouse-click:{request.RequestId}",
             kind: request.Kind,
             message: message,
-            provisional: true);
+            provisional: true,
+            values: new Dictionary<string, string>
+            {
+                ["coordinateSpace"] = spaceName,
+                ["windowX"] = inject.X.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["windowY"] = inject.Y.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            });
     }
 
     // How many identical ticks this mouse-click message stands for. Reads the optional scalar `count` off the

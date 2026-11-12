@@ -886,3 +886,55 @@ fn removed_presentation_contract_command_is_rejected() {
         .expect_err("presentation contract should be removed");
     assert!(err.to_string().contains("presentation"));
 }
+
+#[test]
+fn mouse_click_reports_coordinate_space_and_window_point() {
+    for space in ["canvas", "window"] {
+        let result = run(&[
+            "sts2",
+            "--json",
+            "--mode",
+            "dangerous",
+            "act",
+            "mouse",
+            "click",
+            "--space",
+            space,
+            "--x",
+            "640",
+            "--y",
+            "360",
+        ]);
+        let payload: serde_json::Value = serde_json::from_str(&result.stdout).expect("click JSON");
+        assert_eq!(payload["coordinateSpace"], space);
+        assert_eq!(
+            payload["windowPoint"],
+            serde_json::json!({ "x": 640.0, "y": 360.0 })
+        );
+    }
+}
+
+#[test]
+fn screenshot_reports_window_pixels_and_coordinate_transform() {
+    let dir = tempfile::tempdir().expect("screenshot dir");
+    let output = dir.path().join("capture.png");
+    let result = run(&[
+        "sts2",
+        "--json",
+        "dev",
+        "screenshot",
+        "--output",
+        output.to_str().expect("output path"),
+    ]);
+    let payload: serde_json::Value = serde_json::from_str(&result.stdout).expect("screenshot JSON");
+    assert_eq!(payload["pixelSpace"], "window");
+    assert_eq!(payload["windowWidth"], payload["width"]);
+    assert_eq!(payload["windowHeight"], payload["height"]);
+    assert_eq!(payload["canvasWidth"], 1);
+    assert_eq!(payload["canvasHeight"], 1);
+    assert_eq!(payload["canvasToWindowScaleX"], 1.0);
+    assert_eq!(payload["canvasToWindowScaleY"], 1.0);
+    assert_eq!(payload["canvasToWindowOffsetX"], 0.0);
+    assert_eq!(payload["canvasToWindowOffsetY"], 0.0);
+    assert!(output.is_file());
+}

@@ -841,6 +841,13 @@ pub enum MouseSubcommand {
     Click(MouseClickArgs),
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq, Default)]
+pub enum MouseCoordinateSpaceArg {
+    #[default]
+    Canvas,
+    Window,
+}
+
 #[derive(Debug, Clone, Args)]
 pub struct MouseClickArgs {
     #[arg(long)]
@@ -851,6 +858,10 @@ pub struct MouseClickArgs {
 
     #[arg(long, value_enum, default_value_t = MouseButtonArg::Left)]
     pub button: MouseButtonArg,
+
+    /// Coordinate space: canvas by default; use window for screenshot pixels.
+    #[arg(long, value_enum, default_value = "canvas")]
+    pub space: MouseCoordinateSpaceArg,
 }
 
 #[derive(Debug, Clone, Subcommand)]

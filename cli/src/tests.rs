@@ -2229,3 +2229,56 @@ transport:
     assert_eq!(config.transport.mock_scenario, MockScenario::Lobby);
     assert_eq!(config.game.assemblies_dir, None);
 }
+
+#[test]
+fn mouse_coordinate_space_flag_maps_to_request() {
+    for (flags, expected) in [
+        (vec![], bridge::proto::MouseCoordinateSpace::Canvas),
+        (
+            vec!["--space", "canvas"],
+            bridge::proto::MouseCoordinateSpace::Canvas,
+        ),
+        (
+            vec!["--space", "window"],
+            bridge::proto::MouseCoordinateSpace::Window,
+        ),
+    ] {
+        let mut argv = vec![
+            "sts2",
+            "--mode",
+            "dangerous",
+            "act",
+            "mouse",
+            "click",
+            "--x",
+            "640",
+            "--y",
+            "360",
+            "--button",
+            "right",
+        ];
+        argv.extend(flags);
+        let cli = Cli::try_parse_from(argv).expect("mouse click flags");
+        let Commands::Act(command) = cli.command else {
+            panic!("act command")
+        };
+        let ActSubcommand::Mouse(mouse) = command.command else {
+            panic!("mouse command")
+        };
+        let MouseSubcommand::Click(args) = mouse.command;
+        let request = mouse_click_action(args);
+        assert_eq!(request.coordinate_space, expected as i32);
+        assert_eq!((request.x, request.y), (640, 360));
+        assert_eq!(request.button, bridge::proto::RawMouseButton::Right as i32);
+    }
+}
+
+#[test]
+fn mouse_coordinate_space_rejects_unknown_space() {
+    assert!(
+        Cli::try_parse_from([
+            "sts2", "act", "mouse", "click", "--x", "1", "--y", "2", "--space", "screen",
+        ])
+        .is_err()
+    );
+}

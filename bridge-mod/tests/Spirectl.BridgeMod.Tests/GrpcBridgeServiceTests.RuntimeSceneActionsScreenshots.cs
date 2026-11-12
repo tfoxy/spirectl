@@ -679,6 +679,64 @@ public sealed partial class GrpcBridgeServiceTests
         Assert.False(result.Success.Provisional);
     }
 
+    [Theory]
+    [InlineData(MouseCoordinateSpace.Unspecified)]
+    [InlineData(MouseCoordinateSpace.Canvas)]
+    [InlineData(MouseCoordinateSpace.Window)]
+    public void ExecuteActionMapsMouseCoordinateSpaceAndReturnsWindowPoint(MouseCoordinateSpace space)
+    {
+        var handler = new FixedActionHandler(ActionExecutionResult.Success(
+            "action:mouse-click:req-3", SemanticActionKind.MouseClick, "Injected click.",
+            values: new Dictionary<string, string>
+            {
+                ["coordinateSpace"] = space == MouseCoordinateSpace.Window ? "window" : "canvas",
+                ["windowX"] = "640.5",
+                ["windowY"] = "360.25",
+            }));
+        var runtime = BridgeRuntime.Create(new BridgeRuntimeOptions
+        {
+            StateExtractor = new FixedSnapshotExtractor(
+                new GameStateSnapshot(
+                    SchemaVersion: "spirectl/v0",
+                    GameVersion: "sts2-live",
+                    BridgeVersion: BridgeBuildInfo.BridgeVersion,
+                    Source: DataSourceKind.Live,
+                    Provisional: false,
+                    ScreenType: "Screens.CharacterSelect.NCharacterSelectScreen",
+                    ScreenTitle: "Character Select",
+                    ScreenInstanceId: "screen:lobby:start-run",
+                    ResolvedPerspective: new PlayerPerspective(PlayerScope.Local, "p:100", UsesDefault: true),
+                    Menu: null,
+                    Lobby: null,
+                    Run: null,
+                    Combat: null,
+                    Choices: [],
+                    AvailableActions: [],
+                    Notices: [],
+                    Debug: null)),
+            ActionHandler = handler,
+            LogStream = new InMemoryLogStream(),
+            PerspectiveProvider = new DefaultPerspectiveProvider(),
+            BridgeHost = new FixedBridgeHost(new BridgeHostStatus("ipc", true, "Live IPC host running.")),
+        });
+        var service = new GrpcBridgeService(runtime);
+
+        var result = service.HandleExecuteAction(new ActionRequest
+        {
+            RequestId = "req-3",
+            MouseClick = new MouseClickAction { X = 960, Y = 540, CoordinateSpace = space },
+        });
+
+        Assert.NotNull(result.Success);
+        Assert.Equal((MouseCoordinateSpaceKind)space, handler.LastRequest!.MouseCoordinateSpace);
+        Assert.Equal(960, handler.LastRequest.MouseX);
+        Assert.Equal(540, handler.LastRequest.MouseY);
+        Assert.Equal(space == MouseCoordinateSpace.Window ? MouseCoordinateSpace.Window : MouseCoordinateSpace.Canvas,
+            result.Success.MouseClick.CoordinateSpace);
+        Assert.Equal(640.5, result.Success.MouseClick.WindowX);
+        Assert.Equal(360.25, result.Success.MouseClick.WindowY);
+    }
+
     [Fact]
     public void ExecuteActionMapsSelectCharacterRequests()
     {
@@ -1192,6 +1250,15 @@ public sealed partial class GrpcBridgeServiceTests
         Assert.Equal((uint)1920, result.Success.RestoredViewportWidth);
         Assert.Equal((uint)1080, result.Success.RestoredViewportHeight);
         Assert.True(result.Success.RestoredViewport);
+        Assert.Equal("window", result.Success.PixelSpace);
+        Assert.Equal((uint)1280, result.Success.WindowWidth);
+        Assert.Equal((uint)720, result.Success.WindowHeight);
+        Assert.Equal((uint)1920, result.Success.CanvasWidth);
+        Assert.Equal((uint)1080, result.Success.CanvasHeight);
+        Assert.Equal(2.0 / 3, result.Success.CanvasToWindowScaleX);
+        Assert.Equal(2.0 / 3, result.Success.CanvasToWindowScaleY);
+        Assert.Equal(12, result.Success.CanvasToWindowOffsetX);
+        Assert.Equal(24, result.Success.CanvasToWindowOffsetY);
     }
 
 }

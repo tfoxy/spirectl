@@ -28,6 +28,16 @@ message ScreenshotResponse {
   bool restored_viewport = 13;
   uint32 restored_viewport_width = 14;
   uint32 restored_viewport_height = 15;
+  uint32 window_width = 16;
+  uint32 window_height = 17;
+  uint32 canvas_width = 18;
+  uint32 canvas_height = 19;
+  double canvas_to_window_scale_x = 20;
+  double canvas_to_window_scale_y = 21;
+  double canvas_to_window_offset_x = 22;
+  double canvas_to_window_offset_y = 23;
+  // Image pixels use window coordinates at capture time, before any viewport restoration.
+  string pixel_space = 24;
 }
 
 message ScreenshotResult {

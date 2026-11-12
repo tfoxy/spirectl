@@ -327,7 +327,8 @@ public sealed record EmbeddableActionRequest(
     // "leftBumper", …); the host names the game action. The EDGE reuses KeyPressed above (true=down, false=up,
     // null=full press+release) — a request is a key OR a pad input, never both. Maps to
     // SemanticActionRequest.ControllerInput.
-    string? ControllerInput = null);
+    string? ControllerInput = null,
+    MouseCoordinateSpaceKind MouseCoordinateSpace = MouseCoordinateSpaceKind.Unspecified);
 
 public sealed record EmbeddableActionResult(
     bool Success,

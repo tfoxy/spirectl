@@ -630,10 +630,13 @@ Dangerous raw fallback:
 
 ```bash
 sts2 --mode dangerous act mouse click --x 100 --y 200
-sts2 --mode dangerous act mouse click --x 960 --y 540 --button right
+sts2 --mode dangerous act mouse click --space window --x 640 --y 360 --button right
 ```
 
-- `mouse click`: dispatches a raw viewport click using screenshot/viewport coordinates and bypasses semantic legality checks
+- `mouse click`: dispatches raw input and bypasses semantic legality checks. The bridge accepts canvas
+  coordinates by default (`--space canvas`); `--space window` uses screenshot pixels directly. Screenshot metadata reports
+  window/canvas sizes, scale and letterbox offset at capture time. Mouse results report the selected space and
+  final window point as `coordinateSpace` and `windowPoint: {x, y}` in JSON. A cancelled or suppressed injection returns a structured runtime failure.
 - dangerous raw input is only advertised through `supportedActions` when the CLI runs in `--mode dangerous`
 - dangerous raw input is intentionally omitted from `availableActions` and `inspect ai-tools`
 - event-room, treasure-room, shop, reward, rest-site, Crystal Sphere, card-selection, and map-flow compatibility IDs can still appear in `choices[]`, but current clients should read the typed family section and follow `preferredAction` before using fallback choose
@@ -1049,6 +1052,21 @@ sts2 dev screenshot --rpc-timeout-ms 5000 --output ./.sts2/artifacts/combat.png
 ```
 
 `game install-bridge`, `game launch`, `game attach`, `game bridge-health`, `game mods settings`, `game mods active`, `dev visual-preflight`, `game close`, `game kill`, and `game deploy` are real CLI workflows. `game bridge-health` is read-only by default: it reports compact endpoint, connection, bridge version, duplicate-mod status, structured status codes such as `endpoint_missing`, `endpoint_refused_or_stale`, `rpc_timeout`, `deployed_version_mismatch`, `live_version_mismatch`, `game_version_mismatch`, and `reachable_current`, plus safe next commands. Use `--verbose` for the full diagnostic payload, and keep `--non-mutating` only as a compatibility no-op. Source freshness is a cheap sentinel stat by default (`bridge.sourceScanMode: "sentinel"`), because the command is polled: it stats `bridge-mod/Directory.Build.props`, `bridge-mod/src/Spirectl.BridgeMod/BridgeRuntime.cs` and `proto/spirectl/v0/runtime.proto` instead of walking every bridge and proto source file. `--check-source` (implied by `--verbose`) does the full walk and is the authoritative answer for `stale_live_host`: an edit to a bridge source file outside the sentinels is only seen in that mode. The repository root is found by walking up from the working directory and then from the binary's own directory, so a `sts2` built in one checkout reports the freshness of the checkout you are standing in. Add `--repair-stale-endpoint` only when you explicitly want stale local endpoint cleanup; no cleanup runs in default mode. The remaining lifecycle, mod, fixture, screenshot, and diagnostics commands keep the same structured output contracts and normal-mode behavior unless their command help explicitly requires dangerous mode. `dev screenshot` and live `dev screenshot-diff` accept `--rpc-timeout-ms <ms>` and return the existing structured `bridge_rpc_timeout` error if live screenshot capture exceeds that bound.
+
+### Screenshot Coordinate Space
+
+`sts2 --json dev screenshot --output capture.png` reports `pixelSpace: "window"`.
+Read PNG pixel coordinates directly with
+`sts2 --mode dangerous act mouse click --space window --x X --y Y`.
+The screenshot JSON includes `windowWidth`, `windowHeight`, `canvasWidth`, `canvasHeight`,
+`canvasToWindowScaleX`, `canvasToWindowScaleY`, `canvasToWindowOffsetX` and `canvasToWindowOffsetY`.
+The mapping is `window = canvas * scale + offset` on each axis. For canvas clicks, use
+`canvas = (window - offset) / scale`; at 1280×720 with a 1920×1080 canvas and zero offset,
+window point (640, 360) maps to canvas point (960, 540).
+
+Metadata describes the capture size, before any requested viewport restoration. Click after restoring
+or resizing a window only after mapping the point into the current window size. Scene hover/unhover
+positions and control rectangles remain canvas coordinates; hover injection converts them to window pixels.
 
 ### Game Build Binding
 

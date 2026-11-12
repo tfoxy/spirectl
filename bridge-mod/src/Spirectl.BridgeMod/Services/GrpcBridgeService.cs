@@ -1032,6 +1032,15 @@ public sealed partial class GrpcBridgeService(BridgeRuntime runtime) : BridgeSer
                 RestoredViewport = capture.RestoredViewport,
                 RestoredViewportWidth = (uint)(capture.RestoredViewportWidth ?? 0),
                 RestoredViewportHeight = (uint)(capture.RestoredViewportHeight ?? 0),
+                WindowWidth = (uint)capture.WindowWidth,
+                WindowHeight = (uint)capture.WindowHeight,
+                CanvasWidth = (uint)capture.CanvasWidth,
+                CanvasHeight = (uint)capture.CanvasHeight,
+                CanvasToWindowScaleX = capture.CanvasToWindowScaleX,
+                CanvasToWindowScaleY = capture.CanvasToWindowScaleY,
+                CanvasToWindowOffsetX = capture.CanvasToWindowOffsetX,
+                CanvasToWindowOffsetY = capture.CanvasToWindowOffsetY,
+                PixelSpace = capture.PixelSpace,
             }
         };
     }

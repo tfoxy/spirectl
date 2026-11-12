@@ -91,10 +91,10 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
     },
     CommandInfo {
         name: "act mouse click",
-        summary: "Dangerous raw viewport mouse click fallback routed through the bridge contract.",
+        summary: "Dangerous raw mouse click in canvas (default) or window pixel coordinates; screenshot pixels use --space window.",
         status: "implemented",
         read_only: false,
-        examples: &["sts2 --mode dangerous act mouse click --x 100 --y 200"],
+        examples: &["sts2 --mode dangerous act mouse click --space window --x 100 --y 200"],
     },
     CommandInfo {
         name: "act select-map-node",
@@ -697,7 +697,7 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
     },
     CommandInfo {
         name: "dev screenshot",
-        summary: "Capture a bridge-backed PNG screenshot to a file.",
+        summary: "Capture a bridge-backed PNG in window pixels, with canvas-to-window scale and offset metadata.",
         status: "implemented",
         read_only: false,
         examples: &[
