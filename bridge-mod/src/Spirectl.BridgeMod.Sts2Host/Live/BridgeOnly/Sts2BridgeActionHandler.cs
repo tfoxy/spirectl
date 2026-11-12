@@ -12,5 +12,5 @@ public sealed class Sts2BridgeActionHandler(IActionHandler reusable, IActionHand
         SemanticActionKind.DebugApplyGodMode or SemanticActionKind.DebugSetSeed or SemanticActionKind.DebugStartRun or
         SemanticActionKind.DebugAdvance or SemanticActionKind.DebugPlayCombat or SemanticActionKind.DebugTravel or
         SemanticActionKind.DebugResolveEvent or SemanticActionKind.DebugOpenShop or SemanticActionKind.DebugUsePotions or
-        SemanticActionKind.DebugSpeedFast or SemanticActionKind.Heal;
+        SemanticActionKind.DebugSpeedFast or SemanticActionKind.Heal or SemanticActionKind.Tutorials;
 }

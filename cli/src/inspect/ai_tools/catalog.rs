@@ -188,6 +188,7 @@ pub(crate) fn ai_tool_catalog() -> Vec<Value> {
                 "view-exhaust-pile",
                 "inspect-relic",
                 "close-inspect-relic",
+                "dismiss-modal",
                 "select-hand-card",
                 "deselect-hand-card",
                 "confirm-hand-selection",
@@ -218,6 +219,14 @@ pub(crate) fn ai_tool_catalog() -> Vec<Value> {
         schema_string(
             "Stable shop item id from state.scene.items[].id or state.actions[].args.shopItemId.",
         ),
+    );
+    act_schema_properties.insert(
+        "modalId".to_string(),
+        schema_string("Current blocking modal id from state.blockingModal.id."),
+    );
+    act_schema_properties.insert(
+        "buttonId".to_string(),
+        schema_string("Modal button id; required when multiple buttons are visible."),
     );
     act_schema_properties.insert(
         "relicId".to_string(),

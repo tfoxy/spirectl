@@ -92,6 +92,8 @@ export interface RuntimeActionArguments {
   bundleId?: string | null;
   shopItemId?: string | null;
   relicId?: string | null;
+  modalId?: string | null;
+  buttonId?: string | null;
   restOptionId?: string | null;
   eventOptionId?: string | null;
   controlId?: string | null;
@@ -665,11 +667,21 @@ export interface RuntimeStateActionsResult {
 
 // NOTE: this interface still describes the pre-cutover state envelope. The canonical
 // `spirectl.state/v0` envelope the CLI emits today is `{ schemaVersion, language, rootScene,
-// characterSelect, run }` — the top-level `screen`/`scene`/`actions`/`combat`/per-screen sections
+// characterSelect, run, blockingModal }` — the top-level `screen`/`scene`/`actions`/`combat`/per-screen sections
 // below were deleted by design (e2aa8028) and never appear. Every member is optional and the index
 // signature is open, so this stays structurally valid; migrating it to the canonical shape is a
 // separate, larger job.
+export interface RuntimeBlockingModal {
+  id: string;
+  kind: "ftue" | "popup";
+  typeName: string;
+  title: string | null;
+  body: string | null;
+  buttons: Array<{ id: string; label: string }>;
+}
+
 export interface RuntimeState {
+  blockingModal?: RuntimeBlockingModal | null;
   schemaVersion: string;
   gameVersion: string;
   bridgeVersion: string;
@@ -880,6 +892,8 @@ export interface AiToolDefinition {
 }
 
 export interface ActionResult {
+  closed?: boolean;
+  waitedMs?: number;
   requestId: string;
   actionInstanceId: string;
   kind: string;
@@ -1940,6 +1954,7 @@ export type ActOptions =
   | (PlayerScopedActionOption &
       PreferredActionOption &
       (
+        | { kind: "dismiss-modal"; modal?: string; modalId?: string; button?: string; buttonId?: string }
         | { kind: "choose"; choice?: string; choiceId?: string }
         | { kind: "confirm-selection" }
         | { kind: "cancel-selection" }

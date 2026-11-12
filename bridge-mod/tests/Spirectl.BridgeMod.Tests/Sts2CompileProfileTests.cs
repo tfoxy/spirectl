@@ -180,6 +180,7 @@ public sealed class Sts2CompileProfileTests
     /// <summary>The semantic action kinds the embedded dispatcher routes: what an embedder in this repo family sends.</summary>
     private static readonly string[] EmbeddedActionKinds =
     [
+        "DismissModal",
         "ControllerInput",
         "DisconnectClient",
         "HoverElement",

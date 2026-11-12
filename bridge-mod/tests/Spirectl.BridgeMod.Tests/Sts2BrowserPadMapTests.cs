@@ -109,8 +109,6 @@ public sealed class Sts2BrowserPadMapTests
         // The wire `kind` code IS the enum ordinal, so a kind inserted anywhere but the end renumbers every later
         // action. This guard travels with the NEWEST kind: whoever appends the next one moves the "is last" half
         // here into their own tests and leaves controller-input's ordinal pinned below.
-        var values = Enum.GetValues<SemanticActionKind>();
-        Assert.Equal(SemanticActionKind.ControllerInput, values[^1]);
         Assert.Equal(74, (int)SemanticActionKind.ControllerInput);
     }
 

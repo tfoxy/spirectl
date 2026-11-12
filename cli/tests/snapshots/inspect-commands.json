@@ -370,6 +370,25 @@
     },
     {
       "examples": [
+        "sts2 act dismiss-modal",
+        "sts2 act dismiss-modal --modal modal:CombatFtue --button modal-button:0"
+      ],
+      "name": "act dismiss-modal",
+      "readOnly": false,
+      "status": "implemented",
+      "summary": "Press a blocking modal’s own button; specify --button for multiple buttons."
+    },
+    {
+      "examples": [
+        "sts2 dev tutorials --disable"
+      ],
+      "name": "dev tutorials",
+      "readOnly": false,
+      "status": "implemented",
+      "summary": "Enable or disable tutorials, persisting the active profile through the game."
+    },
+    {
+      "examples": [
         "sts2 act close-inspect-relic"
       ],
       "name": "act close-inspect-relic",

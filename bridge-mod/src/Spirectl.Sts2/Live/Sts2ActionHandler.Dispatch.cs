@@ -10,6 +10,12 @@ public sealed partial class Sts2ActionHandler
     {
         try
         {
+            var blocked = Sts2BlockingModalResolver.Precheck(request.Kind, Sts2BlockingModalResolver.ResolveLive());
+            if (blocked is not null)
+            {
+                return blocked;
+            }
+
             return request.Kind switch
             {
                 SemanticActionKind.PlayCard => ExecutePlayCard(request),
@@ -68,6 +74,7 @@ public sealed partial class Sts2ActionHandler
                 SemanticActionKind.ViewExhaustPile => ExecuteViewExhaustPile(request),
                 SemanticActionKind.InspectRelic => ExecuteInspectRelic(request),
                 SemanticActionKind.CloseInspectRelic => ExecuteCloseInspectRelic(request),
+                SemanticActionKind.DismissModal => ExecuteDismissModal(request),
                 SemanticActionKind.SelectHandCard => ExecuteSelectHandCard(request),
                 SemanticActionKind.DeselectHandCard => ExecuteDeselectHandCard(request),
                 SemanticActionKind.ConfirmHandSelection => ExecuteConfirmHandSelection(request),

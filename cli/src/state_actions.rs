@@ -165,6 +165,33 @@ fn resolve_state_actions(
     diagnostics: &mut Vec<Value>,
 ) -> Vec<Value> {
     let mut actions = Vec::new();
+    if let Some(modal) = non_null(state.get("blockingModal")) {
+        diagnostics.push(json!({"code": "blocking_modal_present", "blocker": {"id": modal["id"], "kind": modal["kind"], "title": modal["title"]}}));
+        for button in modal
+            .get("buttons")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let mut args = Map::new();
+            args.insert("modalId".into(), modal["id"].clone());
+            args.insert("buttonId".into(), button["id"].clone());
+            emit_action(
+                &mut actions,
+                "dismiss-modal",
+                format!(
+                    "action:{}:{}",
+                    modal["id"].as_str().unwrap_or("modal"),
+                    button["id"].as_str().unwrap_or("button")
+                ),
+                button["label"].as_str().map(str::to_string),
+                args,
+                None,
+                Some("blockingModal".to_string()),
+            );
+        }
+        return actions;
+    }
     let mut matched = false;
     // Surfaces are evaluated in catalog order; several can match at once (e.g. a
     // combat screen matches run-top-bar AND combat-room), and their actions

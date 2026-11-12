@@ -549,6 +549,10 @@
             "description": "Stable bundle id from state.scene.items[].id or state.actions[].args.bundleId.",
             "type": "string"
           },
+          "buttonId": {
+            "description": "Modal button id; required when multiple buttons are visible.",
+            "type": "string"
+          },
           "by": {
             "description": "Deck view sort key for sort-deck-view.",
             "enum": [
@@ -623,6 +627,7 @@
               "view-exhaust-pile",
               "inspect-relic",
               "close-inspect-relic",
+              "dismiss-modal",
               "select-hand-card",
               "deselect-hand-card",
               "confirm-hand-selection",
@@ -634,6 +639,10 @@
           },
           "mapNodeId": {
             "description": "Stable map node id from state.scene.items[].id or state.actions[].args.mapNodeId.",
+            "type": "string"
+          },
+          "modalId": {
+            "description": "Current blocking modal id from state.blockingModal.id.",
             "type": "string"
           },
           "playerId": {

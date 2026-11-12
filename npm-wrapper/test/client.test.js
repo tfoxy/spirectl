@@ -537,6 +537,20 @@ test("act accepts typed arguments for CLI execution", async () => {
   ]);
 });
 
+test("dismiss-modal forwards optional button and modal ids", async () => {
+  const client = createSts2Client({
+    binaryPath: fakeBinaryPath,
+    cwd: repoRoot,
+    env: { ...process.env, FAKE_STS2_CASE: "echo-argv" },
+  });
+
+  assert.deepEqual((await client.act({ kind: "dismiss-modal" })).argv,
+    ["--json", "act", "dismiss-modal"]);
+  assert.deepEqual((await client.act({
+    kind: "dismiss-modal", arguments: { modalId: "modal:TestFtue", buttonId: "modal-button:1" },
+  })).argv, ["--json", "act", "dismiss-modal", "--modal", "modal:TestFtue", "--button", "modal-button:1"]);
+});
+
 test("act forwards S86 action arguments for CLI execution", async () => {
   const client = createSts2Client({
     binaryPath: fakeBinaryPath,

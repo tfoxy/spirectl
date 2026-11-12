@@ -124,6 +124,8 @@ public enum SemanticActionKind
     // client can still drive the seat's controller mode. Appended at the end on purpose — the wire `kind` code
     // equals the enum ordinal, so new kinds must stay last.
     ControllerInput,
+    DismissModal,
+    Tutorials,
 }
 
 public enum MouseCoordinateSpaceKind
@@ -164,6 +166,8 @@ public enum ActionFailureCode
     StaleId,
     UnsupportedPerspective,
     DangerousModeRequired,
+    BlockedByModal,
+    InvalidArgument,
 }
 
 public enum ActionArgumentValueKind
@@ -251,6 +255,8 @@ public sealed record ActionParameterDescriptorSnapshot(
     bool Required,
     string Summary);
 
+public sealed record ModalBlockerSnapshot(string Id, string Kind, string? Title);
+
 public sealed record ActionFailureDetail(
     string Field,
     string Value,
@@ -267,7 +273,8 @@ public sealed record ActionFailureDetail(
     string? HostPlayerId = null,
     MultiplayerRoleSnapshot LocalRole = MultiplayerRoleSnapshot.Unspecified,
     string? Action = null,
-    RemoteClientOrchestrationCapabilitySnapshot? RemoteOrchestration = null);
+    RemoteClientOrchestrationCapabilitySnapshot? RemoteOrchestration = null,
+    ModalBlockerSnapshot? Blocker = null);
 
 public sealed record ActionFailureFieldDiagnostic(
     string Field,

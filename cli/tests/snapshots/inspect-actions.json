@@ -6,6 +6,11 @@
   "screen": null,
   "source": "bridge",
   "stateContract": {
+    "blockingModal": {
+      "dismissAction": "dismiss-modal",
+      "otherActionFailure": "blocked_by_modal",
+      "scope": "top-level"
+    },
     "compatibilityMetadata": [
       "choiceKind",
       "intentKind",
@@ -79,10 +84,75 @@
       "cardOverlay": "Typed partial card detail overlay state. Prefer this section before compatibility choices/actions; it may include visible card/detail data, preview text, source-screen breadcrumbs, overlayPolicy, validated close/back compatibility metadata, fallback visible controls, and structured notices for partial, passive, unsupported, or ambiguous ownership cases."
     },
     "typedOverlaySections": [
-      "cardOverlay"
+      "cardOverlay",
+      "blockingModal"
     ]
   },
   "supportedActions": [
+    {
+      "argumentSchema": [
+        {
+          "allowedValues": [],
+          "name": "modalId",
+          "required": false,
+          "stableId": true,
+          "summary": "Current blocking modal id.",
+          "valueType": "string"
+        },
+        {
+          "allowedValues": [],
+          "name": "buttonId",
+          "required": false,
+          "stableId": true,
+          "summary": "Required when multiple buttons are visible.",
+          "valueType": "string"
+        }
+      ],
+      "checkedHookPaths": [],
+      "cliCommandHint": "sts2 act dismiss-modal",
+      "failureReasonCodes": [
+        "invalid_argument",
+        "stale_id",
+        "missing_hook",
+        "runtime_failure"
+      ],
+      "id": "dismiss-modal",
+      "kind": "dismiss-modal",
+      "kindDescriptor": {
+        "commandName": "dismiss-modal",
+        "dangerous": false,
+        "fallback": false,
+        "intentKind": "dismiss-modal",
+        "kind": "dismiss-modal",
+        "modes": [
+          "normal"
+        ],
+        "screenTypes": [
+          "any"
+        ],
+        "summary": "Press a blocking modal’s own button."
+      },
+      "legalityStatus": "unknown",
+      "ownerPlayerId": null,
+      "parameters": [
+        {
+          "name": "modalId",
+          "required": false,
+          "summary": "Current blocking modal id.",
+          "valueType": "string"
+        },
+        {
+          "name": "buttonId",
+          "required": false,
+          "summary": "Required when multiple buttons are visible.",
+          "valueType": "string"
+        }
+      ],
+      "perspectiveBehavior": "local-only",
+      "provisional": false,
+      "status": "implemented",
+      "summary": "Press a blocking modal’s own button."
+    },
     {
       "argumentSchema": [
         {
@@ -105,6 +175,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act play-card --card c_1 --target e_1",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -175,6 +246,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act use-potion --potion potion:p:100:0:fire-potion --target e_1",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -237,6 +309,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act choose --choice reward:p1:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -286,6 +359,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act confirm-selection",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -328,6 +402,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act cancel-selection",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -379,6 +454,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act select-map-node --node map-node:3:1",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -426,6 +502,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act end-turn",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -475,6 +552,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act select-character --character silent",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -523,6 +601,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act ready",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -564,6 +643,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act unready",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -614,6 +694,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act claim-reward --reward reward:p1:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -661,6 +742,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act skip-rewards",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -710,6 +792,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act select-card --card card-selection:card:bash:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -761,6 +844,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act skip-card-selection",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -814,6 +898,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act select-bundle --bundle card-selection:bundle:offensive-pack:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -870,6 +955,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act buy-card --shop-item shop:p1:card:strike:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -927,6 +1013,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act buy-relic --shop-item shop:p1:relic:anchor:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -984,6 +1071,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act buy-potion --shop-item shop:p1:potion:fire-potion:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1041,6 +1129,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act remove-card --shop-item shop:p1:card-removal:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1089,6 +1178,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act leave-shop",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1130,6 +1220,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act close-shop-inventory",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1171,6 +1262,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act rest",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1220,6 +1312,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act smith --card c_1",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1276,6 +1369,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act use-rest-site-option --rest-option heal",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1323,6 +1417,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act proceed-rest-site",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1363,6 +1458,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act open-chest",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1414,6 +1510,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act take-relic --relic anchor",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1463,6 +1560,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act proceed-treasure-room",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1505,6 +1603,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act back-from-map",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1554,6 +1653,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act select-event-option --event-option event-room:gain-gold:0",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1610,6 +1710,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act open-event-shop --event-option event-room:fake-merchant:open-shop",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1674,6 +1775,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act use-crystal-sphere-control --control crystal-sphere:tool:big",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1727,6 +1829,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act proceed-event",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1768,6 +1871,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act toggle-map",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1808,6 +1912,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act toggle-deck",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1848,6 +1953,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act toggle-settings",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1897,6 +2003,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act sort-deck-view --by type",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1944,6 +2051,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act toggle-deck-view-upgrades",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -1993,6 +2101,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act open-potion-popup --potion potion:p1:0:fire-potion",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -2049,6 +2158,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act start-potion-targeting --potion potion:p1:0:fire-potion",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -2105,6 +2215,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act select-target --target e_1",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",
@@ -2161,6 +2272,7 @@
       "checkedHookPaths": [],
       "cliCommandHint": "sts2 act discard-potion --potion potion:p1:0:fire-potion",
       "failureReasonCodes": [
+        "blocked_by_modal",
         "wrong_screen",
         "wrong_player",
         "not_visible",

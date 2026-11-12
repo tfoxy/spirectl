@@ -12,6 +12,45 @@ fn parses_state_command_with_global_json() {
 }
 
 #[test]
+fn parses_dev_tutorials_and_requires_one_setting() {
+    let cli = Cli::try_parse_from(["sts2", "dev", "tutorials", "--disable"]).unwrap();
+    assert_eq!(cli.mode, Mode::Normal);
+    assert!(matches!(
+        cli.command,
+        Commands::Dev(DevCommand {
+            command: DevSubcommand::Tutorials(DevTutorialsArgs { disable: true, .. })
+        })
+    ));
+    assert!(Cli::try_parse_from(["sts2", "dev", "tutorials"]).is_err());
+    assert!(Cli::try_parse_from(["sts2", "dev", "tutorials", "--enable", "--disable"]).is_err());
+}
+
+#[test]
+fn dev_tutorials_reports_setting_change_in_normal_mode() {
+    let config = tempfile::NamedTempFile::new().unwrap();
+    fs::write(
+        config.path(),
+        "transport:\n  kind: mock\nusageTracking:\n  enabled: false\n",
+    )
+    .unwrap();
+    let args = || {
+        Cli::parse_from([
+            "sts2",
+            "--config",
+            config.path().to_str().unwrap(),
+            "--json",
+            "dev",
+            "tutorials",
+            "--disable",
+        ])
+    };
+    let response = run_cli(args()).unwrap();
+    let value: Value = serde_json::from_str(&response.stdout).unwrap();
+    assert_eq!(value["before"], true);
+    assert_eq!(value["after"], false);
+}
+
+#[test]
 fn rejects_removed_dev_mode() {
     let error = Cli::try_parse_from(["sts2", "--mode", "dev", "state"])
         .expect_err("dev must not remain a CLI mode");

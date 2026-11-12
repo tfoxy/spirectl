@@ -100,7 +100,8 @@ public sealed record FixtureLoadFailure(
 public sealed record FixtureLoadDetail(
     string Field,
     string Value,
-    string Note);
+    string Note,
+    Spirectl.Sts2.Core.Actions.ModalBlockerSnapshot? Blocker = null);
 
 public sealed record FixtureLoadNotice(
     string Code,

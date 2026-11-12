@@ -29,6 +29,7 @@ pub fn bridge_error_payload(error: &proto::BridgeError) -> Value {
         .iter()
         .map(|detail| {
             let mut value = json!({
+                "blocker": detail.blocker.as_ref().map(|b| json!({"id": b.id, "kind": b.kind, "title": b.title})),
                 "field": detail.field,
                 "value": detail.value,
                 "note": detail.note,
@@ -293,11 +294,13 @@ fn inspect_actions_state_contract_json() -> Value {
             "lobby"
         ],
         "typedOverlaySections": [
-            "cardOverlay"
+            "cardOverlay",
+            "blockingModal"
         ],
         "typedNonCombatSectionDetails": {
             "eventRoom": "Typed event-room state. eventRoom.page exposes the currently visible localized rich event title/body/shared label with LocString provenance when available; ancient event banner/epithet/dialogue live under eventRoom.page.ancient, and eventRoom.options[] exposes visible option labels and descriptions."
         },
+        "blockingModal": {"scope": "top-level", "dismissAction": "dismiss-modal", "otherActionFailure": "blocked_by_modal"},
         "typedOverlaySectionDetails": {
             "cardOverlay": "Typed partial card detail overlay state. Prefer this section before compatibility choices/actions; it may include visible card/detail data, preview text, source-screen breadcrumbs, overlayPolicy, validated close/back compatibility metadata, fallback visible controls, and structured notices for partial, passive, unsupported, or ambiguous ownership cases."
         },
@@ -429,6 +432,8 @@ pub fn action_kind_name(value: proto::ActionKind) -> &'static str {
         proto::ActionKind::ViewExhaustPile => "view-exhaust-pile",
         proto::ActionKind::InspectRelic => "inspect-relic",
         proto::ActionKind::CloseInspectRelic => "close-inspect-relic",
+        proto::ActionKind::DismissModal => "dismiss-modal",
+        proto::ActionKind::Tutorials => "tutorials",
         proto::ActionKind::SelectHandCard => "select-hand-card",
         proto::ActionKind::DeselectHandCard => "deselect-hand-card",
         proto::ActionKind::ConfirmHandSelection => "confirm-hand-selection",

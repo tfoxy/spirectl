@@ -23,6 +23,8 @@ enum ActionFailureReasonCode {
   ACTION_FAILURE_REASON_CODE_STALE_ID = 11;
   ACTION_FAILURE_REASON_CODE_UNSUPPORTED_PERSPECTIVE = 12;
   ACTION_FAILURE_REASON_CODE_DANGEROUS_MODE_REQUIRED = 13;
+  ACTION_FAILURE_REASON_CODE_BLOCKED_BY_MODAL = 14;
+  ACTION_FAILURE_REASON_CODE_INVALID_ARGUMENT = 15;
 }
 
 message ActionDescriptor {
@@ -97,6 +99,8 @@ message ActionRequest {
     DrawMapStrokeAction draw_map_stroke = 64;
     ClearMapDrawingsAction clear_map_drawings = 65;
     HealAction heal = 66;
+    DismissModalAction dismiss_modal = 67;
+    TutorialsAction tutorials = 68;
   }
 }
 
@@ -523,6 +527,8 @@ message ActionResponse {
   bool provisional = 5;
   string message = 6;
   MouseClickResult mouse_click = 7;
+  TutorialsResult tutorials = 8;
+  DismissModalResult dismiss_modal = 9;
 }
 
 message ActionResponseV0 {
@@ -545,4 +551,20 @@ message ActionResult {
     ActionResponse success = 1;
     BridgeError error = 2;
   }
+}
+
+message DismissModalAction {
+  string modal_id = 1;
+  string button_id = 2;
+}
+// Dev-only setting persisted to the active profile by the game.
+message TutorialsAction { bool enabled = 1; }
+message TutorialsResult {
+  bool before = 1;
+  bool after = 2;
+}
+
+message DismissModalResult {
+  bool closed = 1;
+  int64 waited_ms = 2;
 }

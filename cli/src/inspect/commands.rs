@@ -321,6 +321,23 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
         examples: &["sts2 act inspect-relic --relic relic:p:1:0:BURNING_BLOOD"],
     },
     CommandInfo {
+        name: "act dismiss-modal",
+        summary: "Press a blocking modal’s own button; specify --button for multiple buttons.",
+        status: "implemented",
+        read_only: false,
+        examples: &[
+            "sts2 act dismiss-modal",
+            "sts2 act dismiss-modal --modal modal:CombatFtue --button modal-button:0",
+        ],
+    },
+    CommandInfo {
+        name: "dev tutorials",
+        summary: "Enable or disable tutorials, persisting the active profile through the game.",
+        status: "implemented",
+        read_only: false,
+        examples: &["sts2 dev tutorials --disable"],
+    },
+    CommandInfo {
         name: "act close-inspect-relic",
         summary: "Close the open relic-details overlay.",
         status: "implemented",

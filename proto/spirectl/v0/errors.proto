@@ -40,6 +40,8 @@ enum ErrorActionFailureReasonCode {
   ERROR_ACTION_FAILURE_REASON_CODE_STALE_ID = 11;
   ERROR_ACTION_FAILURE_REASON_CODE_UNSUPPORTED_PERSPECTIVE = 12;
   ERROR_ACTION_FAILURE_REASON_CODE_DANGEROUS_MODE_REQUIRED = 13;
+  ERROR_ACTION_FAILURE_REASON_CODE_BLOCKED_BY_MODAL = 14;
+  ERROR_ACTION_FAILURE_REASON_CODE_INVALID_ARGUMENT = 15;
 }
 
 message ErrorDetail {
@@ -60,6 +62,7 @@ message ErrorDetail {
   string action = 15;
   RemoteClientOrchestrationCapability remote_orchestration = 16;
   google.protobuf.Struct diagnostic = 17;
+  ModalBlocker blocker = 18;
 }
 
 message BridgeError {
@@ -89,4 +92,10 @@ message FieldDiagnostic {
   string field = 1;
   string value = 2;
   string note = 3;
+}
+
+message ModalBlocker {
+  string id = 1;
+  string kind = 2;
+  string title = 3;
 }

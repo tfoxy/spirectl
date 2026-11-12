@@ -54,6 +54,8 @@ struct ActToolArgs {
     bundle_id: Option<String>,
     shop_item_id: Option<String>,
     relic_id: Option<String>,
+    modal_id: Option<String>,
+    button_id: Option<String>,
     rest_option_id: Option<String>,
     event_option_id: Option<String>,
     control_id: Option<String>,
@@ -291,6 +293,10 @@ pub(crate) fn act_subcommand_from_tool_args(args: ActToolArgs) -> Result<ActSubc
         "inspect-relic" => Ok(ActSubcommand::InspectRelic(InspectRelicActionArgs {
             relic: required_ai_tool_string("act", "relicId", args.relic_id)?,
             player_id: args.player_id,
+        })),
+        "dismiss-modal" => Ok(ActSubcommand::DismissModal(DismissModalActionArgs {
+            modal: args.modal_id,
+            button: args.button_id,
         })),
         "close-inspect-relic" => Ok(ActSubcommand::CloseInspectRelic(PlayerScopedActionArgs {
             player_id: args.player_id,

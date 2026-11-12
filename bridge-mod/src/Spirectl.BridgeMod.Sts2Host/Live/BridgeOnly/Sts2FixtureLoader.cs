@@ -228,11 +228,18 @@ public sealed partial class Sts2FixtureLoader : IFixtureLoader
             ]);
     }
 
+    private static string ModalFailureMessage(string message)
+    {
+        var modal = Sts2BlockingModalResolver.ResolveLive()?.State;
+        return modal is null ? message : $"{message} Blocker: {modal.Id} ({modal.Kind}), '{modal.Title}'. Run `sts2 act dismiss-modal`.";
+    }
+
     private static FixtureLoadResult RuntimeFailure(
         FixtureLoadRequestSnapshot request,
         string field,
         string note)
     {
+        var modal = Sts2BlockingModalResolver.ResolveLive()?.State;
         return FixtureLoadResult.Failure(
             requestId: request.RequestId,
             fixtureName: request.FixtureName,
@@ -246,7 +253,8 @@ public sealed partial class Sts2FixtureLoader : IFixtureLoader
                 new FixtureLoadDetail(
                     Field: field,
                     Value: request.FixtureName,
-                    Note: note),
+                    Note: note,
+                    Blocker: modal is null ? null : new Spirectl.Sts2.Core.Actions.ModalBlockerSnapshot(modal.Id, modal.Kind, modal.Title)),
             ]);
     }
 

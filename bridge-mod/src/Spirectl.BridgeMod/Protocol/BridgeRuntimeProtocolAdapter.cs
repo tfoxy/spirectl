@@ -171,6 +171,15 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
             SchemaVersion = snapshot.SchemaVersion,
             Language = snapshot.Language ?? string.Empty,
             RootScene = snapshot.RootScene,
+            BlockingModal = snapshot.BlockingModal is null ? null : new StateBlockingModal
+            {
+                Id = snapshot.BlockingModal.Id,
+                Kind = snapshot.BlockingModal.Kind,
+                TypeName = snapshot.BlockingModal.TypeName,
+                Title = snapshot.BlockingModal.Title ?? string.Empty,
+                Body = snapshot.BlockingModal.Body ?? string.Empty,
+                Buttons = { snapshot.BlockingModal.Buttons.Select(b => new StateModalButton { Id = b.Id, Label = b.Label }) },
+            },
         };
 
         if (snapshot.CharacterSelect is not null)
@@ -1429,6 +1438,8 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
             ActionRequest.ActionOneofCase.ViewDiscardPile => NewSemantic(request.RequestId, perspective, SemanticActionKind.ViewDiscardPile, values: Values(("playerId", request.ViewDiscardPile.PlayerId))),
             ActionRequest.ActionOneofCase.ViewExhaustPile => NewSemantic(request.RequestId, perspective, SemanticActionKind.ViewExhaustPile, values: Values(("playerId", request.ViewExhaustPile.PlayerId))),
             ActionRequest.ActionOneofCase.InspectRelic => NewSemantic(request.RequestId, perspective, SemanticActionKind.InspectRelic, values: Values(("relicId", request.InspectRelic.RelicId), ("playerId", request.InspectRelic.PlayerId))),
+            ActionRequest.ActionOneofCase.DismissModal => NewSemantic(request.RequestId, perspective, SemanticActionKind.DismissModal, values: Values(("modalId", request.DismissModal.ModalId), ("buttonId", request.DismissModal.ButtonId))),
+            ActionRequest.ActionOneofCase.Tutorials => NewSemantic(request.RequestId, perspective, SemanticActionKind.Tutorials, values: Values(("enabled", request.Tutorials.Enabled ? "true" : "false"))),
             ActionRequest.ActionOneofCase.CloseInspectRelic => NewSemantic(request.RequestId, perspective, SemanticActionKind.CloseInspectRelic, values: Values(("playerId", request.CloseInspectRelic.PlayerId))),
             ActionRequest.ActionOneofCase.SelectHandCard => NewSemantic(request.RequestId, perspective, SemanticActionKind.SelectHandCard, cardId: request.SelectHandCard.CardId, values: Values(("playerId", request.SelectHandCard.PlayerId))),
             ActionRequest.ActionOneofCase.DeselectHandCard => NewSemantic(request.RequestId, perspective, SemanticActionKind.DeselectHandCard, cardId: request.DeselectHandCard.CardId, values: Values(("playerId", request.DeselectHandCard.PlayerId))),
@@ -1513,6 +1524,14 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
                 Accepted = result.Accepted,
                 Provisional = result.Provisional,
                 Message = result.Message,
+                Tutorials = result.Kind == SemanticActionKind.Tutorials && result.Values is { } tutorialValues
+                    ? new TutorialsResult { Before = bool.Parse(tutorialValues["before"]), After = bool.Parse(tutorialValues["after"]) } : null,
+                DismissModal = result.Kind == SemanticActionKind.DismissModal && result.Values is { } modalValues
+                    ? new DismissModalResult
+                    {
+                        Closed = bool.Parse(modalValues["closed"]),
+                        WaitedMs = long.Parse(modalValues["waitedMs"], System.Globalization.CultureInfo.InvariantCulture),
+                    } : null,
                 MouseClick = result.Kind == SemanticActionKind.MouseClick && result.Values is { } values
                     ? new MouseClickResult
                     {

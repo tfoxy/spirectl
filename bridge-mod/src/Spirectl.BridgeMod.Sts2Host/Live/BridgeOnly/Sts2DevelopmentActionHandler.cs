@@ -61,6 +61,7 @@ public sealed class Sts2DevelopmentActionHandler : IActionHandler
             SemanticActionKind.DebugUsePotions => ExecuteDebugUsePotions(request),
             SemanticActionKind.DebugSpeedFast => ExecuteDebugSpeedFast(request),
             SemanticActionKind.Heal => ExecuteHeal(request),
+            SemanticActionKind.Tutorials => ExecuteTutorials(request),
             _ => ActionExecutionResult.Failure(request.Kind, ActionFailureCode.InvalidAction, $"Unsupported development action '{request.Kind}'."),
         };
     // Survival cheat for the browser auto-player: +9999 Buffer (negate incoming hits) and +9999
@@ -95,6 +96,19 @@ public sealed class Sts2DevelopmentActionHandler : IActionHandler
             request.RequestId,
             request.Kind,
             "God mode applied to the local player: +9999 Buffer, +9999 Regen (no Strength), free energy (kept at 5).");
+    }
+
+    private static ActionExecutionResult ExecuteTutorials(SemanticActionRequest request)
+    {
+        if (request.Values is null || !request.Values.TryGetValue("enabled", out var value) || !bool.TryParse(value, out var enabled))
+        {
+            return ActionExecutionResult.Failure(request.Kind, ActionFailureCode.InvalidAction, "tutorials requires enabled=true or false.");
+        }
+
+        var before = SaveManager.Instance.Progress.EnableFtues;
+        SaveManager.Instance.SetFtuesEnabled(enabled);
+        return ActionExecutionResult.Success(request.RequestId, request.Kind, "Updated tutorials for the active profile.",
+            values: new Dictionary<string, string> { ["before"] = before.ToString(), ["after"] = SaveManager.Instance.Progress.EnableFtues.ToString() });
     }
 
     // Dev-only host-side heal (`sts2 dev heal`): a live-rescue devtool, NOT a legal

@@ -447,3 +447,41 @@ fn map_node_args_use_canonical_ids_for_state_points_and_node_ids() {
         assert_eq!(actions[0]["sourcePath"], "run.map.points[0]");
     }
 }
+
+#[test]
+fn blocking_modal_only_offers_its_buttons() {
+    let state = json!({
+        "rootScene": "screens/character_select_screen",
+        "characterSelect": {
+            "lobby": {"players": [{"id": "p1", "isReady": false}]},
+            "characterButtons": [{"id": "b1", "characterId": "the-silent", "isLocked": false}],
+            "view": {"playerId": "p1", "selectedCharacterButtonId": "b1"}
+        },
+        "blockingModal": {
+            "id": "modal:AcceptTutorialsFtue", "kind": "ftue", "title": "Enable tutorials?",
+            "buttons": [{"id": "modal-button:0", "label": "Yes"}, {"id": "modal-button:1", "label": "No"}]
+        }
+    });
+    let mut unblocked = state.clone();
+    unblocked["blockingModal"] = Value::Null;
+    let underlying = resolve_state_actions_json(
+        &unblocked,
+        &PresentationModels::default(),
+        PerspectiveRequest::default(),
+    );
+    assert!(!underlying["actions"].as_array().unwrap().is_empty());
+
+    let result = resolve_state_actions_json(
+        &state,
+        &PresentationModels::default(),
+        PerspectiveRequest::default(),
+    );
+    let actions = result["actions"].as_array().unwrap();
+    assert_eq!(actions.len(), 2);
+    assert!(actions.iter().all(|a| a["kind"] == "dismiss-modal"));
+    assert_eq!(
+        actions[1]["args"],
+        json!({"modalId": "modal:AcceptTutorialsFtue", "buttonId": "modal-button:1"})
+    );
+    assert_eq!(result["diagnostics"][0]["code"], "blocking_modal_present");
+}

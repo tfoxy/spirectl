@@ -25,6 +25,13 @@ public sealed partial class Sts2ActionHandler
     /// </summary>
     private static readonly EmbeddedRoute[] EmbeddedRoutes =
     [
+        RouteFor(
+            "dismiss-modal", SemanticActionKind.DismissModal,
+            "Press a blocking modal’s own button.", "sts2 act dismiss-modal",
+            provisional: false, ActionImplementationStatus.Implemented,
+            static (handler, request) => handler.ExecuteDismissModal(request),
+            RouteParam("modalId", false, "Current blocking modal id."),
+            RouteParam("buttonId", false, "Required when the modal offers multiple buttons.")),
         // select-map-node is worded exactly as the full profile's catalog words it.
         RouteFor(
             "select-map-node", SemanticActionKind.SelectMapNode,
@@ -130,6 +137,12 @@ public sealed partial class Sts2ActionHandler
     {
         try
         {
+            var blocked = Sts2BlockingModalResolver.Precheck(request.Kind, Sts2BlockingModalResolver.ResolveLive());
+            if (blocked is not null)
+            {
+                return blocked;
+            }
+
             return EmbeddedRoutesByKind.TryGetValue(request.Kind, out var route)
                 ? route.Execute(this, request)
                 : ActionExecutionResult.Failure(

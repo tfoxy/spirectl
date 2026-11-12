@@ -285,7 +285,7 @@ public sealed partial class GrpcBridgeServiceTests
         Assert.Equal("host-local-seat", hostLocalSeatOrchestration.Id);
         Assert.Equal(RemoteClientOrchestrationState.HostLocalSeat, hostLocalSeatOrchestration.State);
         var supportedActions = result.Success.SupportedActions.ToDictionary(action => action.Id);
-        Assert.Equal(53, supportedActions.Count);
+        Assert.Equal(54, supportedActions.Count);
         Assert.Equal(ActionStatus.Implemented, supportedActions["view-draw-pile"].Status);
         Assert.Equal(ActionStatus.Implemented, supportedActions["view-discard-pile"].Status);
         Assert.Equal(ActionStatus.Implemented, supportedActions["view-exhaust-pile"].Status);
@@ -344,7 +344,7 @@ public sealed partial class GrpcBridgeServiceTests
 
         Assert.NotNull(result.Success);
         var supportedActions = result.Success.SupportedActions.ToDictionary(action => action.Id);
-        Assert.Equal(54, supportedActions.Count);
+        Assert.Equal(55, supportedActions.Count);
         Assert.True(supportedActions.ContainsKey("mouse-click"));
         Assert.True(supportedActions.ContainsKey("view-draw-pile"));
         Assert.True(supportedActions.ContainsKey("ready"));

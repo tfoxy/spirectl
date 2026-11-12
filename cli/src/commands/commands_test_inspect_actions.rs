@@ -692,6 +692,14 @@ pub(crate) fn execute_action_json(
             )),
             ..Default::default()
         },
+        ActSubcommand::DismissModal(args) => bridge::proto::ActionRequest {
+            request_id: "cli-dismiss-modal".to_string(),
+            perspective,
+            action: Some(bridge::proto::action_request::Action::DismissModal(
+                dismiss_modal_action(args),
+            )),
+            ..Default::default()
+        },
         ActSubcommand::CloseInspectRelic(args) => bridge::proto::ActionRequest {
             request_id: "cli-close-inspect-relic".to_string(),
             perspective,
@@ -738,6 +746,10 @@ pub(crate) fn execute_action_json(
     };
 
     let response = client.execute_action(request).map_err(AppError::bridge)?;
+    Ok(action_response_json(response))
+}
+
+fn action_response_json(response: bridge::proto::ActionResponse) -> Value {
     let mut payload = json!({
         "requestId": response.request_id,
         "actionInstanceId": response.action_instance_id,
@@ -746,6 +758,10 @@ pub(crate) fn execute_action_json(
         "provisional": response.provisional,
         "message": response.message
     });
+    if let Some(modal) = response.dismiss_modal {
+        payload["closed"] = json!(modal.closed);
+        payload["waitedMs"] = json!(modal.waited_ms);
+    }
     if let Some(click) = response.mouse_click {
         payload["coordinateSpace"] = json!(match bridge::proto::MouseCoordinateSpace::try_from(
             click.coordinate_space
@@ -755,7 +771,7 @@ pub(crate) fn execute_action_json(
         });
         payload["windowPoint"] = json!({ "x": click.window_x, "y": click.window_y });
     }
-    Ok(payload)
+    payload
 }
 
 pub(crate) fn mouse_click_action(args: MouseClickArgs) -> bridge::proto::MouseClickAction {
@@ -837,6 +853,7 @@ pub(crate) fn action_player_id(command: &ActSubcommand) -> Option<&str> {
         ActSubcommand::ViewExhaustPile(args) => args.player_id.as_deref(),
         ActSubcommand::InspectRelic(args) => args.player_id.as_deref(),
         ActSubcommand::CloseInspectRelic(args) => args.player_id.as_deref(),
+        ActSubcommand::DismissModal(_) => None,
         ActSubcommand::SelectHandCard(args) => args.player_id.as_deref(),
         ActSubcommand::DeselectHandCard(args) => args.player_id.as_deref(),
         ActSubcommand::ConfirmHandSelection(args) => args.player_id.as_deref(),
@@ -993,5 +1010,49 @@ pub(crate) fn proto_mouse_button(button: MouseButtonArg) -> bridge::proto::RawMo
         MouseButtonArg::Left => bridge::proto::RawMouseButton::Left,
         MouseButtonArg::Right => bridge::proto::RawMouseButton::Right,
         MouseButtonArg::Middle => bridge::proto::RawMouseButton::Middle,
+    }
+}
+
+pub(crate) fn dismiss_modal_action(
+    args: crate::DismissModalActionArgs,
+) -> bridge::proto::DismissModalAction {
+    bridge::proto::DismissModalAction {
+        modal_id: args.modal.unwrap_or_default(),
+        button_id: args.button.unwrap_or_default(),
+    }
+}
+
+#[cfg(test)]
+mod modal_tests {
+    use super::*;
+
+    #[test]
+    fn dismiss_modal_response_preserves_closure_and_wait_duration() {
+        for closed in [true, false] {
+            let payload = action_response_json(bridge::proto::ActionResponse {
+                dismiss_modal: Some(bridge::proto::DismissModalResult {
+                    closed,
+                    waited_ms: 3000,
+                }),
+                ..Default::default()
+            });
+            assert_eq!(payload["closed"], closed);
+            assert_eq!(payload["waitedMs"], 3000);
+        }
+    }
+
+    #[test]
+    fn dismiss_modal_request_mapping_preserves_ids_and_defaults() {
+        let request = dismiss_modal_action(crate::DismissModalActionArgs {
+            modal: Some("modal:TestFtue".into()),
+            button: Some("modal-button:1".into()),
+        });
+        assert_eq!(request.modal_id, "modal:TestFtue");
+        assert_eq!(request.button_id, "modal-button:1");
+        let defaults = dismiss_modal_action(crate::DismissModalActionArgs {
+            modal: None,
+            button: None,
+        });
+        assert!(defaults.modal_id.is_empty() && defaults.button_id.is_empty());
     }
 }

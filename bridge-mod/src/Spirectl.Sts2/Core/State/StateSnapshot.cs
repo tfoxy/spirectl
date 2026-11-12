@@ -13,7 +13,8 @@ public sealed record StateSnapshot(
     string? Language,
     string RootScene,
     StateCharacterSelectSnapshot? CharacterSelect,
-    StateRunSnapshot? Run)
+    StateRunSnapshot? Run,
+    StateBlockingModalSnapshot? BlockingModal = null)
 {
     public const string CurrentSchemaVersion = "spirectl.state/v0";
 }

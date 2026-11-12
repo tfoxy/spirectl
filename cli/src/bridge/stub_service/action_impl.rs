@@ -1235,6 +1235,26 @@ impl StubBridgeService {
                     ))
                 }
             }
+            Some(proto::action_request::Action::DismissModal(_)) => Err(error(
+                proto::BridgeErrorCode::InvalidAction,
+                "No blocking modal is visible in this mock scenario.",
+                &[],
+            )),
+            Some(proto::action_request::Action::Tutorials(tutorials)) => {
+                let mut state = self.debug_state.lock().expect("stub debug state lock");
+                let before = !state.tutorials_disabled;
+                state.tutorials_disabled = !tutorials.enabled;
+                let mut response = action_response(
+                    &request.request_id,
+                    proto::ActionKind::Tutorials,
+                    "Updated mock tutorial setting.",
+                );
+                response.tutorials = Some(proto::TutorialsResult {
+                    before,
+                    after: tutorials.enabled,
+                });
+                Ok(response)
+            }
             Some(proto::action_request::Action::CloseInspectRelic(_)) => Ok(action_response(
                 &request.request_id,
                 proto::ActionKind::CloseInspectRelic,

@@ -226,7 +226,9 @@ public sealed partial class GrpcBridgeService
                     or ActionFailureCode.NotEnabled
                     or ActionFailureCode.StaleId
                     or ActionFailureCode.UnsupportedPerspective
-                    or ActionFailureCode.DangerousModeRequired => BridgeErrorCode.InvalidAction,
+                    or ActionFailureCode.DangerousModeRequired
+                    or ActionFailureCode.BlockedByModal
+                    or ActionFailureCode.InvalidArgument => BridgeErrorCode.InvalidAction,
                 _ => BridgeErrorCode.RuntimeFailure,
             },
             Message = error.Message,
@@ -234,6 +236,7 @@ public sealed partial class GrpcBridgeService
 
         protoError.Details.Add(error.Details.Select(detail => new ErrorDetail
         {
+            Blocker = detail.Blocker is null ? null : new ModalBlocker { Id = detail.Blocker.Id, Kind = detail.Blocker.Kind, Title = detail.Blocker.Title ?? string.Empty },
             Field = detail.Field,
             Value = detail.Value,
             Note = detail.Note,
@@ -394,6 +397,7 @@ public sealed partial class GrpcBridgeService
 
         protoError.Details.Add(error.Details.Select(detail => new ErrorDetail
         {
+            Blocker = detail.Blocker is null ? null : new ModalBlocker { Id = detail.Blocker.Id, Kind = detail.Blocker.Kind, Title = detail.Blocker.Title ?? string.Empty },
             Field = detail.Field,
             Value = detail.Value,
             Note = detail.Note,
@@ -1601,6 +1605,8 @@ public sealed partial class GrpcBridgeService
             ActionFailureCode.StaleId => ErrorActionFailureReasonCode.StaleId,
             ActionFailureCode.UnsupportedPerspective => ErrorActionFailureReasonCode.UnsupportedPerspective,
             ActionFailureCode.DangerousModeRequired => ErrorActionFailureReasonCode.DangerousModeRequired,
+            ActionFailureCode.BlockedByModal => ErrorActionFailureReasonCode.BlockedByModal,
+            ActionFailureCode.InvalidArgument => ErrorActionFailureReasonCode.InvalidArgument,
             _ => ErrorActionFailureReasonCode.Unspecified,
         };
     }
@@ -1695,6 +1701,8 @@ public sealed partial class GrpcBridgeService
             SemanticActionKind.ViewDiscardPile => Spirectl.Proto.V0.ActionKind.ViewDiscardPile,
             SemanticActionKind.ViewExhaustPile => Spirectl.Proto.V0.ActionKind.ViewExhaustPile,
             SemanticActionKind.InspectRelic => Spirectl.Proto.V0.ActionKind.InspectRelic,
+            SemanticActionKind.DismissModal => Spirectl.Proto.V0.ActionKind.DismissModal,
+            SemanticActionKind.Tutorials => Spirectl.Proto.V0.ActionKind.Tutorials,
             SemanticActionKind.CloseInspectRelic => Spirectl.Proto.V0.ActionKind.CloseInspectRelic,
             SemanticActionKind.SelectHandCard => Spirectl.Proto.V0.ActionKind.SelectHandCard,
             SemanticActionKind.DeselectHandCard => Spirectl.Proto.V0.ActionKind.DeselectHandCard,

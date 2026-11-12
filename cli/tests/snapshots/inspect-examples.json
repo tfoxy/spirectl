@@ -281,6 +281,21 @@
       "summary": "Open the relic-details overlay for a relic-bar relic."
     },
     {
+      "command": "act dismiss-modal",
+      "example": "sts2 act dismiss-modal",
+      "summary": "Press a blocking modal’s own button; specify --button for multiple buttons."
+    },
+    {
+      "command": "act dismiss-modal",
+      "example": "sts2 act dismiss-modal --modal modal:CombatFtue --button modal-button:0",
+      "summary": "Press a blocking modal’s own button; specify --button for multiple buttons."
+    },
+    {
+      "command": "dev tutorials",
+      "example": "sts2 dev tutorials --disable",
+      "summary": "Enable or disable tutorials, persisting the active profile through the game."
+    },
+    {
       "command": "act close-inspect-relic",
       "example": "sts2 act close-inspect-relic",
       "summary": "Close the open relic-details overlay."

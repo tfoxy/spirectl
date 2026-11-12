@@ -9,7 +9,7 @@ The CLI now uses the runtime protobuf contract for bridge-backed commands, defau
 - `--json`: emit structured JSON output
 - `--progress`: stream newline-delimited JSON progress lines to **stderr** while long lifecycle commands run (`{"progress":"game deploy","phase":"bridge.publish","elapsedMs":1234}`). Off by default. stdout keeps exactly the structured result, so `--json ... | jq` is unaffected. Phases are emitted for the deploy build command, the bridge build/publish/stage/copy, the attach poll, post-attach stability samples, the quiescence wait, and the process-stop wait; with `--progress` the bridge build's own `dotnet` output also streams through to stderr as it arrives instead of appearing only on failure.
 - `--config <path>`: load a YAML config file
-- `--mode <normal|dangerous>`: select CLI mode metadata and gate dangerous raw-input commands
+- `--mode <normal|dangerous>`: select CLI mode metadata; raw-input commands require `dangerous`
 - `--instance <name>`: target a named game instance with its own bridge socket and Godot user-dir (also settable via `SPIRECTL_INSTANCE`, otherwise `instances.default`); use `auto` to allocate a random name. See [Multi-Instance](#multi-instance).
 - `--isolated-build`: with an active instance, give the instance its own game/mods mirror so it can run a different bridge build alongside others (Unix only). This can force isolated mode on when `instances.isolatedBuild` is false.
 
@@ -2116,3 +2116,34 @@ In practice:
 ## Helper Tool Resolution
 
 `sts2 code ...` resolves the helper tool project by searching upward from the current working directory. For the default helper path, if no current-directory ancestor contains the helper project, the CLI falls back to the `spirectl` source repo that built the binary. A `tools.dotnetToolsPath` value of `dotnet-tools/src/Spirectl.DotnetTools/Spirectl.DotnetTools.csproj` is treated as that same default helper project whether the value comes from built-in defaults or from checked-in config such as `sts2.config.yaml`. The default helper project is built automatically when its DLL is missing or older than helper source/project inputs; otherwise `code` commands invoke the fresh built DLL directly. Custom helper `.csproj` paths intentionally keep the diagnostic `dotnet run` launch path. `sts2 --json toolchain info` reports the selected launch kind, resolved invocation path, availability, and build-needed state so slow helper fallback or rebuild decisions are visible. If the default resolution is not sufficient for your environment, set `tools.dotnetToolsPath` explicitly.
+
+## Blocking modals and tutorials
+
+`state` includes top-level `blockingModal` (null when none), including on menus and lobbies.
+It contains `id`, `kind` (`ftue` or `popup`), `typeName`, visible `title` / `body`, and
+`buttons: [{id, label}]`. `state actions` offers only `dismiss-modal` while it is present,
+one entry per button with `args: {modalId, buttonId}`, and a `blocking_modal_present`
+diagnostic naming the blocker. Other semantic actions fail with
+`blocked_by_modal` and a structured `blocker: {id, kind, title}` in the error details.
+
+```bash
+sts2 --json state actions
+sts2 act dismiss-modal
+sts2 act dismiss-modal --modal modal:CombatFtue --button modal-button:0
+sts2 --json dev tutorials --disable
+sts2 --json dev tutorials --enable
+```
+
+Dismissal uses the game button's public click operation (or the native Godot button's
+pressed signal) and waits up to 3000 ms for the modal to disappear.
+The result includes `closed: true|false` and `waitedMs`. If the game is still closing it,
+the press succeeds with `closed: false`; callers may poll `state` until `blockingModal`
+is null before sending another semantic action. Calls made synchronously on the game
+thread return immediately with `closed: false` to let the game continue processing.
+Omit `--button` only for a single-button modal;
+multiple buttons require a choice and errors list their ids. Stale modal/button ids fail
+with `stale_id`. Raw input (`mouse-click`, `hover-element`, `key-input`, `controller-input`) and host-session actions
+(`disconnect-client`, `set-client-name`) remain available.
+
+`dev tutorials` writes the active profile through the game's tutorial setting API and
+reports boolean `before` / `after` values. It does not dismiss an already visible popup.

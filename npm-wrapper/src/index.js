@@ -75,6 +75,8 @@ function normalizeAction(action) {
     bundleId: preferred.bundleId ?? preferred.bundle ?? args.bundleId,
     shopItemId: preferred.shopItemId ?? preferred.shopItem ?? args.shopItemId,
     relicId: preferred.relicId ?? preferred.relic ?? args.relicId,
+    modalId: preferred.modalId ?? preferred.modal ?? args.modalId,
+    buttonId: preferred.buttonId ?? preferred.button ?? args.buttonId,
     restOptionId: preferred.restOptionId ?? preferred.restOption ?? args.restOptionId,
     eventOptionId: preferred.eventOptionId ?? preferred.eventOption ?? args.eventOptionId,
     controlId: preferred.controlId ?? preferred.control ?? args.controlId,
@@ -97,6 +99,8 @@ function normalizedActionToolArgs(action) {
     bundleId: action.bundleId,
     shopItemId: action.shopItemId,
     relicId: action.relicId,
+    modalId: action.modalId,
+    buttonId: action.buttonId,
     restOptionId: action.restOptionId,
     eventOptionId: action.eventOptionId,
     controlId: action.controlId,
@@ -1204,6 +1208,12 @@ export function createSts2Client(options = {}) {
           );
           const argv = ["act", "use-crystal-sphere-control", "--control", control];
           pushActionPlayerArgs(argv, normalized);
+          return run(argv);
+        }
+        case "dismiss-modal": {
+          const argv = ["act", "dismiss-modal"];
+          pushFlag(argv, "--modal", normalized.modalId);
+          pushFlag(argv, "--button", normalized.buttonId);
           return run(argv);
         }
         case "play-card": {

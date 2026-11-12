@@ -175,7 +175,7 @@ public sealed partial class Sts2FixtureLoader
                         return RuntimeFailure(
                             request,
                             "screen",
-                            "The live start-run lobby screen did not remain stable after submenu push.");
+                            ModalFailureMessage("The live start-run lobby screen did not remain stable after submenu push."));
                     }
 
                     ApplyFixtureLobbyCharacterLocks(screen, recipe.LockedCharacterIds);
@@ -188,7 +188,7 @@ public sealed partial class Sts2FixtureLoader
                         return RuntimeFailure(
                             request,
                             "screen",
-                            "The live start-run lobby screen did not remain stable after fixture UI customization.");
+                            ModalFailureMessage("The live start-run lobby screen did not remain stable after fixture UI customization."));
                     }
 
                     _retainLobbyHost(netService);
@@ -377,7 +377,7 @@ public sealed partial class Sts2FixtureLoader
                         return RuntimeFailure(
                             request,
                             "screen",
-                            "The live load-run lobby screen did not remain stable after submenu push.");
+                            ModalFailureMessage("The live load-run lobby screen did not remain stable after submenu push."));
                     }
 
                     FocusLocalCharacterButton(screen, recipe.LocalPlayer.Character.Id.Entry);

@@ -29,6 +29,11 @@ pub(crate) fn state_json(response: &bridge::proto::StateResponse) -> Value {
         "schemaVersion": response.schema_version,
         "language": nullable_string_json(&response.language),
         "rootScene": response.root_scene,
+        "blockingModal": response.blocking_modal.as_ref().map(|m| json!({
+            "id": m.id, "kind": m.kind, "typeName": m.type_name,
+            "title": nullable_string_json(&m.title), "body": nullable_string_json(&m.body),
+            "buttons": m.buttons.iter().map(|b| json!({"id": b.id, "label": b.label})).collect::<Vec<_>>(),
+        })),
         "characterSelect": response.character_select.as_ref().map(character_select_json).unwrap_or(Value::Null),
         "run": response.run.as_ref().map(run_json).unwrap_or(Value::Null),
     })
@@ -1106,7 +1111,8 @@ pub(crate) fn state_schema_json() -> Value {
         "stateSchemaVersion": "spirectl.state/v0",
         "summaryDetail": "Runtime-only state shape for presentation render consumers. It excludes immutable model data, localization text, assets, actions, layout, and computed UI-control fields.",
         "viewSemantics": "All state view objects describe attached-client local UI state. They are omitted with notices when the requested perspective is remote and the attached client cannot observe that player's UI.",
-        "topLevelFields": ["schemaVersion", "language", "rootScene", "characterSelect", "run"],
+        "topLevelFields": ["schemaVersion", "language", "rootScene", "characterSelect", "run", "blockingModal"],
+        "blockingModal": {"nullable": true, "fields": ["id", "kind", "typeName", "title", "body", "buttons"], "buttonFields": ["id", "label"]},
         "unsupportedScreens": "All screens return the envelope; characterSelect is null except the start-run character select scene, and run is null unless RunManager has an active run.",
         "actionContract": {
             "command": "sts2 --json state actions",
@@ -1138,7 +1144,8 @@ pub(crate) fn state_schema_json() -> Value {
             "schemaVersion": "spirectl.state/v0",
             "summary": "Runtime-only state shape for presentation render consumers. It excludes immutable model data, localization text, assets, actions, layout, and computed UI-control fields.",
             "viewSemantics": "All state view objects describe attached-client local UI state. They are omitted with notices when the requested perspective is remote and the attached client cannot observe that player's UI.",
-            "topLevelFields": ["schemaVersion", "language", "rootScene", "characterSelect", "run"],
+            "topLevelFields": ["schemaVersion", "language", "rootScene", "characterSelect", "run", "blockingModal"],
+            "blockingModal": {"nullable": true, "fields": ["id", "kind", "typeName", "title", "body", "buttons"], "buttonFields": ["id", "label"]},
             "unsupportedScreens": "All screens return the envelope; characterSelect is null except the start-run character select scene, and run is null unless RunManager has an active run.",
             "characterSelect": {
                 "lobby": ["netGameType", "localPlayerId", "hostPlayerId", "connectingPlayerCount", "ascension", "maxAscension", "act1", "seed", "modifierIds", "players", "maxPlayers"],
@@ -1204,10 +1211,32 @@ mod tests {
     use crate::bridge::proto;
 
     #[test]
+    fn state_json_projects_blocking_modal_on_menu_and_null_when_absent() {
+        let mut response = proto::StateResponse::default();
+        assert!(state_json(&response)["blockingModal"].is_null());
+        response.blocking_modal = Some(proto::StateBlockingModal {
+            id: "modal:TestFtue".into(),
+            kind: "ftue".into(),
+            type_name: "TestFtue".into(),
+            title: "Tutorial".into(),
+            body: "Instructions".into(),
+            buttons: vec![proto::StateModalButton {
+                id: "modal-button:0".into(),
+                label: "Got it!".into(),
+            }],
+        });
+        let state = state_json(&response);
+        assert!(state["run"].is_null());
+        assert_eq!(state["blockingModal"]["title"], "Tutorial");
+        assert_eq!(state["blockingModal"]["buttons"][0]["label"], "Got it!");
+    }
+
+    #[test]
     fn state_json_projects_generic_run_payload() {
         let response = proto::StateResponse {
             schema_version: "spirectl.state/v0".to_string(),
             language: "en".to_string(),
+            blocking_modal: None,
             root_scene: "run".to_string(),
             character_select: None,
             run: Some(proto::StateRun {
@@ -2176,6 +2205,7 @@ mod tests {
         let payload = state_json(&proto::StateResponse {
             schema_version: "spirectl.state/v0".to_string(),
             language: "en".to_string(),
+            blocking_modal: None,
             root_scene: "screens/character_select_screen".to_string(),
             character_select: Some(proto::StateCharacterSelect {
                 lobby: Some(proto::StateCharacterSelectLobby {

@@ -60,7 +60,8 @@ public sealed class Sts2StateProvider : IStateProvider
             StateProjectionValues.CurrentLanguage(),
             rootScene,
             characterSelect,
-            run);
+            run,
+            Sts2BlockingModalResolver.ResolveLive()?.State);
 
     // Internal callers retain these entrypoints while their projection helpers have a focused owner.
     internal static StateHandSelectionViewSnapshot? ResolveHandSelectionView(ICollection<StateNoticeSnapshot> notices, string? playerId)

@@ -34,6 +34,7 @@ message StateResponse {
   StateCharacterSelect character_select = 4;
   StateRun run = 5;
   string root_scene = 6;
+  StateBlockingModal blocking_modal = 7;
 }
 
 // Reactive state stream. Mirrors StateWatchRequest/StateWatchEvent but carries
@@ -1088,4 +1089,18 @@ message StateNotice {
   string source = 6;
   string stability = 7;
   string perspective = 8;
+}
+
+// Visible screen-blocking UI, including first-run tutorials, on menus or runs.
+message StateBlockingModal {
+  string id = 1;
+  string kind = 2;
+  string type_name = 3;
+  string title = 4;
+  string body = 5;
+  repeated StateModalButton buttons = 6;
+}
+message StateModalButton {
+  string id = 1;
+  string label = 2;
 }

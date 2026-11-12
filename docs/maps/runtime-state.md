@@ -160,3 +160,9 @@ Use `ReadTail` for a bounded recent excerpt and run file reads away from the gam
 
 Focused coverage: `GodotLogReaderTests`, `EmbeddableMultiplayerConnectionHubTests`, and
 `Sts2MultiplayerConnectionHookTargetTests` (the latter requires the live-host test leg for each game lane).
+
+## Blocking modals
+
+Top-level `blockingModal` exposes visible blocking tutorial/pop-up text and button ids on menus, lobbies, and runs. It is null when absent; the persistent modal backstop alone never counts. `state actions` suppresses underlying actions and reports `blocking_modal_present` while a modal is visible.
+
+The CLI projection lives in `cli/src/state.rs`; `cli/src/state_actions.rs` emits one `dismiss-modal` entry per button with `args: {modalId, buttonId}`. The modal remains top-level even when both `characterSelect` and `run` are null.

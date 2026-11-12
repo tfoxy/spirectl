@@ -607,6 +607,8 @@ pub enum ActSubcommand {
     InspectRelic(InspectRelicActionArgs),
     #[command(name = "close-inspect-relic")]
     CloseInspectRelic(PlayerScopedActionArgs),
+    /// Press a blocking modal’s own button.
+    DismissModal(DismissModalActionArgs),
     #[command(name = "select-hand-card")]
     SelectHandCard(CardActionArgs),
     #[command(name = "deselect-hand-card")]
@@ -799,6 +801,14 @@ pub struct TakeRelicActionArgs {
 }
 
 #[derive(Debug, Clone, Args)]
+pub struct DismissModalActionArgs {
+    #[arg(long)]
+    pub modal: Option<String>,
+    #[arg(long)]
+    pub button: Option<String>,
+}
+
+#[derive(Args, Debug, Clone)]
 pub struct InspectRelicActionArgs {
     #[arg(long = "relic")]
     pub relic: String,
@@ -879,6 +889,8 @@ pub enum DevSubcommand {
     LogHealth(LogHealthArgs),
     Console(ConsoleArgs),
     Heal(DevHealArgs),
+    /// Persist tutorial settings for the active profile through the game.
+    Tutorials(DevTutorialsArgs),
     Diagnostics(DiagnosticsArgs),
     Assert(AssertArgs),
     Http(DevHttpArgs),
@@ -928,6 +940,15 @@ pub struct VisualPreflightArgs {
 }
 
 #[derive(Debug, Clone, Args)]
+#[command(about = "Enable or disable tutorials, writing the active profile through the game.")]
+pub struct DevTutorialsArgs {
+    #[arg(long, conflicts_with = "disable", required_unless_present = "disable")]
+    pub enable: bool,
+    #[arg(long, conflicts_with = "enable", required_unless_present = "enable")]
+    pub disable: bool,
+}
+
+#[derive(Args, Debug, Clone)]
 #[command(about = "Instantly heal a creature on the host (devtool, not a legal player action).")]
 pub struct DevHealArgs {
     #[arg(

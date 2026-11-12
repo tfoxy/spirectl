@@ -85,3 +85,9 @@ See also: [capabilities](../capabilities.md), [known limitations](../known-gaps.
 - CLI parsing/help/examples and AI tool metadata in `cli/src/lib.rs`
 - Wrapper and MCP callers in `npm-wrapper/src/index.js`, `npm-wrapper/src/index.d.ts`, and `npm-wrapper/src/mcp-tool-executor.js`
 - Tests in `cli/tests/dev_workflows.rs`, `cli/tests/cli_snapshots.rs`, `bridge-mod/tests/Spirectl.BridgeMod.Tests/GrpcBridgeServiceTests.RuntimeSceneActionsScreenshots.cs`, `bridge-mod/tests/Spirectl.BridgeMod.Tests/EmbeddableRuntimeFacadeTests.cs`, and Node wrapper/MCP tests
+
+## Blocking modals
+
+`act dismiss-modal [--modal <id>] [--button <id>]` presses a blocking modal’s own button. Multi-button popups require an explicit button id. Dismissal waits up to 3000 ms and reports `closed` and `waitedMs`; if still closing, poll `state` until `blockingModal` is null. Other semantic actions fail before execution with `blocked_by_modal`, structured blocker details, and dismissal guidance. Raw input (`mouse-click`, `hover-element`, `key-input`, `controller-input`) and host-session actions (`disconnect-client`, `set-client-name`) bypass this check. `dev tutorials --disable|--enable` persists the active profile’s tutorial setting through the game and reports before/after values.
+
+CLI requests are mapped in `cli/src/commands/commands_test_inspect_actions.rs` (dismissal) and `cli/src/commands/commands_dev_game_health.rs` (tutorial settings). `dev tutorials` runs in normal mode and does not dismiss an already visible modal.

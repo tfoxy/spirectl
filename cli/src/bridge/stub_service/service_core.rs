@@ -13,6 +13,7 @@ struct StubDebugState {
     /// Samples served by `get_runtime_transition_status`. The first one reports
     /// a running transition so quiescence waits have something to settle from.
     transition_samples: u64,
+    tutorials_disabled: bool,
 }
 
 impl StubBridgeService {
@@ -58,6 +59,23 @@ impl StubBridgeService {
 
     pub fn handshake(&self, request: proto::HandshakeRequest) -> proto::HandshakeResult {
         let mut supported_actions = vec![
+            action_descriptor(
+                "dismiss-modal",
+                proto::ActionKind::DismissModal,
+                "Press a blocking modal’s own button.",
+                "sts2 act dismiss-modal",
+                false,
+                proto::ActionStatus::Implemented,
+                vec![
+                    action_parameter("modalId", "string", false, "Current blocking modal id."),
+                    action_parameter(
+                        "buttonId",
+                        "string",
+                        false,
+                        "Required when multiple buttons are visible.",
+                    ),
+                ],
+            ),
             action_descriptor(
                 "play-card",
                 proto::ActionKind::PlayCard,
@@ -350,6 +368,7 @@ impl StubBridgeService {
                 schema_version: "spirectl.state/v0".to_string(),
                 language: "mock".to_string(),
                 root_scene: root_scene.to_string(),
+                blocking_modal: None,
                 character_select,
                 run,
             })),

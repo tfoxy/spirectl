@@ -44,6 +44,25 @@ public sealed partial class Sts2ActionHandler : IActionHandler, Spirectl.Sts2.Em
 
     public ActionExecutionResult Execute(SemanticActionRequest request)
     {
+        // A synchronous in-process caller already on the game thread must receive the press
+        // result immediately so that closing animations can keep processing.
+        if (request.Kind == SemanticActionKind.DismissModal
+            && !Sts2MainThreadDispatcher.DescribeStatus().IsOnCapturedThread)
+        {
+            return Sts2MainThreadDispatcher.InvokeAsync(async () =>
+            {
+                try
+                {
+                    var pressed = ExecuteOnMainThread(request);
+                    return pressed.Accepted
+                        ? await Sts2BlockingModalResolver.WaitForDismissalAsync(
+                            pressed, pressed.Values!["modalId"], Sts2BlockingModalResolver.ResolveLive, AwaitModalProcessFrameAsync)
+                        : pressed;
+                }
+                finally { _injectedInput.Complete(Input.FlushBufferedEvents); }
+            }).GetAwaiter().GetResult();
+        }
+
         return Sts2MainThreadDispatcher.Invoke(() =>
         {
             try { return ExecuteOnMainThread(request); }

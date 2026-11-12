@@ -63,6 +63,7 @@
     <Compile Include="Live/Sts2RuntimeInstrumentation.cs" />
     <Compile Include="Live/Sts2AnimationHintInstrumentation.cs" />
     <Compile Include="Live/Sts2LiveIntrospection.cs" />
+    <Compile Include="Live/Sts2BlockingModalResolver.cs" />
     <!-- Public read-only active-screen seam (current screen, is-this-it, and the game's own "may have changed"
          event): always compiled, like the introspection helper it delegates to. It is pure reflection with no
          Godot dependency, and an embedder's compile-time reference to it must not depend on which lane this
@@ -374,6 +375,7 @@
     <Compile Include="Live/Sts2ActionHandler.HandSelection.cs" />
     <Compile Include="Live/Sts2ActionHandler.Input.cs" />
     <Compile Include="Live/Sts2ActionHandler.InspectRelic.cs" />
+    <Compile Include="Live/Sts2ActionHandler.Modal.cs" />
     <Compile Include="Live/Sts2ActionHandler.Multiplayer.cs" />
     <Compile Include="Live/Sts2ActionHandler.RewardCommit.cs" />
     <Compile Include="Live/Sts2ActionHandler.RewardCommit.Full.cs" />

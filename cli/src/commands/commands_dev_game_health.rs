@@ -50,6 +50,23 @@ pub(crate) fn handle_dev(
         DevSubcommand::Console(args) => {
             render_value_success(execute_console_json(args, context)?, context.json_output)
         }
+        DevSubcommand::Tutorials(args) => {
+            let response = bridge_client(context)
+                .execute_action(bridge::proto::ActionRequest {
+                    request_id: "cli-dev-tutorials".to_string(),
+                    action: Some(bridge::proto::action_request::Action::Tutorials(
+                        bridge::proto::TutorialsAction {
+                            enabled: args.enable,
+                        },
+                    )),
+                    ..Default::default()
+                })
+                .map_err(AppError::bridge)?;
+            render_value_success(
+                json!({"before": response.tutorials.as_ref().map(|r| r.before), "after": response.tutorials.as_ref().map(|r| r.after), "message": response.message}),
+                context.json_output,
+            )
+        }
         DevSubcommand::Heal(args) => {
             render_value_success(execute_dev_heal_json(args, context)?, context.json_output)
         }

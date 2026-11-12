@@ -144,6 +144,8 @@ enum ActionKind {
   // Dev-only host-side heal (sts2 dev heal). Not a legal player action; never advertised in
   // availableActions. Appended additively — never renumber existing kinds.
   ACTION_KIND_HEAL = 57;
+  ACTION_KIND_DISMISS_MODAL = 58;
+  ACTION_KIND_TUTORIALS = 59;
 }
 
 enum ActionStatus {

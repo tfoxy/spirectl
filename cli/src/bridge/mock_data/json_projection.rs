@@ -177,6 +177,8 @@ pub(super) fn error_action_failure_reason_code_name(
         proto::ErrorActionFailureReasonCode::StaleId => "stale_id",
         proto::ErrorActionFailureReasonCode::UnsupportedPerspective => "unsupported_perspective",
         proto::ErrorActionFailureReasonCode::DangerousModeRequired => "dangerous_mode_required",
+        proto::ErrorActionFailureReasonCode::BlockedByModal => "blocked_by_modal",
+        proto::ErrorActionFailureReasonCode::InvalidArgument => "invalid_argument",
         proto::ErrorActionFailureReasonCode::Unspecified => "unspecified",
     }
 }
@@ -199,7 +201,7 @@ pub(super) fn action_argument_schema_json_from_parameter(
         "required": parameter.required,
         "summary": parameter.summary,
         "allowedValues": Vec::<String>::new(),
-        "stableId": parameter.value_type.contains("id")
+        "stableId": parameter.value_type.contains("id") || matches!(parameter.name.as_str(), "modalId" | "buttonId")
     })
 }
 
@@ -231,6 +233,8 @@ pub(super) fn action_kind_descriptor_json(action: &proto::ActionDescriptor) -> V
         "dangerous": kind == proto::ActionKind::MouseClick,
         "modes": if kind == proto::ActionKind::MouseClick {
             vec!["dangerous"]
+        } else if kind == proto::ActionKind::Tutorials {
+            vec!["dev"]
         } else {
             vec!["normal"]
         },
@@ -241,7 +245,9 @@ pub(super) fn action_kind_descriptor_json(action: &proto::ActionDescriptor) -> V
 pub(super) fn default_perspective_behavior_for_action(kind: proto::ActionKind) -> &'static str {
     match kind {
         proto::ActionKind::MouseClick => "dangerous-viewport",
-        proto::ActionKind::Choose => "local-only",
+        proto::ActionKind::Choose
+        | proto::ActionKind::DismissModal
+        | proto::ActionKind::Tutorials => "local-only",
         proto::ActionKind::Ready
         | proto::ActionKind::Unready
         | proto::ActionKind::SelectCharacter
@@ -312,8 +318,16 @@ pub(super) fn default_failure_reason_codes_for_action(
             "invalid_action",
             "runtime_failure",
         ]
+    } else if kind == proto::ActionKind::DismissModal {
+        vec![
+            "invalid_argument",
+            "stale_id",
+            "missing_hook",
+            "runtime_failure",
+        ]
     } else {
         vec![
+            "blocked_by_modal",
             "wrong_screen",
             "wrong_player",
             "not_visible",
@@ -404,6 +418,7 @@ pub(super) fn screen_types_for_action(kind: proto::ActionKind) -> Vec<&'static s
         | proto::ActionKind::DiscardPotion
         | proto::ActionKind::InspectRelic
         | proto::ActionKind::CloseInspectRelic => vec!["run"],
+        proto::ActionKind::DismissModal | proto::ActionKind::Tutorials => vec!["any"],
         proto::ActionKind::Choose => vec!["generic", "modded", "unmodeled-visible-choice"],
         proto::ActionKind::MouseClick => vec!["viewport"],
         // Dev-only host-side heal: works anywhere a run is active (in or out of combat).
