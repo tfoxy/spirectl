@@ -106,6 +106,6 @@ Each entry is marked **limitation** (may change) or **non-goal** (deliberately o
 
 - **Limitation:** the CLI integration suites that need a Unix-socket bridge stub do not run on Windows; Windows
   automated coverage is unit tests, fake SSH/SCP lifecycle tests, and a cross-target compile check
-  (see [testing](testing.md#platform-coverage)). TCP transport, state, actions, screenshots, and console
-  commands have been exercised against a real Windows game. Remote Windows named pipes have not yet
-  been exercised against a real game.
+  (see [testing](testing.md#platform-coverage)). TCP transport, state, actions, screenshots, console
+  commands, and the `sts2 game remote` install/launch/stop lifecycle have been exercised against a real
+  Windows game. Remote Windows named pipes have not yet been exercised against a real game.
