@@ -591,6 +591,71 @@ When you add a test that constructs Godot nodes or resolves game content by id, 
 `-- --blame` to see which test was running, and check the kernel log for a `segfault at 0 ip 0000000000000000` line.
 CI does not run this leg: it has no game assemblies, only the declaration-only reference SDK.
 
+### Running-bridge smoke across core fixtures
+
+The stdlib-only smoke script requires Python 3.10+ and a running bridge matching the configured
+game build. For example, bring the game up first with:
+
+```bash
+scripts/build-fixture.sh fixtures/basic-main-menu.sts2.fixture.yaml
+```
+
+Then run from the repository root:
+
+```bash
+python3 scripts/live-smoke.py --out .local/live-smoke/manual
+```
+
+This loads the five core fixtures (main menu, map, combat, lobby, and shop inventory), disables
+tutorials in the active game profile, and leaves the game on the last fixture. It does not launch,
+install, or close the game. `--sts2 PATH` defaults to `./target/debug/sts2`; `--config PATH` passes
+that config to every call. `--fixtures main-menu,combat,shop-inventory` selects a subset; full
+`basic-*` names and fixture YAML paths also work. `--timeout-s 120` bounds each command or readiness
+poll. Without `--out`, artifacts go to `.local/live-smoke/<UTC timestamp>`.
+
+Every fixture checks `state`, `state-actions`, `play-card`, `end-turn`,
+`end-turn→cancel-end-turn`, and `buy-card`, alongside fixture-load validation and transition waits.
+Combat verifies that a targeted card play consumes the card and energy and damages its target.
+The shop must advertise buy-card, buy-relic, buy-potion and remove-card with `shopItemId` arguments;
+the purchase uses a listed card ID and verifies consumed stock and the exact gold delta.
+Off-screen play-card/buy-card calls must refuse with `wrong_screen`; end-turn/cancel-end-turn
+must refuse with `invalid_action`. In combat, cancellation may also refuse with `invalid_action`
+if the turn has already committed. Refusals require exit 3 and
+`error.actionFailure.reasonCode`; any other exit or reason fails.
+
+Stdout is exactly one JSON object with this shape (arrays abbreviated):
+
+```json
+{
+  "schema": "spirectl-live-smoke/1",
+  "ok": true,
+  "gameBuild": { "status": "match" },
+  "preflight": [
+    { "check": "bridge-health", "outcome": "passed", "reasonCode": null,
+      "detail": "Running bridge and configured game build match", "evidence": "/path/to/health.json" }
+  ],
+  "fixtures": [
+    { "fixture": "basic-main-menu", "checks": [
+      { "check": "play-card", "outcome": "refused", "reasonCode": "wrong_screen",
+        "detail": "Structured action refusal (exit 3)", "evidence": "/path/to/play-card.json" }
+    ] }
+  ],
+  "summary": { "passed": 26, "refused": 16, "failed": 0 }
+}
+```
+
+`gameBuild` preserves the health command's complete compatibility result. Counts include
+preflight and fixture setup checks. Exit 0 means no failed checks; exit 1 means a fixture check
+failed; exit 2 means preflight failed (`bridge_unreachable`, `game_build_mismatch`, or tutorial
+setup failure). A failed check includes its reason, detail and evidence path; checks blocked by
+failed setup are failures too. Each call saves raw stdout as `.json`, stderr as `.stderr`, and
+arguments/exit status as `.call.json`, including every polling attempt. The output directory also
+contains `summary.json` (the stdout object) and `summary.md`. Dependency failures without a CLI
+call have `.check.json` evidence. Keep this directory ignored; it contains live game state.
+
+Run the offline fake-CLI self-test with `python3 scripts/test-live-smoke.py`; it never contacts
+the game.
+
 ## Suggested Commands
 
 ```bash
