@@ -105,5 +105,7 @@ Each entry is marked **limitation** (may change) or **non-goal** (deliberately o
 ## Platforms
 
 - **Limitation:** the CLI integration suites that need a Unix-socket bridge stub do not run on Windows; Windows
-  coverage is unit tests plus a cross-target compile check (see [testing](testing.md#platform-coverage)). The Windows
-  paths have not been exercised against a real game.
+  automated coverage is unit tests, fake SSH/SCP lifecycle tests, and a cross-target compile check
+  (see [testing](testing.md#platform-coverage)). TCP transport, state, actions, screenshots, and console
+  commands have been exercised against a real Windows game. Remote Windows named pipes have not yet
+  been exercised against a real game.

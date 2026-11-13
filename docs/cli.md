@@ -1008,6 +1008,99 @@ Artifact collection is best-effort and reporting-only:
 - scenario-level `artifacts.errors[]` records collection or write problems such as failed log capture
 - human-readable output now includes the failing step, `result.json` path, and persisted run `summary.json` path
 
+## Remote Windows host
+
+`sts2 --json game remote status --host windows-game` inspects a Windows install through an
+SSH alias using batch authentication and encoded PowerShell. Configure `remote.host` to omit
+`--host`, and `remote.gamePath` with the Windows install directory if Steam discovery cannot find it.
+`remote.sshCommand` and `remote.scpCommand` select executable paths (defaults: `ssh`, `scp`).
+`remote.stageDir` defaults to `%LOCALAPPDATA%\spirectl\stage`, resolved on Windows; file transfers
+require a staging path without spaces.
+
+Status JSON includes `host`, `gamePath`, `stageDir`, `releaseInfo`, `apiLane`, `bridge`
+(`present`, `endpointFile`, `endpoint`, `buildIdentity`), `processes` (`pid`, `executablePath`), and
+`launchTasks`. A running game is reported successfully. Errors include `remote_unreachable`,
+`remote_command_failed`, `remote_invalid_response`, and `remote_game_not_found`; transport failures
+include `exitCode` and `stderrTail` and exit nonzero. No interactive SSH prompts are allowed.
+
+```bash
+sts2 --json game remote sync-assemblies --host windows-game
+sts2 --json game remote sync-assemblies --host windows-game --refresh
+sts2 --json game remote install-bridge --host windows-game --endpoint tcp:127.0.0.1:51173
+sts2 --json game remote install-bridge --host windows-game --profile-root 'D:\Profiles\STS2'
+```
+
+`sync-assemblies` caches `release_info.json` and `sts2.dll`, `GodotSharp.dll`, `0Harmony.dll`, and
+`Steamworks.NET.dll` under `.sts2/remote/<host>/<version>-<hash>/data_sts2_windows_x86_64/`.
+The release metadata sits beside that directory. The hash is `main_assembly_hash` when present;
+otherwise it is the SHA-256 of `sts2.dll`. JSON reports `cacheDir`, `assembliesDir`, `releaseInfo`,
+`apiLane` and `cacheHit`. Complete caches avoid file transfers; `--refresh` re-fetches them.
+Partial transfers never count as a cache hit. The cache contains game assemblies and stays local.
+Archives from Windows PowerShell 5.1 are supported, including backslash entry names.
+
+`install-bridge` uses the existing bridge source builder against that cache, transfers a ZIP through
+`remote.stageDir`, and replaces `<gamePath>\mods\spirectlbridge` using a temporary sibling and
+rename, restoring the old directory if the final rename fails. Run from a source checkout to build
+against the remote game's assemblies. Source builds also support game lanes without a published
+bridge payload (for example v0.111.0): the builder selects the lane from the cached
+`release_info.json` and compiles managed IL on Linux for the Windows install. This does not require
+a Windows .NET build host. Published `--no-build` payload availability is a separate constraint.
+The default listener is `tcp:127.0.0.1:51173`; `--endpoint`
+selects another loopback TCP address or a Windows named pipe. The listener file is packaged with the
+mod; environment transport overrides are not persisted.
+
+Installation refuses a running game unless `--force` is passed. It finds `settings.save` files below
+`%APPDATA%\SlayTheSpire2` (or `--profile-root`), enables `spirectlbridge`, and places it before mods
+that bundle `Spirectl.Sts2.dll`. Settings patches and metadata are read as UTF-8, preserving
+non-ASCII settings values and profile paths. Other settings are preserved. Each changed settings file
+gets a `.spirectl-backup-*` copy; unchanged files are left alone. Build or settings changes during transfer
+produce `remote_game_changed` or `remote_settings_changed` rather than overwriting newer data.
+Missing settings files are reported as an empty `modLoadOrder.settingsFiles` list; profile seeding
+belongs to launch. Install JSON mirrors local installation, with `host`, `cacheHit`,
+`builtAgainstGame`, `buildIdentity`, `endpoint`, and per-file `modLoadOrder` reports. Other errors
+include `remote_stage_invalid`, `remote_transfer_failed`, and `remote_game_running`.
+
+```bash
+sts2 --json game remote launch --host windows-game --isolated-profile 'C:\spirectl-profile' --windowed 1280x720
+ssh -N -L 127.0.0.1:51173:127.0.0.1:51173 windows-game
+# In another terminal, use the forwarded loopback endpoint:
+sts2 --json --endpoint tcp:127.0.0.1:51173 state
+sts2 --json game remote stop --host windows-game --timeout-ms 10000
+```
+
+`launch` refuses an already running game and starts a windowed game through a temporary
+`spirectl-launch-*` scheduled task for the SSH user on the Windows desktop. That user must already
+be logged into an interactive desktop session. The task uses the computer name and username and
+is unregistered after success or failure; cleanup is retried with a separate SSH command if launch
+fails. No firewall or system settings are changed. `--wait-ms` bounds the process wait (default
+15000, maximum 300000); it does not wait for bridge readiness. `--windowed WxH` adds an explicit
+window size, and arguments after `--` are passed to the game as individual arguments.
+
+`--isolated-profile DIR` sets the game's `APPDATA` to `<DIR>\Roaming` and `LOCALAPPDATA` to
+`<DIR>\Local`. Windows profile isolation uses these variables because the game ignores
+`--user-dir` there. Settings are seeded below `Roaming\SlayTheSpire2` from the real profile at
+matching relative paths, or from minimal settings for the default and current Steam user. Existing
+isolated settings take precedence; changed files are backed up. The master mods switch and the
+bridge entry are enabled. Saves are not copied. The game still loads mods from the executable's
+`mods` directory, so install the bridge before launching. Without `--isolated-profile`, launch uses
+the real Windows profile without changing its settings.
+
+Launch JSON includes `host`, `pid`, `gamePath`, `isolatedProfile`, `task` (`name`, `deleted`), the
+installed `endpoint`, and `tunnelCommand`. A TCP endpoint produces the ready-to-run `ssh -N -L`
+command above; named pipes and missing endpoint files produce `null`. The tunnel stays in a
+separate terminal; local and remote ports must be available. Launch failures include
+`remote_game_running`, `remote_profile_invalid`, `remote_settings_changed`, and
+`remote_launch_timeout`. A failed cleanup returns an error, with `cleanupError` attached when
+launch itself also failed. A new SSH connection cannot guarantee cleanup while the host is unreachable;
+`status` reports leftovers and `stop` removes them.
+
+`stop` asks game windows to close, waits up to `--timeout-ms` (default 10000, maximum 300000),
+then terminates remaining game processes. `--force` skips the graceful phase. It verifies exit for
+up to another five seconds and always attempts to delete leftover `spirectl-launch-*` tasks.
+JSON reports `host`, `stoppedPids`, `deletedTasks`, and `forced`; remaining processes produce
+`remote_stop_timeout`. Both launch refusal and stop apply to all `SlayTheSpire2` processes on the
+host, including games started outside this CLI.
+
 ## Lifecycle And Dev Commands
 
 ```bash

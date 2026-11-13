@@ -30,6 +30,7 @@ pub mod query;
 mod recorded_fixture;
 mod reference;
 mod reference_topics;
+mod remote;
 mod scenario_checkpoint;
 mod skill;
 mod snapshot_regression;

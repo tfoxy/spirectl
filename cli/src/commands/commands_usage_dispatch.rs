@@ -101,6 +101,13 @@ pub(crate) fn canonical_usage_command(command: &Commands) -> &'static str {
             DevSubcommand::VisualPreflight(_) => "dev visual-preflight",
         },
         Commands::Game(command) => match &command.command {
+            GameSubcommand::Remote(command) => match command.command {
+                crate::GameRemoteSubcommand::Status => "game remote status",
+                crate::GameRemoteSubcommand::SyncAssemblies(_) => "game remote sync-assemblies",
+                crate::GameRemoteSubcommand::InstallBridge(_) => "game remote install-bridge",
+                crate::GameRemoteSubcommand::Launch(_) => "game remote launch",
+                crate::GameRemoteSubcommand::Stop(_) => "game remote stop",
+            },
             GameSubcommand::Detect => "game detect",
             GameSubcommand::Info => "game info",
             GameSubcommand::BridgeHealth(_) => "game bridge-health",
@@ -437,6 +444,16 @@ pub fn run_cli(mut cli: Cli) -> Result<RenderedCommand, AppError> {
 
     if let Commands::Game(crate::GameCommand {
         command: GameSubcommand::InstallBridge(args),
+    }) = &mut cli.command
+    {
+        args.endpoint = cli.endpoint.clone();
+    }
+    if let Commands::Game(crate::GameCommand {
+        command:
+            GameSubcommand::Remote(crate::GameRemoteCommand {
+                command: crate::GameRemoteSubcommand::InstallBridge(args),
+                ..
+            }),
     }) = &mut cli.command
     {
         args.endpoint = cli.endpoint.clone();

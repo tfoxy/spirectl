@@ -4,6 +4,7 @@ use super::*;
 #[serde(default, rename_all = "camelCase")]
 pub struct AppConfig {
     pub game: GameConfig,
+    pub remote: RemoteConfig,
     pub mode: ModeConfig,
     pub transport: TransportConfig,
     pub tools: ToolsConfig,
@@ -15,6 +16,28 @@ pub struct AppConfig {
     pub instances: InstancesConfig,
     pub usage_tracking: UsageTrackingConfig,
     pub visual_validation: VisualValidationConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct RemoteConfig {
+    pub host: Option<String>,
+    pub game_path: Option<String>,
+    pub stage_dir: Option<String>,
+    pub ssh_command: String,
+    pub scp_command: String,
+}
+
+impl Default for RemoteConfig {
+    fn default() -> Self {
+        Self {
+            host: None,
+            game_path: None,
+            stage_dir: None,
+            ssh_command: "ssh".into(),
+            scp_command: "scp".into(),
+        }
+    }
 }
 
 impl AppConfig {

@@ -75,3 +75,11 @@ project:
 visualValidation:
   presetCatalogs:
     - /path/to/project/custom.sts2.viewport-presets.yaml
+
+# Windows install reached via an SSH alias; independent of the local game block.
+# remote:
+#   host: windows-game
+#   gamePath: 'C:\Games\Slay the Spire 2' # Omit for Steam discovery.
+#   stageDir: 'C:\spirectl-stage' # Default: %LOCALAPPDATA%\spirectl\stage; no spaces.
+#   sshCommand: ssh
+#   scpCommand: scp

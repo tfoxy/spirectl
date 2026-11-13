@@ -461,6 +461,9 @@ pub(crate) fn handle_game(
     context: AppContext<'_>,
 ) -> Result<RenderedCommand, AppError> {
     match command.command {
+        GameSubcommand::Remote(args) => {
+            render_value_success(crate::remote::execute(args, context)?, context.json_output)
+        }
         GameSubcommand::Detect => {
             let detection = detect_game_path(context.config);
             let live_bridge = detect_report(

@@ -866,6 +866,31 @@
       "summary": "Set transient runtime visibility for one live Godot CanvasItem scene node by normalized /root path, with optional post-mutation stability verification."
     },
     {
+      "command": "game remote sync-assemblies",
+      "example": "sts2 --json game remote sync-assemblies --host windows-game",
+      "summary": "Cache the Windows install's release metadata and required source-build assemblies over SSH; --refresh bypasses a complete cache."
+    },
+    {
+      "command": "game remote install-bridge",
+      "example": "sts2 --json game remote install-bridge --host windows-game --endpoint tcp:127.0.0.1:51173",
+      "summary": "Build against cached Windows assemblies, transfer and replace the bridge, then back up and enable it in remote saved settings; refuse a running game unless --force."
+    },
+    {
+      "command": "game remote launch",
+      "example": "sts2 --json game remote launch --host windows-game --isolated-profile 'C:\\spirectl-profile' --windowed 1280x720 --wait-ms 15000",
+      "summary": "Launch a windowed Windows game through an interactive scheduled task, optionally isolate APPDATA and LOCALAPPDATA with enabled mod settings; always remove the task and report a TCP tunnel command."
+    },
+    {
+      "command": "game remote stop",
+      "example": "sts2 --json game remote stop --host windows-game --timeout-ms 10000",
+      "summary": "Ask remote game windows to close, terminate after a bounded grace period (or immediately with --force), verify exit and remove leftover launch tasks."
+    },
+    {
+      "command": "game remote status",
+      "example": "sts2 --json game remote status --host windows-game",
+      "summary": "Inspect a Windows STS2 install, bridge identity, running processes and leftover launch tasks over SSH."
+    },
+    {
       "command": "game detect",
       "example": "sts2 game detect",
       "summary": "Report configured or detected game path status."

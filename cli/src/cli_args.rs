@@ -191,7 +191,7 @@ pub struct Cli {
         long,
         global = true,
         value_name = "SPEC",
-        help = "Override the bridge endpoint for this invocation (tcp:<host:port>, pipe:<name>, unix:<path>; env: SPIRECTL_ENDPOINT). With game install-bridge, persist the flag beside the mod. Conflicts with --instance."
+        help = "Override the bridge endpoint for this invocation (tcp:<host:port>, pipe:<name>, unix:<path>; env: SPIRECTL_ENDPOINT). With game install-bridge or game remote install-bridge, persist the flag beside the mod. Conflicts with --instance."
     )]
     pub endpoint: Option<String>,
 
@@ -2077,6 +2077,8 @@ pub struct DevSceneSetVisibleArgs {
 
 #[derive(Debug, Clone, Subcommand)]
 pub enum GameSubcommand {
+    /// Manage a Windows STS2 install through an SSH alias.
+    Remote(GameRemoteCommand),
     Detect,
     Info,
     #[command(name = "bridge-health")]
@@ -2090,6 +2092,75 @@ pub enum GameSubcommand {
     Deploy(DeployArgs),
     Mods(GameModsCommand),
     Instances(GameInstancesCommand),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct GameRemoteCommand {
+    /// SSH alias (defaults to remote.host in config).
+    #[arg(long, global = true)]
+    pub host: Option<String>,
+    #[command(subcommand)]
+    pub command: GameRemoteSubcommand,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum GameRemoteSubcommand {
+    /// Report install identity, bridge files, running processes and leftover tasks.
+    Status,
+    /// Cache the Windows game's build metadata and four source-build assemblies locally.
+    SyncAssemblies(GameRemoteSyncArgs),
+    /// Build against the remote game, transfer the bridge and enable it in saved settings.
+    InstallBridge(GameRemoteInstallArgs),
+    /// Launch a windowed game in the logged-in Windows user's interactive session.
+    Launch(GameRemoteLaunchArgs),
+    /// Close the remote game, terminate after a bounded wait, and remove leftover launch tasks.
+    Stop(GameRemoteStopArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct GameRemoteLaunchArgs {
+    /// Isolate APPDATA and LOCALAPPDATA below this remote directory; seed enabled mod settings.
+    #[arg(long, value_name = "DIR")]
+    pub isolated_profile: Option<String>,
+    /// Window size, for example 1280x720 (the game always launches windowed).
+    #[arg(long, value_name = "WxH")]
+    pub windowed: Option<String>,
+    /// Maximum wait for the game process, in milliseconds (not bridge readiness).
+    #[arg(long, default_value_t = 15000, value_parser = clap::value_parser!(u64).range(1..=300000))]
+    pub wait_ms: u64,
+    /// Extra game arguments after --.
+    #[arg(last = true)]
+    pub game_args: Vec<String>,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct GameRemoteStopArgs {
+    /// Terminate immediately instead of first asking the game window to close.
+    #[arg(long)]
+    pub force: bool,
+    /// Grace period for closing the window before terminating, in milliseconds.
+    #[arg(long, default_value_t = 10000, value_parser = clap::value_parser!(u64).range(0..=300000))]
+    pub timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct GameRemoteSyncArgs {
+    /// Re-fetch even when this game's assembly cache is complete.
+    #[arg(long)]
+    pub refresh: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct GameRemoteInstallArgs {
+    /// Explicit global --endpoint; environment transport overrides are not persisted.
+    #[arg(skip)]
+    pub endpoint: Option<String>,
+    /// Remote STS2 user-data root (default: %APPDATA%\SlayTheSpire2).
+    #[arg(long, value_name = "DIR")]
+    pub profile_root: Option<String>,
+    /// Permit replacing bridge files and settings while the game is running.
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Debug, Clone, Args)]

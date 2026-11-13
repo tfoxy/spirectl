@@ -919,6 +919,51 @@
     },
     {
       "examples": [
+        "sts2 --json game remote sync-assemblies --host windows-game"
+      ],
+      "name": "game remote sync-assemblies",
+      "readOnly": false,
+      "status": "implemented",
+      "summary": "Cache the Windows install's release metadata and required source-build assemblies over SSH; --refresh bypasses a complete cache."
+    },
+    {
+      "examples": [
+        "sts2 --json game remote install-bridge --host windows-game --endpoint tcp:127.0.0.1:51173"
+      ],
+      "name": "game remote install-bridge",
+      "readOnly": false,
+      "status": "implemented",
+      "summary": "Build against cached Windows assemblies, transfer and replace the bridge, then back up and enable it in remote saved settings; refuse a running game unless --force."
+    },
+    {
+      "examples": [
+        "sts2 --json game remote launch --host windows-game --isolated-profile 'C:\\spirectl-profile' --windowed 1280x720 --wait-ms 15000"
+      ],
+      "name": "game remote launch",
+      "readOnly": false,
+      "status": "implemented",
+      "summary": "Launch a windowed Windows game through an interactive scheduled task, optionally isolate APPDATA and LOCALAPPDATA with enabled mod settings; always remove the task and report a TCP tunnel command."
+    },
+    {
+      "examples": [
+        "sts2 --json game remote stop --host windows-game --timeout-ms 10000"
+      ],
+      "name": "game remote stop",
+      "readOnly": false,
+      "status": "implemented",
+      "summary": "Ask remote game windows to close, terminate after a bounded grace period (or immediately with --force), verify exit and remove leftover launch tasks."
+    },
+    {
+      "examples": [
+        "sts2 --json game remote status --host windows-game"
+      ],
+      "name": "game remote status",
+      "readOnly": true,
+      "status": "implemented",
+      "summary": "Inspect a Windows STS2 install, bridge identity, running processes and leftover launch tasks over SSH."
+    },
+    {
+      "examples": [
         "sts2 game detect",
         "sts2 --json game detect"
       ],

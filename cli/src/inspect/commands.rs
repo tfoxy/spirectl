@@ -832,6 +832,45 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
         ],
     },
     CommandInfo {
+        name: "game remote sync-assemblies",
+        summary: "Cache the Windows install's release metadata and required source-build assemblies over SSH; --refresh bypasses a complete cache.",
+        status: "implemented",
+        read_only: false,
+        examples: &["sts2 --json game remote sync-assemblies --host windows-game"],
+    },
+    CommandInfo {
+        name: "game remote install-bridge",
+        summary: "Build against cached Windows assemblies, transfer and replace the bridge, then back up and enable it in remote saved settings; refuse a running game unless --force.",
+        status: "implemented",
+        read_only: false,
+        examples: &[
+            "sts2 --json game remote install-bridge --host windows-game --endpoint tcp:127.0.0.1:51173",
+        ],
+    },
+    CommandInfo {
+        name: "game remote launch",
+        summary: "Launch a windowed Windows game through an interactive scheduled task, optionally isolate APPDATA and LOCALAPPDATA with enabled mod settings; always remove the task and report a TCP tunnel command.",
+        status: "implemented",
+        read_only: false,
+        examples: &[
+            "sts2 --json game remote launch --host windows-game --isolated-profile 'C:\\spirectl-profile' --windowed 1280x720 --wait-ms 15000",
+        ],
+    },
+    CommandInfo {
+        name: "game remote stop",
+        summary: "Ask remote game windows to close, terminate after a bounded grace period (or immediately with --force), verify exit and remove leftover launch tasks.",
+        status: "implemented",
+        read_only: false,
+        examples: &["sts2 --json game remote stop --host windows-game --timeout-ms 10000"],
+    },
+    CommandInfo {
+        name: "game remote status",
+        summary: "Inspect a Windows STS2 install, bridge identity, running processes and leftover launch tasks over SSH.",
+        status: "implemented",
+        read_only: true,
+        examples: &["sts2 --json game remote status --host windows-game"],
+    },
+    CommandInfo {
         name: "game detect",
         summary: "Report configured or detected game path status.",
         status: "implemented",
