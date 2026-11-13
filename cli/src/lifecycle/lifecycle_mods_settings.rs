@@ -2,11 +2,13 @@ pub(crate) fn execute_game_mods_settings_json(
     args: GameModsSettingsArgs,
     context: AppContext<'_>,
 ) -> Result<Value, AppError> {
-    let settings_path = resolve_mod_settings_file(
+    let resolved = resolve_mod_settings_file(
         context.config,
         args.settings_file.as_deref(),
         "game mods settings",
+        context.instance.is_some(),
     )?;
+    let settings_path = resolved.path;
     let mut settings = read_settings_save_json(&settings_path, "game mods settings")?;
     let entries =
         read_mod_entries_from_settings(&mut settings, "game mods settings", &settings_path)?;
@@ -35,6 +37,7 @@ pub(crate) fn execute_game_mods_settings_json(
 
     Ok(json!({
         "settingsFile": settings_path.display().to_string(),
+        "seededSettings": resolved.seeded_settings,
         "mods": mods,
         "enabledIds": enabled_ids,
         "disabledIds": disabled_ids
@@ -101,29 +104,30 @@ fn empty_string_as_null(value: &str) -> Value {
     }
 }
 
+#[derive(Debug)]
+struct ResolvedModSettingsFile {
+    path: PathBuf,
+    seeded_settings: Option<Value>,
+}
+
+#[derive(Debug)]
+struct ModSettingsCandidates {
+    paths: Vec<PathBuf>,
+    seeded_settings: Option<Value>,
+}
+
 fn resolve_mod_settings_file(
     config: &AppConfig,
     override_path: Option<&Path>,
     command_name: &str,
-) -> Result<PathBuf, AppError> {
-    if let Some(path) = override_path {
-        return Ok(resolve_runtime_path(&path.display().to_string()));
-    }
-
-    let configured = config.game.mod_loadout.settings_file.trim();
-    if !configured.is_empty() && configured != "auto" {
-        return Ok(resolve_runtime_path(configured));
-    }
-
-    let candidates = sts2_mod_settings_save_candidates(config, command_name)?;
-    match candidates.as_slice() {
-        [path] => Ok(path.clone()),
-        [] => Err(lifecycle_error(
-            2,
-            "settings_save_not_found",
-            command_name,
-            "No STS2 settings.save file with mod_settings.mod_list was found under the local SlayTheSpire2 data directory.",
-        )),
+    is_instance: bool,
+) -> Result<ResolvedModSettingsFile, AppError> {
+    let candidates = resolve_mod_settings_files(config, override_path, command_name, is_instance)?;
+    match candidates.paths.as_slice() {
+        [path] => Ok(ResolvedModSettingsFile {
+            path: path.clone(),
+            seeded_settings: candidates.seeded_settings,
+        }),
         _ => Err(AppError {
             exit_code: 2,
             payload: json!({
@@ -131,18 +135,55 @@ fn resolve_mod_settings_file(
                     "code": "settings_save_ambiguous",
                     "command": command_name,
                     "message": "Multiple STS2 settings.save files contain mod_settings.mod_list; set game.modLoadout.settingsFile or pass --settings-file.",
-                    "candidates": candidates.iter().map(|path| path.display().to_string()).collect::<Vec<_>>()
-                }
+                    "candidates": candidates.paths.iter().map(|path| path.display().to_string()).collect::<Vec<_>>()
+                },
+                "seededSettings": candidates.seeded_settings,
             }),
         }),
     }
 }
 
+fn resolve_mod_settings_files(
+    config: &AppConfig,
+    override_path: Option<&Path>,
+    command_name: &str,
+    is_instance: bool,
+) -> Result<ModSettingsCandidates, AppError> {
+    if let Some(path) = override_path {
+        return Ok(ModSettingsCandidates {
+            paths: vec![resolve_runtime_path(&path.display().to_string())],
+            seeded_settings: None,
+        });
+    }
+
+    let configured = config.game.mod_loadout.settings_file.trim();
+    if !configured.is_empty() && configured != "auto" {
+        return Ok(ModSettingsCandidates {
+            paths: vec![resolve_runtime_path(configured)],
+            seeded_settings: None,
+        });
+    }
+
+    let candidates = sts2_mod_settings_save_candidates(config, command_name, is_instance)?;
+    if candidates.paths.is_empty() {
+        let mut error = lifecycle_error(
+            2,
+            "settings_save_not_found",
+            command_name,
+            "No STS2 settings.save file with mod_settings.mod_list was found under the local SlayTheSpire2 data directory.",
+        );
+        error.payload["seededSettings"] = json!(candidates.seeded_settings);
+        return Err(error);
+    }
+    Ok(candidates)
+}
+
 fn sts2_mod_settings_save_candidates(
     config: &AppConfig,
     command_name: &str,
-) -> Result<Vec<PathBuf>, AppError> {
-    seed_instance_user_data_if_missing(config, command_name)?;
+    is_instance: bool,
+) -> Result<ModSettingsCandidates, AppError> {
+    let seeded_settings = seed_user_data_if_missing(config, command_name, is_instance)?;
     let mut candidates = Vec::new();
     for path in settings_save_candidates_for(config) {
         if !path.is_file() {
@@ -155,7 +196,10 @@ fn sts2_mod_settings_save_candidates(
             candidates.push(path);
         }
     }
-    Ok(candidates)
+    Ok(ModSettingsCandidates {
+        paths: candidates,
+        seeded_settings,
+    })
 }
 
 fn read_settings_save_json(settings_path: &Path, command_name: &str) -> Result<Value, AppError> {
@@ -270,6 +314,43 @@ fn enumerate_installed_mod_entries(
         }
     }
 
+    Ok(mods)
+}
+
+fn enumerate_workshop_mod_entries(
+    command_name: &str,
+    game_path: &Path,
+) -> Result<BTreeMap<String, SavedModEntry>, AppError> {
+    let mut mods = BTreeMap::new();
+    let Some(content_dir) = crate::steam_discovery::workshop_content_dir_for_game(game_path) else {
+        return Ok(mods);
+    };
+    if !content_dir.is_dir() {
+        return Ok(mods);
+    }
+
+    for item in fs::read_dir(content_dir).map_err(io_lifecycle_error(command_name))? {
+        let item_path = item.map_err(io_lifecycle_error(command_name))?.path();
+        if !item_path.is_dir() {
+            continue;
+        }
+        let mut manifests = immediate_json_files(&item_path);
+        for entry in fs::read_dir(&item_path).map_err(io_lifecycle_error(command_name))? {
+            let path = entry.map_err(io_lifecycle_error(command_name))?.path();
+            if path.is_dir() {
+                manifests.extend(immediate_json_files(&path));
+            }
+        }
+        for manifest in manifests {
+            if let Some(id) = read_mod_id_from_manifest(&manifest) {
+                mods.entry(id.clone()).or_insert(SavedModEntry {
+                    id,
+                    enabled: true,
+                    source: "steam_workshop".to_string(),
+                });
+            }
+        }
+    }
     Ok(mods)
 }
 
@@ -417,6 +498,62 @@ fn ensure_shared_user_data_links(
     Ok(SharedUserDataLinks::default())
 }
 
+fn user_data_seed_skip_report(config: &AppConfig, reason: &str) -> Option<Value> {
+    let user_dir = config.game.user_dir.as_deref()?;
+    let root = instance_game_data_dir(&resolve_runtime_path(user_dir));
+    Some(json!({
+        "status": "skipped",
+        "reason": reason,
+        "seededTo": root.display().to_string(),
+        "fileCount": 0,
+    }))
+}
+
+/// Plain user directories with an existing profile must never inherit host data.
+/// Explicit instances retain copy-if-missing seeding, including into existing profiles.
+fn seed_user_data_if_missing(
+    config: &AppConfig,
+    command_name: &str,
+    is_instance: bool,
+) -> Result<Option<Value>, AppError> {
+    if is_instance {
+        return seed_instance_user_data_if_missing(config, command_name);
+    }
+    let Some(user_dir) = config.game.user_dir.as_deref() else {
+        return Ok(None);
+    };
+    let root = instance_game_data_dir(&resolve_runtime_path(user_dir));
+    let reason = if !config.game.seed_user_dir {
+        Some("seeding_disabled")
+    } else if user_data_has_profile(&root) {
+        Some("existing_profile")
+    } else {
+        None
+    };
+    if let Some(reason) = reason {
+        return Ok(user_data_seed_skip_report(config, reason));
+    }
+    let fallback_reason = if root.join(".spirectl-seeded").exists() {
+        "already_seeded"
+    } else if !crate::host_paths::sts2_user_data_root().is_some_and(|root| root.is_dir()) {
+        "source_profile_missing"
+    } else {
+        "no_files_to_seed"
+    };
+    Ok(seed_instance_user_data_if_missing(config, command_name)?
+        .or_else(|| user_data_seed_skip_report(config, fallback_reason)))
+}
+
+fn user_data_has_profile(root: &Path) -> bool {
+    ["steam", "default"].iter().any(|kind| {
+        fs::read_dir(root.join(kind)).is_ok_and(|entries| {
+            entries
+                .filter_map(Result::ok)
+                .any(|entry| entry.path().join("settings.save").is_file())
+        })
+    })
+}
+
 /// On first launch of an instance the per-instance user-dir has no
 /// `settings.save` yet, so the bridge mod may not be enabled. Seed it from the
 /// shared install's `settings.save` files (which already enable the bridge),
@@ -458,9 +595,11 @@ fn seed_instance_user_data_if_missing(
     // Seed exactly once; afterwards the instance owns its diverged state.
     let sentinel = instance_root.join(".spirectl-seeded");
     if sentinel.exists() {
-        return Ok(links.report().map(|report| json!({
-            "symlinkedUserDataDirs": report,
-        })));
+        return Ok(links.report().map(|report| {
+            json!({
+                "symlinkedUserDataDirs": report,
+            })
+        }));
     }
 
     let mut count = 0usize;
@@ -619,7 +758,8 @@ pub(crate) struct ModSettingsReorder {
     pub(crate) updated_text: Option<String>,
     pub(crate) before_order: Vec<String>,
     pub(crate) after_order: Vec<String>,
-    pub(crate) skip_reason: Option<&'static str>,
+    pub(crate) mod_list_created: bool,
+    pub(crate) mods_enabled_changed: bool,
 }
 
 #[derive(Debug)]
@@ -634,30 +774,32 @@ pub(crate) fn reorder_mod_settings(
     json_text: &str,
     dependent_mod_ids: &[String],
 ) -> Result<ModSettingsReorder, ModSettingsReorderError> {
-    let mut settings =
-        serde_json::from_str::<Value>(json_text).map_err(ModSettingsReorderError::Parse)?;
-    let mod_settings = settings
-        .get_mut("mod_settings")
-        .and_then(Value::as_object_mut);
-    let skip_reason = if mod_settings.is_none() {
-        Some("mod_settings_missing")
-    } else {
-        None
-    };
-    let Some(mod_list) = mod_settings
-        .and_then(|settings| settings.get_mut("mod_list"))
-        .and_then(Value::as_array_mut)
-    else {
-        return Ok(ModSettingsReorder {
-            updated_text: None,
-            before_order: Vec::new(),
-            after_order: Vec::new(),
-            skip_reason: Some(skip_reason.unwrap_or("mod_list_missing")),
-        });
-    };
+    let mut settings = serde_json::from_str::<Map<String, Value>>(json_text)
+        .map_err(ModSettingsReorderError::Parse)?;
+    let mod_settings = settings.entry("mod_settings").or_insert(json!({}));
+    if !mod_settings.is_object() {
+        *mod_settings = json!({});
+    }
+    let mod_settings = mod_settings.as_object_mut().unwrap();
+    let mods_enabled_changed = mod_settings.get("mods_enabled") != Some(&Value::Bool(true));
+    mod_settings.insert("mods_enabled".to_string(), Value::Bool(true));
+    let mod_list = mod_settings.entry("mod_list").or_insert(Value::Null);
+    let mod_list_created = !mod_list.is_array();
+    if mod_list_created {
+        *mod_list = json!([]);
+    }
+    let mod_list = mod_list.as_array_mut().unwrap();
 
     let before_order = mod_list_ids(mod_list);
-    let changed = reorder_mod_list_for_bridge(mod_list, dependent_mod_ids);
+    let mut changed = mod_list_created || mods_enabled_changed;
+    if changed
+        && !mod_list
+            .iter()
+            .any(|entry| mod_entry_id(entry) == Some(DEPLOYED_MOD_DIR_NAME))
+    {
+        mod_list.push(default_bridge_mod_list_entry());
+    }
+    changed |= reorder_mod_list_for_bridge(mod_list, dependent_mod_ids);
     let after_order = mod_list_ids(mod_list);
     let updated_text = if changed {
         Some(
@@ -672,7 +814,8 @@ pub(crate) fn reorder_mod_settings(
         updated_text,
         before_order,
         after_order,
-        skip_reason: None,
+        mod_list_created,
+        mods_enabled_changed,
     })
 }
 
@@ -681,7 +824,18 @@ fn update_settings_mod_load_order(
     settings_path: &Path,
     dependent_mod_ids: &[String],
 ) -> Result<Value, AppError> {
-    let contents = fs::read_to_string(settings_path).map_err(io_lifecycle_error(command_name))?;
+    let contents = match fs::read_to_string(settings_path) {
+        Ok(contents) => contents,
+        Err(error) => {
+            return Ok(json!({
+                "path": settings_path.display().to_string(),
+                "status": "skipped",
+                "reason": "settings_save_unreadable",
+                "message": error.to_string(),
+                "changed": false,
+            }));
+        }
+    };
     let reorder = reorder_mod_settings(&contents, dependent_mod_ids).map_err(|error| {
         let (code, operation, source) = match error {
             ModSettingsReorderError::Parse(source) => {
@@ -701,15 +855,6 @@ fn update_settings_mod_load_order(
             ),
         )
     })?;
-    if let Some(reason) = reorder.skip_reason {
-        return Ok(json!({
-            "path": settings_path.display().to_string(),
-            "status": "skipped",
-            "reason": reason,
-            "changed": false
-        }));
-    }
-
     let changed = reorder.updated_text.is_some();
     let mut backup_path = None;
     if let Some(updated) = reorder.updated_text {
@@ -722,6 +867,8 @@ fn update_settings_mod_load_order(
         "path": settings_path.display().to_string(),
         "status": if changed { "updated" } else { "unchanged" },
         "changed": changed,
+        "modListCreated": reorder.mod_list_created,
+        "modsEnabledChanged": reorder.mods_enabled_changed,
         "backupPath": backup_path,
         "beforeOrder": reorder.before_order,
         "afterOrder": reorder.after_order
@@ -1220,19 +1367,23 @@ fn ensure_launch_bridge_layout(
     context: AppContext<'_>,
     layout: &ResolvedLiveBridgeLayout,
     command_name: &str,
-) -> Result<(), AppError> {
+    is_instance: bool,
+) -> Result<Option<Value>, AppError> {
     let expected_version = expected_bridge_semver(command_name)?;
     match inspect_deployed_bridge_layout(&layout.mod_dir, expected_version) {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok(None),
         Err(issue) => {
             cache_lifecycle_paths(context, layout, true);
             deploy_bridge(
                 command_name,
                 context.config,
                 layout,
-                BridgeDeployOptions::default(),
+                BridgeDeployOptions {
+                    is_instance,
+                    ..Default::default()
+                },
             )
-            .map(|_| ())
+            .map(Some)
             .map_err(|source| auto_install_error(command_name, layout, &issue, source))
         }
     }

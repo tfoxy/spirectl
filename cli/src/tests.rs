@@ -1938,6 +1938,23 @@ game:
 }
 
 #[test]
+fn app_config_loads_user_dir_seeding_opt_out() {
+    let config = serde_yaml::from_str::<AppConfig>(
+        "game:\n  userDir: ./profiles/beta\n  seedUserDir: false\n",
+    )
+    .expect("yaml config");
+    assert_eq!(config.game.user_dir.as_deref(), Some("./profiles/beta"));
+    assert!(!config.game.seed_user_dir);
+    assert_eq!(
+        serde_json::to_value(&config).unwrap()["game"]["seedUserDir"],
+        false
+    );
+    let defaults =
+        serde_yaml::from_str::<AppConfig>("game:\n  userDir: ./profiles/fresh\n").unwrap();
+    assert!(defaults.game.seed_user_dir);
+}
+
+#[test]
 fn app_config_loads_lifecycle_overrides() {
     let config = serde_yaml::from_str::<AppConfig>(
         r#"

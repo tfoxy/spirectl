@@ -14,6 +14,7 @@ pub(crate) fn execute_game_install_bridge_json(
             force: args.force,
             settings_root: args.settings_root.as_deref(),
             skip_mod_load_order: args.skip_mod_load_order,
+            is_instance: context.instance.is_some(),
         },
     )?;
     let endpoint_file = layout.mod_dir.join(crate::endpoint::ENDPOINT_FILE_NAME);
@@ -605,24 +606,56 @@ fn execute_game_launch_with_policy_json(
     settings_policy: InstanceSettingsPolicy,
 ) -> Result<Value, AppError> {
     prepare_instance_for_command(context, "game launch", settings_policy)?;
-    let result = match execute_game_launch_attempt_json(args.clone(), context, policy) {
+    let mut bridge_auto_install = None;
+    let result = match execute_game_launch_attempt_json(
+        args.clone(),
+        context,
+        policy,
+        &mut bridge_auto_install,
+    ) {
         Ok(result) => Ok(result),
         Err(first_error) if should_retry_wrapper_launch(&first_error, context.config) => {
-            retry_wrapper_launch_after_failure(args, context, policy, first_error)
+            retry_wrapper_launch_after_failure(
+                args,
+                context,
+                policy,
+                first_error,
+                &mut bridge_auto_install,
+            )
         }
         Err(error) => Err(error),
-    }?;
+    }
+    .map_err(|mut error| {
+        attach_bridge_auto_install_to_error(&mut error, bridge_auto_install.as_ref());
+        error
+    })?;
     record_instance_running(context, &result);
     Ok(result)
+}
+
+/// A launch that installed the bridge itself and then failed (loadout rewrite, spawn, attach
+/// timeout) has still seeded the profile and edited `settings.save`; keep that report on the error
+/// so every persistent change stays visible in the command's JSON.
+fn attach_bridge_auto_install_to_error(error: &mut AppError, report: Option<&Value>) {
+    let Some(report) = report.filter(|report| !report.is_null()) else {
+        return;
+    };
+    if let Some(object) = error.payload.as_object_mut() {
+        object
+            .entry("bridgeAutoInstall".to_string())
+            .or_insert_with(|| report.clone());
+    }
 }
 
 fn execute_game_launch_attempt_json(
     args: GameLaunchArgs,
     context: AppContext<'_>,
     policy: LaunchPolicy,
+    bridge_auto_install: &mut Option<Value>,
 ) -> Result<Value, AppError> {
     // Read the instance before the context is re-scoped for the RPC timeout:
     // scoped contexts intentionally drop the instance identity.
+    let is_instance = context.instance.is_some();
     let instance_logs_dir = context
         .instance
         .map(|instance| launch_output_dir(context.config, Some(instance)));
@@ -693,6 +726,7 @@ fn execute_game_launch_attempt_json(
                     &matching_processes,
                     attachment,
                     stability,
+                    bridge_auto_install.as_ref(),
                 );
                 attach_quiescence_to_launch(&mut result, quiescence);
                 return Ok(if args.verbose {
@@ -726,13 +760,22 @@ fn execute_game_launch_attempt_json(
         }
     };
 
-    if mod_loadout_plan.should_attach_bridge {
-        ensure_launch_bridge_layout(context, &layout, "game launch")?;
+    if mod_loadout_plan.should_attach_bridge
+        && let Some(report) =
+            ensure_launch_bridge_layout(context, &layout, "game launch", is_instance)?
+    {
+        // A retry must retain the install performed by the first attempt.
+        *bridge_auto_install = Some(report);
     }
     let steam_appid = ensure_steam_appid_file(&layout.game_path, "game launch")?;
     let launch_diagnostics = launch_diagnostics(&layout);
-    let mut prepared_mod_loadout =
-        prepare_launch_mod_loadout(context.config, &layout, &mod_loadout_plan, "game launch")?;
+    let mut prepared_mod_loadout = prepare_launch_mod_loadout(
+        context.config,
+        &layout,
+        &mod_loadout_plan,
+        "game launch",
+        is_instance,
+    )?;
 
     let output_capture =
         prepare_launch_output_capture(context.config, instance_logs_dir.as_deref(), &launch);
@@ -898,7 +941,8 @@ fn execute_game_launch_attempt_json(
         },
         "attachment": attachment,
         "stability": stability,
-        "modLoadout": launch_mod_loadout_json(&mod_loadout_plan, prepared_mod_loadout.as_ref(), mod_loadout_restore)
+        "bridgeAutoInstall": bridge_auto_install,
+        "modLoadout": launch_mod_loadout_json(&mod_loadout_plan, prepared_mod_loadout.as_ref(), mod_loadout_restore, bridge_auto_install.as_ref())
     });
     if let Some(pre_launch_stop) = pre_launch_stop
         && let Some(object) = result.as_object_mut()
@@ -937,11 +981,12 @@ fn retry_wrapper_launch_after_failure(
     context: AppContext<'_>,
     policy: LaunchPolicy,
     first_error: AppError,
+    bridge_auto_install: &mut Option<Value>,
 ) -> Result<Value, AppError> {
     let first_error_payload = first_error.payload.clone();
     let cleanup = cleanup_after_failed_wrapper_launch(&args, context);
     thread::sleep(Duration::from_millis(WRAPPER_LAUNCH_RETRY_DELAY_MS));
-    match execute_game_launch_attempt_json(args, context, policy) {
+    match execute_game_launch_attempt_json(args, context, policy, bridge_auto_install) {
         Ok(mut result) => {
             let retry = json!({
                 "attempted": true,
@@ -1052,6 +1097,7 @@ fn compact_game_launch_json(result: Value) -> Value {
         },
         "attachment": compact_launch_attachment_json(attachment),
         "stability": result["stability"].clone(),
+        "bridgeAutoInstall": result["bridgeAutoInstall"].clone(),
         "modLoadout": result["modLoadout"].clone()
     });
 
@@ -1311,6 +1357,7 @@ fn game_launch_reused_json(
     matching_processes: &[DetectedGameProcess],
     attachment: Value,
     stability: Value,
+    bridge_auto_install: Option<&Value>,
 ) -> Value {
     let notices = reused_launch_notices(launch, mod_loadout_plan);
 
@@ -1349,6 +1396,7 @@ fn game_launch_reused_json(
         },
         "attachment": attachment,
         "stability": stability,
+        "bridgeAutoInstall": bridge_auto_install,
         "modLoadout": launch_mod_loadout_reused_json(mod_loadout_plan)
     })
 }
@@ -1391,6 +1439,7 @@ fn launch_mod_loadout_reused_json(plan: &LaunchModLoadoutPlan) -> Value {
         return json!({
             "configured": false,
             "changed": false,
+            "seededSettings": null,
             "attachmentPolicy": "reused"
         });
     }
@@ -1399,6 +1448,7 @@ fn launch_mod_loadout_reused_json(plan: &LaunchModLoadoutPlan) -> Value {
         "configured": true,
         "mode": if plan.use_nomods_arg { "nomods" } else { "allowlist" },
         "changed": false,
+        "seededSettings": null,
         "attachmentPolicy": "reused",
         "requestedEnabledIds": plan.requested_enabled_ids.clone(),
         "notices": [{
@@ -1516,6 +1566,12 @@ struct LaunchModLoadoutPlan {
 
 #[derive(Debug, Clone)]
 struct PreparedModLoadout {
+    settings_files: Vec<PreparedModLoadoutFile>,
+    seeded_settings: Option<Value>,
+}
+
+#[derive(Debug, Clone)]
+struct PreparedModLoadoutFile {
     settings_path: PathBuf,
     backup_path: Option<PathBuf>,
     temporary: bool,
@@ -1523,6 +1579,7 @@ struct PreparedModLoadout {
     requested_enabled_ids: Vec<String>,
     effective_enabled_ids: Vec<String>,
     disabled_ids: Vec<String>,
+    workshop_mods_disabled: Vec<String>,
     restore: Option<Value>,
     post_exit_restore: Option<Value>,
 }
@@ -1575,41 +1632,69 @@ fn prepare_launch_mod_loadout(
     layout: &ResolvedLiveBridgeLayout,
     plan: &LaunchModLoadoutPlan,
     command_name: &str,
+    is_instance: bool,
 ) -> Result<Option<PreparedModLoadout>, AppError> {
     if !plan.configured || plan.use_nomods_arg {
         return Ok(None);
     }
 
-    let settings_path = resolve_mod_settings_file(config, None, command_name)?;
-    let mut settings = read_settings_save_json(&settings_path, command_name)?;
+    let candidates = resolve_mod_settings_files(config, None, command_name, is_instance)?;
     let installed_mods = enumerate_installed_mod_entries(command_name, &layout.mods_dir)?;
-    let rewrite = rewrite_settings_mod_allowlist(
-        &mut settings,
-        &installed_mods,
-        &plan.requested_enabled_ids,
-        command_name,
-        &settings_path,
-    )?;
+    let workshop_mods = enumerate_workshop_mod_entries(command_name, &layout.game_path)?;
+    // Validate every rewrite before changing any profile.
+    let mut rewrites = Vec::new();
+    for settings_path in candidates.paths {
+        let mut settings = read_settings_save_json(&settings_path, command_name)?;
+        let rewrite = rewrite_settings_mod_allowlist(
+            &mut settings,
+            &installed_mods,
+            &workshop_mods,
+            &plan.requested_enabled_ids,
+            command_name,
+            &settings_path,
+        )?;
+        rewrites.push((settings_path, settings, rewrite));
+    }
 
-    let backup_path = if rewrite.changed {
-        let backup = backup_settings_save(command_name, &settings_path)?;
-        write_settings_save_json(command_name, &settings_path, &settings)?;
-        Some(backup)
-    } else {
-        None
+    let mut prepared = PreparedModLoadout {
+        settings_files: Vec::new(),
+        seeded_settings: candidates.seeded_settings,
     };
-
-    Ok(Some(PreparedModLoadout {
-        settings_path,
-        backup_path,
-        temporary: config.game.mod_loadout.temporary,
-        changed: rewrite.changed,
-        requested_enabled_ids: plan.requested_enabled_ids.clone(),
-        effective_enabled_ids: rewrite.effective_enabled_ids,
-        disabled_ids: rewrite.disabled_ids,
-        restore: None,
-        post_exit_restore: None,
-    }))
+    for (settings_path, settings, rewrite) in rewrites {
+        let result = (|| {
+            let backup_path = if rewrite.changed {
+                Some(backup_settings_save(command_name, &settings_path)?)
+            } else {
+                None
+            };
+            prepared.settings_files.push(PreparedModLoadoutFile {
+                settings_path: settings_path.clone(),
+                backup_path,
+                temporary: config.game.mod_loadout.temporary,
+                changed: rewrite.changed,
+                requested_enabled_ids: plan.requested_enabled_ids.clone(),
+                effective_enabled_ids: rewrite.effective_enabled_ids,
+                disabled_ids: rewrite.disabled_ids,
+                workshop_mods_disabled: rewrite.workshop_mods_disabled,
+                restore: None,
+                post_exit_restore: None,
+            });
+            if rewrite.changed {
+                write_settings_save_json(command_name, &settings_path, &settings)?;
+            }
+            Ok(())
+        })();
+        if let Err(mut error) = result {
+            // Preparation failed, so even a persistent loadout must be rolled back.
+            for file in &mut prepared.settings_files {
+                file.temporary = true;
+            }
+            let restore = restore_prepared_mod_loadout(&mut Some(prepared), command_name);
+            attach_mod_loadout_restore_to_error(&mut error, restore);
+            return Err(error);
+        }
+    }
+    Ok(Some(prepared))
 }
 
 fn restore_after_no_bridge_delay(config: &AppConfig) {
@@ -1626,6 +1711,28 @@ fn restore_prepared_mod_loadout(
     let Some(prepared) = prepared.as_mut() else {
         return Value::Null;
     };
+    let restores = prepared
+        .settings_files
+        .iter_mut()
+        .map(|file| restore_prepared_mod_loadout_file(file, command_name))
+        .collect::<Vec<_>>();
+    mod_loadout_restore_report(restores)
+}
+
+fn mod_loadout_restore_report(reports: Vec<Value>) -> Value {
+    let Some(mut first) = reports.first().cloned() else {
+        return Value::Null;
+    };
+    if reports.len() > 1 {
+        first["settingsFiles"] = json!(reports);
+    }
+    first
+}
+
+fn restore_prepared_mod_loadout_file(
+    prepared: &mut PreparedModLoadoutFile,
+    command_name: &str,
+) -> Value {
     if prepared.restore.is_some() {
         return prepared.restore.clone().unwrap_or(Value::Null);
     }
@@ -1683,18 +1790,21 @@ fn schedule_prepared_mod_loadout_post_exit_restore(
     let Some(prepared) = prepared.as_mut() else {
         return Value::Null;
     };
-    if let Some(existing) = prepared.post_exit_restore.as_ref() {
-        return existing.clone();
+    let mut reports = Vec::new();
+    for file in &mut prepared.settings_files {
+        let report = file
+            .post_exit_restore
+            .clone()
+            .unwrap_or_else(|| schedule_mod_loadout_post_exit_restore(file, pid, command_name));
+        file.post_exit_restore = Some(report.clone());
+        reports.push(report);
     }
-
-    let post_exit_restore = schedule_mod_loadout_post_exit_restore(prepared, pid, command_name);
-    prepared.post_exit_restore = Some(post_exit_restore.clone());
-    post_exit_restore
+    mod_loadout_restore_report(reports)
 }
 
 #[cfg(unix)]
 fn schedule_mod_loadout_post_exit_restore(
-    prepared: &PreparedModLoadout,
+    prepared: &PreparedModLoadoutFile,
     pid: u32,
     _command_name: &str,
 ) -> Value {
@@ -1774,7 +1884,7 @@ fi
 /// that waits for the game to exit and then puts the saved `settings.save` back.
 #[cfg(windows)]
 fn schedule_mod_loadout_post_exit_restore(
-    prepared: &PreparedModLoadout,
+    prepared: &PreparedModLoadoutFile,
     pid: u32,
     _command_name: &str,
 ) -> Value {
@@ -1848,7 +1958,7 @@ fn powershell_single_quote(value: &str) -> String {
 
 #[cfg(not(any(unix, windows)))]
 fn schedule_mod_loadout_post_exit_restore(
-    prepared: &PreparedModLoadout,
+    prepared: &PreparedModLoadoutFile,
     pid: u32,
     _command_name: &str,
 ) -> Value {
@@ -1872,11 +1982,13 @@ fn launch_mod_loadout_json(
     plan: &LaunchModLoadoutPlan,
     prepared: Option<&PreparedModLoadout>,
     restore: Value,
+    bridge_auto_install: Option<&Value>,
 ) -> Value {
     if !plan.configured {
         return json!({
             "configured": false,
             "changed": false,
+            "seededSettings": null,
             "attachmentPolicy": "default"
         });
     }
@@ -1886,6 +1998,7 @@ fn launch_mod_loadout_json(
             "configured": true,
             "mode": "nomods",
             "changed": false,
+            "seededSettings": null,
             "launchArg": "nomods",
             "attachmentPolicy": "skipped",
             "requestedEnabledIds": []
@@ -1897,24 +2010,42 @@ fn launch_mod_loadout_json(
             "configured": true,
             "mode": "allowlist",
             "changed": false,
+            "seededSettings": null,
             "attachmentPolicy": if plan.should_attach_bridge { "attach" } else { "skipped" },
             "requestedEnabledIds": plan.requested_enabled_ids
         });
     };
 
+    let seeded_settings = bridge_auto_install
+        .and_then(|report| report.pointer("/modLoadOrder/seededSettings"))
+        .filter(|seeded| !seeded.is_null() && seeded["status"] != "skipped")
+        .or(prepared.seeded_settings.as_ref());
+    let first = &prepared.settings_files[0];
     json!({
         "configured": true,
         "mode": "allowlist",
-        "settingsFile": prepared.settings_path.display().to_string(),
-        "backupPath": prepared.backup_path.as_ref().map(|path| path.display().to_string()),
-        "temporary": prepared.temporary,
-        "changed": prepared.changed,
+        "settingsFile": first.settings_path.display().to_string(),
+        "backupPath": first.backup_path.as_ref().map(|path| path.display().to_string()),
+        "temporary": first.temporary,
+        "changed": prepared.settings_files.iter().any(|file| file.changed),
+        "seededSettings": seeded_settings,
         "attachmentPolicy": if plan.should_attach_bridge { "attach" } else { "skipped" },
-        "requestedEnabledIds": prepared.requested_enabled_ids,
-        "effectiveEnabledIds": prepared.effective_enabled_ids,
-        "disabledIds": prepared.disabled_ids,
+        "requestedEnabledIds": first.requested_enabled_ids,
+        "effectiveEnabledIds": first.effective_enabled_ids,
+        "disabledIds": first.disabled_ids,
+        "workshopModsDisabled": first.workshop_mods_disabled,
         "restore": restore,
-        "postExitRestore": prepared.post_exit_restore.clone().unwrap_or(Value::Null)
+        "postExitRestore": first.post_exit_restore,
+        "settingsFiles": prepared.settings_files.iter().map(|file| json!({
+            "path": file.settings_path.display().to_string(),
+            "changed": file.changed,
+            "backupPath": file.backup_path.as_ref().map(|path| path.display().to_string()),
+            "effectiveEnabledIds": file.effective_enabled_ids,
+            "disabledIds": file.disabled_ids,
+            "workshopModsDisabled": file.workshop_mods_disabled,
+            "restore": file.restore,
+            "postExitRestore": file.post_exit_restore,
+        })).collect::<Vec<_>>()
     })
 }
 
@@ -1923,11 +2054,13 @@ struct ModSettingsRewrite {
     changed: bool,
     effective_enabled_ids: Vec<String>,
     disabled_ids: Vec<String>,
+    workshop_mods_disabled: Vec<String>,
 }
 
 fn rewrite_settings_mod_allowlist(
     settings: &mut Value,
     installed_mods: &BTreeMap<String, SavedModEntry>,
+    workshop_mods: &BTreeMap<String, SavedModEntry>,
     requested_enabled_ids: &[String],
     command_name: &str,
     settings_path: &Path,
@@ -1944,6 +2077,7 @@ fn rewrite_settings_mod_allowlist(
     let known_ids = existing_by_id
         .keys()
         .chain(installed_mods.keys())
+        .chain(workshop_mods.keys())
         .cloned()
         .collect::<BTreeSet<_>>();
     let unknown = requested
@@ -1967,7 +2101,7 @@ fn rewrite_settings_mod_allowlist(
         .iter()
         .map(|entry| entry.id.clone())
         .collect::<Vec<_>>();
-    for id in installed_mods.keys() {
+    for id in installed_mods.keys().chain(workshop_mods.keys()) {
         if !ordered_ids.iter().any(|existing| existing == id) {
             ordered_ids.push(id.clone());
         }
@@ -1976,11 +2110,13 @@ fn rewrite_settings_mod_allowlist(
     let before = settings.clone();
     let mut effective_enabled_ids = Vec::new();
     let mut disabled_ids = Vec::new();
+    let mut workshop_mods_disabled = Vec::new();
     let mut new_mod_list = Vec::new();
     for id in ordered_ids {
         let template = existing_by_id
             .get(&id)
             .or_else(|| installed_mods.get(&id))
+            .or_else(|| workshop_mods.get(&id))
             .cloned()
             .unwrap_or_else(|| SavedModEntry {
                 id: id.clone(),
@@ -1992,6 +2128,12 @@ fn rewrite_settings_mod_allowlist(
             effective_enabled_ids.push(id.clone());
         } else {
             disabled_ids.push(id.clone());
+            if !existing_by_id.contains_key(&id)
+                && !installed_mods.contains_key(&id)
+                && workshop_mods.contains_key(&id)
+            {
+                workshop_mods_disabled.push(id.clone());
+            }
         }
         new_mod_list.push(json!({
             "id": id,
@@ -2013,6 +2155,7 @@ fn rewrite_settings_mod_allowlist(
         changed: *settings != before,
         effective_enabled_ids,
         disabled_ids,
+        workshop_mods_disabled,
     })
 }
 

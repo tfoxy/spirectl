@@ -34,7 +34,10 @@ pub(crate) fn execute_game_deploy_json(
         "game deploy",
         context.config,
         &layout,
-        BridgeDeployOptions::default(),
+        BridgeDeployOptions {
+            is_instance: context.instance.is_some(),
+            ..Default::default()
+        },
     )?;
     let mod_source = resolve_mod_deploy_source(context.config, &project_root)?;
     let mod_name = deployable_mod_name(&mod_source)?;
@@ -1504,6 +1507,7 @@ struct BridgeDeployOptions<'a> {
     force: bool,
     settings_root: Option<&'a Path>,
     skip_mod_load_order: bool,
+    is_instance: bool,
 }
 
 const RELEASE_REPOSITORY: &str = "tfoxy/spirectl";
@@ -1664,6 +1668,7 @@ fn deploy_bridge(
         layout,
         options.settings_root,
         options.skip_mod_load_order,
+        options.is_instance,
     )?;
 
     Ok(json!({
@@ -2288,6 +2293,7 @@ fn update_bridge_mod_load_order(
     layout: &ResolvedLiveBridgeLayout,
     settings_root: Option<&Path>,
     skip_mod_load_order: bool,
+    is_instance: bool,
 ) -> Result<Value, AppError> {
     let install_platforms = bridge_install_platforms(&layout.game_path);
     let install_platform = match install_platforms.as_slice() {
@@ -2303,7 +2309,9 @@ fn update_bridge_mod_load_order(
     let foreign_install = !install_platforms.is_empty()
         && !install_platforms
             .iter()
-            .any(|platform| platform == host_platform);
+            .any(|platform| {
+                platform == host_platform || (platform == "linuxbsd" && host_platform == "linux")
+            });
     let skip_reason = if skip_mod_load_order {
         Some("requested")
     } else if foreign_install && settings_root.is_none() && config.game.user_dir.is_none() {
@@ -2311,13 +2319,27 @@ fn update_bridge_mod_load_order(
     } else {
         None
     };
+    let seed_skip_reason = if skip_mod_load_order {
+        Some("requested")
+    } else if settings_root.is_some() {
+        Some("explicit_settings_root")
+    } else if foreign_install {
+        Some("foreign_install")
+    } else {
+        None
+    };
+    let seed_skip = if is_instance {
+        None
+    } else {
+        seed_skip_reason.and_then(|reason| user_data_seed_skip_report(config, reason))
+    };
     let mut report = json!({
         "searchedModsDir": layout.mods_dir.display().to_string(),
         "installPlatform": install_platform,
         "installPlatforms": install_platforms,
         "foreignInstall": foreign_install,
         "dependentModIds": [],
-        "seededSettings": null,
+        "seededSettings": seed_skip,
         "settingsFiles": [],
     });
     if let Some(reason) = skip_reason {
@@ -2328,9 +2350,9 @@ fn update_bridge_mod_load_order(
 
     // Explicit roots and foreign profiles must not inherit the host's user data.
     let seeded = if settings_root.is_none() && !foreign_install {
-        seed_instance_user_data_if_missing(config, command_name)?
+        seed_user_data_if_missing(config, command_name, is_instance)?
     } else {
-        None
+        seed_skip
     };
     let root = settings_root
         .map(absolute_lifecycle_path)

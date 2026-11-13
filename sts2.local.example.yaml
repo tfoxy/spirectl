@@ -9,9 +9,13 @@ game:
   assembliesDir: /path/to/SlayTheSpire2/data_sts2_<platform>
   resourcesDir: /path/to/SlayTheSpire2
   modsDir: /path/to/SlayTheSpire2/mods
-  # Optional Godot user-dir override (saves/settings/logs). Normally left unset;
-  # `--instance <name>` sets this automatically per instance for isolation.
-  # userDir: /path/to/instance-user-dir
+  # Optional data home override via XDG_DATA_HOME; saves/settings/logs live in
+  # <userDir>/SlayTheSpire2. `--instance <name>` sets this automatically.
+  # userDir: /path/to/profile-data-home
+  # Plain userDir is seeded from the host only when no steam/*/settings.save or
+  # default/*/settings.save exists. .spirectl-seeded prevents later copies.
+  # Disable host seeding even for empty directories (does not affect --instance):
+  # seedUserDir: false
   # Temporary auto-player workaround. When true, the launcher sets
   # SPIRECTL_BRIDGE_ASSET_LOAD_GUARD=1 so the bridge installs its asset-load
   # crash guards (texture + Ancient-event). Those guards replace real game-side

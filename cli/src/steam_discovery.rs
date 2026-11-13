@@ -22,26 +22,61 @@ fn discover_game_path_with_context(context: &DiscoveryContext) -> Option<PathBuf
 
 fn discover_game_path_from_steam_root(steam_root: &Path) -> Option<PathBuf> {
     for library_path in library_paths_for_steam_root(steam_root) {
-        let manifest_path = library_path
-            .join("steamapps")
-            .join(format!("appmanifest_{STS2_APP_ID}.acf"));
-        let Ok(manifest) = fs::read_to_string(&manifest_path) else {
+        let Some(game_path) = game_path_for_library(&library_path) else {
             continue;
         };
-        let Ok(install_dir) = parse_app_manifest_install_dir(&manifest) else {
-            continue;
-        };
-        let game_path = library_path
-            .join("steamapps")
-            .join("common")
-            .join(install_dir);
-
         if game_path.is_dir() {
             return Some(game_path);
         }
     }
 
     None
+}
+
+fn game_path_for_library(library_path: &Path) -> Option<PathBuf> {
+    let manifest_path = library_path
+        .join("steamapps")
+        .join(format!("appmanifest_{STS2_APP_ID}.acf"));
+    let manifest = fs::read_to_string(manifest_path).ok()?;
+    let install_dir = parse_app_manifest_install_dir(&manifest).ok()?;
+    Some(library_path.join("steamapps/common").join(install_dir))
+}
+
+pub(crate) fn workshop_content_dir_for_game(game_path: &Path) -> Option<PathBuf> {
+    workshop_content_dir_with_context(game_path, &DiscoveryContext::current())
+}
+
+fn workshop_content_dir_with_context(
+    game_path: &Path,
+    context: &DiscoveryContext,
+) -> Option<PathBuf> {
+    let game_path = fs::canonicalize(game_path).unwrap_or_else(|_| game_path.to_path_buf());
+    if let Some(common) = game_path.parent()
+        && common.file_name() == Some(std::ffi::OsStr::new("common"))
+        && let Some(steamapps) = common.parent()
+        && steamapps.file_name() == Some(std::ffi::OsStr::new("steamapps"))
+    {
+        return Some(steamapps.join("workshop/content").join(STS2_APP_ID));
+    }
+
+    let mut fallback = None;
+    for steam_root in candidate_steam_roots(context) {
+        for library in library_paths_for_steam_root(&steam_root) {
+            let Some(installed_game) = game_path_for_library(&library) else {
+                continue;
+            };
+            if !installed_game.is_dir() {
+                continue;
+            }
+            let content = library.join("steamapps/workshop/content").join(STS2_APP_ID);
+            if fs::canonicalize(&installed_game).unwrap_or(installed_game) == game_path {
+                return Some(content);
+            }
+            // Copies outside Steam still use the host's subscribed Workshop content.
+            fallback.get_or_insert(content);
+        }
+    }
+    fallback
 }
 
 fn library_paths_for_steam_root(steam_root: &Path) -> Vec<PathBuf> {
@@ -437,6 +472,94 @@ fn tokenize_vdf(contents: &str) -> Result<Vec<VdfToken>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn workshop_test_context(steam_root: &Path) -> DiscoveryContext {
+        DiscoveryContext {
+            host: HostPlatform::Windows,
+            home_dir: None,
+            program_files_x86: None,
+            program_files: None,
+            windows_registry_steam_path: Some(steam_root.to_path_buf()),
+            is_wsl: false,
+            wsl_mount_root: PathBuf::new(),
+        }
+    }
+
+    fn write_workshop_test_library(steam_root: &Path, library: &Path) -> PathBuf {
+        fs::create_dir_all(steam_root.join("steamapps")).unwrap();
+        fs::write(
+            steam_root.join("steamapps/libraryfolders.vdf"),
+            format!(
+                "\"libraryfolders\" {{ \"1\" {{ \"path\" \"{}\" }} }}",
+                library.display().to_string().replace('\\', "\\\\")
+            ),
+        )
+        .unwrap();
+        let game = library.join("steamapps/common/Slay the Spire 2");
+        fs::create_dir_all(&game).unwrap();
+        fs::write(
+            library.join("steamapps/appmanifest_2868840.acf"),
+            r#""AppState" { "installdir" "Slay the Spire 2" }"#,
+        )
+        .unwrap();
+        game
+    }
+
+    #[test]
+    fn workshop_content_dir_uses_the_configured_game_library() {
+        let root = tempfile::tempdir().unwrap();
+        let steam = root.path().join("Steam");
+        let library = root.path().join("SecondaryLibrary");
+        let game = write_workshop_test_library(&steam, &library);
+        assert_eq!(
+            workshop_content_dir_with_context(&game, &workshop_test_context(&steam)),
+            Some(library.join("steamapps/workshop/content/2868840"))
+        );
+    }
+
+    #[test]
+    fn workshop_content_dir_for_external_copy_uses_discovered_library() {
+        let root = tempfile::tempdir().unwrap();
+        let steam = root.path().join("Steam");
+        let library = root.path().join("SecondaryLibrary");
+        write_workshop_test_library(&steam, &library);
+        let copy = root.path().join("separate-install");
+        fs::create_dir_all(&copy).unwrap();
+        assert_eq!(
+            workshop_content_dir_with_context(&copy, &workshop_test_context(&steam)),
+            Some(library.join("steamapps/workshop/content/2868840"))
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn workshop_content_dir_prefers_matching_symlinked_game_over_first_library() {
+        let root = tempfile::tempdir().unwrap();
+        let steam = root.path().join("Steam");
+        let library = root.path().join("SecondaryLibrary");
+        write_workshop_test_library(&steam, &steam);
+        let game = write_workshop_test_library(&steam, &library);
+        let real_game = root.path().join("game-storage");
+        fs::rename(&game, &real_game).unwrap();
+        std::os::unix::fs::symlink(&real_game, &game).unwrap();
+        assert_eq!(
+            workshop_content_dir_with_context(&real_game, &workshop_test_context(&steam)),
+            Some(library.join("steamapps/workshop/content/2868840"))
+        );
+    }
+
+    #[test]
+    fn workshop_content_dir_without_an_installed_game_is_none() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join("steamapps/workshop/content/2868840")).unwrap();
+        assert_eq!(
+            workshop_content_dir_with_context(
+                &root.path().join("separate-install"),
+                &workshop_test_context(root.path())
+            ),
+            None
+        );
+    }
 
     #[test]
     fn parse_library_folders_supports_modern_steam_shape() {

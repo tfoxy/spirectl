@@ -724,10 +724,13 @@ pub struct GameConfig {
     pub assemblies_dir: Option<String>,
     pub resources_dir: Option<String>,
     pub mods_dir: Option<String>,
-    /// Optional Godot user data directory override, passed to the game as
-    /// `--user-dir`. Multi-instance launches set this per instance so saves,
-    /// settings, mod load order, shader cache, and logs stay isolated.
+    /// Optional data home override. The game ignores `--user-dir`, so launches
+    /// set `XDG_DATA_HOME` and store saves, settings, caches, and logs under
+    /// `<userDir>/SlayTheSpire2`. Multi-instance launches set this per instance.
     pub user_dir: Option<String>,
+    /// Seed a plain userDir from the host profile when it has no profile yet.
+    /// Instance seeding is independent of this setting.
+    pub seed_user_dir: bool,
     pub mod_loadout: GameModLoadoutConfig,
     #[serde(deserialize_with = "deserialize_launch_wrapper_words")]
     pub launch_wrapper: Vec<String>,
@@ -767,6 +770,7 @@ impl Default for GameConfig {
             resources_dir: None,
             mods_dir: None,
             user_dir: None,
+            seed_user_dir: true,
             mod_loadout: GameModLoadoutConfig::default(),
             launch_wrapper: Vec::new(),
             launch_executable: None,

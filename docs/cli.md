@@ -1299,15 +1299,47 @@ sources produce different bytes and therefore a different hash. See
 precedence over `--settings-root`.
 These seeding restrictions also apply to the launch preparation for `--restart`.
 
+For plain `game.userDir` (without `--instance`), host-profile seeding runs only
+when `<userDir>/SlayTheSpire2` has no `steam/*/settings.save` or
+`default/*/settings.save`. An existing profile is left in place without copying
+host data; JSON reports `modLoadOrder.seededSettings.status: "skipped"`,
+`reason: "existing_profile"`, and `fileCount: 0`. Set `game.seedUserDir: false`
+to disable this copy even for an empty directory (`reason: "seeding_disabled"`).
+Fresh directories are seeded copy-if-missing, excluding regenerable caches and
+settings backups. The copy creates `<userDir>/SlayTheSpire2/.spirectl-seeded`,
+which prevents later copies even if profile files are removed. The existing-profile
+check does not create that marker. `--instance` retains its own copy-if-missing
+seeding, including into an existing directory, independently of `game.seedUserDir`.
+Automatic allowlist discovery during `game launch` reports the same copy or skip
+outcome as `modLoadout.seededSettings`. Launch also returns `bridgeAutoInstall`:
+the full bridge deployment report when it installed or repaired the bridge,
+or `null` when no install ran. Both compact and verbose results include its
+`modLoadOrder.seededSettings` and `modLoadOrder.settingsFiles[]`, along with
+`installed`, `reason`, and `version`. A wrapper retry retains an install report
+from its first attempt. When the launch fails after an automatic install (for example an unknown
+`modLoadout` id, a spawn failure or an attach timeout), the error JSON carries the same report as a
+top-level `bridgeAutoInstall`, so seeding and `settings.save` changes stay visible. If auto-install has a non-skip seeding report, it takes
+precedence in `modLoadout.seededSettings` over the later discovery report, so
+a successful copy is not hidden by an `existing_profile` skip.
+`game mods settings` reports discovery's outcome as `seededSettings`.
+These seeding fields are `null` when seeding did not run. An explicit settings
+file bypasses discovery; any seeding performed by auto-install is still reported.
+
 If the install has `data_sts2_*` directories and none matches the CLI host OS,
 load-order updates are skipped unless `--settings-root` or `game.userDir` is explicit.
 An explicit `game.userDir` is searched without seeding it from the host profile
 when the install is foreign.
+For plain `game.userDir`, `modLoadOrder.seededSettings` reports a skipped copy
+with `fileCount: 0` and a reason: `foreign_install`, `explicit_settings_root`, or
+`requested` for the restrictions above; `already_seeded` for an existing marker;
+`source_profile_missing` or `no_files_to_seed` when no host data is available.
 JSON reports `modLoadOrder.status: "skipped"` with `reason: "foreign_install"`
 (or `"requested"` for `--skip-mod-load-order`), without searching the local profile.
-`modLoadOrder.installPlatform` is the detected OS (`linux`, `windows`, or `macos`),
+`modLoadOrder.installPlatform` is the detected OS (`linux`, `linuxbsd`, `windows`, or `macos`),
 `null` when undetected, or `"mixed"` for multiple OSes; `installPlatforms` lists all
-observed platform names. A matching host OS in a mixed install permits the default
+observed platform names. `linuxbsd` is native on Linux; a Windows install remains
+foreign when run through Proton or Wine on Linux.
+A matching host OS in a mixed install permits the default
 profile search. A missing or unreadable install directory leaves the platform
 undetected and retains the default profile search.
 A completed search reports `status: "completed"`, the searched
@@ -2023,6 +2055,8 @@ Future-facing endpoint fields already exist in config:
 - `game.assembliesDir`
 - `game.resourcesDir`
 - `game.modsDir`
+- `game.userDir`
+- `game.seedUserDir` (default `true`; plain userDir only)
 - `game.modLoadout.enabled`
 - `game.modLoadout.settingsFile`
 - `game.modLoadout.temporary`
@@ -2053,9 +2087,12 @@ Notes:
 - If `game.resourcesDir` is unset, `sts2 code scene-*` uses the resolved game path as the static resource root.
 - `game.resourcesDir` should point at an accessible Godot resource tree or extracted install root containing supported `.tscn`, `.escn`, `.tres`, `.scn`, `.res`, and `.pck` inputs.
 - If `game.modsDir` is unset, live bridge tooling defaults it to `<resolved game path>/mods`.
+- `game.userDir` redirects the game data home through `XDG_DATA_HOME`; saves, settings, caches, and logs live under `<userDir>/SlayTheSpire2`. The game ignores `--user-dir` as an isolation mechanism. Settings discovery and bridge installation use this same data root. Plain user directories with an existing Steam or default profile are never seeded from the host; `game.seedUserDir: false` also disables seeding empty directories.
 - If `game.modLoadout.enabled` is unset, `game launch` leaves STS2 mod settings untouched. Set it to `[]` to launch with STS2's native `nomods` arg, or set specific mod ids to temporarily enable only those discovered mods through `settings.save`.
-- With `game.modLoadout.temporary: true`, `game launch` restores the previous `settings.save` immediately after launch attachment and schedules a second restore after the launched process exits, because STS2 may save its in-memory mod list during shutdown.
-- `game.modLoadout.settingsFile: auto` discovers exactly one mod-capable STS2 `settings.save` under `$XDG_DATA_HOME/SlayTheSpire2` or `~/.local/share/SlayTheSpire2`; pass `game mods settings --settings-file <path>` or configure this field when multiple Steam profiles have mod settings.
+- An allowlist also covers Steam Workshop mods discovered under `steamapps/workshop/content/2868840` in the game's Steam library. For a game copy outside Steam, the CLI uses the first installed STS2 library found through Steam metadata. Manifest `id` values are mod ids; the numeric Workshop directory names are not. Excluded Workshop mods missing from `mod_list` receive entries with `is_enabled: false` and `source: "steam_workshop"`. Existing entries keep their source and follow the same allowlist. Workshop files are read only.
+- Launch JSON reports the ids of newly added disabled Workshop entries as `modLoadout.workshopModsDisabled` (an empty array when none are added), alongside `effectiveEnabledIds` and `disabledIds`. For example, `"workshopModsDisabled": ["ExampleMod"]` means that mod was absent from the saved list and explicitly disabled for this launch. `modLoadout.settingsFiles[]` reports each profile's `path`, `changed`, `backupPath`, `effectiveEnabledIds`, `disabledIds`, `workshopModsDisabled`, `restore`, and `postExitRestore`. Existing top-level file fields describe the first profile; top-level `changed` is true if any profile changed.
+- With `game.modLoadout.temporary: true`, `game launch` backs up each changed `settings.save`, restores every file immediately after launch attachment, and schedules another restore for each file after the launched process exits, because STS2 may save its in-memory mod lists during shutdown.
+- `game.modLoadout.settingsFile: auto` discovers mod-capable STS2 `settings.save` files under the data root derived from `game.userDir`, `$XDG_DATA_HOME`, or the host profile. Allowlist launches rewrite every candidate, including both Steam and default profiles after bridge installation, because the active profile cannot be determined in advance. Configure an explicit settings file to restrict launch rewriting to that one file. `game mods settings` still requires exactly one auto-discovered candidate; use `--settings-file <path>` or configure this field to resolve ambiguity for that command.
 - `game.launchWrapper` is an optional local command prefix for display/session wrappers such as `xvfb-run -a` or `gamescope --`; `game.launchExecutable` remains the actual game binary used for lifecycle process targeting. Prefer array form (`launchWrapper: [gamescope, --]`) because it preserves exact argv boundaries, but `launchWrapper: "xvfb-run -a"` is accepted as shell-word shorthand. In agent-host launch mode (`STS2_AGENT_HOST_LAUNCH=1`), the CLI passes this wrapper as broker metadata and spawns the STS2 executable directly so container `xvfb-run` remains available for non-STS2 tools.
 - For wrapper-backed launches, `game launch` captures wrapper stdout/stderr to temporary log files and includes log paths in launch JSON plus bounded log tails on launch errors. On Linux, `game close` and `game kill` also track matching wrapper processes whose command line includes the configured game executable, so quick relaunches wait for display/session wrappers such as gamescope to tear down before a new launch.
 - If a wrapper-backed `game launch` times out or the wrapper child exits before bridge attachment, the CLI performs one cleanup pass, waits 8 seconds for wrapper/display teardown, and retries the launch once. Retry metadata is reported under `launch.retry` on success or `error.launchRetry` / `error.firstFailure` if the retry also fails.
@@ -2169,7 +2206,7 @@ sts2 game instances prune                        # drop registry entries for sto
 
 The canonical lifecycle flow is now CLI-native:
 
-- `game install-bridge` builds and stages the bridge artifacts into `<modsDir>/spirectlbridge` without requiring a mod project path, copying the published standalone bridge `.dll` payloads directly from the host project output. It also scans sibling installed mod directories for `Spirectl.Sts2.dll` consumers and, when a selected STS2 user-data root's `settings.save` contains `mod_settings.mod_list`, moves or inserts `spirectlbridge` before those consumers in that settings load order after writing a `settings.save.spirectl-backup-*` copy. Mod manifests are not changed. JSON output reports `modLoadOrder.dependentModIds` and per-settings-file status under `modLoadOrder.settingsFiles[]`.
+- `game install-bridge` builds and stages the bridge artifacts into `<modsDir>/spirectlbridge` without requiring a mod project path, copying the published standalone bridge `.dll` payloads directly from the host project output. It also scans sibling installed mod directories for `Spirectl.Sts2.dll` consumers and moves or inserts `spirectlbridge` before those consumers in that settings load order after writing a `settings.save.spirectl-backup-*` copy. Mod manifests are not changed. JSON output reports `modLoadOrder.dependentModIds` and per-settings-file status under `modLoadOrder.settingsFiles[]`. Missing `mod_settings` or `mod_list` is initialized with the bridge entry, and `mods_enabled` is set to true. Each file report includes `modListCreated` and `modsEnabledChanged`; unchanged files keep their original bytes and do not receive another backup.
 - `game deploy` reuses the same bridge packaging/install path, optionally builds and copies a mod project, and can chain restart + verify.
 - `game mods settings` reads the saved mod list from a configured, overridden, or auto-discovered `settings.save` and reports `enabledIds` / `disabledIds` for easy copy-paste into `game.modLoadout.enabled`.
 - `game mods active` asks the live bridge for `ModManager` state and reports mod ids, names, versions, paths, load states, enabled/active booleans, assemblies, and load errors. It requires `spirectlbridge` to be loaded in the live game.
