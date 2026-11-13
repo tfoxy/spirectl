@@ -22,7 +22,8 @@ import {
 // owning scene pushes per instance (a slide offset, a ramp speed, a banner's arc), none of which a
 // remote host receives — and a reveal that re-fires whenever the markup is re-emitted flashes the
 // text. They stay `{kind:"style", css:{}}`: parsed and consumed, so the brackets never leak as
-// literal text, and visually inert.
+// literal text, and visually inert. `scramble` (a title that cycles random glyphs around its text) is
+// the same case: its glyph cycling is per-instance state, so it renders as its plain text.
 export const DEFAULT_BBCODE_TAGS: Record<string, GodotBbcodeTagDescriptor> =
   Object.fromEntries([
     ["aqua", { kind: "color", value: "#2aebbe" }],
@@ -47,4 +48,5 @@ export const DEFAULT_BBCODE_TAGS: Record<string, GodotBbcodeTagDescriptor> =
     ["ancient_banner", { kind: "style", css: {} }],
     ["fade_in", { kind: "style", css: {} }],
     ["fly_in", { kind: "style", css: {} }],
+    ["scramble", { kind: "style", css: {} }],
   ]) as Record<string, GodotBbcodeTagDescriptor>;

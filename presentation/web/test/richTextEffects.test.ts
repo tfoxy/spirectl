@@ -48,6 +48,15 @@ describe("STS2 rich-text effects", () => {
     expect(html).not.toContain("godot-rich-char");
   });
 
+  it("consumes [scramble] and keeps its plain text", () => {
+    expect(godotBbcodeTagKind("scramble", DEFAULT_BBCODE_TAGS)).toBe("style");
+    const html = richTextLayeredHtml("[scramble]Blitz[/scramble]", {
+      customTags: DEFAULT_BBCODE_TAGS,
+    });
+    expect(html).not.toContain("scramble]");
+    expect(html).toContain("Blitz");
+  });
+
   it("splits a [sine] run into per-character spans carrying its class and index", () => {
     const html = richTextLayeredHtml("[sine]ab[/sine]", {
       customTags: DEFAULT_BBCODE_TAGS,
