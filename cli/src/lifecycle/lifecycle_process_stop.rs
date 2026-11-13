@@ -1139,6 +1139,7 @@ fn launch_wait_error(
     last_error: Option<&Value>,
     recent_log_cursor: Option<&bridge::Sts2LogCursor>,
     output_capture: Option<&LaunchOutputCapture>,
+    game_pids: &[u32],
 ) -> AppError {
     let mut error = json!({
         "code": "launch_exited_before_ipc",
@@ -1162,6 +1163,13 @@ fn launch_wait_error(
         "launchDiagnostics": launch_diagnostics(layout),
         "lastError": last_error.cloned().unwrap_or(Value::Null)
     });
+    add_startup_diagnostics(
+        &mut error,
+        recent_log_cursor,
+        output_capture,
+        game_pids,
+        Some(pid),
+    );
     if let Some(log) = bridge::latest_recent_relevant_log() {
         error["logPath"] = json!(log.log_path.display().to_string());
         error["latestLog"] = json!({
@@ -1190,6 +1198,7 @@ fn wait_timeout_error(
     process: Option<Value>,
     recent_log_cursor: Option<&bridge::Sts2LogCursor>,
     output_capture: Option<&LaunchOutputCapture>,
+    game_pids: &[u32],
 ) -> AppError {
     let (code, message) = if command_name == "game launch" {
         (
@@ -1211,7 +1220,11 @@ fn wait_timeout_error(
         )
     };
 
-    AppError {
+    let launch_pid = process
+        .as_ref()
+        .and_then(|process| process["pid"].as_u64())
+        .map(|pid| pid as u32);
+    let mut result = AppError {
         exit_code: 3,
         payload: json!({
             "error": {
@@ -1238,7 +1251,17 @@ fn wait_timeout_error(
                 "lastError": last_error
             }
         }),
+    };
+    if command_name == "game launch" {
+        add_startup_diagnostics(
+            &mut result.payload["error"],
+            recent_log_cursor,
+            output_capture,
+            game_pids,
+            launch_pid,
+        );
     }
+    result
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1306,7 +1329,7 @@ fn steam_initialization_error(
     recent_log_cursor: Option<&bridge::Sts2LogCursor>,
     output_capture: Option<&LaunchOutputCapture>,
 ) -> AppError {
-    AppError {
+    let mut error = AppError {
         exit_code: 4,
         payload: json!({
             "error": {
@@ -1328,7 +1351,15 @@ fn steam_initialization_error(
                 "lastError": last_error
             }
         }),
-    }
+    };
+    add_startup_diagnostics(
+        &mut error.payload["error"],
+        recent_log_cursor,
+        output_capture,
+        &[],
+        None,
+    );
+    error
 }
 
 fn launch_diagnostics(layout: &ResolvedLiveBridgeLayout) -> Value {

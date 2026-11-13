@@ -30,6 +30,7 @@ include!("lifecycle/lifecycle_launch.rs");
 include!("lifecycle/lifecycle_deploy_wait.rs");
 include!("lifecycle/lifecycle_mods_settings.rs");
 include!("lifecycle/lifecycle_process_stop.rs");
+include!("lifecycle/lifecycle_startup.rs");
 include!("lifecycle/lifecycle_process_windows.rs");
 #[cfg(test)]
 #[path = "lifecycle_tests.rs"]

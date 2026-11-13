@@ -76,13 +76,111 @@ pub fn is_releasable_api_lane(lane: &str) -> bool {
 /// Exact-match row lookup, matching the fenced `;<version>=` contract the props
 /// file's MSBuild regex uses, so both readers agree on every input.
 pub fn api_lane_for_game_version(version: &str) -> Option<&'static str> {
+    api_lane_in_table(version, API_LANE_TABLE)
+}
+
+fn api_lane_in_table<'a>(version: &str, table: &'a str) -> Option<&'a str> {
     if version.is_empty() {
         return None;
     }
     let needle = format!(";{version}=");
-    let rest = &API_LANE_TABLE[API_LANE_TABLE.find(&needle)? + needle.len()..];
+    let rest = &table[table.find(&needle)? + needle.len()..];
     let lane = rest.split(';').next()?;
     if lane.is_empty() { None } else { Some(lane) }
+}
+
+/// Explain an unmapped build without using a newer source table to select a
+/// payload the running CLI does not know how to validate.
+pub(crate) fn api_lane_resolution_diagnostic(version: &str) -> Option<serde_json::Value> {
+    if api_lane_for_game_version(version).is_some() {
+        return None;
+    }
+    lane_resolution_diagnostic(version, API_LANE_TABLE, source_lane_props().as_deref())
+}
+
+fn source_lane_props() -> Option<PathBuf> {
+    for base in [
+        std::env::current_dir().ok(),
+        std::env::current_exe()
+            .ok()
+            .and_then(|path| path.parent().map(Path::to_path_buf)),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        for ancestor in base.ancestors() {
+            let props = ancestor.join("bridge-mod/Sts2GameApi.props");
+            if props.is_file() {
+                return Some(props);
+            }
+        }
+    }
+    None
+}
+
+fn lane_resolution_diagnostic(
+    version: &str,
+    table: &str,
+    source_props: Option<&Path>,
+) -> Option<serde_json::Value> {
+    use serde_json::json;
+
+    if api_lane_in_table(version, table).is_some() {
+        return None;
+    }
+    let known_lanes: Vec<_> = table
+        .split(';')
+        .filter_map(|row| row.split_once('='))
+        .map(|(version, lane)| json!({ "gameVersion": version, "apiLane": lane }))
+        .collect();
+    let known = known_lanes
+        .iter()
+        .map(|row| {
+            format!(
+                "{}→{}",
+                row["gameVersion"].as_str().unwrap(),
+                row["apiLane"].as_str().unwrap()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source_lane = source_props
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|contents| {
+            let start = contents.find("<Sts2GameApiLaneTable>")? + "<Sts2GameApiLaneTable>".len();
+            let table = contents[start..]
+                .split_once("</Sts2GameApiLaneTable>")?
+                .0
+                .trim();
+            api_lane_in_table(version, table).map(str::to_string)
+        });
+    let mut message =
+        format!("game build {version} has no API lane in this sts2 build (known: {known})");
+    let (code, remediation) = if let Some(lane) = source_lane.as_deref() {
+        message.push_str(&format!(
+            "; this sts2 build predates lane {lane} (mapped in {}); rebuild with scripts/install-cli.sh",
+            source_props.unwrap().display()
+        ));
+        (
+            "cli_lane_table_stale",
+            "rebuild with scripts/install-cli.sh",
+        )
+    } else {
+        message.push_str("; update sts2 to a build supporting this game version");
+        (
+            "bridge_release_lane_unresolved",
+            "update sts2 to a build supporting this game version",
+        )
+    };
+    Some(json!({
+        "code": code,
+        "message": message,
+        "gameVersion": version,
+        "knownLanes": known_lanes,
+        "sourceLane": source_lane,
+        "sourcePath": source_lane.as_ref().and(source_props),
+        "remediation": remediation
+    }))
 }
 
 /// Read `<game_root>/release_info.json`. `None` when it is absent or
@@ -178,6 +276,73 @@ impl BridgeGameBuildStamp {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stale_lane_table_diagnostic_names_the_source_lane_and_rebuild() {
+        let temp = tempfile::tempdir().unwrap();
+        let props = temp.path().join("Sts2GameApi.props");
+        std::fs::write(
+            &props,
+            "<Project><Sts2GameApiLaneTable>;v0.107.1=v107;v0.113.0=v113;</Sts2GameApiLaneTable></Project>",
+        ).unwrap();
+        let diagnostic =
+            lane_resolution_diagnostic("v0.113.0", ";v0.107.1=v107;", Some(&props)).unwrap();
+        assert_eq!(diagnostic["code"], "cli_lane_table_stale");
+        assert_eq!(diagnostic["gameVersion"], "v0.113.0");
+        assert_eq!(
+            diagnostic["knownLanes"],
+            serde_json::json!([
+                { "gameVersion": "v0.107.1", "apiLane": "v107" }
+            ])
+        );
+        assert_eq!(diagnostic["sourceLane"], "v113");
+        assert_eq!(diagnostic["sourcePath"], serde_json::json!(props));
+        assert_eq!(
+            diagnostic["remediation"],
+            "rebuild with scripts/install-cli.sh"
+        );
+        let message = diagnostic["message"].as_str().unwrap();
+        assert!(message.contains(
+            "game build v0.113.0 has no API lane in this sts2 build (known: v0.107.1→v107)"
+        ));
+        assert!(message.contains("this sts2 build predates lane v113"));
+        assert!(message.contains(&format!("mapped in {}", props.display())));
+        assert!(message.contains("rebuild with scripts/install-cli.sh"));
+        // Finding a source row must not change what this binary can resolve.
+        assert_eq!(api_lane_in_table("v0.113.0", ";v0.107.1=v107;"), None);
+    }
+
+    #[test]
+    fn unmapped_lane_diagnostic_does_not_claim_staleness_without_a_source_row() {
+        let temp = tempfile::tempdir().unwrap();
+        let props = temp.path().join("Sts2GameApi.props");
+        for contents in [
+            None,
+            Some("not XML"),
+            Some("<Sts2GameApiLaneTable>;v0.113.0=v113;</Sts2GameApiLaneTable>"),
+        ] {
+            if let Some(contents) = contents {
+                std::fs::write(&props, contents).unwrap();
+            }
+            let diagnostic =
+                lane_resolution_diagnostic("v0.113", ";v0.107.1=v107;", Some(&props)).unwrap();
+            assert_eq!(diagnostic["code"], "bridge_release_lane_unresolved");
+            assert_eq!(diagnostic["gameVersion"], "v0.113");
+            assert!(diagnostic["sourceLane"].is_null());
+            assert!(diagnostic["sourcePath"].is_null());
+            assert!(
+                diagnostic["message"]
+                    .as_str()
+                    .unwrap()
+                    .contains("known: v0.107.1→v107")
+            );
+        }
+    }
+
+    #[test]
+    fn mapped_lane_needs_no_diagnostic_or_source_checkout() {
+        assert!(lane_resolution_diagnostic("v0.113.0", ";v0.113.0=v113;", None).is_none());
+    }
 
     #[test]
     fn lane_table_resolves_supported_builds_and_refuses_to_guess() {

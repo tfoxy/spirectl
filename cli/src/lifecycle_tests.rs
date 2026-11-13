@@ -3014,6 +3014,11 @@ fn release_bridge_refuses_when_the_install_build_cannot_be_identified() {
     )
     .expect_err("an unmapped game build must refuse");
     assert_eq!(
+        unmapped.payload["error"]["gameVersion"], "v0.999.0",
+        "{}",
+        unmapped.payload
+    );
+    assert_eq!(
         unmapped.payload["error"]["code"],
         "bridge_release_lane_unresolved"
     );
@@ -3022,6 +3027,53 @@ fn release_bridge_refuses_when_the_install_build_cannot_be_identified() {
             .as_str()
             .expect("message")
             .contains("v0.999.0")
+    );
+}
+
+#[test]
+fn source_bridge_refuses_an_unmapped_build_before_staging_or_msbuild() {
+    let temp = tempfile::tempdir().unwrap();
+    let layout = mod_load_order_test_layout(temp.path());
+    let stage_dir = temp.path().join("stage");
+    fs::create_dir_all(&stage_dir).unwrap();
+    fs::write(stage_dir.join("existing"), "preserve").unwrap();
+    let error = stage_source_bridge(
+        "game install-bridge",
+        &layout,
+        temp.path(),
+        &temp.path().join("publish"),
+        &stage_dir,
+        "9.8.7",
+        Some(&release_info_for("v0.999.0", 1)),
+        true,
+    )
+    .expect_err("unmapped builds fail before invoking dotnet");
+    assert_eq!(error.exit_code, 2);
+    assert_eq!(
+        error.payload["error"]["code"],
+        "bridge_release_lane_unresolved"
+    );
+    assert_eq!(error.payload["error"]["gameVersion"], "v0.999.0");
+    assert_eq!(
+        fs::read_to_string(stage_dir.join("existing")).unwrap(),
+        "preserve"
+    );
+
+    let launch_error = auto_install_error(
+        "game launch",
+        &layout,
+        &BridgeLayoutIssue::MissingFile("spirectlbridge.json".to_string()),
+        error,
+    );
+    assert_eq!(
+        launch_error.payload["error"]["cause"]["gameVersion"],
+        "v0.999.0"
+    );
+    assert!(
+        launch_error.payload["error"]["cause"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("has no API lane in this sts2 build")
     );
 }
 
@@ -3168,4 +3220,361 @@ fn install_bridge_restart_preserves_profile_only_when_install_declined_seeding()
         restart_settings_policy(false, None),
         InstanceSettingsPolicy::SeedFromHost
     );
+}
+
+const STARTUP_HEADER: &str = "MegaDot v4.5.1.m.14.mono.custom_build - https://godotengine.org";
+const STARTUP_XDG_WARNING: &str = "WARNING: Can't obtain the XDG decoration manager. Libdecor will be used for drawing CSDs, if available.";
+const STARTUP_RENDERER: &str = "Vulkan 1.4.329 - Forward+ - Using Device #0: NVIDIA";
+const STARTUP_STEAM_FAILURE: &str =
+    "[ERROR] Steamworks initialization failed! Result: k_ESteamAPIInitResult_NoSteamClient";
+const STARTUP_MOD: &str = "[INFO] Loading assembly DLL example.dll";
+const STARTUP_BRIDGE: &str =
+    "[INFO] [spirectl] Live unix-socket bridge host started at <endpoint> (source: env).";
+
+#[test]
+fn startup_stages_follow_observed_log_markers() {
+    let cases = [
+        (vec![], "no_log"),
+        (vec!["  "], "no_log"),
+        (vec!["wrapper starting"], "unknown"),
+        (vec![STARTUP_HEADER], "engine_started"),
+        (vec![STARTUP_HEADER, STARTUP_XDG_WARNING], "display_init"),
+        (
+            vec![STARTUP_HEADER, STARTUP_XDG_WARNING, STARTUP_RENDERER],
+            "renderer_started",
+        ),
+        (
+            vec![STARTUP_RENDERER, STARTUP_STEAM_FAILURE],
+            "steam_init_failed",
+        ),
+        (vec![STARTUP_RENDERER, STARTUP_MOD], "mods_loading"),
+        (vec![STARTUP_MOD, STARTUP_BRIDGE], "bridge_started"),
+    ];
+    for (lines, expected) in cases {
+        let mut evidence = StartupLogEvidence::default();
+        for line in lines {
+            evidence.observe(line);
+        }
+        let (stage, hint) = evidence.stage_and_hint();
+        assert_eq!(stage, expected);
+        assert!(!hint.is_empty());
+        assert!(!hint.contains('\n'));
+        if stage == "display_init" {
+            assert!(hint.contains("game.launchArgs: [\"--display-driver\",\"x11\"]"));
+        }
+    }
+}
+
+#[test]
+fn startup_later_stages_override_display_warnings_in_either_stream_order() {
+    for lines in [
+        vec![
+            STARTUP_BRIDGE,
+            STARTUP_RENDERER,
+            STARTUP_XDG_WARNING,
+            STARTUP_HEADER,
+        ],
+        vec![
+            STARTUP_HEADER,
+            STARTUP_XDG_WARNING,
+            STARTUP_RENDERER,
+            STARTUP_BRIDGE,
+        ],
+    ] {
+        let mut evidence = StartupLogEvidence::default();
+        for line in lines {
+            evidence.observe(line);
+        }
+        assert_eq!(evidence.stage_and_hint().0, "bridge_started");
+    }
+}
+
+fn startup_test_capture(dir: &Path, stdout: &str, stderr: &str) -> LaunchOutputCapture {
+    let capture = LaunchOutputCapture {
+        dir: dir.to_path_buf(),
+        stdout_path: dir.join("stdout.log"),
+        stderr_path: dir.join("stderr.log"),
+        latest_stdout_path: dir.join("latest-stdout.log"),
+        latest_stderr_path: dir.join("latest-stderr.log"),
+        wrapper_configured: true,
+    };
+    fs::write(&capture.stdout_path, stdout).unwrap();
+    fs::write(&capture.stderr_path, stderr).unwrap();
+    capture
+}
+
+#[test]
+fn startup_timeout_and_early_exit_expose_stage_hint_and_process_state() {
+    let dir = tempfile::tempdir().unwrap();
+    with_xdg_data_home(dir.path(), || {
+        let layout = mod_load_order_test_layout(dir.path());
+        let capture = startup_test_capture(dir.path(), STARTUP_HEADER, STARTUP_XDG_WARNING);
+        let timeout = wait_timeout_error(
+            "game launch",
+            &layout,
+            90000,
+            250,
+            2,
+            90000,
+            json!({}),
+            None,
+            None,
+            Some(&capture),
+            &[],
+        );
+        assert_eq!(timeout.payload["error"]["startupStage"], "display_init");
+        assert!(
+            timeout.payload["error"]["startupHint"]
+                .as_str()
+                .unwrap()
+                .contains("x11")
+        );
+        assert!(
+            timeout.payload["error"]["launchDiagnostics"]["processState"]["processes"].is_array()
+        );
+
+        #[cfg(unix)]
+        let status = ExitStatus::from_raw(256);
+        #[cfg(windows)]
+        let status = {
+            use std::os::windows::process::ExitStatusExt;
+            ExitStatus::from_raw(1)
+        };
+        let exited = launch_wait_error(
+            "game launch",
+            &layout,
+            1,
+            10,
+            u32::MAX,
+            &status,
+            None,
+            None,
+            Some(&capture),
+            &[],
+        );
+        assert_eq!(exited.payload["error"]["startupStage"], "display_init");
+        assert_eq!(exited.payload["error"]["code"], "launch_exited_before_ipc");
+
+        let attach = wait_timeout_error(
+            "game attach",
+            &layout,
+            100,
+            10,
+            1,
+            100,
+            json!({}),
+            None,
+            None,
+            None,
+            &[],
+        );
+        assert!(attach.payload["error"].get("startupStage").is_none());
+    });
+}
+
+#[test]
+fn startup_uses_early_markers_beyond_the_displayed_log_tail() {
+    let dir = tempfile::tempdir().unwrap();
+    let capture = startup_test_capture(
+        dir.path(),
+        &format!(
+            "{STARTUP_RENDERER}\n{STARTUP_BRIDGE}\n{}",
+            "later message\n".repeat(100)
+        ),
+        STARTUP_XDG_WARNING,
+    );
+    let mut error = json!({"launchDiagnostics": {}});
+    add_startup_diagnostics(&mut error, None, Some(&capture), &[], None);
+    assert_eq!(error["startupStage"], "bridge_started");
+}
+
+#[test]
+fn startup_no_log_and_steam_failure_errors_have_actionable_stages() {
+    let dir = tempfile::tempdir().unwrap();
+    let layout = mod_load_order_test_layout(dir.path());
+    let error = wait_timeout_error(
+        "game launch",
+        &layout,
+        100,
+        10,
+        1,
+        100,
+        json!({}),
+        None,
+        None,
+        None,
+        &[],
+    );
+    assert_eq!(error.payload["error"]["startupStage"], "no_log");
+    let error = steam_initialization_error(
+        "game launch",
+        &layout,
+        1,
+        100,
+        Path::new("log"),
+        STARTUP_STEAM_FAILURE,
+        json!({}),
+        None,
+        None,
+    );
+    assert_eq!(error.payload["error"]["startupStage"], "steam_init_failed");
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn startup_proc_state_counts_wait_channels_and_missing_samples() {
+    let dir = tempfile::tempdir().unwrap();
+    let process = dir.path().join("42");
+    fs::create_dir_all(process.join("task/42")).unwrap();
+    fs::create_dir_all(process.join("task/43")).unwrap();
+    fs::create_dir_all(process.join("task/44")).unwrap();
+    fs::create_dir_all(process.join("task/45")).unwrap();
+    fs::write(
+        process.join("status"),
+        "State:\tS (sleeping)\nThreads:\t4\n",
+    )
+    .unwrap();
+    fs::write(process.join("task/42/wchan"), "futex_wait_queue\n").unwrap();
+    fs::write(process.join("task/43/wchan"), "futex_wait_queue\n").unwrap();
+    fs::write(process.join("task/44/wchan"), "do_poll.constprop.0\n").unwrap();
+    let state = startup_proc_state(dir.path(), 42);
+    assert_eq!(state["state"], "S (sleeping)");
+    assert_eq!(state["threadCount"], 4);
+    assert_eq!(state["sampledThreadCount"], 4);
+    assert_eq!(
+        state["wchanSummary"],
+        json!({"futex_wait_queue": 2, "do_poll.constprop.0": 1})
+    );
+    assert_eq!(state["unavailableWchanThreads"], 1);
+    let missing = startup_proc_state(dir.path(), 99);
+    assert_eq!(missing["available"], false);
+    assert!(missing["threadCount"].is_null());
+    assert!(missing["wchanSummary"].is_null());
+}
+
+#[test]
+fn startup_retry_retains_full_previous_failure_in_compact_success() {
+    let failure = json!({
+        "code": "launch_timeout", "elapsedMs": 90000,
+        "startupStage": "display_init", "startupHint": "Use x11 under headless gamescope.",
+        "recentLogs": {"entries": [STARTUP_HEADER]},
+        "launchDiagnostics": {"processState": {"processes": [{"pid": 42, "threadCount": 15}]}}
+    });
+    let mut result = json!({"launch": {"status": "attached", "retry": {"attempted": true}}});
+    retain_previous_launch_failure(&mut result, &failure);
+    assert_eq!(result["launchDiagnostics"]["previousAttempts"][0], failure);
+    let compact = compact_game_launch_json(result);
+    assert_eq!(compact["launchDiagnostics"]["previousAttempts"][0], failure);
+    assert_eq!(compact["launch"]["retry"]["attempted"], true);
+    let direct = compact_game_launch_json(json!({"launch": {"status": "attached"}}));
+    assert!(direct.get("launchDiagnostics").is_none());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn startup_godot_cursor_ignores_old_markers_and_reads_replacement_log() {
+    let dir = tempfile::tempdir().unwrap();
+    with_xdg_data_home(dir.path(), || {
+        let logs = dir.path().join("SlayTheSpire2/logs");
+        fs::create_dir_all(&logs).unwrap();
+        let log = logs.join("godot.log");
+        fs::write(&log, format!("{STARTUP_BRIDGE}\n{STARTUP_STEAM_FAILURE}\n")).unwrap();
+        let cursor = bridge::capture_relevant_log_cursor();
+        fs::copy(&log, logs.join("godot-previous.log")).unwrap();
+        fs::write(&log, format!("{STARTUP_HEADER}\n{STARTUP_XDG_WARNING}\n")).unwrap();
+        let mut error = json!({"launchDiagnostics": {}});
+        add_startup_diagnostics(&mut error, Some(&cursor), None, &[], None);
+        assert_eq!(error["startupStage"], "display_init");
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn assert_startup_cursor_reads_repeated_stall(archived_stall: bool) {
+    let dir = tempfile::tempdir().unwrap();
+    with_xdg_data_home(dir.path(), || {
+        let logs = dir.path().join("SlayTheSpire2/logs");
+        fs::create_dir_all(&logs).unwrap();
+        let log = logs.join("godot.log");
+        let stall = format!("{STARTUP_HEADER}\n{STARTUP_XDG_WARNING}\n");
+        if archived_stall {
+            fs::write(logs.join("godot-old.log"), &stall).unwrap();
+            fs::write(
+                &log,
+                format!("{STARTUP_BRIDGE}\n{}", "successful launch\n".repeat(30)),
+            )
+            .unwrap();
+        } else {
+            fs::write(&log, &stall).unwrap();
+            fs::OpenOptions::new()
+                .write(true)
+                .open(&log)
+                .unwrap()
+                .set_modified(SystemTime::UNIX_EPOCH)
+                .unwrap();
+        }
+        let cursor = bridge::capture_relevant_log_cursor();
+        fs::copy(&log, logs.join("godot-previous.log")).unwrap();
+        fs::write(&log, &stall).unwrap();
+
+        let mut visited = Vec::new();
+        bridge::visit_relevant_log_lines_since(&cursor, |path, line| {
+            visited.push((path.to_path_buf(), line.to_string()));
+        });
+        assert_eq!(
+            visited,
+            vec![
+                (log.clone(), STARTUP_HEADER.to_string()),
+                (log.clone(), STARTUP_XDG_WARNING.to_string()),
+            ]
+        );
+        let tail = bridge::recent_relevant_log_tail_since(&cursor, 40, 8192);
+        assert_eq!(tail.entries.len(), 2);
+        assert!(tail.entries.iter().all(|entry| entry.log_path == log));
+        let mut error = json!({"launchDiagnostics": {}});
+        add_startup_diagnostics(&mut error, Some(&cursor), None, &[], None);
+        assert_eq!(error["startupStage"], "display_init");
+    });
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn startup_cursor_reads_stall_repeated_from_an_existing_archive() {
+    assert_startup_cursor_reads_repeated_stall(true);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn startup_cursor_reads_identical_stall_after_rotation() {
+    assert_startup_cursor_reads_repeated_stall(false);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn startup_cursor_ignores_unchanged_archive_matching_rotated_log() {
+    let dir = tempfile::tempdir().unwrap();
+    with_xdg_data_home(dir.path(), || {
+        let logs = dir.path().join("SlayTheSpire2/logs");
+        fs::create_dir_all(&logs).unwrap();
+        let log = logs.join("godot.log");
+        let stall = format!("{STARTUP_HEADER}\n{STARTUP_XDG_WARNING}\n");
+        fs::write(logs.join("godot-old.log"), &stall).unwrap();
+        fs::write(&log, &stall).unwrap();
+        let cursor = bridge::capture_relevant_log_cursor();
+
+        fs::copy(&log, logs.join("godot-previous.log")).unwrap();
+        fs::write(&log, format!("{STARTUP_HEADER}\n")).unwrap();
+
+        let mut visited = Vec::new();
+        bridge::visit_relevant_log_lines_since(&cursor, |path, line| {
+            visited.push((path.to_path_buf(), line.to_string()));
+        });
+        assert_eq!(visited, vec![(log.clone(), STARTUP_HEADER.to_string())]);
+        let tail = bridge::recent_relevant_log_tail_since(&cursor, 40, 8192);
+        assert_eq!(tail.entries.len(), 1);
+        assert_eq!(tail.entries[0].log_path, log);
+        assert_eq!(tail.entries[0].line, STARTUP_HEADER);
+        let mut error = json!({"launchDiagnostics": {}});
+        add_startup_diagnostics(&mut error, Some(&cursor), None, &[], None);
+        assert_eq!(error["startupStage"], "engine_started");
+    });
 }

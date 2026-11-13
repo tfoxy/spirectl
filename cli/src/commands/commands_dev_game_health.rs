@@ -745,10 +745,13 @@ pub(crate) fn bridge_health_compact_json(full: &Value) -> Value {
     if !duplicate_entries.is_empty() {
         compact["duplicateBridgeMods"]["entries"] = Value::Array(duplicate_entries);
     }
-    // Only when it actually mismatched. The compact output is polled, and
-    // "unknown" or "match" is already carried by `bridge.gameBuildStatus`; the
-    // per-field expected/found list is only worth its bytes when it is the
-    // finding.
+    if full.pointer("/compatibility/gameBuild/status") == Some(&json!("unknown")) {
+        compact["bridge"]["gameBuildReason"] = full
+            .pointer("/compatibility/gameBuild/reason")
+            .cloned()
+            .unwrap_or(Value::Null);
+    }
+    // Carry the full comparison only when it mismatched.
     if full.pointer("/compatibility/gameBuild/status") == Some(&json!("mismatch")) {
         compact["compatibility"] = json!({
             "gameBuild": full.pointer("/compatibility/gameBuild").cloned().unwrap_or(Value::Null)
@@ -1384,6 +1387,20 @@ fn bridge_health_game_build_json(
     let install = install_root
         .as_deref()
         .and_then(game_build::read_release_info);
+    bridge_health_game_build_comparison(
+        install,
+        release_info_path,
+        deployed_manifest,
+        live_handshake,
+    )
+}
+
+fn bridge_health_game_build_comparison(
+    install: Option<game_build::GameReleaseInfo>,
+    release_info_path: Option<String>,
+    deployed_manifest: &Value,
+    live_handshake: Option<&Value>,
+) -> Value {
     let install_lane = install
         .as_ref()
         .and_then(game_build::GameReleaseInfo::api_lane);
@@ -1458,12 +1475,12 @@ fn bridge_health_game_build_json(
 
     let status = if !mismatches.is_empty() {
         "mismatch"
-    } else if compared {
+    } else if compared && install_lane.is_some() {
         "match"
     } else {
         "unknown"
     };
-    json!({
+    let mut result = json!({
         "status": status,
         "install": {
             "releaseInfoPath": release_info_path,
@@ -1477,7 +1494,21 @@ fn bridge_health_game_build_json(
         "runningGameVersion": live_running_version,
         "knownApiLanes": game_build::api_lanes(),
         "mismatches": mismatches
-    })
+    });
+    if status == "unknown" {
+        result["reason"] = match install.as_ref() {
+            None => json!({
+                "code": "game_build_unidentified",
+                "message": "could not read the install's game build version from release_info.json"
+            }),
+            Some(info) => game_build::api_lane_resolution_diagnostic(&info.version)
+                .unwrap_or_else(|| json!({
+                    "code": "bridge_game_build_unclaimed",
+                    "message": "neither bridge claims a game build identity comparable with this install"
+                })),
+        };
+    }
+    result
 }
 
 /// What one side claims about the game build it was compiled for. Every field is
@@ -1763,4 +1794,71 @@ pub(crate) fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
     let doy = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + day - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
     i64::from(era * 146_097 + doe - 719_468)
+}
+
+#[cfg(test)]
+mod game_build_health_tests {
+    use super::*;
+
+    fn install(version: &str) -> game_build::GameReleaseInfo {
+        game_build::GameReleaseInfo {
+            version: version.to_string(),
+            commit: String::new(),
+            main_assembly_hash: Some(1),
+        }
+    }
+
+    #[test]
+    fn game_build_health_explains_an_unidentified_install() {
+        let result = bridge_health_game_build_comparison(None, None, &json!({}), None);
+        assert_eq!(result["status"], "unknown");
+        assert_eq!(result["reason"]["code"], "game_build_unidentified");
+    }
+
+    #[test]
+    fn game_build_health_explains_missing_bridge_claims() {
+        let result =
+            bridge_health_game_build_comparison(Some(install("v0.113.0")), None, &json!({}), None);
+        assert_eq!(result["status"], "unknown");
+        assert_eq!(result["reason"]["code"], "bridge_game_build_unclaimed");
+    }
+
+    #[test]
+    fn game_build_health_explains_an_unmapped_version_even_when_identity_matches() {
+        let result = bridge_health_game_build_comparison(
+            Some(install("v0.999.0")),
+            None,
+            &json!({}),
+            Some(&json!({ "gameVersion": "v0.999.0" })),
+        );
+        assert_eq!(result["status"], "unknown");
+        assert_eq!(result["reason"]["code"], "bridge_release_lane_unresolved");
+        assert_eq!(result["reason"]["gameVersion"], "v0.999.0");
+        assert!(
+            result["reason"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("has no API lane in this sts2 build")
+        );
+        let compact = bridge_health_compact_json(&json!({
+            "compatibility": { "gameBuild": result }
+        }));
+        assert_eq!(compact["bridge"]["gameBuildStatus"], "unknown");
+        let mut reason = result["reason"].clone();
+        remove_null_fields(&mut reason);
+        assert_eq!(compact["bridge"]["gameBuildReason"], reason);
+    }
+
+    #[test]
+    fn game_build_health_keeps_a_proven_mismatch_ahead_of_an_unknown_lane() {
+        let result = bridge_health_game_build_comparison(
+            Some(install("v0.999.0")),
+            None,
+            &json!({}),
+            Some(&json!({ "gameVersion": "v0.113.0" })),
+        );
+        assert_eq!(result["status"], "mismatch");
+        assert!(result.get("reason").is_none());
+        assert_eq!(result["mismatches"][0]["field"], "runningGameVersion");
+    }
 }

@@ -998,6 +998,7 @@ fn retry_wrapper_launch_after_failure(
             if let Some(launch) = result.get_mut("launch").and_then(Value::as_object_mut) {
                 launch.insert("retry".to_string(), retry);
             }
+            retain_previous_launch_failure(&mut result, &first_error_payload["error"]);
             Ok(result)
         }
         Err(mut retry_error) => {
@@ -1100,6 +1101,10 @@ fn compact_game_launch_json(result: Value) -> Value {
         "bridgeAutoInstall": result["bridgeAutoInstall"].clone(),
         "modLoadout": result["modLoadout"].clone()
     });
+
+    if let Some(diagnostics) = result.get("launchDiagnostics") {
+        compact["launchDiagnostics"] = diagnostics.clone();
+    }
 
     if let Some(pre_launch_stop) = result.get("preLaunchStop")
         && let Some(object) = compact.as_object_mut()

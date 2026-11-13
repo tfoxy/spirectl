@@ -144,6 +144,7 @@ use output_json::recent_bootstrap_failure_error;
 pub(crate) use output_json::{
     Sts2LogCursor, capture_relevant_log_cursor, capture_sts2_log_cursor,
     latest_recent_relevant_log, recent_relevant_log_tail_since, steam_initialization_failure_since,
+    visit_relevant_log_lines_since,
 };
 pub use output_json::{
     action_kind_name, asset_artifact_kind_name, attachment_state_name, bridge_error_code_name,

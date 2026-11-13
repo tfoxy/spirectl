@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeSet;
 
 pub fn bridge_error_exit_code(error: &proto::BridgeError) -> i32 {
     match proto::BridgeErrorCode::try_from(error.code)
@@ -569,6 +570,76 @@ pub(crate) fn latest_recent_relevant_log() -> Option<RecentRelevantLog> {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Sts2LogCursor {
     file_lengths: BTreeMap<PathBuf, u64>,
+    file_hashes: BTreeMap<PathBuf, Vec<u8>>,
+    file_modified_times: BTreeMap<PathBuf, SystemTime>,
+}
+
+impl Sts2LogCursor {
+    fn rotated_paths(&self, files: &[PathBuf]) -> BTreeSet<PathBuf> {
+        use sha2::{Digest, Sha256};
+
+        let mut rotated = BTreeSet::new();
+        for path in files {
+            if self.file_lengths.contains_key(path) {
+                continue;
+            }
+            let Ok(contents) = fs::read(path) else {
+                continue;
+            };
+            let hash = Sha256::digest(&contents).to_vec();
+            for (recorded_path, recorded_hash) in &self.file_hashes {
+                if *recorded_hash == hash
+                    && self.recorded_path_changed(recorded_path, recorded_hash)
+                {
+                    rotated.insert(recorded_path.clone());
+                }
+            }
+        }
+        rotated
+    }
+
+    /// A recorded file whose bytes or mtime moved since capture (rewritten, truncated, renamed away).
+    fn recorded_path_changed(&self, recorded_path: &Path, recorded_hash: &[u8]) -> bool {
+        use sha2::{Digest, Sha256};
+
+        file_modified(recorded_path) != self.file_modified_times.get(recorded_path).copied()
+            || fs::read(recorded_path)
+                .is_ok_and(|contents| Sha256::digest(&contents).as_slice() != recorded_hash)
+    }
+
+    fn start_offset(&self, path: &Path, contents: &[u8], rotated: &BTreeSet<PathBuf>) -> usize {
+        use sha2::{Digest, Sha256};
+
+        if !self.file_lengths.contains_key(path) {
+            // A new file is old evidence only when it is an archive copy: its bytes match a
+            // recorded file that has since changed or moved away. If that recorded file is
+            // untouched, the new file (for example a fresh godot.log) is a new startup whose
+            // output merely repeats an earlier attempt, so read it in full.
+            let hash = Sha256::digest(contents).to_vec();
+            let archived_copy = self
+                .file_hashes
+                .iter()
+                .any(|(recorded_path, recorded_hash)| {
+                    *recorded_hash == hash
+                        && self.recorded_path_changed(recorded_path, recorded_hash)
+                });
+            return if archived_copy { contents.len() } else { 0 };
+        }
+        if rotated.contains(path) {
+            // This path changed and its previous contents were archived, even
+            // when the new startup writes exactly the same bytes.
+            return 0;
+        }
+        self.file_lengths
+            .get(path)
+            .copied()
+            .filter(|length| *length <= contents.len() as u64)
+            .filter(|length| {
+                self.file_hashes.get(path)
+                    == Some(&Sha256::digest(&contents[..*length as usize]).to_vec())
+            })
+            .unwrap_or(0) as usize
+    }
 }
 
 pub(crate) fn capture_sts2_log_cursor() -> Sts2LogCursor {
@@ -608,36 +679,13 @@ pub(crate) fn recent_relevant_log_tail_since(
     max_lines: usize,
     max_bytes: usize,
 ) -> RecentLogTail {
-    let mut files = godot_log_files();
-    files.extend(sts2_log_files());
-    files.sort_by(|left, right| {
-        file_modified(left)
-            .cmp(&file_modified(right))
-            .then_with(|| left.cmp(right))
-    });
-    files.dedup();
-
     let mut entries = Vec::new();
-    for path in files {
-        let Ok(contents) = fs::read(&path) else {
-            continue;
-        };
-        let start = cursor
-            .file_lengths
-            .get(&path)
-            .copied()
-            .filter(|length| *length <= contents.len() as u64)
-            .unwrap_or(0) as usize;
-        if start >= contents.len() {
-            continue;
-        }
-
-        let appended = String::from_utf8_lossy(&contents[start..]);
-        entries.extend(appended.lines().map(|line| RecentLogTailEntry {
-            log_path: path.clone(),
+    visit_relevant_log_lines_since(cursor, |path, line| {
+        entries.push(RecentLogTailEntry {
+            log_path: path.to_path_buf(),
             line: line.to_string(),
-        }));
-    }
+        });
+    });
 
     let original_len = entries.len();
     if entries.len() > max_lines {
@@ -666,31 +714,66 @@ pub(crate) fn recent_relevant_log_tail_since(
     }
 }
 
+pub(crate) fn visit_relevant_log_lines_since(
+    cursor: &Sts2LogCursor,
+    mut visit: impl FnMut(&Path, &str),
+) {
+    let mut files = godot_log_files();
+    files.extend(sts2_log_files());
+    files.sort_by(|left, right| {
+        file_modified(left)
+            .cmp(&file_modified(right))
+            .then_with(|| left.cmp(right))
+    });
+    files.dedup();
+
+    let rotated = cursor.rotated_paths(&files);
+    for path in files {
+        let Ok(contents) = fs::read(&path) else {
+            continue;
+        };
+        let start = cursor.start_offset(&path, &contents, &rotated);
+        if start >= contents.len() {
+            continue;
+        }
+
+        let appended = String::from_utf8_lossy(&contents[start..]);
+        for line in appended.lines() {
+            visit(&path, line);
+        }
+    }
+}
+
 fn capture_sts2_log_cursor_from_files(files: Vec<PathBuf>) -> Sts2LogCursor {
-    let file_lengths = files
-        .into_iter()
-        .filter_map(|path| {
-            let length = fs::metadata(&path).ok()?.len();
-            Some((path, length))
-        })
-        .collect();
-    Sts2LogCursor { file_lengths }
+    use sha2::{Digest, Sha256};
+
+    let mut cursor = Sts2LogCursor::default();
+    for path in files {
+        if let Ok(contents) = fs::read(&path) {
+            if let Some(modified) = file_modified(&path) {
+                cursor.file_modified_times.insert(path.clone(), modified);
+            }
+            cursor
+                .file_lengths
+                .insert(path.clone(), contents.len() as u64);
+            cursor
+                .file_hashes
+                .insert(path, Sha256::digest(&contents).to_vec());
+        }
+    }
+    cursor
 }
 
 fn steam_initialization_failure_since_in_files(
     cursor: &Sts2LogCursor,
     files: Vec<PathBuf>,
 ) -> Option<(PathBuf, String)> {
+    let rotated = cursor.rotated_paths(&files);
     for path in files {
         let Ok(contents) = fs::read(&path) else {
             continue;
         };
-        let start = cursor
-            .file_lengths
-            .get(&path)
-            .copied()
-            .filter(|length| *length <= contents.len() as u64)
-            .unwrap_or(0) as usize;
+        let start = cursor.start_offset(&path, &contents, &rotated);
         if start >= contents.len() {
             continue;
         }
@@ -1063,6 +1146,125 @@ mod log_cursor_tests {
         assert_eq!(
             steam_initialization_failure_since_in_files(&cursor, vec![log]),
             None
+        );
+    }
+
+    #[test]
+    fn steam_cursor_ignores_failure_lines_copied_by_rotation() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("godot.log");
+        let rotated = dir.path().join("godot-previous.log");
+        write(&log, &format!("{FAILURE_LINE}\n"));
+        let cursor = capture_sts2_log_cursor_from_files(vec![log.clone()]);
+        fs::copy(&log, &rotated).unwrap();
+        write(&log, "MegaDot v4.5.1 - https://godotengine.org\n");
+        assert_eq!(
+            steam_initialization_failure_since_in_files(&cursor, vec![rotated, log]),
+            None
+        );
+    }
+
+    #[test]
+    fn steam_cursor_reads_a_replaced_log_from_the_start_even_when_it_is_longer() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("godot.log");
+        write(&log, &"previous launch\n".repeat(8));
+        let cursor = capture_sts2_log_cursor_from_files(vec![log.clone()]);
+        write(
+            &log,
+            &format!("{FAILURE_LINE}\n{}", "new launch\n".repeat(30)),
+        );
+        assert_eq!(
+            steam_initialization_failure_since_in_files(&cursor, vec![log.clone()]),
+            Some((log, FAILURE_LINE.to_string()))
+        );
+    }
+
+    #[test]
+    fn steam_cursor_reads_failure_repeated_from_an_existing_archive() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("godot.log");
+        let archived = dir.path().join("godot-old.log");
+        let rotated = dir.path().join("godot-previous.log");
+        write(&archived, &format!("{FAILURE_LINE}\n"));
+        write(&log, &"successful launch\n".repeat(30));
+        let cursor = capture_sts2_log_cursor_from_files(vec![archived.clone(), log.clone()]);
+
+        fs::copy(&log, &rotated).unwrap();
+        write(&log, &format!("{FAILURE_LINE}\n"));
+
+        assert_eq!(
+            steam_initialization_failure_since_in_files(
+                &cursor,
+                vec![archived, rotated, log.clone()]
+            ),
+            Some((log, FAILURE_LINE.to_string()))
+        );
+    }
+
+    #[test]
+    fn steam_cursor_reads_identical_failure_after_rotation() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("godot.log");
+        let rotated = dir.path().join("godot-previous.log");
+        write(&log, &format!("{FAILURE_LINE}\n"));
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&log)
+            .unwrap()
+            .set_modified(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        let cursor = capture_sts2_log_cursor_from_files(vec![log.clone()]);
+
+        fs::copy(&log, &rotated).unwrap();
+        write(&log, &format!("{FAILURE_LINE}\n"));
+
+        assert_eq!(
+            steam_initialization_failure_since_in_files(&cursor, vec![rotated, log.clone()]),
+            Some((log, FAILURE_LINE.to_string()))
+        );
+    }
+
+    #[test]
+    fn steam_cursor_ignores_unchanged_archive_matching_rotated_log() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("godot.log");
+        let old = dir.path().join("godot-old.log");
+        let previous = dir.path().join("godot-previous.log");
+        write(&old, &format!("{FAILURE_LINE}\n"));
+        write(&log, &format!("{FAILURE_LINE}\n"));
+        let cursor = capture_sts2_log_cursor_from_files(vec![old.clone(), log.clone()]);
+
+        fs::copy(&log, &previous).unwrap();
+        write(&log, "successful launch\n");
+
+        assert_eq!(
+            steam_initialization_failure_since_in_files(&cursor, vec![old, previous, log]),
+            None
+        );
+    }
+    #[test]
+    fn steam_cursor_reads_fresh_active_log_matching_unchanged_archive() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("godot.log");
+        let old = dir.path().join("godot-old.log");
+        write(&old, &format!("{FAILURE_LINE}\n"));
+        // The active log is absent at capture; only an archive of an earlier failure exists.
+        let cursor = capture_sts2_log_cursor_from_files(vec![old.clone()]);
+
+        write(&log, &format!("{FAILURE_LINE}\n"));
+
+        let contents = fs::read(&log).unwrap();
+        let rotated = cursor.rotated_paths(&[old.clone(), log.clone()]);
+        assert_eq!(cursor.start_offset(&log, &contents, &rotated), 0);
+        let old_contents = fs::read(&old).unwrap();
+        assert_eq!(
+            cursor.start_offset(&old, &old_contents, &rotated),
+            old_contents.len()
+        );
+        assert_eq!(
+            steam_initialization_failure_since_in_files(&cursor, vec![old, log.clone()]),
+            Some((log, FAILURE_LINE.to_string()))
         );
     }
 }

@@ -1195,7 +1195,11 @@ the deployed one. `game bridge-health` compares every claim both sides actually 
 `release_info.json` and reports the result under `compatibility.gameBuild` — `status` of `match`, `mismatch`
 or `unknown`, the install identity, both bridge claims, and a per-field `mismatches` list of
 `{source, field, expected, found}`. The compact output carries `bridge.gameBuildStatus` always and the full
-comparison only when it mismatched. A mismatch is `game_version_mismatch` at exit 4; it outranks
+comparison only when it mismatched. An `unknown` comparison includes a structured `reason` with `code` and
+`message`; compact output exposes it as `bridge.gameBuildReason`. It distinguishes unreadable install
+identity, an unmapped game version, and absent comparable bridge claims. An unmapped version stays
+`unknown` even if a bridge claims the same version or hash, unless another claim proves a mismatch.
+A mismatch is `game_version_mismatch` at exit 4; it outranks
 `stale_live_host` and `deployed_version_mismatch`, because those two mean "rebuild for newer bridge source"
 while this one means the bridge is bound to a build that is not on disk.
 
@@ -1207,9 +1211,23 @@ from the install before a payload is selected, so `--no-build` installs the payl
 refuses, and a best-effort payload is never installed:
 
 - `bridge_release_lane_unresolved` — the install's build cannot be identified, or its version has no lane.
+- `cli_lane_table_stale` — this CLI lacks the install's version, but the source checkout maps it; rebuild
+  the CLI with `scripts/install-cli.sh`.
 - `bridge_release_lane_unreleasable` — the lane is supported but no release covers it (see below).
 - `bridge_release_cache_missing` — naming the lane and the expected archive, when no payload for it is cached.
 - `bridge_release_lane_mismatch` — the archive's own manifest claims a different lane than its name.
+
+The lane table is compiled into `sts2`. Updating the checkout alone does not update an installed CLI.
+For an unmapped version, installation reports `game build vX has no API lane in this sts2 build (known:
+v0.107.1→v107, …)`. If `bridge-mod/Sts2GameApi.props` can be found above the working directory or CLI
+executable and maps that version, the diagnostic adds `this sts2 build predates lane vNNN (mapped in
+<path>); rebuild with scripts/install-cli.sh` and uses `cli_lane_table_stale`. The source table provides
+diagnostics only; it never selects an otherwise unknown payload. JSON includes `gameVersion`,
+`knownLanes` (an array of `{gameVersion, apiLane}`), `sourceLane`, `sourcePath`, and `remediation`.
+Source builds and release installs both check before staging or building. Launch auto-install errors
+preserve the diagnostic under `error.cause`; health uses it as the unknown comparison's `reason`.
+Without a newer source mapping, update to a CLI supporting the game version; the diagnostic does not
+claim that rebuilding the current checkout will add support.
 
 Not every supported lane is a *releasable* one, and `Sts2GameApiReleasableLanes` in the props file says which
 are. A release compiles against the pinned reference SDK, which declares one game build; a lane whose sources
@@ -2097,7 +2115,7 @@ Notes:
 - `game.modLoadout.settingsFile: auto` discovers mod-capable STS2 `settings.save` files under the data root derived from `game.userDir`, `$XDG_DATA_HOME`, or the host profile. Allowlist launches rewrite every candidate, including both Steam and default profiles after bridge installation, because the active profile cannot be determined in advance. Configure an explicit settings file to restrict launch rewriting to that one file. `game mods settings` still requires exactly one auto-discovered candidate; use `--settings-file <path>` or configure this field to resolve ambiguity for that command.
 - `game.launchWrapper` is an optional local command prefix for display/session wrappers such as `xvfb-run -a` or `gamescope --`; `game.launchExecutable` remains the actual game binary used for lifecycle process targeting. Prefer array form (`launchWrapper: [gamescope, --]`) because it preserves exact argv boundaries, but `launchWrapper: "xvfb-run -a"` is accepted as shell-word shorthand. In agent-host launch mode (`STS2_AGENT_HOST_LAUNCH=1`), the CLI passes this wrapper as broker metadata and spawns the STS2 executable directly so container `xvfb-run` remains available for non-STS2 tools.
 - For wrapper-backed launches, `game launch` captures wrapper stdout/stderr to temporary log files and includes log paths in launch JSON plus bounded log tails on launch errors. On Linux, `game close` and `game kill` also track matching wrapper processes whose command line includes the configured game executable, so quick relaunches wait for display/session wrappers such as gamescope to tear down before a new launch.
-- If a wrapper-backed `game launch` times out or the wrapper child exits before bridge attachment, the CLI performs one cleanup pass, waits 8 seconds for wrapper/display teardown, and retries the launch once. Retry metadata is reported under `launch.retry` on success or `error.launchRetry` / `error.firstFailure` if the retry also fails.
+- If a wrapper-backed `game launch` times out or the wrapper child exits before bridge attachment, the CLI performs one cleanup pass, waits 8 seconds for wrapper/display teardown, and retries the launch once. Retry metadata is reported under `launch.retry` on success, with the full first error (including its startup stage and hint) retained in `launchDiagnostics.previousAttempts[]` in both compact and verbose output. If the retry also fails, see `error.launchRetry` / `error.firstFailure`.
 - `game.launchArgs` may also use array form or shell-word shorthand. Prefer `launchArgs: [--headless, -fastmp, host_standard]`; `launchArgs: "--headless -fastmp host_standard"` is equivalent. Quote arguments that contain spaces, such as `launchArgs: "--profile '/path with spaces/profile.json'"`.
 - `game.assetLoadGuard` (default `false`) is a temporary auto-player workaround. When `true`, `game launch` sets `SPIRECTL_BRIDGE_ASSET_LOAD_GUARD=1` so the bridge mod installs its asset-load crash guards, which prefix the game's texture and forced-Ancient-event loads to return empty placeholders. Those placeholders render as a purple missing-texture grid, so leave it `false` for normal/interactive launches. Only enable it for the auto-player, whose software-rendered (`xvfb`) launch still segfaults on game-side texture loads; it exists only until that crash is root-caused. Setting `SPIRECTL_BRIDGE_ASSET_LOAD_GUARD` directly via `game.launchEnv` works too.
 - `game.disableBackgroundThrottle` (default `false`) keeps a launched instance usable as an automation target while its window sits in the background. Two things otherwise break it. The game lowers its own frame limit on window focus-out, halving every main-thread cadence the bridge depends on. Worse, the engine draws every iteration and takes a swapchain image with an unbounded wait, so on a compositor that stops releasing an invisible surface's buffers the whole main thread parks inside that acquire (0% CPU in `poll()`, zero protocol traffic) until the window is visible again — bridge RPCs time out, live state/scene streaming stops, and queued actions replay in a burst on un-hide. When `true`, `game launch` (and the relaunch inside `game restart` / `game deploy --restart`) sets `SPIRECTL_BRIDGE_DISABLE_BACKGROUND_THROTTLE=1`, and the bridge mod skips the background frame cap and pins vertical sync ON for the session. Pinning vsync ON is the counter-intuitive part and it is the actual cure: the engine only stops drawing a hidden surface once it considers that surface suspended, and it can reach that state either from a compositor that advertises the toplevel as suspended (not sent by every compositor generation) or from its legacy emulated-vsync timeout path, which it enables only when vertical sync is on and the compositor exposes no fifo protocol. With vsync off neither route exists and the instance hangs on every hide. Nothing is persisted — the saved graphics setting is untouched — and the frame limit still comes from the game's own setting. Prefer it for long-lived developer/agent instances and leave it `false` for normal play. Per-launch equivalent: `game launch --disable-background-throttle`. Individual levers can be turned off for bisection with `SPIRECTL_BRIDGE_BACKGROUND_FPS_UNCAP=0` / `SPIRECTL_BRIDGE_BACKGROUND_VSYNC_ON=0`, and setting `SPIRECTL_BRIDGE_DISABLE_BACKGROUND_THROTTLE` directly via `game.launchEnv` works too. Headless instances are unaffected (no window to background).
@@ -2218,6 +2236,48 @@ The canonical lifecycle flow is now CLI-native:
 - `game close` and `game kill` share the real game executable resolution and exact process matching used by lifecycle commands, even when `game.launchWrapper` is configured. On Linux and Windows they also match wrapper processes whose command line includes that executable, so wrapper teardown is included in lifecycle waits. `game close` is graceful and may use the bridge or `game.stopCommand`; its live bridge close RPC defaults to 10 seconds, including when `game launch` closes an existing game before relaunching. `game kill` is forceful and local-process-only. Neither command writes saves, mutates fixtures, or restores state.
 - For machine-specific installs, the default config stack already picks up `sts2.local.yaml`; pass `--config sts2.local.yaml` when you want a command to pin that exact file explicitly.
 - `scripts/live-bridge.sh` is now a compatibility helper rather than the canonical workflow.
+
+### Launch troubleshooting
+
+`launch_timeout` and `launch_exited_before_ipc` errors include `startupStage` and a one-line
+`startupHint`, inferred from new Godot logs and captured stdout/stderr for that attempt. The stage
+reports the furthest recognized startup marker; it does not prove which function blocked.
+Steam initialization errors also include these fields. A later renderer, mod, or bridge marker takes
+precedence over display warnings, which can also occur on successful launches.
+
+| `startupStage` | Meaning |
+| --- | --- |
+| `no_log` | No new nonempty log content was found. Check the executable, wrapper, and stdio paths. |
+| `unknown` | Logs exist but contain no recognized startup marker. |
+| `engine_started` | The engine header appeared, without a renderer marker or recognized Wayland warnings. |
+| `display_init` | The engine header and XDG warnings appeared, without a renderer marker. Startup stopped before rendering. |
+| `renderer_started` | A Vulkan renderer marker appeared. |
+| `steam_init_failed` | Steamworks initialization failed, including `NoSteamClient`. Check the owning user's Steam session. |
+| `mods_loading` | Mod assembly loading or initialization was logged. |
+| `bridge_started` | The bridge reported its listening endpoint. Compare that endpoint with the requested endpoint. |
+
+On Linux, `error.launchDiagnostics.processState.processes[]` contains best-effort `/proc` snapshots
+for observed game PIDs and the launch command PID, with `role`, `state`, `threadCount`,
+`sampledThreadCount`, `wchanSummary` (wait channel to thread count), and `unavailableWchanThreads`.
+Exited or unreadable processes have `available: false`; unavailable fields are `null`.
+`processState.supported` is `false` on platforms without this collector. These snapshots are
+observations, not backtraces. `recentLogs`, `stdio`, and `wrapperLogs` retain their existing log evidence.
+When an automatic retry succeeds, inspect `launchDiagnostics.previousAttempts[]` for the first
+attempt's complete error, including its `startupStage`, `startupHint`, process snapshot, and log paths.
+
+Under headless gamescope, native Wayland first launches stalled before the renderer and attached only
+on the automatic retry: about 105 seconds total with `--timeout-ms 90000`. X11 attached on its first
+launch in about 5 seconds under the same wrapper. For this startup problem, keep the headless wrapper
+and configure the X11 display driver in your local config:
+
+```yaml
+game:
+  launchArgs: ["--display-driver", "x11"]
+```
+
+An empty `LIBDECOR_PLUGIN_DIR` did **not** prevent the stall in testing and is not a recommended
+workaround. The logs establish a pre-render Wayland startup stall, not a specific libdecor plugin
+cause. The CLI does not change launch arguments or environment automatically.
 
 Current limitations:
 

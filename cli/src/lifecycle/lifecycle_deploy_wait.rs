@@ -452,6 +452,10 @@ fn wait_for_bridge(
                     last_error.as_ref(),
                     recent_log_cursor,
                     output_capture,
+                    &game_process_observation
+                        .as_deref()
+                        .map(|observation| observation.matched_pids())
+                        .unwrap_or_default(),
                 ));
             }
         }
@@ -521,6 +525,10 @@ fn wait_for_bridge(
                 process,
                 recent_log_cursor,
                 output_capture,
+                &game_process_observation
+                    .as_deref()
+                    .map(|observation| observation.matched_pids())
+                    .unwrap_or_default(),
             ));
         }
 
@@ -1536,6 +1544,10 @@ fn deploy_bridge(
     options: BridgeDeployOptions<'_>,
 ) -> Result<Value, AppError> {
     let semver = expected_bridge_semver(command_name)?;
+    let release_info_path = game_build::release_info_path(&layout.game_path);
+    let install_release_info = game_build::read_release_info(&layout.game_path)
+        .or_else(|| game_build::read_release_info_for_assemblies_dir(&layout.assemblies_dir));
+    ensure_known_install_lane(command_name, install_release_info.as_ref())?;
     let artifacts_root = absolute_artifacts_dir(config).join("live-bridge");
     let publish_dir = artifacts_root.join("host-publish");
     let stage_dir = artifacts_root.join("staging").join(DEPLOYED_MOD_DIR_NAME);
@@ -1551,9 +1563,6 @@ fn deploy_bridge(
     // throw on the first lobby walk. The assemblies-dir fallback uses the `..`
     // anchor `bridge-mod/Sts2GameApi.props` compiles against, so the CLI and
     // MSBuild can never disagree about which install a build was for.
-    let release_info_path = game_build::release_info_path(&layout.game_path);
-    let install_release_info = game_build::read_release_info(&layout.game_path)
-        .or_else(|| game_build::read_release_info_for_assemblies_dir(&layout.assemblies_dir));
     let install_lane = install_release_info
         .as_ref()
         .and_then(game_build::GameReleaseInfo::api_lane);
@@ -1715,6 +1724,7 @@ fn stage_source_bridge(
     install_release_info: Option<&game_build::GameReleaseInfo>,
     build: bool,
 ) -> Result<Value, AppError> {
+    ensure_known_install_lane(command_name, install_release_info)?;
     // A rejected release ZIP may have left partial files in staging before a
     // source-checkout fallback is attempted. Never mix those files into the
     // trusted source payload.
@@ -1981,6 +1991,13 @@ fn release_lane_unresolved_error(
     install_release_info: Option<&game_build::GameReleaseInfo>,
     release_info_path: &Path,
 ) -> AppError {
+    if let Some(diagnostic) = install_release_info
+        .and_then(|info| game_build::api_lane_resolution_diagnostic(&info.version))
+    {
+        let mut error = lane_resolution_error(command_name, diagnostic);
+        error.payload["error"]["releaseInfoPath"] = json!(release_info_path);
+        return error;
+    }
     let lanes = game_build::api_lanes().join(", ");
     let detail = match install_release_info {
         Some(info) => format!(
@@ -1995,6 +2012,26 @@ fn release_lane_unresolved_error(
         ),
     };
     release_error(command_name, "bridge_release_lane_unresolved", detail)
+}
+
+fn lane_resolution_error(command_name: &str, mut diagnostic: Value) -> AppError {
+    diagnostic["command"] = json!(command_name);
+    AppError {
+        exit_code: 2,
+        payload: json!({ "error": diagnostic }),
+    }
+}
+
+fn ensure_known_install_lane(
+    command_name: &str,
+    install_release_info: Option<&game_build::GameReleaseInfo>,
+) -> Result<(), AppError> {
+    if let Some(diagnostic) = install_release_info
+        .and_then(|info| game_build::api_lane_resolution_diagnostic(&info.version))
+    {
+        return Err(lane_resolution_error(command_name, diagnostic));
+    }
+    Ok(())
 }
 
 fn read_release_manifest(
