@@ -25,7 +25,7 @@ steps:
   # a loaded fixture either — the room's own scene identity is what's real here.
   - dev.assert:
       path: run.currentRoom.scene
-      equals: rooms/shop_room
+      equals: rooms/merchant_room
   - act.buy-card:
       shopItem: shop:p1:card:strike:0
   - act.leave-shop: {}

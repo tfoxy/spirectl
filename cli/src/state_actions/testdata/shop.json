@@ -89,7 +89,7 @@
   "schemaVersion": "spirectl.state-actions/v0",
   "screen": {
     "rootScene": "run",
-    "scene": "rooms/shop_room"
+    "scene": "rooms/merchant_room"
   },
   "source": {
     "actionsCatalogVersion": "spirectl.presentation.actions/v0",

@@ -5,11 +5,11 @@ steps:
       path: ../../fixtures/basic-shop.sts2.fixture.yaml
   - dev.wait-for:
       path: run.currentRoom.scene
-      equals: rooms/shop_room
+      equals: rooms/merchant_room
       timeoutMs: 5000
   - dev.assert:
       path: run.currentRoom.scene
-      equals: rooms/shop_room
+      equals: rooms/merchant_room
   - dev.assert:
       path: run.currentRoom.shop
       exists: true

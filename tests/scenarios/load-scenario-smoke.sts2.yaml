@@ -5,4 +5,4 @@ steps:
       path: ./repros/mock-shop.sts2.scenario.yaml
   - dev.assert:
       path: run.currentRoom.scene
-      equals: rooms/shop_room
+      equals: rooms/merchant_room

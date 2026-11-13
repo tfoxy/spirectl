@@ -64,7 +64,7 @@ fn mock_room_kind(scenario: MockScenario) -> (&'static str, &'static str, &'stat
         MockScenario::Shop => (
             "Shop",
             "MegaCrit.Sts2.Core.Rooms.ShopRoom",
-            "rooms/shop_room",
+            "rooms/merchant_room",
         ),
         MockScenario::Map => ("Map", "MegaCrit.Sts2.Core.Rooms.MapRoom", "rooms/map_room"),
         // `rooms/combat_room` is the scene name the action resolver keys the combat surface on

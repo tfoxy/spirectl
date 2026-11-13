@@ -18,7 +18,7 @@ steps:
       eventOption: event-room:fake-merchant:open-shop
   - dev.wait-for:
       path: run.currentRoom.scene
-      equals: rooms/shop_room
+      equals: rooms/merchant_room
       timeoutMs: 5000
   - dev.assert:
       path: run.currentRoom.shop

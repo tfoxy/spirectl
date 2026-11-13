@@ -502,7 +502,7 @@ fn checked_in_m36_fixture_scenarios_prove_usable_choice_or_notice_contracts() {
         (
             "tests/scenarios/fixture-basic-shop.sts2.yaml",
             "run.currentRoom.scene",
-            "rooms/shop_room",
+            "rooms/merchant_room",
         ),
         (
             "tests/scenarios/fixture-basic-card-selection.sts2.yaml",

@@ -5,7 +5,7 @@ steps:
       path: ../../fixtures/basic-shop-inventory.sts2.fixture.yaml
   - dev.assert:
       path: run.currentRoom.scene
-      equals: rooms/shop_room
+      equals: rooms/merchant_room
   - dev.assert:
       path: run.currentRoom.shop
       exists: true

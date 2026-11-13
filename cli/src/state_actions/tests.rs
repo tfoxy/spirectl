@@ -253,7 +253,7 @@ fn cases() -> Vec<(String, Value, PresentationModels)> {
                 "players": [{ "id": "p1" }],
                 "view": { "playerId": "p1" },
                 "currentRoom": {
-                    "scene": "rooms/shop_room",
+                    "scene": "rooms/merchant_room",
                     "shop": {
                         "inventory": {
                             "characterCardEntries": [
@@ -411,6 +411,38 @@ fn native_matches_golden() {
             golden, actual,
             "golden mismatch for `{name}` (rebless if intended)"
         );
+    }
+}
+
+#[test]
+fn merchant_room_and_legacy_alias_surface_shop_verbs() {
+    let (_, mut state, models) = cases()
+        .into_iter()
+        .find(|(name, _, _)| name == "shop")
+        .expect("shop case");
+    for scene in ["rooms/merchant_room", "rooms/shop_room"] {
+        state["run"]["currentRoom"]["scene"] = json!(scene);
+        let actual = resolve_state_actions_json(&state, &models, PerspectiveRequest::default());
+        let shop_actions: Vec<_> = actual["actions"]
+            .as_array()
+            .expect("actions array")
+            .iter()
+            .filter(|action| action["id"].as_str().unwrap().starts_with("action:shop:"))
+            .collect();
+        assert_eq!(shop_actions.len(), 4, "shop actions for {scene}");
+        for (kind, item_id) in [
+            ("buy-card", "shop:card:0"),
+            ("buy-relic", "shop:relic:0"),
+            ("buy-potion", "shop:potion:0"),
+            ("remove-card", "shop:remove:0"),
+        ] {
+            let action = shop_actions
+                .iter()
+                .find(|action| action["kind"] == kind)
+                .unwrap_or_else(|| panic!("missing {kind} for {scene}"));
+            assert_eq!(action["args"]["shopItemId"], item_id);
+            assert_eq!(action["id"], format!("action:shop:{kind}:{item_id}"));
+        }
     }
 }
 

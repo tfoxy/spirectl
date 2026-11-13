@@ -1015,6 +1015,10 @@ fn surface_rest_site(state: &Value, actions: &mut Vec<Value>) -> bool {
     true
 }
 
+pub(crate) fn is_merchant_room_scene(scene: &str) -> bool {
+    matches!(scene, "rooms/merchant_room" | "rooms/shop_room")
+}
+
 // Shop (merchant): buy a card/relic/potion, or pay to remove a card. Mirrors
 // surface_treasure's item-repeat shape. Card entries carry only `card.modelId` (no
 // embedded title), so card labels resolve through the model catalog exactly like
@@ -1022,10 +1026,10 @@ fn surface_rest_site(state: &Value, actions: &mut Vec<Value>) -> bool {
 // a `modelId` directly, like treasure relics.
 fn surface_shop(state: &Value, models: &PresentationModels, actions: &mut Vec<Value>) -> bool {
     if root_scene(state) != Some("run")
-        || state
+        || !state
             .pointer("/run/currentRoom/scene")
             .and_then(Value::as_str)
-            != Some("rooms/shop_room")
+            .is_some_and(is_merchant_room_scene)
     {
         return false;
     }

@@ -384,13 +384,35 @@ fn derive_validation_screen_id_from_state(state: &Value) -> Option<Value> {
             Some("rooms/event_room") => bridge::EVENT_ROOM_SCREEN_ID,
             Some("rooms/treasure_room") => bridge::TREASURE_ROOM_SCREEN_ID,
             Some("rooms/rest_site_room") => bridge::REST_SITE_SCREEN_ID,
-            Some("rooms/shop_room") => bridge::SHOP_SCREEN_ID,
+            Some(scene) if crate::state_actions::is_merchant_room_scene(scene) => {
+                bridge::SHOP_SCREEN_ID
+            }
             Some("rooms/map_room") => bridge::MAP_SCREEN_ID,
             _ => return None,
         },
         _ => return None,
     };
     Some(Value::String(id.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn merchant_room_and_legacy_alias_derive_shop_screen() {
+        for scene in ["rooms/merchant_room", "rooms/shop_room"] {
+            let state = json!({
+                "rootScene": "run",
+                "run": { "currentRoom": { "scene": scene } }
+            });
+            assert_eq!(
+                derive_validation_screen_id_from_state(&state),
+                Some(json!(bridge::SHOP_SCREEN_ID)),
+                "shop screen for {scene}"
+            );
+        }
+    }
 }
 
 /// Derive the recipe `combat` validation summary from current state

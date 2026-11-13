@@ -46,7 +46,7 @@ steps:
       path: ../../fixtures/basic-shop-inventory.sts2.fixture.yaml
   - dev.assert:
       path: run.currentRoom.scene
-      equals: rooms/shop_room
+      equals: rooms/merchant_room
 
   - dev.load-fixture:
       path: ../../fixtures/basic-rewards.sts2.fixture.yaml
