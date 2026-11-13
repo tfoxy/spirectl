@@ -92,10 +92,14 @@ fn act_play_card_succeeds_for_combat_mock() {
 
 #[test]
 fn tcp_transport_returns_transport_connection_failed_error() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let tcp_address = listener.local_addr().expect("listener address").to_string();
+    drop(listener);
+
     let config = AppConfig {
         transport: sts2::TransportConfig {
             kind: TransportKind::Tcp,
-            tcp_address: Some("127.0.0.1:51173".to_string()),
+            tcp_address: Some(tcp_address),
             ..sts2::TransportConfig::default()
         },
         ..AppConfig::default()

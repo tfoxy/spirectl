@@ -556,6 +556,37 @@ run_command_capture() {
   return "$status"
 }
 
+parse_cargo_test_counts() {
+  awk '
+    /^test result: (ok|FAILED)\. [0-9]+ passed; [0-9]+ failed; [0-9]+ ignored;/ {
+      passed += $4; failed += $6; skipped += $8
+    }
+    END {
+      printf "{\"passed\":%d,\"failed\":%d,\"skipped\":%d,\"total\":%d}",
+        passed, failed, skipped, passed + failed + skipped
+    }
+  ' "$1"
+}
+
+parse_dotnet_test_counts() {
+  awk -F '[:,]' '
+    /^[[:space:]]*(Passed|Failed)![[:space:]]+-[[:space:]]+Failed:/ {
+      failed += $2; passed += $4; skipped += $6; total += $8
+    }
+    END {
+      printf "{\"passed\":%d,\"failed\":%d,\"skipped\":%d,\"total\":%d}",
+        passed, failed, skipped, total
+    }
+  ' "$1"
+}
+
+bridge_test_counts_field() {
+  local output_file="$1"
+  shift
+  [[ "${2:-}" == "test" ]] || return 0
+  printf ',"tests":%s' "$(parse_dotnet_test_counts "$output_file")"
+}
+
 run_cargo_test_filter() {
   local command_name="$1"
   local package="$2"
@@ -576,11 +607,12 @@ run_cargo_test_filter() {
           (( i == 0 )) || printf ','
           printf '"%s"' "$(json_escape "${argv[$i]}")"
         done
-        printf '],"package":"%s","test":"%s","filter":"%s","diagnostics":"%s","message":"cargo test filter executed zero tests"}\n' \
+        printf '],"package":"%s","test":"%s","filter":"%s","diagnostics":"%s","message":"cargo test filter executed zero tests","tests":%s}\n' \
           "$(json_escape "$package")" \
           "$(json_escape "$test_target")" \
           "$(json_escape "$filter")" \
-          "$(json_escape "$(tail -n 80 "$output_file")")"
+          "$(json_escape "$(tail -n 80 "$output_file")")" \
+          "$(parse_cargo_test_counts "$output_file")"
       else
         cat "$output_file" >&2
         printf 'cargo test filter executed zero tests\n' >&2
@@ -596,10 +628,11 @@ run_cargo_test_filter() {
         (( i == 0 )) || printf ','
         printf '"%s"' "$(json_escape "${argv[$i]}")"
       done
-      printf '],"package":"%s","test":"%s","filter":"%s","message":"validation passed"}\n' \
+      printf '],"package":"%s","test":"%s","filter":"%s","message":"validation passed","tests":%s}\n' \
         "$(json_escape "$package")" \
         "$(json_escape "$test_target")" \
-        "$(json_escape "$filter")"
+        "$(json_escape "$filter")" \
+        "$(parse_cargo_test_counts "$output_file")"
     fi
     rm -f "$output_file"
     return 0
@@ -614,13 +647,14 @@ run_cargo_test_filter() {
       (( i == 0 )) || printf ','
       printf '"%s"' "$(json_escape "${argv[$i]}")"
     done
-    printf '],"package":"%s","test":"%s","filter":"%s","exitCode":%s,"diagnostics":"%s","message":"cargo test filter failed with exit code %s"}\n' \
+    printf '],"package":"%s","test":"%s","filter":"%s","exitCode":%s,"diagnostics":"%s","message":"cargo test filter failed with exit code %s","tests":%s}\n' \
       "$(json_escape "$package")" \
       "$(json_escape "$test_target")" \
       "$(json_escape "$filter")" \
       "$status" \
       "$(json_escape "$(tail -n 80 "$output_file")")" \
-      "$status"
+      "$status" \
+      "$(parse_cargo_test_counts "$output_file")"
   else
     cat "$output_file" >&2
     printf 'cargo test filter failed with exit code %s\n' "$status" >&2
@@ -648,10 +682,11 @@ run_cargo_unit_test_filter() {
           (( i == 0 )) || printf ','
           printf '"%s"' "$(json_escape "${argv[$i]}")"
         done
-        printf '],"package":"%s","filter":"%s","diagnostics":"%s","message":"cargo unit test filter executed zero tests"}\n' \
+        printf '],"package":"%s","filter":"%s","diagnostics":"%s","message":"cargo unit test filter executed zero tests","tests":%s}\n' \
           "$(json_escape "$package")" \
           "$(json_escape "$filter")" \
-          "$(json_escape "$(tail -n 80 "$output_file")")"
+          "$(json_escape "$(tail -n 80 "$output_file")")" \
+          "$(parse_cargo_test_counts "$output_file")"
       else
         cat "$output_file" >&2
         printf 'cargo unit test filter executed zero tests\n' >&2
@@ -667,9 +702,10 @@ run_cargo_unit_test_filter() {
         (( i == 0 )) || printf ','
         printf '"%s"' "$(json_escape "${argv[$i]}")"
       done
-      printf '],"package":"%s","filter":"%s","message":"validation passed"}\n' \
+      printf '],"package":"%s","filter":"%s","message":"validation passed","tests":%s}\n' \
         "$(json_escape "$package")" \
-        "$(json_escape "$filter")"
+        "$(json_escape "$filter")" \
+        "$(parse_cargo_test_counts "$output_file")"
     fi
     rm -f "$output_file"
     return 0
@@ -684,12 +720,13 @@ run_cargo_unit_test_filter() {
       (( i == 0 )) || printf ','
       printf '"%s"' "$(json_escape "${argv[$i]}")"
     done
-    printf '],"package":"%s","filter":"%s","exitCode":%s,"diagnostics":"%s","message":"cargo unit test filter failed with exit code %s"}\n' \
+    printf '],"package":"%s","filter":"%s","exitCode":%s,"diagnostics":"%s","message":"cargo unit test filter failed with exit code %s","tests":%s}\n' \
       "$(json_escape "$package")" \
       "$(json_escape "$filter")" \
       "$status" \
       "$(json_escape "$(tail -n 80 "$output_file")")" \
-      "$status"
+      "$status" \
+      "$(parse_cargo_test_counts "$output_file")"
   else
     cat "$output_file" >&2
     printf 'cargo unit test filter failed with exit code %s\n' "$status" >&2
@@ -740,11 +777,12 @@ emit_bridge_environment_blocked() {
       if (( first )); then first=0; else printf ','; fi
       printf '"%s"' "$(json_escape "$arg")"
     done
-    printf '],"retried":%s,"message":"%s","guidance":"%s","diagnostics":"%s"}\n' \
+    printf '],"retried":%s,"message":"%s","guidance":"%s","diagnostics":"%s"%s}\n' \
       "$retry_performed" \
       "$(json_escape "$message")" \
       "$(json_escape "$guidance")" \
-      "$(json_escape "$(tail -n 20 "$output_file")")"
+      "$(json_escape "$(tail -n 20 "$output_file")")" \
+      "$(bridge_test_counts_field "$output_file" "$@")"
   else
     cat "$output_file" >&2
     printf 'environment blocked: %s\n%s\n' "$message" "$guidance" >&2
@@ -806,8 +844,9 @@ emit_bridge_zero_tests_matched() {
       if (( first )); then first=0; else printf ','; fi
       printf '"%s"' "$(json_escape "$arg")"
     done
-    printf '],"diagnostics":"%s","message":"dotnet test filter executed zero tests"}\n' \
-      "$(json_escape "$(tail -n 80 "$output_file")")"
+    printf '],"diagnostics":"%s","message":"dotnet test filter executed zero tests"%s}\n' \
+      "$(json_escape "$(tail -n 80 "$output_file")")" \
+      "$(bridge_test_counts_field "$output_file" "$@")"
   else
     cat "$output_file" >&2
     printf 'dotnet test filter executed zero tests\n' >&2
@@ -846,7 +885,8 @@ run_bridge_command_with_locked_retry() {
         if (( first )); then first=0; else printf ','; fi
         printf '"%s"' "$(json_escape "$arg")"
       done
-      printf '],"retried":false,"cleanup":{"attempted":[],"removed":[]},"message":"validation passed"}\n'
+      printf '],"retried":false,"cleanup":{"attempted":[],"removed":[]},"message":"validation passed"%s}\n' \
+        "$(bridge_test_counts_field "$output_file" "$@")"
     fi
     rm -f "$output_file"
     return 0
@@ -886,7 +926,8 @@ run_bridge_command_with_locked_retry() {
           (( idx == 0 )) || printf ','
           printf '"%s"' "$(json_escape "${cleanup_removed[$idx]}")"
         done
-        printf ']},"message":"validation passed after locked-ref cleanup retry"}\n'
+        printf ']},"message":"validation passed after locked-ref cleanup retry"%s}\n' \
+          "$(bridge_test_counts_field "$output_file" "$@")"
       fi
       rm -f "$output_file"
       return 0
@@ -918,9 +959,10 @@ run_bridge_command_with_locked_retry() {
       (( idx == 0 )) || printf ','
       printf '"%s"' "$(json_escape "${cleanup_removed[$idx]}")"
     done
-    printf ']},"diagnostics":"%s","message":"validation command failed with exit code %s"}\n' \
+    printf ']},"diagnostics":"%s","message":"validation command failed with exit code %s"%s}\n' \
       "$(json_escape "$(tail -n 80 "$output_file")")" \
-      "$status"
+      "$status" \
+      "$(bridge_test_counts_field "$output_file" "$@")"
   else
     cat "$output_file" >&2
     printf 'validation command failed with exit code %s\n' "$status" >&2
@@ -1759,6 +1801,11 @@ strip_json_flag() {
     _out+=("$arg")
   done
 }
+
+# Allow focused tests to source the parsers and command wrappers without dispatching a leg.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+  return 0
+fi
 
 command="${1:-}"
 if [[ -z "$command" || "$command" == "-h" || "$command" == "--help" ]]; then

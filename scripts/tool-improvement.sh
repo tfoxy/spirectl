@@ -2,13 +2,18 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-target_file="${SPIRECTL_TOOL_IMPROVEMENT_FILE:-$repo_root/.ai/tool-improvements.md}"
+feedback_root="$repo_root"
+if common_dir="$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"; then
+  feedback_root="$(dirname "$common_dir")"
+fi
+target_file="${SPIRECTL_TOOL_IMPROVEMENT_FILE:-$feedback_root/.ai/tool-improvements.md}"
 
 usage() {
   cat <<'EOF'
 Usage: scripts/tool-improvement.sh add --title <title> --tool <tool> --problem <problem> --why <why> --example <example> --suggestion <suggestion>
 
-Adds a request to .ai/tool-improvements.md with the current local timestamp.
+Adds a request to the main checkout's .ai/tool-improvements.md with the current local timestamp.
+SPIRECTL_TOOL_IMPROVEMENT_FILE overrides the destination.
 EOF
 }
 
@@ -30,7 +35,7 @@ now_timestamp() {
   fi
 }
 
-add_request() {
+add_request() (
   local title="" tool="" problem="" why="" example="" suggestion=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -81,6 +86,7 @@ add_request() {
 
   local entry
   entry="$(mktemp "${TMPDIR:-/tmp}/spirectl-tool-improvement.XXXXXX")"
+  trap 'rm -f -- "$entry"' EXIT
   local timestamp
   timestamp="$(now_timestamp)"
   {
@@ -99,13 +105,13 @@ import sys
 
 target = Path(sys.argv[1])
 entry = Path(sys.argv[2]).read_text(encoding="utf-8")
-text = target.read_text(encoding="utf-8")
 marker = "<!-- Add new requests above this line. -->"
+target.parent.mkdir(parents=True, exist_ok=True)
+text = target.read_text(encoding="utf-8") if target.exists() else f"# Tool improvement requests\n\n{marker}\n"
 if marker not in text:
     raise SystemExit(f"marker not found in {target}")
 target.write_text(text.replace(marker, entry + marker, 1), encoding="utf-8")
 PY
-  rm -f "$entry"
 
   if [[ "${SPIRECTL_TOOL_IMPROVEMENT_JSON:-}" == "true" ]]; then
     printf '{"status":"added","path":"%s","timestamp":"%s","title":"%s"}\n' \
@@ -113,7 +119,7 @@ PY
       "$(json_escape "$timestamp")" \
       "$(json_escape "$title")"
   fi
-}
+)
 
 case "${1:-}" in
   add)

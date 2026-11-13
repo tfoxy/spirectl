@@ -53,6 +53,29 @@ expect deny 'cargo test -p sts2 --test dev_workflows some_case'
 expect deny 'cargo test --test cli_snapshots snapshot_help'
 expect deny 'dotnet build bridge-mod/src/Spirectl.BridgeMod.Sts2Host/Spirectl.BridgeMod.Sts2Host.csproj'
 expect deny 'dotnet test bridge-mod/tests/Spirectl.BridgeMod.Tests/Spirectl.BridgeMod.Tests.csproj'
+expect deny 'dotnet build x.csproj'
+expect deny 'cd x && dotnet test y'
+expect deny "bash -c 'dotnet build'"
+expect deny 'true; cargo test -p sts2 nosuchfilter'
+expect deny 'cargo test -p sts2 nosuchfilter; cargo test -p sts2'
+expect deny 'cargo test -p sts2; cargo test -p sts2 nosuchfilter'
+expect deny 'dotnet build x -m:1; dotnet test y'
+expect deny 'scripts/validate.sh bridge-tests && cargo test -p sts2 typo'
+expect deny 'true || dotnet build x'
+expect deny 'true | dotnet build x'
+expect deny $'true\ndotnet build x'
+expect deny '(dotnet build x)'
+expect deny 'echo $(dotnet build x)'
+expect deny "sh -c 'cargo test -p sts2 typo'"
+expect deny 'echo "$(dotnet build x)"'
+expect deny 'echo "$(echo $(true); dotnet build x)"'
+expect deny 'echo "$(echo $(true); cargo test -p sts2 typo)"'
+expect deny 'echo $(true; dotnet build x)'
+expect deny "echo \"\$(echo ')'; dotnet build x)\""
+expect deny 'echo "$(echo \); cargo test typo)"'
+expect deny 'echo pre$(true; dotnet build x)post'
+expect deny 'BUILD_MODE=test dotnet build x'
+expect deny "bash -lc 'cargo +stable test --package sts2 typo'"
 expect deny "flock /tmp/sts2-dotnet-build.lock -c 'dotnet build spirectl.sln -m:1'"
 expect deny "flock -w 600 /tmp/sts2-dotnet-build.lock -c 'scripts/validate.sh bridge-tests'"
 
@@ -74,6 +97,24 @@ expect allow "flock --close /tmp/sts2-dotnet-build.lock -c 'scripts/validate.sh 
 expect allow "flock -no /tmp/sts2-dotnet-build.lock -c 'scripts/validate.sh bridge-tests'"
 expect allow 'flock /tmp/sts2-dotnet-build.lock echo no-command-flag'
 expect allow 'npm --prefix npm-wrapper test'
+expect allow 'pgrep -af "MSBuild\|dotnet build"'
+expect allow 'echo waiting for dotnet build'
+expect allow 'git commit -m "note: cargo test foo"'
+expect allow $'cat <<\'EOF\'\ndotnet build x\ncargo test -p sts2 bar\nEOF'
+expect allow $'cat <<\'EOF\'\nx\nEOF\n# don\'t worry'
+expect allow $'cat <<-"EOF"\n\tdotnet build x\n\tcargo test -p sts2 bar\n\tEOF'
+expect allow 'echo "true; dotnet build x"'
+expect allow "echo 'true; cargo test -p sts2 typo'"
+expect allow '# dotnet build x'
+expect allow $'git commit -m "note:\ndotnet build x\ncargo test typo"'
+expect allow 'echo "\$(dotnet build x)"'
+expect allow 'echo $(true) dotnet build x'
+expect allow 'echo $(true) cargo test typo'
+expect allow "echo '\$(dotnet build x)'"
+expect allow 'echo "cat <<EOF"; echo "dotnet build x"'
+expect allow $'cat <<FIRST <<SECOND\ndotnet build x\nFIRST\ncargo test typo\nSECOND'
+expect allow 'cargo test -p sts2 --test cli_snapshots; cargo test -p sts2'
+expect deny $'cat <<EOF\ndotnet build ignored\nEOF\ndotnet build real'
 
 echo "== must block: force-adding the private companion =="
 expect deny 'git add -f private'

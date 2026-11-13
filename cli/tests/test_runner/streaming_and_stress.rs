@@ -902,6 +902,10 @@ fn test_run_reports_empty_directory() {
 
 #[test]
 fn test_run_uses_highest_nonzero_exit_code() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind listener");
+    let tcp_address = listener.local_addr().expect("listener address").to_string();
+    drop(listener);
+
     let scenario = write_scenario(
         r#"
 name: tcp-failure
@@ -912,7 +916,7 @@ steps:
     let config = write_config(&AppConfig {
         transport: sts2::TransportConfig {
             kind: TransportKind::Tcp,
-            tcp_address: Some("127.0.0.1:51173".to_string()),
+            tcp_address: Some(tcp_address),
             ..sts2::TransportConfig::default()
         },
         ..AppConfig::default()
