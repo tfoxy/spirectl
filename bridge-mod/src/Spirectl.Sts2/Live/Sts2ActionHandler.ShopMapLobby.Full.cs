@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.Runs;
 using Godot;
 using Spirectl.Sts2.Core.Actions;
 using Spirectl.Sts2.Core.Logging;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -773,12 +774,44 @@ public sealed partial class Sts2ActionHandler
                 ]);
         }
 
-        if (!TryInvokeCancelEndTurn(combatContext.ActionOwnerPlayer))
+        return ExecuteCancelEndTurn(
+            request,
+            combatContext.ActionOwnerPlayerId,
+            () => combatContext.ActionOwnerPlayer is null
+                || CombatManager.Instance is null
+                || GameApiCombatActions.CanUndoReadyToEndTurn(CombatManager.Instance, combatContext.ActionOwnerPlayer),
+            () => TryInvokeCancelEndTurn(combatContext.ActionOwnerPlayer));
+    }
+
+    internal ActionExecutionResult ExecuteCancelEndTurn(
+        SemanticActionRequest request,
+        string? playerId,
+        Func<bool> canUndo,
+        Func<bool?> undo)
+    {
+        // A lane can refuse cancellation even while the seat is ready.
+        var cancelled = canUndo() ? undo() : false;
+        if (cancelled is false)
+        {
+            return ActionExecutionResult.Failure(
+                kind: request.Kind,
+                code: ActionFailureCode.InvalidAction,
+                message: "The game does not allow this seat to cancel its end turn right now.",
+                details:
+                [
+                    new ActionFailureDetail(
+                        Field: "player_id",
+                        Value: playerId ?? string.Empty,
+                        Note: "The game does not allow this seat to cancel its end turn right now."),
+                ]);
+        }
+
+        if (cancelled is null)
         {
             _logStream.Write(
                 BridgeLogLevel.Error,
                 "bridge.action",
-                $"No callable cancel-end-turn hook was found for player '{combatContext.ActionOwnerPlayerId ?? "unknown"}'.");
+                $"No callable cancel-end-turn hook was found for player '{playerId ?? "unknown"}'.");
             return ActionExecutionResult.Failure(
                 kind: request.Kind,
                 code: ActionFailureCode.MissingHook,
@@ -787,7 +820,7 @@ public sealed partial class Sts2ActionHandler
                 [
                     new ActionFailureDetail(
                         Field: "player_id",
-                        Value: combatContext.ActionOwnerPlayerId ?? string.Empty,
+                        Value: playerId ?? string.Empty,
                         Note: "The active combat controller did not expose any recognized undo-end-turn callback."),
                 ]);
         }
@@ -795,11 +828,11 @@ public sealed partial class Sts2ActionHandler
         _logStream.Write(
             BridgeLogLevel.Info,
             "bridge.action",
-            $"Executed cancel-end-turn for '{combatContext.ActionOwnerPlayerId ?? "local"}'.");
+            $"Executed cancel-end-turn for '{playerId ?? "local"}'.");
         return ActionExecutionResult.Success(
             actionInstanceId: $"action:cancel-end-turn:{request.RequestId}",
             kind: request.Kind,
-            message: $"Cancelled pending end-turn for '{combatContext.ActionOwnerPlayerId ?? "local"}'.");
+            message: $"Cancelled pending end-turn for '{playerId ?? "local"}'.");
     }
 
     private ActionExecutionResult ExecuteReady(SemanticActionRequest request)
@@ -1093,10 +1126,9 @@ public sealed partial class Sts2ActionHandler
             id = netId,
             slotId = slotId,
             character = character,
-            unlockState = localPlayer.unlockState,
-            maxMultiplayerAscensionUnlocked = localPlayer.maxMultiplayerAscensionUnlocked,
             isReady = false,
         };
+        GameApiLobbyPlayer.CopyUnlockState(ref syntheticPlayer, localPlayer);
         lobbyContext.StartRunLobby.Players.Add(syntheticPlayer);
         Sts2HostLocalSeatRegistry.RegisterSyntheticSeat(netId, displayName);
         RefreshSyntheticStartRunLobbyPlayerUi(lobbyContext.ScreenObject, syntheticPlayer);

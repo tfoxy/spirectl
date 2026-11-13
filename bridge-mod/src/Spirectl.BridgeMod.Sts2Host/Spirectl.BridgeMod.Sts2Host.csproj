@@ -65,12 +65,19 @@
   </ItemGroup>
 
   <!-- `global using` aliases are per-compilation, so this assembly needs the same lane alias file
-       Spirectl.Sts2 compiles. The lane accessors themselves come across as internals (InternalsVisibleTo). -->
+       Spirectl.Sts2 compiles. Shared lane accessors come across as internals (InternalsVisibleTo);
+       fixture adapters compile only here. -->
   <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v107'">
     <Compile Include="..\Spirectl.Sts2\GameApi\V107\GameApiAliases.cs" Link="GameApi\GameApiAliases.cs" />
+    <Compile Include="..\Spirectl.Sts2\GameApi\V107\GameApiFixtures.cs" Link="GameApi\GameApiFixtures.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v111'">
     <Compile Include="..\Spirectl.Sts2\GameApi\V111\GameApiAliases.cs" Link="GameApi\GameApiAliases.cs" />
+    <Compile Include="..\Spirectl.Sts2\GameApi\V111\GameApiFixtures.cs" Link="GameApi\GameApiFixtures.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v113'">
+    <Compile Include="..\Spirectl.Sts2\GameApi\V113\GameApiAliases.cs" Link="GameApi\GameApiAliases.cs" />
+    <Compile Include="..\Spirectl.Sts2\GameApi\V113\GameApiFixtures.cs" Link="GameApi\GameApiFixtures.cs" />
   </ItemGroup>
 
   <Target Name="ValidateSts2LiveHostReferences" BeforeTargets="ResolveReferences" Condition="'$(EnableSts2LiveHost)' == 'true'">

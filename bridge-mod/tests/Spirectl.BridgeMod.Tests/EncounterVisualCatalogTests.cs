@@ -359,7 +359,7 @@ public sealed class EncounterVisualCatalogTests
             .Where(encounter => Overrides(encounter, nameof(Sts2Live::MegaCrit.Sts2.Core.Models.EncounterModel.GetCameraOffset)))
             .ToArray();
 
-#if STS2_API_V111
+#if STS2_API_V111 || STS2_API_V113
         Assert.Equal(24, scalingOverrides.Length);
 #else
         Assert.Equal(23, scalingOverrides.Length);

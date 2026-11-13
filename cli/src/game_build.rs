@@ -183,12 +183,14 @@ mod tests {
     fn lane_table_resolves_supported_builds_and_refuses_to_guess() {
         assert_eq!(api_lane_for_game_version("v0.107.1"), Some("v107"));
         assert_eq!(api_lane_for_game_version("v0.111.0"), Some("v111"));
+        assert_eq!(api_lane_for_game_version("v0.113.0"), Some("v113"));
         assert_eq!(api_lane_for_game_version("v0.999.0"), None);
         assert_eq!(api_lane_for_game_version(""), None);
         // A prefix of a mapped version must not borrow that version's row.
         assert_eq!(api_lane_for_game_version("v0.107"), None);
         assert!(api_lanes().contains(&"v107"));
         assert!(api_lanes().contains(&"v111"));
+        assert!(api_lanes().contains(&"v113"));
     }
 
     #[test]
@@ -202,6 +204,7 @@ mod tests {
                 "{lane} is releasable but not supported"
             );
         }
+        assert!(!is_releasable_api_lane("v113"));
         assert!(!is_releasable_api_lane("v999"));
         assert!(!is_releasable_api_lane(""));
     }

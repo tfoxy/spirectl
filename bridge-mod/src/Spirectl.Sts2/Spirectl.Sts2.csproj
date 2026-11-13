@@ -480,11 +480,15 @@
   <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
     <Compile Include="GameApi/*.cs" />
   </ItemGroup>
+  <!-- Fixture lane adapters compile only in Spirectl.BridgeMod.Sts2Host. -->
   <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v107'">
-    <Compile Include="GameApi/V107/**/*.cs" />
+    <Compile Include="GameApi/V107/**/*.cs" Exclude="GameApi/V107/GameApiFixtures.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v111'">
-    <Compile Include="GameApi/V111/**/*.cs" />
+    <Compile Include="GameApi/V111/**/*.cs" Exclude="GameApi/V111/GameApiFixtures.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v113'">
+    <Compile Include="GameApi/V113/**/*.cs" Exclude="GameApi/V113/GameApiFixtures.cs" />
   </ItemGroup>
 
   <!-- Embedded profile: what an in-process embedder (CouchCoop's private copy) does not compile, and the files

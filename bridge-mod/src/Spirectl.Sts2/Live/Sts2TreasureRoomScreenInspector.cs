@@ -3,6 +3,7 @@ using System.Text;
 using Godot;
 using Spirectl.Sts2.Core.Actions;
 using Spirectl.Sts2.Core.State;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -165,35 +166,7 @@ internal static class Sts2TreasureRoomScreenInspector
             return [];
         }
 
-        var holders = new List<object>();
-        if (Sts2LiveIntrospection.GetMemberValue(relicCollection, "_holdersInUse") is IEnumerable activeHolders)
-        {
-            foreach (var holder in activeHolders)
-            {
-                if (holder is not null)
-                {
-                    holders.Add(holder);
-                }
-            }
-        }
-
-        if (holders.Count == 0
-            && Sts2LiveIntrospection.GetMemberValue(relicCollection, "SingleplayerRelicHolder") is { } singleplayerHolder)
-        {
-            holders.Add(singleplayerHolder);
-        }
-
-        if (holders.Count == 0
-            && Sts2LiveIntrospection.GetMemberValue(relicCollection, "_multiplayerHolders") is IEnumerable multiplayerHolders)
-        {
-            foreach (var holder in multiplayerHolders)
-            {
-                if (holder is not null)
-                {
-                    holders.Add(holder);
-                }
-            }
-        }
+        var holders = GameApiTreasure.Holders(relicCollection);
 
         var choices = new List<ResolvedTreasureRoomChoice>();
         var seenChoiceIds = new HashSet<string>(StringComparer.Ordinal);

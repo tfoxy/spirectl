@@ -14,6 +14,8 @@ What `spirectl` can do today, grouped by area. Each line points at the doc with 
 - Bounded graceful shutdown (`sts2 game close`) and an explicit force path (`sts2 game kill`).
 - `sts2 game bridge-health` is the read-only preflight: it distinguishes missing, stale, timed-out, version-mismatched
   and wrong-game-build bridges without mutating anything. `sts2 dev visual-preflight` adds lifecycle and artifact checks.
+- Source builds select API lanes `v107` (v0.107.1), `v111` (v0.111.0), and `v113` (v0.113.0).
+  Released bridge payloads currently cover `v107`; the beta lanes require a source checkout.
 - Live transport over Unix-domain sockets, Windows named pipes, or loopback TCP. See [CLI](cli.md).
 
 ## Runtime state

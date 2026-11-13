@@ -16,12 +16,12 @@
 
     Outputs: `$(Sts2GameApi)` (the lane), `$(Sts2GameVersion)` and `$(Sts2GameMainAssemblyHash)` (the
     detected game build's identity, both empty when undetectable) and one of the
-    `STS2_API_V107` / `STS2_API_V111` compile constants. `Directory.Build.props` stamps all three into
+    `STS2_API_V107` / `STS2_API_V111` / `STS2_API_V113` compile constants. `Directory.Build.props` stamps all three into
     the bridge assembly, which is how a loaded bridge can say which build it was compiled for.
 
     Adding a build: add its `version=lane` row to `Sts2GameApiLaneTable`. Adding a lane: add it to
     `Sts2GameApiLanes`, create `src/Spirectl.Sts2/GameApi/<lane>/`, and add the lane's `ItemGroup`s to
-    `src/Spirectl.Sts2/Spirectl.Sts2.csproj` (plus the alias link in
+    `src/Spirectl.Sts2/Spirectl.Sts2.csproj` (plus the alias and host-only adapter links in
     `src/Spirectl.BridgeMod.Sts2Host/Spirectl.BridgeMod.Sts2Host.csproj`).
 
     This file is also read by `cli/build.rs` and by the CouchCoop repo's root `Directory.Build.props`, so
@@ -31,16 +31,17 @@
     <Sts2GameApiTableFile>$(MSBuildThisFileFullPath)</Sts2GameApiTableFile>
 
     <!-- Every lane that has a `src/Spirectl.Sts2/GameApi/<lane>/` directory, oldest first. -->
-    <Sts2GameApiLanes>v107;v111</Sts2GameApiLanes>
+    <Sts2GameApiLanes>v107;v111;v113</Sts2GameApiLanes>
 
     <!--
       THE TABLE. One `<release_info.json version>=<lane>` row per supported game build, semicolon
       delimited and semicolon fenced at both ends so a row lookup is an exact match on `;<version>=`.
 
         v0.107.1 -> v107   the stable branch
-        v0.111.0 -> v111   the public-beta branch
+        v0.111.0 -> v111   the previous public-beta build
+        v0.113.0 -> v113   the public-beta branch
     -->
-    <Sts2GameApiLaneTable>;v0.107.1=v107;v0.111.0=v111;</Sts2GameApiLaneTable>
+    <Sts2GameApiLaneTable>;v0.107.1=v107;v0.111.0=v111;v0.113.0=v113;</Sts2GameApiLaneTable>
 
     <!--
       THE SUBSET THAT CAN BE RELEASED. A released bridge payload is compiled against the locked,
@@ -98,6 +99,10 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Sts2GameApi)' == 'v111'">
     <DefineConstants>$(DefineConstants);STS2_API_V111</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Sts2GameApi)' == 'v113'">
+    <DefineConstants>$(DefineConstants);STS2_API_V113</DefineConstants>
   </PropertyGroup>
 
   <!--

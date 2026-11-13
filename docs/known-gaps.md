@@ -12,6 +12,7 @@ Each entry is marked **limitation** (may change) or **non-goal** (deliberately o
 
 ## Runtime state and actions
 
+- **Limitation:** rest-site `smithCount` is unavailable on API lane `v113` and remains unset.
 - **Limitation:** modded or unmodeled non-combat controls have no typed intent action. `sts2 act choose` is the
   explicit fallback for generic, modded or unmodeled visible choices that have no `preferredAction`.
 - **Limitation:** live screen coverage is the documented set (see [capabilities](capabilities.md#runtime-state)).
@@ -54,7 +55,7 @@ Each entry is marked **limitation** (may change) or **non-goal** (deliberately o
 - **Limitation:** `game install-bridge`'s `contentHash` skip does not fire after a real build, because the build
   stamps `SpirectlBridgeBuiltAtUtc` with the wall clock. `--no-build` installs do skip unchanged content.
 - **Limitation:** released bridge payloads exist only for the game build the declaration-only reference SDK
-  (`eng/Sts2.ReferenceSdk`) declares. Other API lanes work from a source checkout; `install-bridge --no-build`
+  (`eng/Sts2.ReferenceSdk`) declares. The `v111` and `v113` API lanes require a source checkout; `install-bridge --no-build`
   refuses an unreleasable lane with `bridge_release_lane_unreleasable`.
 - **Limitation:** the `Spirectl.Sts2` NuGet package carries one STS2 API lane. An embedder targeting another game
   build builds `Spirectl.Sts2` from source with `-p:Sts2GameApi=<lane>`.

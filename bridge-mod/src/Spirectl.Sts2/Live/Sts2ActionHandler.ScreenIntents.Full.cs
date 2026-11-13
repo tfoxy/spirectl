@@ -5,6 +5,7 @@ using MegaCrit.Sts2.Core.Runs;
 using Godot;
 using Spirectl.Sts2.Core.Actions;
 using Spirectl.Sts2.Core.Logging;
+using Spirectl.Sts2.Live.GameApi;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Spirectl.Sts2.Live;
@@ -1585,17 +1586,12 @@ public sealed partial class Sts2ActionHandler
             return result;
         }
 
-        // Headless/browser fallback: the live relic holder is frequently not reported visible/populated to
-        // the choice inspector (the in-engine UI click that normally finishes the chest never happens),
-        // so no per-relic choice matches and the standard path above can't find the control. A
-        // singleplayer chest has exactly one relic in the SingleplayerRelicHolder, so pick it directly via
-        // the same PickRelic(holder) hook the debug treasure resolver uses. This unblocks the chest
-        // (canProceed flips) so proceed-treasure-room can actually leave the room. Multiplayer relic CHOICE
-        // (multiple holders) still flows through the per-relic choices above.
+        // A sole relic can be picked even when its control has not become visible. Multiple relics
+        // still require an explicit choice through the normal path above.
         if (TryResolveTreasureRoomContext(out var treasureRoomContext)
             && treasureRoomContext.RelicCollection is not null)
         {
-            var holder = Sts2LiveIntrospection.GetMemberValue(treasureRoomContext.RelicCollection, "SingleplayerRelicHolder");
+            var holder = GameApiTreasure.SingleplayerHolder(treasureRoomContext.RelicCollection);
             if (holder is not null
                 && Sts2LiveIntrospection.TryInvokeMethod(treasureRoomContext.RelicCollection, "PickRelic", holder))
             {

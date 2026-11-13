@@ -3,14 +3,18 @@ using MegaCrit.Sts2.Core.Bindings.MegaSpine;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Merchant;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Entities.RestSite;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Multiplayer;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
+using MegaCrit.Sts2.Core.Nodes.Screens.TreasureRoomRelic;
 using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.ValueProps;
 
 namespace Spirectl.Sts2.Live.GameApi;
@@ -38,6 +42,8 @@ internal static class GameApiManifest
     [
         // ── The start-run lobby roster ───────────────────────────────────────────────────────────────
 #if !SPIRECTL_PROFILE_EMBEDDED
+        new(typeof(GameLobbyPlayer), GameApiLobbyPlayer.AscensionMember, GameApiMemberKind.Value,
+            Note: "the standard-run ascension limit reported for a lobby seat"),
         new(typeof(StartRunLobby), GameApiNames.LobbyMaxPlayers, GameApiMemberKind.Value,
             Note: "the lobby's live player cap; without it every seat-count limit sizes off a constant"),
 #endif
@@ -146,6 +152,25 @@ internal static class GameApiManifest
         new(typeof(NetHostGameService), ".ctor", GameApiMemberKind.Constructor,
             [typeof(PeerVersionInfo)],
             "the host net service every live lobby fixture starts"),
+#endif
+
+#if !SPIRECTL_PROFILE_EMBEDDED
+        new(typeof(MerchantRoom), "GetLocalInventory", GameApiMemberKind.Method,
+            [], "resolves the local inventory for typed shop state"),
+        new(typeof(MerchantEntry), GameApiMerchantPurchase.PurchaseMember, GameApiMemberKind.Method,
+            [typeof(MerchantInventory), typeof(bool)],
+            "purchases the selected merchant entry for its owning seat"),
+        new(typeof(MerchantCardRemovalEntry), GameApiMerchantPurchase.PurchaseMember, GameApiMemberKind.Method,
+            [typeof(MerchantInventory), typeof(bool), typeof(bool)],
+            "purchases card removal with cancellation enabled"),
+        new(typeof(SmithRestSiteOption), GameApiRestSite.SmithCountMember, GameApiMemberKind.Value,
+            Note: "optional smithing progress in the rest-site state"),
+        new(typeof(NTreasureRoomRelicCollection), GameApiTreasure.SingleplayerHolderMember, GameApiMemberKind.Value,
+            Note: "the sole relic used by headless treasure actions"),
+        new(typeof(NTreasureRoomRelicCollection), GameApiTreasure.MultiplayerHoldersMember, GameApiMemberKind.Value,
+            Note: "fallback treasure choices when active holders are not populated"),
+        new(typeof(NTreasureRoomRelicCollection), GameApiTreasure.ActiveHoldersMember, GameApiMemberKind.Value,
+            Note: "the relic choices exposed by the treasure screen"),
 #endif
     ];
 }

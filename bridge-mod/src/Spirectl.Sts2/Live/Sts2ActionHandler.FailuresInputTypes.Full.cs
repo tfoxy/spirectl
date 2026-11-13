@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
 using Spirectl.Sts2.Core.Actions;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -137,9 +138,8 @@ public sealed partial class Sts2ActionHandler
             return accepted;
         }
 
-        var result = shopChoice.RequiresCancelableWrapper
-            ? Sts2LiveIntrospection.InvokeMethod(shopChoice.Entry, "OnTryPurchaseWrapper", inventory, false, true)
-            : Sts2LiveIntrospection.InvokeMethod(shopChoice.Entry, "OnTryPurchaseWrapper", inventory, false);
+        var result = GameApiMerchantPurchase.Purchase(
+            shopChoice.Entry, inventory, shopChoice.RequiresCancelableWrapper);
         if (result is null)
         {
             accepted = false;

@@ -49,6 +49,7 @@ using Spirectl.Sts2.Core.Logging;
 using Spirectl.Sts2.Core.Perspective;
 using Spirectl.Sts2.Core.Protocol;
 using Spirectl.Sts2;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -373,7 +374,7 @@ public sealed partial class Sts2FixtureLoader
                     "NRun.Instance was null while preparing the game-over screen.");
             }
 
-            run.ShowGameOverScreen(serializableRun);
+            GameApiFixtures.ShowGameOverScreen(run, serializableRun);
 
             await AwaitFixtureRenderFramesAsync(FixtureRenderWarmupFrames);
 

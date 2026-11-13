@@ -207,6 +207,7 @@ public sealed class Sts2CompileProfileTests
     [Theory]
     [InlineData("V107")]
     [InlineData("V111")]
+    [InlineData("V113")]
     public void EmbeddedProfileHasNoExcludedGameApiHelpers(string lane)
     {
         var source = File.ReadAllText(Path.Combine(
@@ -416,21 +417,36 @@ public sealed class Sts2CompileProfileTests
         {
             "V107",
             [
-                "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
+                "AscensionMember", "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
                 "PlayerCanRemoveOrUsePotions", "ModifyDamage",
                 "PlayerConnected", "PlayerChanged",
                 "CombatPlayersReadyToBeginEnemyTurn",
                 "MainMenuBlurBackstop", ".ctor",
+                "GetLocalInventory", "PurchaseMember", "PurchaseMember", "SmithCountMember",
+                "SingleplayerHolderMember", "MultiplayerHoldersMember", "ActiveHoldersMember",
             ]
         },
         {
             "V111",
             [
-                "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
+                "AscensionMember", "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
                 "PlayerCanRemoveOrUsePotions", "ModifyDamage",
                 "PlayerConnected", "PlayerChanged",
                 "CombatTurnState", "TurnStatePlayersReadyToBeginEnemyTurn",
                 "MainMenuBlurBackstop", ".ctor",
+                "GetLocalInventory", "PurchaseMember", "PurchaseMember", "SmithCountMember",
+                "SingleplayerHolderMember", "MultiplayerHoldersMember", "ActiveHoldersMember",
+            ]
+        },
+        {
+            "V113",
+            [
+                "AscensionMember", "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
+                "PlayerCanRemoveOrUsePotions", "ModifyDamage",
+                "PlayerConnected", "PlayerChanged",
+                "CombatTurnState", "TurnStatePlayersReadyToBeginEnemyTurn",
+                "MainMenuBlurBackstop", ".ctor",
+                "PurchaseMember", "ActiveHoldersMember",
             ]
         },
     };
@@ -442,8 +458,8 @@ public sealed class Sts2CompileProfileTests
         var manifest = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(), "bridge-mod/src/Spirectl.Sts2/GameApi", lane, "GameApiManifest.cs"));
 
-        // The members an entry names: a GameApiNames constant, a nameof member, or a short quoted name.
-        var member = new Regex(@"GameApiNames\.(\w+)|nameof\(\w+\.(\w+)\)|""(\w+|\.ctor)""", RegexOptions.CultureInvariant);
+        // The members an entry names: a lane constant, a nameof member, or a short quoted name.
+        var member = new Regex(@"(?:GameApiNames|GameApiLobbyPlayer|GameApiMerchantPurchase|GameApiTreasure|GameApiRestSite)\.(\w+)|nameof\(\w+\.(\w+)\)|""(\w+|\.ctor)""", RegexOptions.CultureInvariant);
         string[] Members(string text) =>
         [
             .. member.Matches(text).Select(match => match.Groups.Cast<Group>().Skip(1).First(group => group.Success).Value),

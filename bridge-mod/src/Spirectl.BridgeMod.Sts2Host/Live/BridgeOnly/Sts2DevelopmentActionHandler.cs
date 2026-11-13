@@ -28,6 +28,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
 using Spirectl.Sts2.Core.Actions;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -813,7 +814,7 @@ public sealed class Sts2DevelopmentActionHandler : IActionHandler
             var relicCollection = Traverse.Create(treasureRoom).Field("_relicCollection").GetValue();
             var holder = relicCollection is null
                 ? null
-                : Traverse.Create(relicCollection).Property("SingleplayerRelicHolder").GetValue();
+                : GameApiTreasure.SingleplayerHolder(relicCollection);
             if (relicCollection is not null && holder is not null)
             {
                 GD.Print("[AUTOPLAY] treasure: picking relic");

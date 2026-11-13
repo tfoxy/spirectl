@@ -2175,15 +2175,15 @@ public sealed partial class Sts2FixtureLoader : IFixtureLoader
 
         foreach (var remotePlayer in recipe.RemotePlayers)
         {
-            lobby.Players.Add(new GameLobbyPlayer
+            var fixturePlayer = new GameLobbyPlayer
             {
                 id = remotePlayer.NetId,
                 slotId = remotePlayer.SlotId,
                 character = remotePlayer.Character,
-                unlockState = localPlayer.unlockState,
-                maxMultiplayerAscensionUnlocked = localPlayer.maxMultiplayerAscensionUnlocked,
                 isReady = remotePlayer.IsReady,
-            });
+            };
+            GameApiLobbyPlayer.CopyUnlockState(ref fixturePlayer, localPlayer);
+            lobby.Players.Add(fixturePlayer);
         }
     }
 
@@ -3218,8 +3218,7 @@ public sealed partial class Sts2FixtureLoader : IFixtureLoader
             return true;
         }
 
-        var merchantRoom = NMerchantRoom.Instance?.Room;
-        if (merchantRoom?.GetLocalInventory() is not MerchantInventory inventory)
+        if (GameApiMerchant.LocalInventory(NMerchantRoom.Instance) is not MerchantInventory inventory)
         {
             invalid = RuntimeFailure(request, "shop", "The live merchant room did not expose an inventory to customize.");
             return false;

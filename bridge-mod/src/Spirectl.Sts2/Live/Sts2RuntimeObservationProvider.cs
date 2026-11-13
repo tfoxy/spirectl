@@ -1179,7 +1179,7 @@ public sealed class Sts2RuntimeObservationProvider : IRuntimeObservationProvider
         {
             var currentRoom = Sts2LiveIntrospection.GetMemberValue(runState, "CurrentRoom");
             var inventory = Sts2LiveIntrospection.GetMemberValue(currentRoom, "Inventory")
-                ?? NMerchantRoom.Instance?.Room?.GetLocalInventory()
+                ?? GameApiMerchant.LocalInventory(NMerchantRoom.Instance)
                 ?? Sts2LiveIntrospection.GetMemberValue(screenObject, "Inventory");
             shopChoices = Sts2ShopScreenInspector.ResolveInventoryChoices(inventory, localPlayerId, notices);
         }

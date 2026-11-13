@@ -1169,7 +1169,7 @@ payload is valid for one build and not another. A payload in the wrong install *
 game under a correctly-installed bridge is exactly that, so the identity is bound at both ends.
 
 `bridge-mod/Sts2GameApi.props` is the one table mapping an install's `release_info.json` `version` to an
-**STS2 API lane** (`v107`, `v111`). MSBuild reads it to choose which `src/Spirectl.Sts2/GameApi/<lane>/`
+**STS2 API lane** (`v107`, `v111`, `v113`). MSBuild reads it to choose which `src/Spirectl.Sts2/GameApi/<lane>/`
 sources compile, the CouchCoop repo imports it, and `cli/build.rs` compiles it into the CLI —
 `scripts/sts2-api-lanes.sh` prints the lane list for shell callers. There is no second copy to keep in sync.
 

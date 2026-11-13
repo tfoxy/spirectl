@@ -19,6 +19,7 @@ using MegaCrit.Sts2.Core.Runs;
 using Spirectl.Sts2.Core.Models;
 using Spirectl.Sts2.Core.State;
 using Spirectl.Sts2.Core.Perspective;
+using Spirectl.Sts2.Live.GameApi;
 using System.Reflection;
 
 namespace Spirectl.Sts2.Live;
@@ -418,10 +419,10 @@ internal static class RoomStateBuilder
         var shopNotices = new List<StateNoticeSnapshot>();
         try
         {
-            var inventory = Sts2LiveIntrospection.InvokeMethod(currentRoom, "GetLocalInventory");
+            var inventory = GameApiMerchant.RoomInventory(currentRoom);
             if (inventory is null)
             {
-                shopNotices.Add(StateProjectionValues.PartialNotice("run.currentRoom.shop.inventory", "state-shop-inventory-unavailable", "The current shop room did not expose MerchantRoom.GetLocalInventory()."));
+                shopNotices.Add(StateProjectionValues.PartialNotice("run.currentRoom.shop.inventory", "state-shop-inventory-unavailable", "The current shop inventory could not be resolved."));
                 return new StateRunShopRoomSnapshot(null, shopNotices, new StateShopViewSnapshot(false));
             }
 
@@ -438,7 +439,7 @@ internal static class RoomStateBuilder
         ICollection<StateNoticeSnapshot> notices)
     {
         // The wares-open flag lives on the live NMerchantInventory screen node, not on the
-        // MerchantInventory data entity exposed by MerchantRoom.GetLocalInventory() (which has no IsOpen).
+        // MerchantInventory data entity (which has no IsOpen).
         var screen = Sts2ShopScreenInspector.ResolveShopScreenObject();
         var isOpen = Sts2ShopScreenInspector.TryResolveIsOpen(screen);
         if (screen is null || isOpen is null)
@@ -711,7 +712,7 @@ internal static class RoomStateBuilder
                 option.GetType().FullName ?? option.GetType().Name,
                 optionId,
                 isEnabled,
-                MapStateBuilder.ToNullableInt32(Sts2LiveIntrospection.GetMemberValue(option, "SmithCount")),
+                MapStateBuilder.ToNullableInt32(GameApiRestSite.SmithCount(option)),
                 ResolveLiftsLeft(optionId, option),
                 disabledReason);
         }

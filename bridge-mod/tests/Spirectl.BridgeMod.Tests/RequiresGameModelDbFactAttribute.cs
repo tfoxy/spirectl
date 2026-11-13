@@ -56,7 +56,7 @@ public sealed class RequiresGameModelDbFactAttribute : FactAttribute
                 return false;
             }
 
-#if STS2_API_V111
+#if STS2_API_V111 || STS2_API_V113
             ModelDb.Init(AbstractModelSubtypes.All.ToArray());
 #else
             ModelDb.Init();

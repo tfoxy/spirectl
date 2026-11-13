@@ -12,6 +12,7 @@ using Spirectl.Sts2.Core.Actions;
 using Spirectl.Sts2.Core.Logging;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -107,23 +108,20 @@ public sealed partial class Sts2ActionHandler
         return false;
     }
 
-    private static bool TryInvokeCancelEndTurn(Player? player)
+    private static bool? TryInvokeCancelEndTurn(Player? player)
     {
         var combatManager = CombatManager.Instance;
         if (combatManager is null)
         {
-            return false;
+            return null;
         }
 
-        // Inverse of TryInvokeEndTurn: the live button enqueues an UndoEndPlayerTurnAction
-        // which calls CombatManager.UndoReadyToEndTurn(player), clearing the ready state and
-        // un-darkening the hand while allies are still taking their turn.
+        // Cancel readiness through the lane's entry point while allies are still taking their turn.
         if (player is not null)
         {
             try
             {
-                combatManager.UndoReadyToEndTurn(player);
-                return true;
+                return GameApiCombatActions.UndoReadyToEndTurn(combatManager, player);
             }
             catch
             {
@@ -139,7 +137,7 @@ public sealed partial class Sts2ActionHandler
             }
         }
 
-        return false;
+        return null;
     }
 
     private static ResolvedCombatCard? ResolveLocalHandCard(Player player, string playerId, string requestedCardId)
@@ -565,7 +563,7 @@ public sealed partial class Sts2ActionHandler
         return true;
     }
 
-    // Build a shop context from the live MerchantInventory MODEL (NMerchantRoom.Instance.Room.GetLocalInventory())
+    // Build a shop context from the live MerchantInventory MODEL (the lane's merchant inventory accessor)
     // when no shop SCREEN is active. The buy path (ResolvedShopChoice.Entry.OnTryPurchaseWrapper) reads the
     // entries straight off this model and is screen-independent, so a seat can buy without the inventory
     // overlay being open. Only entry (purchase) choices are minted here; the screen-bound leave/close flow
@@ -576,7 +574,7 @@ public sealed partial class Sts2ActionHandler
         [NotNullWhen(true)] out ShopActionContext? context)
     {
         var room = NMerchantRoom.Instance;
-        if (room?.Room?.GetLocalInventory() is not { } inventory)
+        if (room is null || GameApiMerchant.LocalInventory(room) is not { } inventory)
         {
             context = null;
             return false;
@@ -727,7 +725,7 @@ public sealed partial class Sts2ActionHandler
         var remotePlayerContainer = Sts2LiveIntrospection.GetMemberValue(screenObject, "_remotePlayerContainer");
         if (RemotePlayerContainerHasPlayer(remotePlayerContainer, player.id))
         {
-            Sts2LiveIntrospection.TryInvokeMethod(screenObject, "PlayerChanged", player, false);
+            GameApiLobbyPlayer.RefreshChanged(screenObject, player);
         }
         else
         {

@@ -1078,7 +1078,7 @@ public sealed class Sts2ModelCatalogProvider : IModelCatalogProvider
             VisualsPath: visualsHidden ? null : NormalizeResourcePath(visualsPath),
             BestiaryAttackAnimId: null,
             CanChangeScale: TryGetBool(() => model.CanChangeScale),
-            IsHealthBarVisible: TryGetBool(() => model.IsHealthBarVisible),
+            IsHealthBarVisible: TryGetBool(() => GameApiMonster.IsHealthBarVisible(model)),
             DeathAnimLengthOverride: TryGetOr(() => model.DeathAnimLengthOverride, 0f),
             HasDeathAnimLengthOverride: TryGetBool(() => model.HasDeathAnimLengthOverride),
             HasDeathSfx: TryGetBool(() => model.HasDeathSfx),

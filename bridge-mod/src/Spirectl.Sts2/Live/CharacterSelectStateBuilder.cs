@@ -131,7 +131,7 @@ internal static class CharacterSelectStateBuilder
                 SlotId: StateProjectionValues.ToInt32(Sts2LiveIntrospection.GetMemberValue(player, "slotId")),
                 CharacterId: StateProjectionValues.ResolveModelId(Sts2LiveIntrospection.GetMemberValue(player, "character")),
                 IsReady: StateProjectionValues.ToBoolean(Sts2LiveIntrospection.GetMemberValue(player, "isReady")),
-                MaxMultiplayerAscensionUnlocked: StateProjectionValues.ToInt32(Sts2LiveIntrospection.GetMemberValue(player, "maxMultiplayerAscensionUnlocked")),
+                MaxMultiplayerAscensionUnlocked: StateProjectionValues.ToInt32(GameApiLobbyPlayer.MaxMultiplayerAscensionUnlocked(player)),
                 DisplayName: netId.HasValue
                     ? Sts2LobbyNameResolver.Resolve(platform, netId.Value, nameNotices)
                     : null,

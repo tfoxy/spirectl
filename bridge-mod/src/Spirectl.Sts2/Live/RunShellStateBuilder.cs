@@ -12,7 +12,6 @@ using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Multiplayer.Game.Lobby;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Combat;
-using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Runs;
@@ -20,6 +19,7 @@ using Spirectl.Sts2.Core.Models;
 using Spirectl.Sts2.Core.State;
 using Spirectl.Sts2.Core.Perspective;
 using System.Reflection;
+using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
@@ -400,7 +400,7 @@ internal sealed class RunShellStateBuilder
             return true;
         }
 
-        return NOverlayStack.Instance?.Peek() is ICardSelector;
+        return GameApiCardSelection.IsCardSelection(NOverlayStack.Instance?.Peek());
     }
 
     private static StateRunCapstoneViewSnapshot? ResolveRunCapstoneView(ICollection<StateNoticeSnapshot> notices, string? localPlayerId)
