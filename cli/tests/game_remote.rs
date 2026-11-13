@@ -67,7 +67,7 @@ elif operation=='install-bridge':
 elif operation=='prepare-launch':
     assert "'Roaming\\SlayTheSpire2'" in script
     assert "'default\\1\\settings.save'" in script
-    assert 'ActiveUser' in script and '76561197960265728' in script
+    assert 'ActiveUser' in script and '[uint64]0x0110000100000000' in script
     print(Path('launch-prepared.json').read_text() if Path('launch-prepared.json').exists() else '{"settingsFiles":[]}')
 elif operation=='launch':
     import re

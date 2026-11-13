@@ -162,7 +162,7 @@ if ($isolatedProfile) {
     }
     $relative = @('default\1\settings.save')
     $steam = Get-ItemProperty -LiteralPath 'HKCU:\Software\Valve\Steam\ActiveProcess' -ErrorAction SilentlyContinue
-    if ($steam.ActiveUser) { $relative += ('steam\' + ([uint64]76561197960265728 + [uint64]$steam.ActiveUser) + '\settings.save') }
+    if ($steam.ActiveUser) { $relative += ('steam\' + ([uint64]0x0110000100000000 + [uint64]$steam.ActiveUser) + '\settings.save') }
     foreach ($root in @($sourceRoot,$targetRoot)) {
         if (Test-Path -LiteralPath $root) {
             $relative += @(Get-ChildItem -LiteralPath $root -Recurse -Filter 'settings.save' -File | ForEach-Object { $_.FullName.Substring($root.TrimEnd('\').Length + 1) })
