@@ -87,7 +87,9 @@ import shlex
 import sys
 
 word = r"(?:\\[\s\S]|'[^']*'|\"(?:\\[\s\S]|[^\"\\])*\"|\$(?!\()|[^\s;&|()'\"\\<>$])+"
-token = re.compile(r"#[^\n]*|<<-?|\$\(|&&|\|\||[;|&()\n]|<[^<>\s]+>|" + word + r"|[<>]")
+redirect = r"\d*(?:&>>|&>|>>|>\||<>|[<>]&|[<>])(?:\d+-?|-)?"
+token = re.compile(r"#[^\n]*|<<-?|\$\(|&&|\|\||<[^<>\s]+>|" + redirect + r"|[;|&()\n]|" + word)
+is_redirect = re.compile(redirect).fullmatch
 
 def unquote(raw):
     return "".join(shlex.split(raw))
@@ -135,7 +137,7 @@ def substitution_bodies(raw):
 
 def commands(source):
     args, pending = [], []
-    delimiter = None
+    delimiter, skip_target = None, False
     pos = 0
     while match := token.search(source, pos):
         raw = match.group()
@@ -147,6 +149,11 @@ def commands(source):
             delimiter = None
         elif raw in ("<<", "<<-"):
             delimiter = raw
+        elif skip_target and raw not in (";", "&", "&&", "||", "|", "(", ")", "\n"):
+            skip_target = False  # a redirection's target file is not an argument
+        elif is_redirect(raw):
+            # `> f`, `2>> f`, `&> f` take the next word as their target; `2>&1`, `>&-` carry it.
+            skip_target = not re.search(r"[<>]&(?:\d+-?|-)$", raw)
         elif raw == "$(":
             end = substitution_end(source, pos)
             yield from commands(source[pos:end - 1])
