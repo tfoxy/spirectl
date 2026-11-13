@@ -14,10 +14,10 @@ Each entry is marked **limitation** (may change) or **non-goal** (deliberately o
 
 - **Limitation:** the v0.113.0 game build no longer exposes the mutable rest-site smith count, so `smithCount`
   remains unset on API lane `v113`; absence does not mean zero.
-- **Limitation:** host-to-peer shop purchase propagation on v0.113.0 has not been live-verified. The local
-  two-instance `-fastmp` check was skipped because its required UDP port 33771 was occupied by another game
-  session outside the validation scope, which was left untouched. The lobby fixture can fall back to another
-  port, but native `-fastmp join` targets 33771, so fixture success does not prove peer synchronization.
+- **Limitation:** v0.113.0 multiplayer shop synchronization is live-verified for one host-local `buy-card`
+  purchase between two native `-fastmp` instances. Both processes showed the host's gold decrease by the listed
+  price and its deck gain one copy of the purchased card model; the peer player's gold and deck stayed unchanged.
+  Other shop purchase types remain unverified.
 - **Limitation:** modded or unmodeled non-combat controls have no typed intent action. `sts2 act choose` is the
   explicit fallback for generic, modded or unmodeled visible choices that have no `preferredAction`.
 - **Limitation:** live screen coverage is the documented set (see [capabilities](capabilities.md#runtime-state)).
