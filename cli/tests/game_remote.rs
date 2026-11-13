@@ -1,4 +1,6 @@
 #![cfg(unix)]
+include!("../src/lifecycle/assembly_metadata_fixture.rs");
+
 use serde_json::{Value, json};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path, process::Command};
 
@@ -8,6 +10,15 @@ struct Harness {
 impl Harness {
     fn new() -> Self {
         let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join("host-metadata.dll"),
+            bridge_metadata_dll(&[
+                ("SpirectlSts2ApiLane", "v111"),
+                ("SpirectlBuiltAgainstGameVersion", "v0.111.0"),
+                ("SpirectlBuiltAgainstMainAssemblyHash", "123"),
+            ]),
+        )
+        .unwrap();
         executable(
             &dir.path().join("ssh"),
             r#"#!/usr/bin/env python3
@@ -151,15 +162,16 @@ with open('dotnet.log','a') as f: f.write(json.dumps(args)+'\n')
 assemblies=next(a.split('=',1)[1] for a in args if a.startswith('-p:Sts2AssembliesDir='))
 assert 'data_sts2_windows_x86_64' in assemblies
 assert json.loads((Path(assemblies).parent/'release_info.json').read_text())['version']=='v0.111.0'
+out=Path(args[args.index('--output')+1])
 if args[0]=='build':
-    out=Path(args[1]).parent/'bin'/'Debug'/'net9.0'
     names=['spirectlbridge.dll']
 elif args[0]=='publish':
-    out=Path(args[args.index('--output')+1])
     names=['Spirectl.BridgeMod.Sts2Host.dll','Spirectl.BridgeMod.dll','Spirectl.Sts2.dll']
 else: raise AssertionError(args)
 out.mkdir(parents=True,exist_ok=True)
-for name in names: (out/name).write_bytes(b'fake managed IL')
+for name in names:
+    payload=Path('host-metadata.dll').read_bytes() if name=='Spirectl.BridgeMod.Sts2Host.dll' else b'fake managed IL'
+    (out/name).write_bytes(payload)
 "#,
         );
         let config = json!({"remote":{"host":"fake-windows","gamePath":"C:\\Games\\STS 2","sshCommand":dir.path().join("ssh"),"scpCommand":dir.path().join("scp")}});

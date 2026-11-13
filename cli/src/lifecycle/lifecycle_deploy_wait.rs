@@ -1548,24 +1548,24 @@ fn deploy_bridge(
     let install_release_info = game_build::read_release_info(&layout.game_path)
         .or_else(|| game_build::read_release_info_for_assemblies_dir(&layout.assemblies_dir));
     ensure_known_install_lane(command_name, install_release_info.as_ref())?;
+    let install_lane = install_release_info
+        .as_ref()
+        .and_then(game_build::GameReleaseInfo::api_lane)
+        .ok_or_else(|| {
+            release_lane_unresolved_error(
+                command_name,
+                install_release_info.as_ref(),
+                &release_info_path,
+            )
+        })?;
     let artifacts_root = absolute_artifacts_dir(config).join("live-bridge");
-    let publish_dir = artifacts_root.join("host-publish");
-    let stage_dir = artifacts_root.join("staging").join(DEPLOYED_MOD_DIR_NAME);
+    let lane_root = bridge_lane_artifacts_dir(&artifacts_root, install_lane);
+    let publish_dir = lane_root.join("host-publish");
+    let stage_dir = lane_root.join("staging").join(DEPLOYED_MOD_DIR_NAME);
     if stage_dir.exists() {
         fs::remove_dir_all(&stage_dir).map_err(io_lifecycle_error(command_name))?;
     }
     fs::create_dir_all(&stage_dir).map_err(io_lifecycle_error(command_name))?;
-    fs::create_dir_all(&layout.mods_dir).map_err(io_lifecycle_error(command_name))?;
-
-    // Which game build this install IS, resolved before anything is staged. The
-    // bridge payload is per-build, so this is what selects it: a payload built
-    // for another build will load, log a few soft "not found" lines, and then
-    // throw on the first lobby walk. The assemblies-dir fallback uses the `..`
-    // anchor `bridge-mod/Sts2GameApi.props` compiles against, so the CLI and
-    // MSBuild can never disagree about which install a build was for.
-    let install_lane = install_release_info
-        .as_ref()
-        .and_then(game_build::GameReleaseInfo::api_lane);
 
     let source_checkout = resolve_repo_root(command_name).ok();
     let acquisition = if !options.no_build {
@@ -1586,7 +1586,7 @@ fn deploy_bridge(
                 &artifacts_root,
                 &stage_dir,
                 semver,
-                install_lane,
+                Some(install_lane),
                 install_release_info.as_ref(),
                 &release_info_path,
                 true,
@@ -1598,7 +1598,7 @@ fn deploy_bridge(
             &artifacts_root,
             &stage_dir,
             semver,
-            install_lane,
+            Some(install_lane),
             install_release_info.as_ref(),
             &release_info_path,
             source_checkout.is_none(),
@@ -1656,6 +1656,7 @@ fn deploy_bridge(
         json!({ "reason": reason, "contentHash": content_hash }),
     );
     if installed {
+        fs::create_dir_all(&layout.mods_dir).map_err(io_lifecycle_error(command_name))?;
         let endpoint_file = layout.mod_dir.join(crate::endpoint::ENDPOINT_FILE_NAME);
         let endpoint_bytes = match fs::read(&endpoint_file) {
             Ok(bytes) => Some(bytes),
@@ -1713,6 +1714,90 @@ fn deploy_bridge(
     }))
 }
 
+fn bridge_lane_artifacts_dir(artifacts_root: &Path, lane: &str) -> PathBuf {
+    artifacts_root.join(lane)
+}
+
+fn source_bridge_release_info(
+    command_name: &str,
+    layout: &ResolvedLiveBridgeLayout,
+    target: &game_build::GameReleaseInfo,
+) -> Result<game_build::GameReleaseInfo, AppError> {
+    let assemblies_info = game_build::read_release_info_for_assemblies_dir(&layout.assemblies_dir);
+    if let Some(info) = assemblies_info
+        .as_ref()
+        .filter(|info| info.version == target.version)
+    {
+        return Ok(info.clone());
+    }
+    let assemblies_release_path = layout
+        .assemblies_dir
+        .join("..")
+        .join(game_build::RELEASE_INFO_FILE_NAME);
+    let found = assemblies_info.as_ref().map(|info| info.version.as_str());
+    Err(lifecycle_error(
+        2,
+        "bridge_lane_mismatch",
+        command_name,
+        &format!(
+            "target install '{}' is game version '{}', but assemblies '{}' read '{}' as {}; \
+             point game.assembliesDir at the target install before building the bridge",
+            layout.game_path.display(),
+            target.version,
+            layout.assemblies_dir.display(),
+            assemblies_release_path.display(),
+            found.unwrap_or("missing or unreadable version")
+        ),
+    ))
+}
+
+fn verify_bridge_lane(
+    command_name: &str,
+    host_dll: &Path,
+    target_lane: &str,
+    compiled_lane: Option<&str>,
+    hint: &str,
+) -> Result<(), AppError> {
+    if compiled_lane == Some(target_lane) {
+        return Ok(());
+    }
+    let mut error = lifecycle_error(
+        2,
+        "bridge_lane_mismatch",
+        command_name,
+        &format!(
+            "staged Host DLL '{}' has SpirectlSts2ApiLane {}, but the target install needs '{}'.{}",
+            host_dll.display(),
+            compiled_lane.unwrap_or("missing or unreadable"),
+            target_lane,
+            hint
+        ),
+    );
+    error.payload["error"]["expectedLane"] = json!(target_lane);
+    error.payload["error"]["compiledLane"] = json!(compiled_lane);
+    error.payload["error"]["hostDll"] = json!(host_dll.display().to_string());
+    Err(error)
+}
+
+fn verified_staged_bridge_metadata(
+    command_name: &str,
+    stage_dir: &Path,
+    target_lane: &str,
+    hint: &str,
+) -> Result<Vec<u8>, AppError> {
+    let host_dll = stage_dir.join("Spirectl.BridgeMod.Sts2Host.dll");
+    let bytes = fs::read(&host_dll).unwrap_or_default();
+    let compiled_lane = assembly_metadata::read(&bytes, "SpirectlSts2ApiLane");
+    verify_bridge_lane(
+        command_name,
+        &host_dll,
+        target_lane,
+        compiled_lane.as_deref(),
+        hint,
+    )?;
+    Ok(bytes)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn stage_source_bridge(
     command_name: &str,
@@ -1725,6 +1810,22 @@ fn stage_source_bridge(
     build: bool,
 ) -> Result<Value, AppError> {
     ensure_known_install_lane(command_name, install_release_info)?;
+    let target_lane = install_release_info
+        .and_then(game_build::GameReleaseInfo::api_lane)
+        .ok_or_else(|| {
+            release_lane_unresolved_error(
+                command_name,
+                install_release_info,
+                &game_build::release_info_path(&layout.game_path),
+            )
+        })?;
+    if build {
+        source_bridge_release_info(
+            command_name,
+            layout,
+            install_release_info.expect("resolved target"),
+        )?;
+    }
     // A rejected release ZIP may have left partial files in staging before a
     // source-checkout fallback is attempted. Never mix those files into the
     // trusted source payload.
@@ -1736,9 +1837,10 @@ fn stage_source_bridge(
         .join("bridge-mod/src/Spirectl.BridgeMod.Sts2Host.Loader/Spirectl.BridgeMod.Sts2Host.Loader.csproj");
     let host_project = repo_root
         .join("bridge-mod/src/Spirectl.BridgeMod.Sts2Host/Spirectl.BridgeMod.Sts2Host.csproj");
-    let loader_output_dir = repo_root.join(format!(
-        "bridge-mod/src/Spirectl.BridgeMod.Sts2Host.Loader/bin/{BUILD_CONFIGURATION}/net9.0"
-    ));
+    let loader_output_dir = publish_dir
+        .parent()
+        .expect("lane publish parent")
+        .join("loader");
     let loader_dll = loader_output_dir.join(format!("{DEPLOYED_MOD_DIR_NAME}.dll"));
 
     if build {
@@ -1746,12 +1848,17 @@ fn stage_source_bridge(
             fs::remove_dir_all(publish_dir).map_err(io_lifecycle_error(command_name))?;
         }
         fs::create_dir_all(publish_dir).map_err(io_lifecycle_error(command_name))?;
+        if loader_output_dir.exists() {
+            fs::remove_dir_all(&loader_output_dir).map_err(io_lifecycle_error(command_name))?;
+        }
         crate::progress::emit(command_name, "bridge.build", Value::Null);
         run_dotnet_command(
             command_name,
             &[
                 "build".to_string(),
                 loader_project.display().to_string(),
+                "--output".to_string(),
+                loader_output_dir.display().to_string(),
                 "--configuration".to_string(),
                 BUILD_CONFIGURATION.to_string(),
                 "-m:1".to_string(),
@@ -1776,6 +1883,15 @@ fn stage_source_bridge(
         )?;
     }
 
+    let lane_mismatch_hint = if build {
+        " Rebuild the bridge against the target install."
+    } else {
+        " Rerun without --no-build to compile a bridge for the target install."
+    };
+    let host_dll = publish_dir.join("Spirectl.BridgeMod.Sts2Host.dll");
+    if !host_dll.is_file() {
+        verify_bridge_lane(command_name, &host_dll, target_lane, None, lane_mismatch_hint)?;
+    }
     let missing = [
         publish_dir.join("Spirectl.BridgeMod.Sts2Host.dll"),
         loader_dll.clone(),
@@ -1809,14 +1925,39 @@ fn stage_source_bridge(
     )?;
     stage_publish_artifacts(command_name, publish_dir, stage_dir)?;
     let content_hash = stage_content_hash(command_name, stage_dir)?;
-    // A source build compiled against a real install, so it can claim that
-    // install's version AND its main_assembly_hash — the strong form of the
-    // stamp. An install whose release_info.json is unreadable claims nothing:
-    // the lane MSBuild picked is then whatever an explicit override said, and
-    // guessing an identity for it would be worse than reporting unknown.
-    let game_build_stamp = install_release_info
-        .map(BridgeGameBuildStamp::from_install)
-        .unwrap_or_else(BridgeGameBuildStamp::unknown);
+    let compiled =
+        verified_staged_bridge_metadata(command_name, stage_dir, target_lane, lane_mismatch_hint)?;
+    let compiled_version = assembly_metadata::read(&compiled, "SpirectlBuiltAgainstGameVersion");
+    let target = install_release_info.expect("resolved target");
+    if compiled_version.as_deref() != Some(target.version.as_str()) {
+        return Err(lifecycle_error(
+            2,
+            "bridge_lane_mismatch",
+            command_name,
+            &format!(
+                "staged Host DLL was compiled for game version {}, but target '{}' is '{}'.{}",
+                compiled_version
+                    .as_deref()
+                    .unwrap_or("missing or unreadable"),
+                layout.game_path.display(),
+                target.version,
+                if build {
+                    " Rebuild against the target install."
+                } else {
+                    " Rerun without --no-build."
+                }
+            ),
+        ));
+    }
+    let game_build_stamp = BridgeGameBuildStamp::from_install(&game_build::GameReleaseInfo {
+        version: compiled_version.expect("verified compiled version"),
+        commit: String::new(),
+        main_assembly_hash: assembly_metadata::read(
+            &compiled,
+            "SpirectlBuiltAgainstMainAssemblyHash",
+        )
+        .and_then(|hash| hash.parse().ok()),
+    });
     write_bridge_manifest(
         command_name,
         stage_dir,
@@ -1945,6 +2086,12 @@ fn stage_release_bridge(
             ),
         ));
     }
+    verified_staged_bridge_metadata(
+        command_name,
+        stage_dir,
+        lane,
+        " The released payload is corrupt or mis-built; reinstall the release or build from a source checkout.",
+    )?;
     // The archive manifest establishes the release version before extraction;
     // rewrite the deployed manifest with the same local content identity used
     // by source builds so future installs can still skip identical copies.
@@ -2001,12 +2148,12 @@ fn release_lane_unresolved_error(
     let lanes = game_build::api_lanes().join(", ");
     let detail = match install_release_info {
         Some(info) => format!(
-            "game build '{}' has no STS2 API lane, so no released bridge payload matches this \
+            "game build '{}' has no STS2 API lane, so no bridge payload matches this \
              install (known lanes: {lanes})",
             info.version
         ),
         None => format!(
-            "could not read a game build version from '{}', so no released bridge payload can be \
+            "could not read a game build version from '{}', so no bridge payload can be \
              matched to this install (known lanes: {lanes})",
             release_info_path.display()
         ),

@@ -1,3 +1,5 @@
+include!("../../src/lifecycle/assembly_metadata_fixture.rs");
+
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 #[cfg(unix)]
@@ -150,8 +152,16 @@ fn create_fake_game_layout() -> tempfile::TempDir {
     fs::create_dir_all(&mods_dir).expect("create mods dir");
     fs::write(assemblies_dir.join("sts2.dll"), []).expect("write sts2 dll");
     fs::write(assemblies_dir.join("GodotSharp.dll"), []).expect("write godot dll");
+    write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
     game_dir
 }
+
+fn create_unversioned_fake_game_layout() -> tempfile::TempDir {
+    let game_dir = create_fake_game_layout();
+    fs::remove_file(game_dir.path().join("release_info.json")).unwrap();
+    game_dir
+}
+
 fn seed_recent_spirectl_log(data_root: &Path, file_name: &str) -> PathBuf {
     let logs_dir = data_root.join("godot/app_userdata/Slay the Spire 2/logs");
     fs::create_dir_all(&logs_dir).expect("logs dir");
@@ -236,6 +246,19 @@ fn create_deployed_bridge_layout_with_game_build(
 /// game build it is. Both real-world builds are in the committed lane table:
 /// `v0.107.1` -> `v107` (stable) and `v0.111.0` -> `v111` (public beta).
 fn write_game_release_info(game_dir: &Path, version: &str, main_assembly_hash: i64) {
+    let lane = sts2::game_build::api_lane_for_game_version(version).unwrap_or("unsupported-test-lane");
+    fs::write(
+        game_dir.join(".bridge-metadata-fixture.dll"),
+        bridge_metadata_dll(&[
+            ("SpirectlSts2ApiLane", lane),
+            ("SpirectlBuiltAgainstGameVersion", version),
+            (
+                "SpirectlBuiltAgainstMainAssemblyHash",
+                &main_assembly_hash.to_string(),
+            ),
+        ]),
+    )
+    .unwrap();
     fs::write(
         game_dir.join("release_info.json"),
         serde_json::to_string_pretty(&serde_json::json!({
@@ -382,6 +405,30 @@ fn spawn_reachable_unix_listener_until(
 #[cfg(unix)]
 fn write_executable_script(dir: &Path, name: &str, contents: &str) -> PathBuf {
     let path = dir.join(name);
+    let contents = if name == "dotnet" {
+        // Preserve each test's build behavior while emitting real metadata and
+        // honoring the deployer's lane-specific Loader output directory.
+        let setup = r#"
+spirectl_output=""
+spirectl_fixture=""
+spirectl_previous=""
+for spirectl_arg in "$@"; do
+  if [ "$spirectl_previous" = "--output" ]; then spirectl_output="$spirectl_arg"; fi
+  case "$spirectl_arg" in
+    -p:Sts2AssembliesDir=*) spirectl_fixture="${spirectl_arg#*=}/../.bridge-metadata-fixture.dll" ;;
+  esac
+  spirectl_previous="$spirectl_arg"
+done
+"#;
+        let (shebang, body) = contents.split_once('\n').unwrap();
+        format!("{shebang}\n{setup}\n{body}")
+            .replace(r#"output_dir="$(dirname "$project")/bin/$configuration/net9.0""#, r#"output_dir="$spirectl_output""#)
+            .replace(r#": > "$output_dir/Spirectl.BridgeMod.Sts2Host.dll""#, r#"cp "$spirectl_fixture" "$output_dir/Spirectl.BridgeMod.Sts2Host.dll""#)
+            .replace(r#"printf '%s' "${SPIRECTL_TEST_BRIDGE_CONTENT:-}" > "$output_dir/Spirectl.BridgeMod.Sts2Host.dll""#, r#"cp "$spirectl_fixture" "$output_dir/Spirectl.BridgeMod.Sts2Host.dll"
+  printf '%s' "${SPIRECTL_TEST_BRIDGE_CONTENT:-}" >> "$output_dir/Spirectl.BridgeMod.Sts2Host.dll""#)
+    } else {
+        contents.to_string()
+    };
     fs::write(&path, contents).expect("write script");
     let mut permissions = fs::metadata(&path).expect("metadata").permissions();
     permissions.set_mode(0o755);

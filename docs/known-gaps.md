@@ -61,7 +61,9 @@ Each entry is marked **limitation** (may change) or **non-goal** (deliberately o
   stamps `SpirectlBridgeBuiltAtUtc` with the wall clock. `--no-build` installs do skip unchanged content.
 - **Limitation:** released bridge payloads exist only for the game build the declaration-only reference SDK
   (`eng/Sts2.ReferenceSdk`) declares. The `v111` and `v113` API lanes require a source checkout; `install-bridge --no-build`
-  refuses an unreleasable lane with `bridge_release_lane_unreleasable`.
+  uses only a same-lane source publish for an unreleasable lane and refuses stale or unidentifiable
+  output with `bridge_lane_mismatch` (rerun without `--no-build`). A packaged CLI refuses an unreleasable
+  lane with `bridge_release_lane_unreleasable`.
 - **Limitation:** the `Spirectl.Sts2` NuGet package carries one STS2 API lane. An embedder targeting another game
   build builds `Spirectl.Sts2` from source with `-p:Sts2GameApi=<lane>`.
 

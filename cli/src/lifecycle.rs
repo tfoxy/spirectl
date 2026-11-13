@@ -25,6 +25,9 @@ use std::os::unix::process::ExitStatusExt;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 
+#[path = "lifecycle/assembly_metadata.rs"]
+mod assembly_metadata;
+
 include!("lifecycle/lifecycle_types_attach_close.rs");
 include!("lifecycle/lifecycle_launch.rs");
 include!("lifecycle/lifecycle_deploy_wait.rs");

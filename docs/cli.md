@@ -1186,8 +1186,8 @@ against a real install, so it names that install's `version` and `main_assembly_
 declaration-only STS2 reference SDK, which has no `release_info.json` and no game hash at all: it can claim
 its lane and the reference package version it was built from, and nothing else
 (`identitySource: "reference-sdk"`, with `version` and `mainAssemblyHash` null). No hash is invented for it,
-so `null` there means "this payload cannot claim one" — never "matches anything". An install whose
-`release_info.json` is unreadable yields `identitySource: "unknown"` and claims nothing.
+so `null` there means "this payload cannot claim one" — never "matches anything". Installation refuses
+an unreadable or unmapped game version with `bridge_release_lane_unresolved`.
 
 The same three fields ride the handshake (`liveBridge.buildIdentity.sts2ApiLane`,
 `.builtAgainstGameVersion`, `.builtAgainstMainAssemblyHash`), so the *loaded* bridge can be checked as well as
@@ -1216,6 +1216,10 @@ refuses, and a best-effort payload is never installed:
 - `bridge_release_lane_unreleasable` — the lane is supported but no release covers it (see below).
 - `bridge_release_cache_missing` — naming the lane and the expected archive, when no payload for it is cached.
 - `bridge_release_lane_mismatch` — the archive's own manifest claims a different lane than its name.
+- `bridge_lane_mismatch` (exit 2) — the staged Host DLL has missing or mismatched compiled lane metadata,
+  a source publish claims a different game version, or the assemblies and target installs have different
+  versions. No bridge files are copied into the mods directory on refusal. The JSON error carries
+  `expectedLane`, `compiledLane` (null when absent), and `hostDll` for compiled lane failures.
 
 The lane table is compiled into `sts2`. Updating the checkout alone does not update an installed CLI.
 For an unmapped version, installation reports `game build vX has no API lane in this sts2 build (known:
@@ -1235,6 +1239,15 @@ need a type that package does not declare cannot be packaged at all. Such a lane
 source checkout — `game install-bridge` detects it from the install and builds against the real assemblies —
 it just has no published archive. `scripts/sts2-api-lanes.sh --releasable` prints the subset, and packaging,
 the release manifest and the `--no-build` refusal all read it.
+
+Source outputs are isolated under `<artifacts>/live-bridge/<lane>/host-publish` and the adjacent
+`loader/` directory. Before building, the assemblies directory's parent `release_info.json` must name
+the same version as the target install. Before installation, the Host DLL's `SpirectlSts2ApiLane`
+assembly metadata must match the target lane, including for released archives. Source manifests use
+that DLL's verified game version and compiled assembly hash. In a source checkout, `--no-build` can
+fall back to a previous source publish for the same lane; stale or unidentifiable output is refused
+with `bridge_lane_mismatch`. Rerun without `--no-build` to produce matching output. Older source
+publishes in the shared `live-bridge/host-publish` directory are not reused.
 
 ### Deploy Build Output Contract
 

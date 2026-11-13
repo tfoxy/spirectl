@@ -2717,8 +2717,18 @@ fn release_bridge_zip(version: &str, extra: Option<(&str, &[u8])>) -> Vec<u8> {
 }
 
 fn release_bridge_zip_for_lane(version: &str, lane: &str, extra: Option<(&str, &[u8])>) -> Vec<u8> {
+    release_bridge_zip_for_compiled_lane(version, lane, lane, extra)
+}
+
+fn release_bridge_zip_for_compiled_lane(
+    version: &str,
+    lane: &str,
+    compiled_lane: &str,
+    extra: Option<(&str, &[u8])>,
+) -> Vec<u8> {
     let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let options = zip::write::SimpleFileOptions::default();
+    let host = bridge_metadata_dll(&[("SpirectlSts2ApiLane", compiled_lane)]);
     let bridge_manifest = serde_json::to_vec(&json!({
         "id": DEPLOYED_MOD_DIR_NAME,
         "version": version,
@@ -2735,7 +2745,7 @@ fn release_bridge_zip_for_lane(version: &str, lane: &str, extra: Option<(&str, &
         ("spirectlbridge/spirectlbridge.dll", b"loader".as_slice()),
         (
             "spirectlbridge/Spirectl.BridgeMod.Sts2Host.dll",
-            b"host".as_slice(),
+            host.as_slice(),
         ),
         (
             "spirectlbridge/Spirectl.BridgeMod.dll",
@@ -3577,4 +3587,305 @@ fn startup_cursor_ignores_unchanged_archive_matching_rotated_log() {
         add_startup_diagnostics(&mut error, Some(&cursor), None, &[], None);
         assert_eq!(error["startupStage"], "engine_started");
     });
+}
+
+include!("lifecycle/assembly_metadata_fixture.rs");
+
+fn bridge_lane_fixture(game_root: &Path, version: &str) -> ResolvedLiveBridgeLayout {
+    fs::create_dir_all(game_root.join("assemblies")).unwrap();
+    fs::write(
+        game_root.join("release_info.json"),
+        json!({"version": version, "main_assembly_hash": 123}).to_string(),
+    )
+    .unwrap();
+    ResolvedLiveBridgeLayout {
+        game_path: game_root.to_path_buf(),
+        assemblies_dir: game_root.join("assemblies"),
+        mods_dir: game_root.join("mods"),
+        mod_dir: game_root.join("mods/spirectlbridge"),
+        endpoint: LiveBridgeEndpoint::Tcp("127.0.0.1:12345".to_string()),
+        used_discovered_game_path: false,
+        derived_assemblies_dir_from_game_path: false,
+    }
+}
+
+fn seed_source_bridge(publish: &Path, lane: &str, version: &str) {
+    fs::create_dir_all(publish).unwrap();
+    let loader = publish.parent().unwrap().join("loader");
+    fs::create_dir_all(&loader).unwrap();
+    fs::write(loader.join("spirectlbridge.dll"), b"loader").unwrap();
+    fs::write(
+        publish.join("Spirectl.BridgeMod.Sts2Host.dll"),
+        bridge_metadata_dll(&[
+            ("SpirectlSts2ApiLane", lane),
+            ("SpirectlBuiltAgainstGameVersion", version),
+            ("SpirectlBuiltAgainstMainAssemblyHash", "456"),
+        ]),
+    )
+    .unwrap();
+    fs::write(publish.join("Spirectl.BridgeMod.dll"), b"library").unwrap();
+}
+
+#[test]
+fn bridge_lane_output_paths_are_isolated() {
+    let root = Path::new("artifacts/live-bridge");
+    for lane in ["v107", "v111", "v113"] {
+        let lane_root = bridge_lane_artifacts_dir(root, lane);
+        assert_eq!(
+            lane_root.join("host-publish"),
+            root.join(lane).join("host-publish")
+        );
+        assert_eq!(lane_root.join("loader"), root.join(lane).join("loader"));
+    }
+}
+
+#[test]
+fn bridge_lane_source_no_build_refuses_stale_and_missing_metadata() {
+    let temp = tempfile::tempdir().unwrap();
+    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.0");
+    let target = game_build::read_release_info(&layout.game_path).unwrap();
+    let publish = temp.path().join("v113/host-publish");
+    let stage = temp.path().join("stage");
+    seed_source_bridge(&publish, "v107", "v0.107.1");
+    for missing in [false, true] {
+        if missing {
+            fs::write(
+                publish.join("Spirectl.BridgeMod.Sts2Host.dll"),
+                b"no metadata",
+            )
+            .unwrap();
+        }
+        let error = stage_source_bridge(
+            "test",
+            &layout,
+            temp.path(),
+            &publish,
+            &stage,
+            "1.0.0",
+            Some(&target),
+            false,
+        )
+        .unwrap_err();
+        assert_eq!(error.exit_code, 2);
+        assert_eq!(error.payload["error"]["code"], "bridge_lane_mismatch");
+        assert!(
+            error.payload["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("without --no-build")
+        );
+        assert!(!stage.join(BRIDGE_MANIFEST_NAME).exists());
+        assert!(!layout.mods_dir.exists());
+    }
+}
+
+#[test]
+fn bridge_lane_source_refuses_different_assemblies_before_build() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.0");
+    let other = bridge_lane_fixture(&temp.path().join("other"), "v0.107.1");
+    layout.assemblies_dir = other.assemblies_dir;
+    let target = game_build::read_release_info(&layout.game_path).unwrap();
+    let stage = temp.path().join("stage");
+    let error = stage_source_bridge(
+        "test",
+        &layout,
+        temp.path(),
+        &temp.path().join("v113/host-publish"),
+        &stage,
+        "1.0.0",
+        Some(&target),
+        true,
+    )
+    .unwrap_err();
+    assert_eq!(error.payload["error"]["code"], "bridge_lane_mismatch");
+    let message = error.payload["error"]["message"].as_str().unwrap();
+    for value in [
+        layout.game_path.to_str().unwrap(),
+        layout.assemblies_dir.to_str().unwrap(),
+        "v0.113.0",
+        "v0.107.1",
+    ] {
+        assert!(message.contains(value), "{message}");
+    }
+    assert!(!stage.exists(), "refuse before building or staging");
+    assert!(!layout.mods_dir.exists());
+}
+
+#[test]
+fn bridge_lane_matching_source_publish_stamps_compiled_identity_and_stable_hash() {
+    let temp = tempfile::tempdir().unwrap();
+    for (lane, version) in [
+        ("v107", "v0.107.1"),
+        ("v111", "v0.111.0"),
+        ("v113", "v0.113.0"),
+    ] {
+        let layout = bridge_lane_fixture(&temp.path().join(lane), version);
+        let target = game_build::read_release_info(&layout.game_path).unwrap();
+        let publish = temp
+            .path()
+            .join("artifacts")
+            .join(lane)
+            .join("host-publish");
+        let stage = temp.path().join(lane).join("stage");
+        seed_source_bridge(&publish, lane, version);
+        let mut hashes = Vec::new();
+        for _ in 0..2 {
+            let result = stage_source_bridge(
+                "test",
+                &layout,
+                temp.path(),
+                &publish,
+                &stage,
+                "1.0.0",
+                Some(&target),
+                false,
+            )
+            .unwrap();
+            assert_eq!(result["sts2ApiLane"], lane);
+            let manifest: Value =
+                serde_json::from_slice(&fs::read(stage.join(BRIDGE_MANIFEST_NAME)).unwrap())
+                    .unwrap();
+            assert_eq!(
+                manifest["buildIdentity"]["builtAgainstGame"]["version"],
+                version
+            );
+            assert_eq!(
+                manifest["buildIdentity"]["builtAgainstGame"]["mainAssemblyHash"], 456,
+                "stamp the compiled hash, not the current install's hash"
+            );
+            hashes.push(stage_content_hash("test", &stage).unwrap());
+        }
+        assert_eq!(hashes[0], hashes[1]);
+    }
+}
+
+#[test]
+fn bridge_lane_metadata_reader_fails_closed_on_truncation_duplicates_and_nonassembly_values() {
+    let key = "SpirectlSts2ApiLane";
+    let dll = bridge_metadata_dll(&[(key, "v113")]);
+    assert_eq!(assembly_metadata::read(&dll, key).as_deref(), Some("v113"));
+    for length in 0..dll.len() {
+        assert_eq!(assembly_metadata::read(&dll[..length], key), None);
+    }
+    assert_eq!(
+        assembly_metadata::read(&bridge_metadata_dll(&[(key, "v107"), (key, "v113")]), key),
+        None
+    );
+    let mut nonassembly = dll;
+    // CustomAttribute follows the tables header, TypeRef, and MemberRef.
+    nonassembly[0x280 + 72 + 40 + 12] = 32; // Module owner instead of Assembly.
+    assert_eq!(assembly_metadata::read(&nonassembly, key), None);
+}
+
+#[test]
+fn bridge_lane_deploy_refusal_preserves_existing_mod_and_ignores_shared_publish() {
+    let temp = tempfile::tempdir().unwrap();
+    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.0");
+    fs::create_dir_all(&layout.mod_dir).unwrap();
+    let marker = layout.mod_dir.join("keep.txt");
+    fs::write(&marker, "installed bridge").unwrap();
+    let mut config = AppConfig::default();
+    config.artifacts.dir = temp.path().join("artifacts").display().to_string();
+    let root = Path::new(&config.artifacts.dir).join("live-bridge");
+    seed_source_bridge(&root.join("host-publish"), "v107", "v0.107.1");
+    for stale_lane in [false, true] {
+        if stale_lane {
+            seed_source_bridge(&root.join("v113/host-publish"), "v107", "v0.107.1");
+        }
+        let error = deploy_bridge(
+            "game install-bridge",
+            &config,
+            &layout,
+            BridgeDeployOptions {
+                no_build: true,
+                force: true,
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error.payload["error"]["code"], "bridge_lane_mismatch");
+        assert_eq!(fs::read_to_string(&marker).unwrap(), "installed bridge");
+        assert_eq!(fs::read_dir(&layout.mod_dir).unwrap().count(), 1);
+    }
+}
+
+#[test]
+fn bridge_lane_matching_deploy_skips_identical_content_and_force_recopies() {
+    let temp = tempfile::tempdir().unwrap();
+    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.0");
+    let mut config = AppConfig::default();
+    config.artifacts.dir = temp.path().join("artifacts").display().to_string();
+    seed_source_bridge(
+        &Path::new(&config.artifacts.dir).join("live-bridge/v113/host-publish"),
+        "v113",
+        "v0.113.0",
+    );
+    for (force, expected, reason) in [
+        (false, true, "not_installed"),
+        (false, false, "content_unchanged"),
+        (true, true, "forced"),
+    ] {
+        let result = deploy_bridge(
+            "game install-bridge",
+            &config,
+            &layout,
+            BridgeDeployOptions {
+                no_build: true,
+                force,
+                skip_mod_load_order: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(result["installed"], expected);
+        assert_eq!(result["reason"], reason);
+        assert!(
+            result["build"]["publishDir"]
+                .as_str()
+                .unwrap()
+                .ends_with("live-bridge/v113/host-publish")
+        );
+    }
+}
+
+#[test]
+fn bridge_lane_release_refuses_compiled_metadata_that_disagrees_with_manifest() {
+    let temp = tempfile::tempdir().unwrap();
+    let version = "9.8.7";
+    let lane = game_build::releasable_api_lanes()[0];
+    seed_release_cache_lane(temp.path(), version, lane);
+    let archive = release_bridge_zip_for_compiled_lane(version, lane, "wrong-lane", None);
+    let archive_name = format!("spirectlbridge-v{version}-{lane}.zip");
+    let cache = temp.path().join("release-cache").join(version).join(lane);
+    fs::write(cache.join(&archive_name), &archive).unwrap();
+    fs::write(
+        cache.join(format!("spirectlbridge-v{version}-{lane}.manifest.json")),
+        json!({
+            "schemaVersion": RELEASE_MANIFEST_SCHEMA,
+            "version": version,
+            "archive": {"name": archive_name, "sha256": sha256_hex(&archive)}
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let stage = temp.path().join("stage");
+    fs::create_dir_all(&stage).unwrap();
+    let error = stage_release_bridge(
+        "test",
+        temp.path(),
+        &stage,
+        version,
+        Some(lane),
+        None,
+        &temp.path().join("release_info.json"),
+        false,
+    )
+    .unwrap_err();
+    assert_eq!(error.payload["error"]["code"], "bridge_lane_mismatch");
+    assert_eq!(error.payload["error"]["compiledLane"], "wrong-lane");
+    assert_eq!(error.payload["error"]["expectedLane"], lane);
+    let message = error.payload["error"]["message"].as_str().unwrap();
+    assert!(!message.contains("--no-build"), "{message}");
+    assert!(message.contains("released payload"), "{message}");
 }

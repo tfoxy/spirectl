@@ -1,7 +1,7 @@
 #[cfg(unix)]
 #[tokio::test]
 async fn game_attach_waits_for_ipc_and_returns_screen_summary() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("spirectl-attach.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu);
@@ -50,7 +50,7 @@ async fn game_attach_waits_for_ipc_and_returns_screen_summary() {
 }
 #[test]
 fn game_bridge_health_defaults_to_non_mutating_mode() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("default-health.sock");
     create_deployed_bridge_layout(&game_dir.path().join("mods"));
     let config = write_config(&AppConfig {
@@ -87,7 +87,7 @@ fn game_bridge_health_defaults_to_non_mutating_mode() {
 
 #[test]
 fn game_bridge_health_rejects_conflicting_mode_flags() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let config = write_config(&AppConfig {
         game: GameConfig {
             path: game_dir.path().to_string_lossy().into_owned(),
@@ -116,7 +116,7 @@ fn game_bridge_health_rejects_conflicting_mode_flags() {
 #[cfg(unix)]
 #[test]
 fn game_bridge_health_repair_removes_stale_unix_socket() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let data_root = game_dir.path().join("xdg-data");
     let log_path = seed_recent_spirectl_log(&data_root, "godot-repair.log");
     let socket_path = game_dir.path().join("repair-health.sock");
@@ -191,7 +191,7 @@ fn game_bridge_health_repair_removes_stale_unix_socket() {
 #[cfg(unix)]
 #[test]
 fn game_bridge_health_reports_refused_endpoint_without_repairing_by_default() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let data_root = game_dir.path().join("xdg-data");
     let log_path = seed_recent_spirectl_log(&data_root, "godot-refused.log");
     let socket_path = game_dir.path().join("refused-health.sock");
@@ -269,7 +269,7 @@ fn game_bridge_health_reports_refused_endpoint_without_repairing_by_default() {
 #[cfg(unix)]
 #[test]
 fn game_bridge_health_repair_skips_unsafe_directory_and_keeps_unrelated_entries() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("repair-directory.sock");
     fs::create_dir(&socket_path).expect("create directory placeholder");
     let unrelated = game_dir.path().join("unrelated.txt");
@@ -315,7 +315,7 @@ fn game_bridge_health_repair_skips_unsafe_directory_and_keeps_unrelated_entries(
 #[cfg(unix)]
 #[test]
 fn game_bridge_health_reports_missing_socket_without_mutating() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("missing-health.sock");
     create_deployed_bridge_layout(&game_dir.path().join("mods"));
     let config = write_config(&AppConfig {
@@ -353,7 +353,7 @@ fn game_bridge_health_reports_missing_socket_without_mutating() {
 
 #[test]
 fn game_bridge_health_reports_duplicate_legacy_bridge_mod_directory() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let mods_dir = game_dir.path().join("mods");
     let socket_path = game_dir.path().join("missing-duplicate-health.sock");
     create_deployed_bridge_layout(&mods_dir);
@@ -408,7 +408,7 @@ fn game_bridge_health_reports_duplicate_legacy_bridge_mod_directory() {
 
 #[test]
 fn game_bridge_health_ignores_canonical_bridge_mod_directory() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("missing-canonical-health.sock");
     create_deployed_bridge_layout(&game_dir.path().join("mods"));
     let config = write_config(&AppConfig {
@@ -448,7 +448,7 @@ fn game_bridge_health_ignores_canonical_bridge_mod_directory() {
 #[cfg(unix)]
 #[test]
 fn game_bridge_health_reports_stale_socket_path() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("stale-health.sock");
     fs::write(&socket_path, b"stale socket placeholder").expect("write stale path");
     create_deployed_bridge_layout(&game_dir.path().join("mods"));
@@ -489,7 +489,7 @@ fn game_bridge_health_reports_stale_socket_path() {
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_rpc_timeout() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("timeout-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let server = spawn_unresponsive_unix_listener(listener).await;
@@ -540,7 +540,7 @@ async fn game_bridge_health_reports_rpc_timeout() {
 #[cfg(unix)]
 #[test]
 fn game_bridge_health_reports_directory_socket_placeholder() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("directory-health.sock");
     fs::create_dir(&socket_path).expect("create socket placeholder directory");
     create_deployed_bridge_layout(&game_dir.path().join("mods"));
@@ -581,7 +581,7 @@ fn game_bridge_health_reports_directory_socket_placeholder() {
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_stale_manifest_as_diagnostic_when_live_bridge_current() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("mismatch-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu);
@@ -651,7 +651,7 @@ async fn game_bridge_health_reports_stale_manifest_as_diagnostic_when_live_bridg
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_reachable_current_bridge() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("spirectl-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu);
@@ -747,7 +747,7 @@ fn game_mods_settings_reads_explicit_settings_file() {
 #[cfg(unix)]
 #[tokio::test]
 async fn game_mods_active_reads_live_bridge_mod_list() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("spirectl-mods.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu);
@@ -787,7 +787,7 @@ async fn game_mods_active_reads_live_bridge_mod_list() {
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_current_handshake_without_legacy_presentation_probe() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("spirectl-no-presentation.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu);
@@ -844,7 +844,7 @@ async fn game_bridge_health_reports_current_handshake_without_legacy_presentatio
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_same_semver_stale_live_host() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("same-semver-stale-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu)
@@ -916,7 +916,7 @@ async fn game_bridge_health_reports_same_semver_stale_live_host() {
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_same_semver_current_live_host() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("same-semver-current-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu)
@@ -969,7 +969,7 @@ async fn game_bridge_health_reports_same_semver_current_live_host() {
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_verbose_preserves_full_diagnostic_payload() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("verbose-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu)
@@ -1088,7 +1088,7 @@ async fn game_bridge_health_allows_unknown_deployed_manifest_when_live_bridge_is
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_allows_malformed_deployed_manifest_when_live_bridge_is_current() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let manifest_path = game_dir
         .path()
         .join("mods")
@@ -1143,7 +1143,7 @@ async fn game_bridge_health_allows_malformed_deployed_manifest_when_live_bridge_
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_allows_missing_deployed_manifest_when_live_bridge_is_current() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("missing-manifest-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu);
@@ -1199,7 +1199,7 @@ async fn game_bridge_health_allows_missing_deployed_manifest_when_live_bridge_is
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_a_bridge_built_for_another_game_build() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
     let socket_path = game_dir.path().join("game-build-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
@@ -1306,7 +1306,7 @@ async fn game_bridge_health_reports_a_bridge_built_for_another_game_build() {
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_accepts_a_bridge_built_for_the_configured_game_build() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     write_game_release_info(game_dir.path(), "v0.111.0", 1_579_942_752);
     let socket_path = game_dir.path().join("game-build-match.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
@@ -1367,7 +1367,7 @@ async fn game_bridge_health_accepts_a_bridge_built_for_the_configured_game_build
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_catches_a_released_payload_from_its_lane_alone() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
     let socket_path = game_dir.path().join("game-build-lane-only.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
@@ -1448,7 +1448,7 @@ async fn game_bridge_health_catches_a_released_payload_from_its_lane_alone() {
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_unknown_when_the_install_build_is_unreadable() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     let socket_path = game_dir.path().join("game-build-unknown.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu).with_build_identity(
@@ -1510,7 +1510,7 @@ async fn game_bridge_health_reports_unknown_when_the_install_build_is_unreadable
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_a_live_bridge_version_mismatch_first() {
-    let game_dir = create_fake_game_layout();
+    let game_dir = create_unversioned_fake_game_layout();
     write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
     let socket_path = game_dir.path().join("live-version-mismatch.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
