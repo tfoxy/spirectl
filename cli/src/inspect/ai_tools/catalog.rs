@@ -574,7 +574,7 @@ pub(crate) fn ai_tool_catalog() -> Vec<Value> {
                 ),
                 (
                     "characterSelect",
-                    "Character-select lobby, character buttons, and view; null outside the start-run character select screen.",
+                    "Start-run (including Blitz) or load-run lobby, character buttons, and view; null outside lobby screens.",
                 ),
                 (
                     "run",

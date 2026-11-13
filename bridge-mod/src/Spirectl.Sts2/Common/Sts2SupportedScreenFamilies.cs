@@ -7,6 +7,7 @@ public static class Sts2SupportedScreenIds
     public const string GameNodeTypePrefix = "MegaCrit.Sts2.Core.Nodes.";
 
     public const string MainMenuScreenId = "Screens.MainMenu.NMainMenu";
+    public const string BlitzLobbyScreenId = "Screens.Blitz.NBlitzScreen";
     public const string StartRunLobbyScreenId = "Screens.CharacterSelect.NCharacterSelectScreen";
     public const string LoadRunLobbyScreenId = "Screens.CharacterSelect.NMultiplayerLoadGameScreen";
     public const string MapScreenId = "Screens.Map.NMapScreen";
@@ -30,6 +31,7 @@ public static class Sts2SupportedScreenIds
     public const string GameOverScreenId = "Screens.GameOverScreen.NGameOverScreen";
 
     private const string MainMenuScreenType = "MegaCrit.Sts2.Core.Nodes.Screens.MainMenu.NMainMenu";
+    private const string BlitzLobbyScreenType = GameNodeTypePrefix + BlitzLobbyScreenId;
     private const string StartRunLobbyScreenType = "MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect.NCharacterSelectScreen";
     private const string LoadRunLobbyScreenType = "MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect.NMultiplayerLoadGameScreen";
     private const string MapScreenType = "MegaCrit.Sts2.Core.Nodes.Screens.Map.NMapScreen";
@@ -168,17 +170,18 @@ public static class Sts2SupportedScreenIds
     }
 
     public static bool IsStartRunLobbyScreen(object? screenObject)
-        => IsTypeOrSubtype(screenObject, StartRunLobbyScreenType);
+        => IsTypeOrSubtype(screenObject, StartRunLobbyScreenType)
+            || IsTypeOrSubtype(screenObject, BlitzLobbyScreenType);
 
     public static bool IsLoadRunLobbyScreen(object? screenObject)
         => IsTypeOrSubtype(screenObject, LoadRunLobbyScreenType);
 
     public static bool IsLobbyScreenType(string? screenType)
-        => string.Equals(screenType, StartRunLobbyScreenId, StringComparison.Ordinal)
-            || string.Equals(screenType, LoadRunLobbyScreenId, StringComparison.Ordinal);
+        => IsStartRunLobbyScreenType(screenType) || IsLoadRunLobbyScreenType(screenType);
 
     public static bool IsStartRunLobbyScreenType(string? screenType)
-        => string.Equals(screenType, StartRunLobbyScreenId, StringComparison.Ordinal);
+        => string.Equals(screenType, StartRunLobbyScreenId, StringComparison.Ordinal)
+            || string.Equals(screenType, BlitzLobbyScreenId, StringComparison.Ordinal);
 
     public static bool IsLoadRunLobbyScreenType(string? screenType)
         => string.Equals(screenType, LoadRunLobbyScreenId, StringComparison.Ordinal);

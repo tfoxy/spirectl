@@ -4,6 +4,7 @@ extern alias Sts2Live;
 using Spirectl.Sts2;
 using Spirectl.Sts2.Core.Actions;
 using Spirectl.Sts2.Core.Logging;
+using Spirectl.Sts2.Core.Perspective;
 using Spirectl.Sts2.Live;
 using Spirectl.Sts2.Live.GameApi;
 using Xunit;
@@ -111,6 +112,70 @@ public sealed partial class Sts2HostTests
         Assert.Equal(4, target.maxBlitzAscension);
         Assert.True(target.isRotatingDread);
         Assert.True(target.isModded);
+#endif
+    }
+
+    [Theory]
+    [InlineData("Standard", 4)]
+    [InlineData("Blitz", 0)]
+    public void GameApiLobbyProjectsModeAndRosterMinimumBlitzCap(string gameMode, int peerCap)
+    {
+        var local = new LobbyPlayer { id = 1 };
+        var peer = new LobbyPlayer { id = 2 };
+#if STS2_API_V113
+        local.maxStandardAscension = 8;
+        peer.maxStandardAscension = 6;
+        local.maxBlitzAscension = 9;
+        peer.maxBlitzAscension = peerCap;
+#else
+        local.maxMultiplayerAscensionUnlocked = 8;
+        peer.maxMultiplayerAscensionUnlocked = 6;
+#endif
+        var screen = new MegaCrit.Sts2.Core.Nodes.Screens.Blitz.NBlitzScreen
+        {
+            Lobby = new BlitzLobbyStub
+            {
+                GameMode = gameMode,
+                Players = [local, peer],
+            },
+        };
+        var state = CharacterSelectStateBuilder.ResolveCharacterSelect(
+            screen, new PlayerPerspective(PlayerScope.Local, null, true));
+
+        Assert.NotNull(state);
+        Assert.Equal(3, state.Lobby.Ascension);
+        Assert.Equal(5, state.Lobby.MaxAscension);
+        Assert.Equal(8, state.Lobby.Players[0].MaxMultiplayerAscensionUnlocked);
+        Assert.Equal(6, state.Lobby.Players[1].MaxMultiplayerAscensionUnlocked);
+#if STS2_API_V113
+        Assert.Equal(gameMode, state.Lobby.GameMode);
+        Assert.Equal(peerCap, state.Lobby.MaxBlitzAscension);
+        Assert.Equal(9, state.Lobby.Players[0].MaxBlitzAscensionUnlocked);
+        Assert.Equal(peerCap, state.Lobby.Players[1].MaxBlitzAscensionUnlocked);
+#else
+        Assert.Null(state.Lobby.GameMode);
+        Assert.Null(state.Lobby.MaxBlitzAscension);
+        Assert.All(state.Lobby.Players, player => Assert.Null(player.MaxBlitzAscensionUnlocked));
+#endif
+    }
+
+    [Fact]
+    public void GameApiLobbyEmptyRosterHasNoBlitzCap()
+    {
+        var screen = new MegaCrit.Sts2.Core.Nodes.Screens.Blitz.NBlitzScreen
+        {
+            Lobby = new BlitzLobbyStub(),
+        };
+        var state = CharacterSelectStateBuilder.ResolveCharacterSelect(
+            screen, new PlayerPerspective(PlayerScope.Local, null, true));
+
+        Assert.NotNull(state);
+        Assert.Null(state.Lobby.MaxBlitzAscension);
+        Assert.Empty(state.Lobby.Players);
+#if STS2_API_V113
+        Assert.Equal("Blitz", state.Lobby.GameMode);
+#else
+        Assert.Null(state.Lobby.GameMode);
 #endif
     }
 
@@ -291,6 +356,15 @@ public sealed partial class Sts2HostTests
     private sealed class SmithOptionStub
     {
         public int SmithCount => 2;
+    }
+
+    private sealed class BlitzLobbyStub
+    {
+        public string GameMode { get; init; } = "Blitz";
+        public LobbyPlayer[] Players { get; init; } = [];
+        public int Ascension => 3;
+        public int MaxAscension => 5;
+        public int MaxPlayers => 4;
     }
 
     private sealed class LobbyScreenStub

@@ -31,6 +31,22 @@ namespace Spirectl.BridgeMod.Tests
         }
 
         [Fact]
+        public void BlitzScreensRouteToStartRunLobbyWithoutChangingIdentity()
+        {
+            var screen = new MegaCrit.Sts2.Core.Nodes.Screens.Blitz.NBlitzScreen();
+            var match = Resolve(screen);
+
+            Assert.Equal("Screens.Blitz.NBlitzScreen", ReadString(match, "ScreenType"));
+            Assert.True(Sts2SupportedScreenIds.IsStartRunLobbyScreen(screen));
+            Assert.True(Sts2SupportedScreenIds.IsStartRunLobbyScreen(
+                new MegaCrit.Sts2.Core.Nodes.Screens.Blitz.NCustomBlitzScreen()));
+            Assert.True(Sts2SupportedScreenIds.IsStartRunLobbyScreenType("Screens.Blitz.NBlitzScreen"));
+            Assert.True(Sts2SupportedScreenIds.IsLobbyScreenType("Screens.Blitz.NBlitzScreen"));
+            Assert.False(Sts2SupportedScreenIds.IsLoadRunLobbyScreenType("Screens.Blitz.NBlitzScreen"));
+            Assert.False(Sts2SupportedScreenIds.IsStartRunLobbyScreenType("Screens.Blitz.NUnknownScreen"));
+        }
+
+        [Fact]
         public void ScreenIdResolverRecognizesTreasureRelicCollectionScreens()
         {
             var match = Resolve(new MegaCrit.Sts2.Core.Nodes.Screens.TreasureRoomRelic.NCustomTreasureRoomRelicCollection());
@@ -251,6 +267,16 @@ namespace MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect
     public class NMultiplayerLoadGameScreen;
 
     public sealed class NCustomLoadGameScreen : NMultiplayerLoadGameScreen;
+}
+
+namespace MegaCrit.Sts2.Core.Nodes.Screens.Blitz
+{
+    public class NBlitzScreen
+    {
+        public object? Lobby { get; set; }
+    }
+
+    public sealed class NCustomBlitzScreen : NBlitzScreen;
 }
 
 namespace MegaCrit.Sts2.Core.Nodes.Screens.Experimental

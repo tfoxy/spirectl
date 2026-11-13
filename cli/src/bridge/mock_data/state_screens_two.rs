@@ -27,6 +27,7 @@ pub(super) fn mock_character_select(
             max_multiplayer_ascension_unlocked: 0,
             display_name: String::new(),
             is_connected: true,
+            max_blitz_ascension_unlocked: None,
         },
         proto::StateCharacterSelectPlayer {
             id: secondary_player_id.clone(),
@@ -36,6 +37,7 @@ pub(super) fn mock_character_select(
             max_multiplayer_ascension_unlocked: 0,
             display_name: String::new(),
             is_connected: true,
+            max_blitz_ascension_unlocked: None,
         },
     ];
     if mock_is_host_local_seat(&secondary_player_id) {
@@ -47,6 +49,7 @@ pub(super) fn mock_character_select(
             max_multiplayer_ascension_unlocked: 0,
             display_name: String::new(),
             is_connected: true,
+            max_blitz_ascension_unlocked: None,
         });
     }
 
@@ -84,6 +87,8 @@ pub(super) fn mock_character_select(
             players,
             saved_run: None,
             max_players: 4,
+            game_mode: None,
+            max_blitz_ascension: None,
         }),
         character_buttons,
         view: Some(proto::StateCharacterSelectView {

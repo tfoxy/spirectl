@@ -74,6 +74,13 @@ internal static class CharacterSelectStateBuilder
         var platform = Sts2LiveIntrospection.GetMemberValue(netService, "Platform");
         var nameNotices = new List<StateNoticeSnapshot>();
 
+        var players = ResolvePlayers(
+            Sts2LiveIntrospection.GetMemberValue(lobby, "Players"),
+            platform,
+            nameNotices,
+            Sts2RunPlayerConnectivity.ResolveConnectedNetIds(netService, localNetId),
+            localPlayerId);
+
         return new StateCharacterSelectLobbySnapshot(
             NetGameType: StateProjectionValues.ResolveNetGameType(Sts2LiveIntrospection.GetMemberValue(netService, "Type")),
             LocalPlayerId: localPlayerId,
@@ -84,14 +91,10 @@ internal static class CharacterSelectStateBuilder
             Act1: StateProjectionValues.NormalizeIdentifier(Sts2LiveIntrospection.GetMemberValue(lobby, "Act1")?.ToString()),
             Seed: StateProjectionValues.NormalizeNullable(Sts2LiveIntrospection.GetMemberValue(lobby, "Seed")?.ToString()),
             ModifierIds: StateProjectionValues.ResolveModelIds(Sts2LiveIntrospection.GetMemberValue(lobby, "Modifiers")),
-            Players: ResolvePlayers(
-                Sts2LiveIntrospection.GetMemberValue(lobby, "Players"),
-                platform,
-                nameNotices,
-                // Use observed transport membership for lobby connectivity.
-                Sts2RunPlayerConnectivity.ResolveConnectedNetIds(netService, localNetId),
-                localPlayerId),
-            MaxPlayers: ResolveMaxPlayers(lobby));
+            Players: players,
+            MaxPlayers: ResolveMaxPlayers(lobby),
+            GameMode: GameApiLobby.GameMode(lobby),
+            MaxBlitzAscension: players.Min(player => player.MaxBlitzAscensionUnlocked));
     }
 
     /// <summary>
@@ -135,7 +138,8 @@ internal static class CharacterSelectStateBuilder
                 DisplayName: netId.HasValue
                     ? Sts2LobbyNameResolver.Resolve(platform, netId.Value, nameNotices)
                     : null,
-                IsConnected: ResolvePlayerConnected(connectedPlayerIds, netId, playerId, localPlayerId)));
+                IsConnected: ResolvePlayerConnected(connectedPlayerIds, netId, playerId, localPlayerId),
+                MaxBlitzAscensionUnlocked: GameApiLobbyPlayer.MaxBlitzAscensionUnlocked(player)));
         }
 
         return result;
@@ -203,7 +207,8 @@ internal static class CharacterSelectStateBuilder
             // disconnects anything else as NetError.NotInSaveGame. The saved roster IS the cap, so report it —
             // that is the honest answer for a caller sizing per-player resources, and it needs no stock fallback
             // (a save always knows how many players it has).
-            MaxPlayers: players.Count);
+            MaxPlayers: players.Count,
+            GameMode: GameApiLobby.GameMode(lobby));
     }
 
     private static IReadOnlyList<StateCharacterSelectPlayerSnapshot> ResolveLoadRunPlayers(

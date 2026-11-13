@@ -144,6 +144,20 @@ public sealed class RecordedFixtureProviderTests
         Assert.Equal("ironclad", lobby.GetProperty("players")[0].GetProperty("characterId").GetString());
     }
 
+    [Fact]
+    public void RecordBlitzLobbyReportsSpecificUnavailableCode()
+    {
+        var provider = CreateProvider(Snapshot("Screens.Blitz.NBlitzScreen", includeLobby: true));
+
+        var result = provider.Record(new RecordedFixtureRequestSnapshot("record-blitz-lobby", "local", "p:1"));
+
+        Assert.Null(result.Success);
+        Assert.NotNull(result.Error);
+        Assert.Equal(RecordedFixtureFailureCode.InvalidAction, result.Error.Code);
+        Assert.Contains(result.Error.Details, detail => detail.Field == "code" && detail.Value == "blitz_lobby_recipe_unavailable");
+        Assert.Contains(result.Error.Details, detail => detail.Field == "screen.id" && detail.Value == "Screens.Blitz.NBlitzScreen");
+    }
+
     private static Sts2RecordedFixtureProvider CreateProvider(GameStateSnapshot snapshot)
         => new(
             new FixedSnapshotExtractor(snapshot),

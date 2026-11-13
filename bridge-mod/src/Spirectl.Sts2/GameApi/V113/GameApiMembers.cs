@@ -32,6 +32,11 @@ internal static class GameApiPlayer
 /// <summary>Run-lobby roster members that differ by lane.</summary>
 internal static class GameApiLobby
 {
+    internal const string GameModeMember = "GameMode";
+
+    internal static string? GameMode(object lobby)
+        => Sts2LiveIntrospection.GetMemberValue(lobby, GameModeMember)?.ToString();
+
     /// <summary>The net ids the in-run lobby currently holds.</summary>
     internal static IEnumerable<ulong> ConnectedPlayerIds(RunLobby lobby) => lobby.PlayerIds;
 }

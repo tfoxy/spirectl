@@ -42,6 +42,12 @@ internal static class GameApiManifest
 #if !SPIRECTL_PROFILE_EMBEDDED
         new(typeof(GameLobbyPlayer), GameApiLobbyPlayer.AscensionMember, GameApiMemberKind.Value,
             Note: "the standard-run ascension limit reported for a lobby seat"),
+        new(typeof(GameLobbyPlayer), GameApiLobbyPlayer.BlitzAscensionMember, GameApiMemberKind.Value,
+            Note: "the Blitz ascension limit reported for a lobby seat"),
+        new(typeof(StartRunLobby), GameApiLobby.GameModeMember, GameApiMemberKind.Value,
+            Note: "the current game mode of the start-run lobby"),
+        new(typeof(LoadRunLobby), GameApiLobby.GameModeMember, GameApiMemberKind.Value,
+            Note: "the saved game mode of the load-run lobby"),
         new(typeof(StartRunLobby), GameApiNames.LobbyMaxPlayers, GameApiMemberKind.Value,
             Note: "the lobby's live player cap; without it every seat-count limit sizes off a constant"),
 #endif

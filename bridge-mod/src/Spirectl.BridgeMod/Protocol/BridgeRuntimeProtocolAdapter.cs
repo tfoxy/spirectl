@@ -213,6 +213,14 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
             },
             View = snapshot.View is null ? null : ToProtoStateCharacterSelectView(snapshot.View),
         };
+        if (snapshot.Lobby.GameMode is { } gameMode)
+        {
+            response.Lobby.GameMode = gameMode;
+        }
+        if (snapshot.Lobby.MaxBlitzAscension is { } maxBlitzAscension)
+        {
+            response.Lobby.MaxBlitzAscension = maxBlitzAscension;
+        }
         response.Lobby.ModifierIds.Add(snapshot.Lobby.ModifierIds);
         response.Lobby.Players.Add(snapshot.Lobby.Players.Select(ToProtoStateCharacterSelectPlayer));
         if (snapshot.Lobby.SavedRun is { } savedRun)
@@ -232,7 +240,8 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
         };
 
     private static StateCharacterSelectPlayer ToProtoStateCharacterSelectPlayer(StateCharacterSelectPlayerSnapshot snapshot)
-        => new()
+    {
+        var response = new StateCharacterSelectPlayer
         {
             Id = snapshot.Id,
             SlotId = snapshot.SlotId,
@@ -242,6 +251,12 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
             DisplayName = snapshot.DisplayName ?? string.Empty,
             IsConnected = snapshot.IsConnected,
         };
+        if (snapshot.MaxBlitzAscensionUnlocked is { } cap)
+        {
+            response.MaxBlitzAscensionUnlocked = cap;
+        }
+        return response;
+    }
 
     private static StateCharacterSelectSavedRun ToProtoStateCharacterSelectSavedRun(StateCharacterSelectSavedRunSnapshot snapshot)
     {

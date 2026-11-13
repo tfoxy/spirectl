@@ -46,6 +46,8 @@ internal static class GameApiMerchant
 /// <summary>Lobby unlock state shared with synthetic and fixture seats.</summary>
 internal static class GameApiLobbyPlayer
 {
+    internal static int? MaxBlitzAscensionUnlocked(object player) => null;
+
     internal const string AscensionMember = "maxMultiplayerAscensionUnlocked";
 
     internal static object? MaxMultiplayerAscensionUnlocked(object player)

@@ -42,6 +42,11 @@ public sealed class Sts2RecordedFixtureProvider(
             new GameStateQuery(new PerspectiveSelection(PlayerScope.Local, request.PlayerId), IncludeDebug: false),
             _perspectiveProvider.GetDefaultPerspective());
 
+        if (string.Equals(snapshot.ScreenType, Sts2SupportedScreenIds.BlitzLobbyScreenId, StringComparison.Ordinal))
+        {
+            return Unsupported(request, snapshot, "blitz_lobby_recipe_unavailable", "Blitz lobby recording is unsupported: fixture lobby recipes only materialize the Standard character-select lobby.");
+        }
+
         if (Sts2SupportedScreenIds.IsLobbyScreenType(snapshot.ScreenType))
         {
             return RecordMultiplayerLobby(request, snapshot);

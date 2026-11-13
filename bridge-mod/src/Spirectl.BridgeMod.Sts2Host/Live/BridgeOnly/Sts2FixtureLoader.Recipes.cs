@@ -3154,7 +3154,7 @@ public sealed partial class Sts2FixtureLoader
         }
 
         if (string.Equals(fixture.Lobby.Kind, "start-run", StringComparison.Ordinal)
-            && !Sts2SupportedScreenIds.IsStartRunLobbyScreenType(fixture.Screen))
+            && !string.Equals(fixture.Screen, Sts2SupportedScreenIds.StartRunLobbyScreenId, StringComparison.Ordinal))
         {
             invalid = InvalidFixture(
                 request,

@@ -441,7 +441,7 @@ public sealed class Sts2CompileProfileTests
         {
             "V113",
             [
-                "AscensionMember", "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
+                "AscensionMember", "BlitzAscensionMember", "GameModeMember", "GameModeMember", "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
                 "PlayerCanRemoveOrUsePotions", "ModifyDamage",
                 "PlayerConnected", "PlayerChanged",
                 "CombatTurnState", "TurnStatePlayersReadyToBeginEnemyTurn",
@@ -459,7 +459,7 @@ public sealed class Sts2CompileProfileTests
             FindRepositoryRoot(), "bridge-mod/src/Spirectl.Sts2/GameApi", lane, "GameApiManifest.cs"));
 
         // The members an entry names: a lane constant, a nameof member, or a short quoted name.
-        var member = new Regex(@"(?:GameApiNames|GameApiLobbyPlayer|GameApiMerchantPurchase|GameApiTreasure|GameApiRestSite)\.(\w+)|nameof\(\w+\.(\w+)\)|""(\w+|\.ctor)""", RegexOptions.CultureInvariant);
+        var member = new Regex(@"(?:GameApiNames|GameApiLobby|GameApiLobbyPlayer|GameApiMerchantPurchase|GameApiTreasure|GameApiRestSite)\.(\w+)|nameof\(\w+\.(\w+)\)|""(\w+|\.ctor)""", RegexOptions.CultureInvariant);
         string[] Members(string text) =>
         [
             .. member.Matches(text).Select(match => match.Groups.Cast<Group>().Skip(1).First(group => group.Success).Value),

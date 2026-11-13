@@ -161,6 +161,7 @@ message StateCharacterSelectLobby {
   string local_player_id = 2;
   string host_player_id = 3;
   uint32 connecting_player_count = 4;
+  // The current game mode's selected ascension and cap.
   int32 ascension = 5;
   int32 max_ascension = 6;
   string act1 = 7;
@@ -173,6 +174,10 @@ message StateCharacterSelectLobby {
   // load-run one (which admits exactly the netIds in the save). 4 in the stock game; the multiplayer limit mods
   // raise it, so callers sizing anything per player must read this rather than assume.
   int32 max_players = 12;
+  // v113+: same spelling as StateRun.game_mode; also present on load-run lobbies.
+  optional string game_mode = 13;
+  // v113+ start-run roster's minimum Blitz cap; absent for an empty roster.
+  optional int32 max_blitz_ascension = 14;
 }
 
 message StateCharacterSelectPlayer {
@@ -180,12 +185,15 @@ message StateCharacterSelectPlayer {
   int32 slot_id = 2;
   string character_id = 3;
   bool is_ready = 4;
+  // Standard multiplayer unlock cap, including when the lobby is in Blitz mode.
   int32 max_multiplayer_ascension_unlocked = 5;
   string display_name = 6;
   // Lobby connection state. Mirrors RunLobby.ConnectedPlayerIds / NRemoteLobbyPlayer._isConnected:
   // the local player is always connected; a remote player is connected iff their net id is in the
   // lobby's ConnectedPlayerIds. The disconnected indicator renders when this is false.
   bool is_connected = 7;
+  // v113+ start-run seat's Blitz cap. The legacy unlock cap above is Standard-only.
+  optional int32 max_blitz_ascension_unlocked = 8;
 }
 
 // Saved-run summary shown on the load-run lobby InfoPanel.

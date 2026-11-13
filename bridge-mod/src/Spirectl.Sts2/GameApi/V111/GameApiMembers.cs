@@ -32,6 +32,8 @@ internal static class GameApiPlayer
 /// <summary>Run-lobby roster members that differ by lane.</summary>
 internal static class GameApiLobby
 {
+    internal static string? GameMode(object lobby) => null;
+
     /// <summary>The net ids the in-run lobby currently holds.</summary>
     internal static IEnumerable<ulong> ConnectedPlayerIds(RunLobby lobby) => lobby.PlayerIds;
 }

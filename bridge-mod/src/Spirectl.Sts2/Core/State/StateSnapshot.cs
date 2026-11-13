@@ -54,8 +54,10 @@ public sealed record StateCharacterSelectLobbySnapshot(
     // limit mods raise it — "Multiplayer Limit Break" writes 16 straight onto the lobby, "Unlimited"
     // overrides the maxPlayers argument InitializeMultiplayerAsHost builds it with — so a host that
     // sizes anything per player (seats, transports, layouts) must ASK rather than assume 4.
-    // Trails the record with a stock default so every existing construction site stays valid.
-    int MaxPlayers = StateCharacterSelectLobbyDefaults.MaxPlayers);
+    // A stock default keeps existing construction sites valid.
+    int MaxPlayers = StateCharacterSelectLobbyDefaults.MaxPlayers,
+    string? GameMode = null,
+    int? MaxBlitzAscension = null);
 
 public sealed record StateCharacterSelectPlayerSnapshot(
     string Id,
@@ -64,7 +66,8 @@ public sealed record StateCharacterSelectPlayerSnapshot(
     bool IsReady,
     int MaxMultiplayerAscensionUnlocked,
     string? DisplayName,
-    bool IsConnected = true);
+    bool IsConnected = true,
+    int? MaxBlitzAscensionUnlocked = null);
 
 // Saved-run summary for the load-run lobby. Mirrors MegaCrit.Sts2.Core.Saves.SerializableRun;
 // null for start-run lobbies (no save being resumed).

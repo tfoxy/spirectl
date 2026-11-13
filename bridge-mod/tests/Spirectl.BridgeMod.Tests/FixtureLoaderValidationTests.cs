@@ -81,6 +81,55 @@ public sealed class FixtureLoaderValidationTests
     }
 
     [Fact]
+    public void StartRunLobbyRecipeRejectsBlitzScreen()
+    {
+        var loaderType = typeof(Sts2FixtureLoader);
+        var documentType = loaderType.GetNestedType("FixtureWireDocument", BindingFlags.NonPublic);
+        Assert.NotNull(documentType);
+
+        const string payload = """
+            {
+              "schemaVersion": "spirectl.fixture/v0",
+              "screen": "Screens.Blitz.NBlitzScreen",
+              "name": "unsupported-blitz-lobby",
+              "characterSelect": { "kind": "start-run" }
+            }
+            """;
+        var wireFixture = JsonSerializer.Deserialize(
+            payload,
+            documentType,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        Assert.NotNull(wireFixture);
+
+        var projectMethod = documentType!.GetMethod("ToRecipeDocument", BindingFlags.Instance | BindingFlags.Public);
+        Assert.NotNull(projectMethod);
+        var fixture = projectMethod!.Invoke(wireFixture, []);
+        Assert.NotNull(fixture);
+
+        var method = loaderType.GetMethod("TryResolveLobbyRecipe", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        object?[] arguments = [
+            new FixtureLoadRequestSnapshot(
+                RequestId: "fixture-1",
+                SchemaVersion: "spirectl.fixture/v0",
+                FixtureName: "unsupported-blitz-lobby",
+                SourcePath: "/repo/fixtures/unsupported-blitz-lobby.sts2.fixture.yaml",
+                FixtureJson: payload),
+            fixture,
+            null,
+            null,
+        ];
+
+        Assert.False(Assert.IsType<bool>(method.Invoke(null, arguments)));
+        var result = Assert.IsType<FixtureLoadResult>(arguments[3]);
+        Assert.NotNull(result.Error);
+        Assert.Equal(FixtureLoadFailureCode.InvalidFixture, result.Error.Code);
+        var detail = Assert.Single(result.Error.Details);
+        Assert.Equal("screen", detail.Field);
+        Assert.Equal("start-run lobby recipes must use screen: Screens.CharacterSelect.NCharacterSelectScreen.", detail.Note);
+    }
+
+    [Fact]
     public void StableScreenCandidateIgnoresMissingScreen()
     {
         Assert.False(Sts2FixtureLoader.IsStableScreenIdCandidate(null, "Screens.CharacterSelect.NCharacterSelectScreen"));

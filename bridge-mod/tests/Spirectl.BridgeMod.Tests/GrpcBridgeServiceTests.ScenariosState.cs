@@ -313,8 +313,11 @@ public sealed partial class GrpcBridgeServiceTests
             result.Error.Message);
     }
 
-    [Fact]
-    public void StateSerializesCharacterSelectRuntimeContract()
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("Blitz", 0)]
+    [InlineData("Standard", 4)]
+    public void StateSerializesCharacterSelectRuntimeContract(string? gameMode, int? blitzCap)
     {
         var runtime = RuntimeWithStateProvider(new StateSnapshot(
             StateSnapshot.CurrentSchemaVersion,
@@ -339,8 +342,11 @@ public sealed partial class GrpcBridgeServiceTests
                             CharacterId: "ironclad",
                             IsReady: false,
                             MaxMultiplayerAscensionUnlocked: 7,
-                            DisplayName: "Test Host"),
-                    ]),
+                            DisplayName: "Test Host",
+                            MaxBlitzAscensionUnlocked: blitzCap),
+                    ],
+                    GameMode: gameMode,
+                    MaxBlitzAscension: blitzCap),
                 CharacterButtons:
                 [
                     new StateCharacterButtonSnapshot("ironclad", "ironclad", IsLocked: false),
@@ -358,6 +364,19 @@ public sealed partial class GrpcBridgeServiceTests
         Assert.Equal("es", roundTrip.Success.Language);
         Assert.Equal("screens/character_select_screen", roundTrip.Success.RootScene);
         Assert.NotNull(roundTrip.Success.CharacterSelect);
+        var lobby = roundTrip.Success.CharacterSelect.Lobby;
+        Assert.Equal(gameMode is not null, lobby.HasGameMode);
+        Assert.Equal(blitzCap.HasValue, lobby.HasMaxBlitzAscension);
+        Assert.Equal(blitzCap.HasValue, lobby.Players[0].HasMaxBlitzAscensionUnlocked);
+        if (gameMode is not null)
+        {
+            Assert.Equal(gameMode, lobby.GameMode);
+        }
+        if (blitzCap is { } cap)
+        {
+            Assert.Equal(cap, lobby.MaxBlitzAscension);
+            Assert.Equal(cap, lobby.Players[0].MaxBlitzAscensionUnlocked);
+        }
         Assert.Equal("host", roundTrip.Success.CharacterSelect.Lobby.NetGameType);
         Assert.Equal((uint)1, roundTrip.Success.CharacterSelect.Lobby.ConnectingPlayerCount);
         Assert.Equal("p:100", roundTrip.Success.CharacterSelect.Lobby.Players[0].Id);
@@ -415,7 +434,8 @@ public sealed partial class GrpcBridgeServiceTests
                         [
                             new StateCharacterSelectSavedRunPlayerSnapshot("p:1", CurrentHp: 80, MaxHp: 80, Gold: 99),
                             new StateCharacterSelectSavedRunPlayerSnapshot("p:2", CurrentHp: 70, MaxHp: 70, Gold: 99),
-                        ])),
+                        ]),
+                    GameMode: "Blitz"),
                 CharacterButtons: [],
                 View: new StateCharacterSelectViewSnapshot("p:1", null)),
             Run: null));
@@ -427,6 +447,10 @@ public sealed partial class GrpcBridgeServiceTests
         Assert.NotNull(roundTrip.Success);
         Assert.Equal("screens/multiplayer_load_game_screen", roundTrip.Success.RootScene);
         var lobby = roundTrip.Success.CharacterSelect.Lobby;
+        Assert.True(lobby.HasGameMode);
+        Assert.Equal("Blitz", lobby.GameMode);
+        Assert.False(lobby.HasMaxBlitzAscension);
+        Assert.All(lobby.Players, player => Assert.False(player.HasMaxBlitzAscensionUnlocked));
         Assert.NotNull(lobby.SavedRun);
         Assert.Equal(0, lobby.SavedRun.CurrentActIndex);
         Assert.Equal(0, lobby.SavedRun.ActFloor);

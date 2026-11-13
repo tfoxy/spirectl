@@ -55,7 +55,7 @@ fn character_select_view_json(value: &bridge::proto::StateCharacterSelectView) -
 }
 
 fn character_select_lobby_json(value: &bridge::proto::StateCharacterSelectLobby) -> Value {
-    json!({
+    let mut payload = json!({
         "netGameType": value.net_game_type,
         "localPlayerId": nullable_string_json(&value.local_player_id),
         "hostPlayerId": nullable_string_json(&value.host_player_id),
@@ -68,11 +68,18 @@ fn character_select_lobby_json(value: &bridge::proto::StateCharacterSelectLobby)
         "players": value.players.iter().map(character_select_player_json).collect::<Vec<_>>(),
         "savedRun": value.saved_run.as_ref().map(character_select_saved_run_json).unwrap_or(Value::Null),
         "maxPlayers": value.max_players,
-    })
+    });
+    if let Some(game_mode) = &value.game_mode {
+        payload["gameMode"] = json!(game_mode);
+    }
+    if let Some(cap) = value.max_blitz_ascension {
+        payload["maxBlitzAscension"] = json!(cap);
+    }
+    payload
 }
 
 fn character_select_player_json(value: &bridge::proto::StateCharacterSelectPlayer) -> Value {
-    json!({
+    let mut payload = json!({
         "id": value.id,
         "slotId": value.slot_id,
         "characterId": nullable_string_json(&value.character_id),
@@ -80,7 +87,11 @@ fn character_select_player_json(value: &bridge::proto::StateCharacterSelectPlaye
         "maxMultiplayerAscensionUnlocked": value.max_multiplayer_ascension_unlocked,
         "displayName": nullable_string_json(&value.display_name),
         "isConnected": value.is_connected,
-    })
+    });
+    if let Some(cap) = value.max_blitz_ascension_unlocked {
+        payload["maxBlitzAscensionUnlocked"] = json!(cap);
+    }
+    payload
 }
 
 fn character_select_saved_run_json(value: &bridge::proto::StateCharacterSelectSavedRun) -> Value {
@@ -1103,7 +1114,7 @@ pub(crate) fn state_schema_json() -> Value {
         "primaryCommand": "state",
         "summary": "sts2 state is the runtime-only presentation envelope: a screen-aware snapshot of what the attached client can observe. Semantic actions are derived natively from it via state actions.",
         "commands": {
-            "state": "Runtime-only envelope. Character Select includes characterSelect; active runs include run; unsupported sections return null.",
+            "state": "Runtime-only envelope. Start-run (including Blitz) and load-run lobbies include characterSelect; active runs include run; unsupported sections return null.",
             "state actions": "Native semantic actions derived from the state envelope plus presentation/actions.json.",
             "state watch": "CLI NDJSON stream over the state envelope; uses reactive live bridge subscriptions when advertised, with polling fallback and explicit polling mode."
         },
@@ -1113,7 +1124,7 @@ pub(crate) fn state_schema_json() -> Value {
         "viewSemantics": "All state view objects describe attached-client local UI state. They are omitted with notices when the requested perspective is remote and the attached client cannot observe that player's UI.",
         "topLevelFields": ["schemaVersion", "language", "rootScene", "characterSelect", "run", "blockingModal"],
         "blockingModal": {"nullable": true, "fields": ["id", "kind", "typeName", "title", "body", "buttons"], "buttonFields": ["id", "label"]},
-        "unsupportedScreens": "All screens return the envelope; characterSelect is null except the start-run character select scene, and run is null unless RunManager has an active run.",
+        "unsupportedScreens": "All screens return the envelope; characterSelect is null outside start-run (including Blitz) and load-run lobby scenes, and run is null unless RunManager has an active run.",
         "actionContract": {
             "command": "sts2 --json state actions",
             "schemaVersion": "spirectl.state-actions/v0",
@@ -1146,10 +1157,12 @@ pub(crate) fn state_schema_json() -> Value {
             "viewSemantics": "All state view objects describe attached-client local UI state. They are omitted with notices when the requested perspective is remote and the attached client cannot observe that player's UI.",
             "topLevelFields": ["schemaVersion", "language", "rootScene", "characterSelect", "run", "blockingModal"],
             "blockingModal": {"nullable": true, "fields": ["id", "kind", "typeName", "title", "body", "buttons"], "buttonFields": ["id", "label"]},
-            "unsupportedScreens": "All screens return the envelope; characterSelect is null except the start-run character select scene, and run is null unless RunManager has an active run.",
+            "unsupportedScreens": "All screens return the envelope; characterSelect is null outside start-run (including Blitz) and load-run lobby scenes, and run is null unless RunManager has an active run.",
             "characterSelect": {
-                "lobby": ["netGameType", "localPlayerId", "hostPlayerId", "connectingPlayerCount", "ascension", "maxAscension", "act1", "seed", "modifierIds", "players", "maxPlayers"],
-                "players": ["id", "slotId", "characterId", "isReady", "maxMultiplayerAscensionUnlocked", "displayName"],
+                "lobby": ["netGameType", "localPlayerId", "hostPlayerId", "connectingPlayerCount", "ascension", "maxAscension", "act1", "seed", "modifierIds", "players", "maxPlayers", "gameMode", "maxBlitzAscension"],
+                "players": ["id", "slotId", "characterId", "isReady", "maxMultiplayerAscensionUnlocked", "displayName", "maxBlitzAscensionUnlocked"],
+                "ascensionSemantics": "Lobby ascension/maxAscension are the current game mode's selection/cap; load-run lobbies retain the saved ascension with maxAscension 0. Player maxMultiplayerAscensionUnlocked is Standard-only.",
+                "optionalV113Fields": "gameMode uses run.gameMode spelling; maxBlitzAscension is the start-run roster minimum (absent if empty); players[].maxBlitzAscensionUnlocked is the per-seat Blitz cap. All are omitted on older lanes; load-run lobbies expose only gameMode.",
                 "characterButtons": ["id", "characterId", "isLocked"],
                 "view": ["playerId", "selectedCharacterButtonId"],
                 "view.playerId": "The player whose local presentation perspective is being rendered.",
@@ -2201,6 +2214,62 @@ mod tests {
     }
 
     #[test]
+    fn state_json_projects_optional_lobby_blitz_caps() {
+        for game_mode in ["Standard", "Blitz"] {
+            let lobby = proto::StateCharacterSelectLobby {
+                game_mode: Some(game_mode.to_string()),
+                max_blitz_ascension: Some(0),
+                ascension: 3,
+                max_ascension: 5,
+                players: vec![proto::StateCharacterSelectPlayer {
+                    max_multiplayer_ascension_unlocked: 8,
+                    max_blitz_ascension_unlocked: Some(0),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            let payload = character_select_lobby_json(&lobby);
+            assert_eq!(payload["gameMode"], game_mode);
+            assert_eq!(payload["maxBlitzAscension"], 0);
+            assert_eq!(payload["players"][0]["maxBlitzAscensionUnlocked"], 0);
+            assert_eq!(payload["players"][0]["maxMultiplayerAscensionUnlocked"], 8);
+            assert_eq!(payload["ascension"], 3);
+            assert_eq!(payload["maxAscension"], 5);
+        }
+    }
+
+    #[test]
+    fn state_json_omits_unavailable_lobby_blitz_fields() {
+        let player = proto::StateCharacterSelectPlayer::default();
+        let lobby = proto::StateCharacterSelectLobby {
+            players: vec![player],
+            ..Default::default()
+        };
+        let payload = character_select_lobby_json(&lobby);
+        assert!(payload.get("gameMode").is_none());
+        assert!(payload.get("maxBlitzAscension").is_none());
+        assert!(
+            payload["players"][0]
+                .get("maxBlitzAscensionUnlocked")
+                .is_none()
+        );
+
+        let load_lobby = proto::StateCharacterSelectLobby {
+            game_mode: Some("Blitz".to_string()),
+            saved_run: Some(proto::StateCharacterSelectSavedRun::default()),
+            ..lobby
+        };
+        let payload = character_select_lobby_json(&load_lobby);
+        assert_eq!(payload["gameMode"], "Blitz");
+        assert!(payload.get("maxBlitzAscension").is_none());
+        assert!(
+            payload["players"][0]
+                .get("maxBlitzAscensionUnlocked")
+                .is_none()
+        );
+    }
+
+    #[test]
     fn state_json_projects_character_select_view_player_id() {
         let payload = state_json(&proto::StateResponse {
             schema_version: "spirectl.state/v0".to_string(),
@@ -2221,6 +2290,8 @@ mod tests {
                     players: Vec::new(),
                     saved_run: None,
                     max_players: 4,
+                    game_mode: None,
+                    max_blitz_ascension: None,
                 }),
                 character_buttons: Vec::new(),
                 view: Some(proto::StateCharacterSelectView {

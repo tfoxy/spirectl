@@ -462,7 +462,7 @@
           },
           {
             "path": "characterSelect",
-            "summary": "Character-select lobby, character buttons, and view; null outside the start-run character select screen."
+            "summary": "Start-run (including Blitz) or load-run lobby, character buttons, and view; null outside lobby screens."
           },
           {
             "path": "run",
