@@ -294,6 +294,9 @@
          which levers were effective without requiring a live host. -->
     <Compile Include="Live/Sts2SceneWatchRuntimeSettings.cs" />
     <Compile Include="Live/Sts2ClickableFocus.cs" />
+    <!-- Godot-free per-type memo for the watcher's on-add capability probes (and the reflection rule that decides
+         when a type may key one), so the memo's equivalence with the uncached probe is offline-unit-testable. -->
+    <Compile Include="Live/Sts2TypeCapabilityCache.cs" />
     <Compile Include="Live/Sts2RewardElementChoice.cs" />
     <Compile Include="Live/Sts2RuntimeSceneWatchControls.cs" />
     <!-- Semantic state-watch pacing levers and the process-global semantic revision the game-thread hooks bump

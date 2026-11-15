@@ -1925,7 +1925,8 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 id,
                 DescribeStaticName(node),
                 node.GetType().FullName ?? node.GetType().Name,
-                DescribeStaticStyle(node))
+                DescribeStaticStyle(node),
+                ReadNativeClass(node))
             {
                 JustAdded = true,
             };
@@ -2637,6 +2638,20 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
 
         value = 0;
         return false;
+    }
+
+    // The node's native class, read once on add for the class-keyed probes in Tracked. Null when the node cannot
+    // answer (it is being freed mid-reconcile); every consumer treats null as "not that class" and "do not memoize".
+    private static string? ReadNativeClass(Node node)
+    {
+        try
+        {
+            return node.GetClass();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static string DescribeStaticName(Node node)
@@ -4480,7 +4495,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         public Transform2D Prefix = prefix;
     }
 
-    private sealed class Tracked(Node node, ulong id, string name, string nodeType, StaticStyle style)
+    private sealed class Tracked(Node node, ulong id, string name, string nodeType, StaticStyle style, string? nativeClass)
     {
         public Node Node = node;
         public ulong Id = id;
@@ -4499,8 +4514,9 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         public bool JustAdded;
 
         // Whether this node exposes NClickableControl's authoritative IsFocused property through Godot's dynamic
-        // property bridge. Probed once on add; the per-tick path performs a Get only when this is true.
-        public readonly bool FocusCapable = HasBoolProperty(node, ClickableFocusedProp);
+        // property bridge. Resolved once on add; the per-tick path performs a Get only when this is true. The answer
+        // is a type fact, so it is memoized per (managed type, native class) — see ResolveFocusCapable.
+        public readonly bool FocusCapable = ResolveFocusCapable(node, nativeClass);
 
         // ORDER/UPSERT CONTRACT: has this node EVER been shipped to clients? A node born inside a hidden
         // subtree is registered (so it sits in `_ordered`) but PRUNED from every incremental capture, so it has no
@@ -4531,7 +4547,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // root (InspectStatic sets Style.Spine only on the root). Computed ONCE on add (class strings are invariant,
         // so this is freeze-timing-independent). Skeleton leaves are browser-inert (no texture/localRect/spine) and
         // carry no hook-driven state, so they are the safe scope for read-elision under a frozen, stationary root.
-        public readonly bool IsSpineSkeletonLeafType = IsSpineSkeletonLeaf(node, style);
+        public readonly bool IsSpineSkeletonLeafType = IsSpineSkeletonLeaf(nativeClass, style);
 
         // The two structural facts the stroke-geometry stream is gated on, packed into ONE field so the
         // native probes run exactly once per add. Computed via the NATIVE class — like IsSpineSkeletonLeafType, and
@@ -4596,21 +4612,15 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
                 : LineKindLine2D;
         }
 
-        private static bool IsSpineSkeletonLeaf(Node node, StaticStyle style)
+        private static bool IsSpineSkeletonLeaf(string? nativeClass, StaticStyle style)
         {
             if (style.Spine is not null)
             {
                 return false; // the SpineSprite clip root itself, not a skeleton leaf
             }
 
-            try
-            {
-                return node.GetClass().Contains("Spine", StringComparison.Ordinal);
-            }
-            catch
-            {
-                return false;
-            }
+            // Null = the class read failed (node mid-teardown), which the per-node read also answered false.
+            return nativeClass?.Contains("Spine", StringComparison.Ordinal) ?? false;
         }
 
         // Streaming suppression: while this deadline (Environment.TickCount64) is in the future, the node's
@@ -4749,7 +4759,59 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
         // change — a change here is what forces the glyph delta (re-shipping its frame set). Null until first set.
         public string? LastIntentAnim;
 
-        private static bool HasBoolProperty(Node node, StringName property)
+        // Every Tracked construction asks the focus question, and the uncached answer walks the node's whole
+        // property list (one marshalled dictionary per property), so on a full first capture it dominated the
+        // main thread. The property set is fixed per (managed type, native class) unless something can vary it per
+        // instance, so those nodes are probed on their own every time:
+        //   - a managed type that declares a per-instance property-list hook (_GetPropertyList/_ValidateProperty);
+        //   - an engine-typed wrapper carrying a non-C# script (its script, not the wrapper type, owns properties);
+        //   - a node whose native class or script could not be read (mid-teardown).
+        // A C#-scripted node's managed type IS its script class, so the type already names the script.
+        private static readonly Sts2TypeCapabilityCache FocusCapabilityCache = new();
+        private static readonly System.Reflection.Assembly EngineAssembly = typeof(GodotObject).Assembly;
+        private static readonly string[] InstancePropertyListHooks =
+            [nameof(GodotObject._GetPropertyList), nameof(GodotObject._ValidateProperty)];
+
+        private static bool ResolveFocusCapable(Node node, string? nativeClass)
+            => FocusCapabilityCache.GetOrProbe(
+                FocusCapabilityKey(node, nativeClass),
+                node,
+                static probed => HasBoolProperty(probed, ClickableFocusedProp));
+
+        private static Sts2TypeCapabilityCache.Key? FocusCapabilityKey(Node node, string? nativeClass)
+        {
+            if (nativeClass is null)
+            {
+                return null;
+            }
+
+            var managedType = node.GetType();
+            if (managedType.Assembly == EngineAssembly)
+            {
+                try
+                {
+                    using var script = node.GetScript();
+                    if (script.VariantType != Variant.Type.Nil)
+                    {
+                        return null;
+                    }
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            else if (FocusCapabilityCache.DeclaresInstanceHook(managedType, EngineAssembly, InstancePropertyListHooks))
+            {
+                return null;
+            }
+
+            return new Sts2TypeCapabilityCache.Key(managedType, nativeClass);
+        }
+
+        // The uncached answer. Null = the property list could not be read (the node is being freed while the
+        // structure is reconciled): not focus-capable for this tenure, and never memoized for the node's type.
+        private static bool? HasBoolProperty(Node node, StringName property)
         {
             try
             {
@@ -4771,6 +4833,7 @@ internal sealed partial class Sts2RuntimeSceneWatcher : IRuntimeSceneWatcher, ID
             catch
             {
                 // A node being freed while the structure is reconciled is not focus-capable for this tenure.
+                return null;
             }
 
             return false;

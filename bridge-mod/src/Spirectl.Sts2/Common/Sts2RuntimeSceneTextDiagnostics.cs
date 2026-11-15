@@ -15,14 +15,113 @@ public static class Sts2RuntimeSceneTextDiagnostics
     // GetMethods). Memoize each resolution — including a "not found" null — so the per-tick text read collapses to
     // dictionary lookups. ConcurrentDictionary because Describe is also called off the watcher thread. Default ON;
     // SPIRECTL_SCENE_WATCH_CACHE_TEXT_REFLECTION=0 restores the uncached path for A/B.
-    private static readonly bool CacheReflection =
+    //
+    // The same rule covers every other answer that is a fact of the TYPE rather than of the instance: the text
+    // source a type maps to, the indexed and best-effort method a name resolves to (with its parameter list, which
+    // reflection otherwise copies on every call), a theme method's parameters, the Godot type a name resolves to in
+    // an assembly, and the StringName argument a theme key converts to. Only the Invoke/GetValue on the instance
+    // stays per call. The full (non-lean) describe runs once per text node on a keyframe, so these lookups were the
+    // reflection share of the first capture after a subscription.
+    //
+    // Settable for the equivalence tests only (cached and uncached Describe output must be identical).
+    internal static bool CacheReflection { get; set; } =
         (System.Environment.GetEnvironmentVariable("SPIRECTL_SCENE_WATCH_CACHE_TEXT_REFLECTION") ?? "1")
             .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
+
+    // Count of uncached member-table scans (GetMethods / hierarchy walks) — a test and diagnostics counter.
+    private static long _reflectionScans;
+
+    internal static long ReflectionScans => Interlocked.Read(ref _reflectionScans);
 
     private static readonly ConcurrentDictionary<(Type, string), PropertyInfo?> PropertyCache = new();
     private static readonly ConcurrentDictionary<(Type, string), FieldInfo?> FieldCache = new();
     private static readonly ConcurrentDictionary<(Type, string), MethodInfo?> ParameterlessMethodCache = new();
-    private static readonly ConcurrentDictionary<(Type, string), MethodInfo[]> ThemeMethodsByName = new();
+    private static readonly ConcurrentDictionary<(Type, string), ThemeMethod[]> ThemeMethodsByName = new();
+    private static readonly ConcurrentDictionary<Type, string?> SourceByType = new();
+    private static readonly ConcurrentDictionary<(Type, string), IndexedMethod?> IndexedMethodCache = new();
+    private static readonly ConcurrentDictionary<(Type, string, int), BestEffortMethod?> BestEffortMethodCache = new();
+    private static readonly ConcurrentDictionary<(Assembly, string), Type?> TypeByName = new();
+    private static readonly ConcurrentDictionary<(Type, string), object?> StringNameArguments = new();
+
+    // Shaped-paragraph metrics, remembered by everything the reconstruction feeds the engine: the font resource
+    // (by reference), the text, the pixel size, the wrap width, the break / justification / overrun flags and the
+    // alignment. The paragraph reads nothing else from the node — theme, line spacing and colours never reach it —
+    // so equal keys shape to equal metrics, and a swap-back's keyframe re-describes mostly identical labels. Only a
+    // successful shape is remembered (a failure adds a notice and must be re-attempted per node). Bounded LRU;
+    // SPIRECTL_SCENE_WATCH_CACHE_TEXT_PARAGRAPHS=0 restores the per-node shaping for A/B. Settable for tests.
+    internal static bool CacheParagraphs { get; set; } =
+        (System.Environment.GetEnvironmentVariable("SPIRECTL_SCENE_WATCH_CACHE_TEXT_PARAGRAPHS") ?? "1")
+            .Trim().ToLowerInvariant() is not ("0" or "false" or "off" or "no");
+
+    internal const int ParagraphCacheCapacity = 2048;
+
+    private static readonly Sts2BoundedLruCache<ParagraphKey, ParagraphMetricsProbe> ParagraphCache =
+        new(ParagraphCacheCapacity);
+
+    // Count of paragraphs actually shaped (a TextParagraph built and laid out) — a test and diagnostics counter.
+    private static long _paragraphShapes;
+
+    internal static long ParagraphShapes => Interlocked.Read(ref _paragraphShapes);
+
+    internal static int ParagraphCacheCount => ParagraphCache.Count;
+
+    internal static void ClearParagraphCacheForTests() => ParagraphCache.Clear();
+
+    // The shaping inputs. The font compares by REFERENCE: one loaded font resource is one managed wrapper, and its
+    // own Equals is not a statement about its glyphs.
+    internal sealed class ParagraphKey(
+        object font,
+        string text,
+        int fontSizePx,
+        double widthPx,
+        string? breakFlags,
+        string? justificationFlags,
+        string? textOverrunBehavior,
+        string? alignment) : IEquatable<ParagraphKey>
+    {
+        public object Font { get; } = font;
+        public string Text { get; } = text;
+        public int FontSizePx { get; } = fontSizePx;
+        public double WidthPx { get; } = widthPx;
+        public string? BreakFlags { get; } = breakFlags;
+        public string? JustificationFlags { get; } = justificationFlags;
+        public string? TextOverrunBehavior { get; } = textOverrunBehavior;
+        public string? Alignment { get; } = alignment;
+
+        public bool Equals(ParagraphKey? other)
+            => other is not null
+                && ReferenceEquals(Font, other.Font)
+                && string.Equals(Text, other.Text, StringComparison.Ordinal)
+                && FontSizePx == other.FontSizePx
+                && WidthPx.Equals(other.WidthPx)
+                && string.Equals(BreakFlags, other.BreakFlags, StringComparison.Ordinal)
+                && string.Equals(JustificationFlags, other.JustificationFlags, StringComparison.Ordinal)
+                && string.Equals(TextOverrunBehavior, other.TextOverrunBehavior, StringComparison.Ordinal)
+                && string.Equals(Alignment, other.Alignment, StringComparison.Ordinal);
+
+        public override bool Equals(object? obj) => Equals(obj as ParagraphKey);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(Font));
+            hash.Add(Text, StringComparer.Ordinal);
+            hash.Add(FontSizePx);
+            hash.Add(WidthPx);
+            hash.Add(BreakFlags, StringComparer.Ordinal);
+            hash.Add(JustificationFlags, StringComparer.Ordinal);
+            hash.Add(TextOverrunBehavior, StringComparer.Ordinal);
+            hash.Add(Alignment, StringComparer.Ordinal);
+            return hash.ToHashCode();
+        }
+    }
+
+    // A resolved method plus its parameter list, captured once: MethodInfo.GetParameters copies the array per call.
+    private sealed record IndexedMethod(MethodInfo Method, Type ParameterType);
+
+    private sealed record BestEffortMethod(MethodInfo Method, ParameterInfo[] Parameters);
+
+    private sealed record ThemeMethod(MethodInfo Method, ParameterInfo[] Parameters);
 
     // lean=true (the mirror): compute only the cheap fields a thin-client renders — text string, color,
     // font size, and horizontal/vertical alignment — and SKIP every expensive probe (per-line layout
@@ -194,8 +293,14 @@ public static class Sts2RuntimeSceneTextDiagnostics
     }
 
     private static string? DescribeSource(object node)
+        => CacheReflection
+            ? SourceByType.GetOrAdd(node.GetType(), static type => DescribeSourceUncached(type))
+            : DescribeSourceUncached(node.GetType());
+
+    private static string? DescribeSourceUncached(Type type)
     {
-        for (var current = node.GetType(); current is not null; current = current.BaseType)
+        Interlocked.Increment(ref _reflectionScans);
+        for (var current = type; current is not null; current = current.BaseType)
         {
             var fullName = current.FullName ?? current.Name;
             if (string.Equals(fullName, "MegaCrit.Sts2.UI.MegaRichTextLabel", StringComparison.Ordinal))
@@ -793,6 +898,45 @@ public static class Sts2RuntimeSceneTextDiagnostics
             return null;
         }
 
+        if (!CacheParagraphs)
+        {
+            return ShapeParagraphMetrics(paragraphType, fontResource, text, fontSizePx, layout, recipe, notices);
+        }
+
+        var key = new ParagraphKey(
+            fontResource,
+            text,
+            fontSizePx,
+            layout?.ContentWidthPx ?? 0,
+            recipe?.BreakFlags,
+            recipe?.JustificationFlags,
+            recipe?.TextOverrunBehavior,
+            layout?.HorizontalAlignment);
+        if (ParagraphCache.TryGet(key, out var known))
+        {
+            return known;
+        }
+
+        var shaped = ShapeParagraphMetrics(paragraphType, fontResource, text, fontSizePx, layout, recipe, notices);
+        if (shaped is not null)
+        {
+            ParagraphCache.Set(key, shaped);
+        }
+
+        return shaped;
+    }
+
+    // The uncached shape: build a TextParagraph with the node's inputs and read its metrics back.
+    private static ParagraphMetricsProbe? ShapeParagraphMetrics(
+        Type paragraphType,
+        object fontResource,
+        string text,
+        int fontSizePx,
+        RuntimeSceneTextLayoutSnapshot? layout,
+        RuntimeSceneTextRecipeSnapshot? recipe,
+        List<RuntimeScenePropertyNoticeSnapshot> notices)
+    {
+        Interlocked.Increment(ref _paragraphShapes);
         object? paragraph = null;
         try
         {
@@ -1185,6 +1329,14 @@ public static class Sts2RuntimeSceneTextDiagnostics
         }
 
         var assembly = anchor.GetType().Assembly;
+        return CacheReflection
+            ? TypeByName.GetOrAdd((assembly, fullName), static key => FindTypeUncached(key.Item1, key.Item2))
+            : FindTypeUncached(assembly, fullName);
+    }
+
+    private static Type? FindTypeUncached(Assembly assembly, string fullName)
+    {
+        Interlocked.Increment(ref _reflectionScans);
         var assemblyName = assembly.GetName().Name;
         if (assemblyName is null || !assemblyName.Contains("Godot", StringComparison.OrdinalIgnoreCase))
         {
@@ -1196,19 +1348,15 @@ public static class Sts2RuntimeSceneTextDiagnostics
 
     private static object? InvokeBestEffort(object target, string methodName, params object?[] required)
     {
-        var method = target.GetType()
-            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .Where(method => string.Equals(method.Name, methodName, StringComparison.Ordinal) && !method.ContainsGenericParameters)
-            .OrderBy(method => method.GetParameters().Length)
-            .FirstOrDefault(method => method.GetParameters().Length >= required.Length);
-        if (method is null)
+        var resolved = ResolveBestEffortMethod(target.GetType(), methodName, required.Length);
+        if (resolved is null)
         {
             return null;
         }
 
         try
         {
-            return method.Invoke(target, ConvertArguments(method, required));
+            return resolved.Method.Invoke(target, ConvertArguments(resolved.Parameters, required));
         }
         catch
         {
@@ -1259,9 +1407,8 @@ public static class Sts2RuntimeSceneTextDiagnostics
         }
     }
 
-    private static object?[] ConvertArguments(MethodInfo method, object?[] required)
+    private static object?[] ConvertArguments(ParameterInfo[] parameters, object?[] required)
     {
-        var parameters = method.GetParameters();
         var arguments = new object?[parameters.Length];
         for (var index = 0; index < parameters.Length; index++)
         {
@@ -1373,16 +1520,13 @@ public static class Sts2RuntimeSceneTextDiagnostics
         string noticeField,
         List<RuntimeScenePropertyNoticeSnapshot> notices)
     {
-        var method = target.GetType()
-            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .FirstOrDefault(method => string.Equals(method.Name, methodName, StringComparison.Ordinal) && method.GetParameters().Length == 1);
-        if (method is null)
+        var resolved = ResolveIndexedMethod(target.GetType(), methodName);
+        if (resolved is null)
         {
             return null;
         }
 
-        var parameter = method.GetParameters()[0];
-        var argument = ConvertNumericArgument(index, parameter.ParameterType);
+        var argument = ConvertNumericArgument(index, resolved.ParameterType);
         if (argument is null)
         {
             return null;
@@ -1390,7 +1534,7 @@ public static class Sts2RuntimeSceneTextDiagnostics
 
         try
         {
-            return method.Invoke(target, [argument]);
+            return resolved.Method.Invoke(target, [argument]);
         }
         catch (Exception ex)
         {
@@ -1525,9 +1669,8 @@ public static class Sts2RuntimeSceneTextDiagnostics
     {
         var methods = ResolveThemeMethods(target.GetType(), methodName);
 
-        foreach (var method in methods)
+        foreach (var (method, parameters) in methods)
         {
-            var parameters = method.GetParameters();
             if (parameters.Length is < 1 or > 2)
             {
                 continue;
@@ -1574,6 +1717,9 @@ public static class Sts2RuntimeSceneTextDiagnostics
         return null;
     }
 
+    // A theme key or theme type converted to the parameter's StringName type. The keys are a fixed set of literals,
+    // and a StringName is immutable, so one instance per (parameter type, key) is reused rather than constructing a
+    // native StringName per call. A failed conversion (null) is not remembered.
     private static object? ConvertStringNameArgument(string value, Type parameterType)
     {
         if (parameterType == typeof(string))
@@ -1581,6 +1727,22 @@ public static class Sts2RuntimeSceneTextDiagnostics
             return value;
         }
 
+        if (!CacheReflection)
+        {
+            return ConvertStringNameArgumentUncached(value, parameterType);
+        }
+
+        if (StringNameArguments.TryGetValue((parameterType, value), out var known))
+        {
+            return known;
+        }
+
+        var converted = ConvertStringNameArgumentUncached(value, parameterType);
+        return converted is null ? null : StringNameArguments.GetOrAdd((parameterType, value), converted);
+    }
+
+    private static object? ConvertStringNameArgumentUncached(string value, Type parameterType)
+    {
         if (string.Equals(parameterType.FullName, "Godot.StringName", StringComparison.Ordinal)
             || string.Equals(parameterType.Name, "StringName", StringComparison.Ordinal))
         {
@@ -1749,6 +1911,7 @@ public static class Sts2RuntimeSceneTextDiagnostics
 
     private static PropertyInfo? FindPropertyUncached(Type type, string propertyName)
     {
+        Interlocked.Increment(ref _reflectionScans);
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
         for (var current = type; current is not null; current = current.BaseType)
         {
@@ -1769,6 +1932,7 @@ public static class Sts2RuntimeSceneTextDiagnostics
 
     private static FieldInfo? FindFieldUncached(Type type, string fieldName)
     {
+        Interlocked.Increment(ref _reflectionScans);
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
         for (var current = type; current is not null; current = current.BaseType)
         {
@@ -1789,6 +1953,7 @@ public static class Sts2RuntimeSceneTextDiagnostics
 
     private static MethodInfo? FindParameterlessMethodUncached(Type type, string methodName)
     {
+        Interlocked.Increment(ref _reflectionScans);
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
         for (var current = type; current is not null; current = current.BaseType)
         {
@@ -1804,17 +1969,69 @@ public static class Sts2RuntimeSceneTextDiagnostics
 
     // The name-matching + parameter-length-ordered method set an InvokeThemeMethod call chooses from. Deterministic
     // per (Type, methodName); the actual argument binding + Invoke stays per-call (it depends on runtime args).
-    private static MethodInfo[] ResolveThemeMethods(Type type, string methodName)
+    private static ThemeMethod[] ResolveThemeMethods(Type type, string methodName)
         => CacheReflection
             ? ThemeMethodsByName.GetOrAdd((type, methodName), static key => ResolveThemeMethodsUncached(key.Item1, key.Item2))
             : ResolveThemeMethodsUncached(type, methodName);
 
-    private static MethodInfo[] ResolveThemeMethodsUncached(Type type, string methodName)
-        => type
+    private static ThemeMethod[] ResolveThemeMethodsUncached(Type type, string methodName)
+    {
+        Interlocked.Increment(ref _reflectionScans);
+        return
+        [
+            .. type
+                .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(method => string.Equals(method.Name, methodName, StringComparison.Ordinal))
+                .Select(method => new ThemeMethod(method, method.GetParameters()))
+                .OrderBy(method => method.Parameters.Length),
+        ];
+    }
+
+    // The first single-parameter overload of `methodName`, in GetMethods order (the uncached rule, unchanged).
+    private static IndexedMethod? ResolveIndexedMethod(Type type, string methodName)
+        => CacheReflection
+            ? IndexedMethodCache.GetOrAdd((type, methodName), static key => ResolveIndexedMethodUncached(key.Item1, key.Item2))
+            : ResolveIndexedMethodUncached(type, methodName);
+
+    private static IndexedMethod? ResolveIndexedMethodUncached(Type type, string methodName)
+    {
+        Interlocked.Increment(ref _reflectionScans);
+        foreach (var method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+        {
+            if (!string.Equals(method.Name, methodName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var parameters = method.GetParameters();
+            if (parameters.Length == 1)
+            {
+                return new IndexedMethod(method, parameters[0].ParameterType);
+            }
+        }
+
+        return null;
+    }
+
+    // The fewest-parameter non-generic overload of `methodName` that takes at least `requiredCount` arguments
+    // (stable order, so ties keep GetMethods order — the uncached rule, unchanged).
+    private static BestEffortMethod? ResolveBestEffortMethod(Type type, string methodName, int requiredCount)
+        => CacheReflection
+            ? BestEffortMethodCache.GetOrAdd(
+                (type, methodName, requiredCount),
+                static key => ResolveBestEffortMethodUncached(key.Item1, key.Item2, key.Item3))
+            : ResolveBestEffortMethodUncached(type, methodName, requiredCount);
+
+    private static BestEffortMethod? ResolveBestEffortMethodUncached(Type type, string methodName, int requiredCount)
+    {
+        Interlocked.Increment(ref _reflectionScans);
+        return type
             .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-            .Where(method => string.Equals(method.Name, methodName, StringComparison.Ordinal))
-            .OrderBy(method => method.GetParameters().Length)
-            .ToArray();
+            .Where(method => string.Equals(method.Name, methodName, StringComparison.Ordinal) && !method.ContainsGenericParameters)
+            .Select(method => new BestEffortMethod(method, method.GetParameters()))
+            .OrderBy(method => method.Parameters.Length)
+            .FirstOrDefault(method => method.Parameters.Length >= requiredCount);
+    }
 
     private static RuntimeScenePropertyNoticeSnapshot Inaccessible(string field, Exception ex)
     {
