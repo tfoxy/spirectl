@@ -349,6 +349,8 @@ mod tests {
         assert_eq!(api_lane_for_game_version("v0.107.1"), Some("v107"));
         assert_eq!(api_lane_for_game_version("v0.111.0"), Some("v111"));
         assert_eq!(api_lane_for_game_version("v0.113.0"), Some("v113"));
+        assert_eq!(api_lane_for_game_version("v0.113.1"), Some("v113"));
+        assert_eq!(api_lane_for_game_version("v0.113.2"), None);
         assert_eq!(api_lane_for_game_version("v0.999.0"), None);
         assert_eq!(api_lane_for_game_version(""), None);
         // A prefix of a mapped version must not borrow that version's row.

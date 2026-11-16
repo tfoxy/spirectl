@@ -3642,12 +3642,16 @@ fn bridge_lane_output_paths_are_isolated() {
 #[test]
 fn bridge_lane_source_no_build_refuses_stale_and_missing_metadata() {
     let temp = tempfile::tempdir().unwrap();
-    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.0");
+    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.1");
     let target = game_build::read_release_info(&layout.game_path).unwrap();
     let publish = temp.path().join("v113/host-publish");
     let stage = temp.path().join("stage");
-    seed_source_bridge(&publish, "v107", "v0.107.1");
-    for missing in [false, true] {
+    for (lane, version, missing) in [
+        ("v107", "v0.107.1", false),
+        ("v113", "v0.113.0", false),
+        ("v113", "v0.113.1", true),
+    ] {
+        seed_source_bridge(&publish, lane, version);
         if missing {
             fs::write(
                 publish.join("Spirectl.BridgeMod.Sts2Host.dll"),
@@ -3719,6 +3723,7 @@ fn bridge_lane_matching_source_publish_stamps_compiled_identity_and_stable_hash(
         ("v107", "v0.107.1"),
         ("v111", "v0.111.0"),
         ("v113", "v0.113.0"),
+        ("v113", "v0.113.1"),
     ] {
         let layout = bridge_lane_fixture(&temp.path().join(lane), version);
         let target = game_build::read_release_info(&layout.game_path).unwrap();

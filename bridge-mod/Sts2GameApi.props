@@ -40,8 +40,9 @@
         v0.107.1 -> v107   the stable branch
         v0.111.0 -> v111   the previous public-beta build
         v0.113.0 -> v113   the public-beta branch
+        v0.113.1 -> v113   the public-beta patch
     -->
-    <Sts2GameApiLaneTable>;v0.107.1=v107;v0.111.0=v111;v0.113.0=v113;</Sts2GameApiLaneTable>
+    <Sts2GameApiLaneTable>;v0.107.1=v107;v0.111.0=v111;v0.113.0=v113;v0.113.1=v113;</Sts2GameApiLaneTable>
 
     <!--
       THE SUBSET THAT CAN BE RELEASED. A released bridge payload is compiled against the locked,

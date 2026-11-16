@@ -243,8 +243,7 @@ fn create_deployed_bridge_layout_with_game_build(
 }
 
 /// Give a fake install a `release_info.json`, so the CLI can tell which STS2
-/// game build it is. Both real-world builds are in the committed lane table:
-/// `v0.107.1` -> `v107` (stable) and `v0.111.0` -> `v111` (public beta).
+/// game build it is. Resolve its lane from the shared, committed lane table.
 fn write_game_release_info(game_dir: &Path, version: &str, main_assembly_hash: i64) {
     let lane = sts2::game_build::api_lane_for_game_version(version).unwrap_or("unsupported-test-lane");
     fs::write(
