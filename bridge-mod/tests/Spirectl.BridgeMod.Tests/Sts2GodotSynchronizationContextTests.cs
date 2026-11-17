@@ -8,6 +8,26 @@ namespace Spirectl.BridgeMod.Tests;
 public sealed class Sts2GodotSynchronizationContextTests
 {
     [Fact]
+    public void PostThroughClosedShutdownGateDoesNotThrowOrInvokeWork()
+    {
+        var gate = new Sts2MainThreadShutdownGate();
+        var scheduled = 0;
+        var invoked = 0;
+        var context = new Sts2GodotSynchronizationContext(() => gate.Run(() => scheduled++));
+        gate.Close();
+
+        var exception = Record.Exception(() =>
+        {
+            context.Post(_ => invoked++, null);
+            context.Post(_ => invoked++, null);
+        });
+
+        Assert.Null(exception);
+        Assert.Equal(0, scheduled);
+        Assert.Equal(0, invoked);
+    }
+
+    [Fact]
     public void PostCoalescesWakeAndDrainsFifoIncludingReentrantWork()
     {
         var scheduled = new Queue<Action>();

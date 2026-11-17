@@ -99,15 +99,49 @@ internal sealed class Sts2GodotSynchronizationContext : SynchronizationContext, 
     }
 }
 
+internal sealed class Sts2MainThreadShutdownGate
+{
+    private readonly object _sync = new();
+    private bool _closed;
+
+    internal void Run(Action action)
+    {
+        lock (_sync)
+        {
+            if (!_closed)
+            {
+                // Keep the engine call inside the lock so Close waits for any in-flight call.
+                action();
+            }
+        }
+    }
+
+    internal bool Close()
+    {
+        lock (_sync)
+        {
+            if (_closed)
+            {
+                return false;
+            }
+
+            _closed = true;
+            return true;
+        }
+    }
+}
+
 public static class Sts2GodotMainThreadPump
 {
     private const string DispatcherNodeName = "SpirectlMainThreadDispatcher";
 
+    private static readonly Sts2MainThreadShutdownGate ShutdownGate = new();
     private static Sts2GodotSynchronizationContext? _context;
     private static Godot.Timer? _timer;
     private static Callable? _timerCallback;
     private static Callable? _drainCallback;
     private static Callable? _tickDemandCallback;
+    private static Callable? _shutdownCallback;
     private static bool _loggedFirstDrain;
 
     public static SynchronizationContext Install()
@@ -140,22 +174,35 @@ public static class Sts2GodotMainThreadPump
 
         _timer = timer;
         _timerCallback = Callable.From(TickOnMainThread);
-        Callable.From(() =>
+        _shutdownCallback = Callable.From(CloseShutdownGate);
+        var installCallback = Callable.From(() =>
         {
             Log.Info("[spirectl] Live bridge main-thread dispatcher deferred scene-tree add running.");
             root.AddChild(timer);
             root.AddChild(new DispatcherDiagnosticsNode(context));
             timer.Connect(Godot.Timer.SignalName.Timeout, _timerCallback.Value);
+            // Close the gate from the tree-exit signal because the virtual exit notification is not delivered
+            // to this mod-created node in the embedded host.
+            timer.Connect(Node.SignalName.TreeExiting, _shutdownCallback.Value);
             ReconcileTickTimerDemand();
             Log.Info("[spirectl] Live bridge main-thread dispatcher tick timer installed dormant.");
-        }).CallDeferred();
+        });
+        ShutdownGate.Run(() => installCallback.CallDeferred());
         Log.Info("[spirectl] Live bridge main-thread dispatcher queued for deferred scene-tree install.");
 
         return context;
     }
 
+    private static void CloseShutdownGate()
+    {
+        if (ShutdownGate.Close())
+        {
+            Log.Info("[spirectl] Live bridge main-thread dispatcher shutdown gate closed.");
+        }
+    }
+
     private static void SchedulePostedWorkDrain()
-        => _drainCallback?.CallDeferred();
+        => ShutdownGate.Run(() => _drainCallback?.CallDeferred());
 
     private static void DrainPostedWorkOnMainThread()
     {
@@ -189,7 +236,7 @@ public static class Sts2GodotMainThreadPump
     }
 
     private static void OnTickDemandChanged()
-        => _tickDemandCallback?.CallDeferred();
+        => ShutdownGate.Run(() => _tickDemandCallback?.CallDeferred());
 
     private static void ReconcileTickTimerDemand()
     {
