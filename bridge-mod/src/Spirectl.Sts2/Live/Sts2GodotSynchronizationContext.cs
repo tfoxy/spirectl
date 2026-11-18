@@ -142,6 +142,8 @@ public static class Sts2GodotMainThreadPump
     private static Callable? _drainCallback;
     private static Callable? _tickDemandCallback;
     private static Callable? _shutdownCallback;
+    private static Callable? _focusEnteredCallback;
+    private static Callable? _focusExitedCallback;
     private static bool _loggedFirstDrain;
 
     public static SynchronizationContext Install()
@@ -163,6 +165,17 @@ public static class Sts2GodotMainThreadPump
         _context = context;
         Sts2MainThreadDispatcher.MainThreadTickDemandChanged += OnTickDemandChanged;
 
+        // Engine notifications reach this pump only through signal connections: virtual notification overrides
+        // on nodes this mod creates are not dispatched. The root connections are made here, synchronously, so
+        // the gate closes even when the engine tears down before the deferred install below ever runs. Statics
+        // are per assembly copy, so every loaded copy of this pump connects and closes its own gate.
+        _shutdownCallback = Callable.From(CloseShutdownGate);
+        _focusEnteredCallback = Callable.From(OnRootWindowFocusEntered);
+        _focusExitedCallback = Callable.From(OnRootWindowFocusExited);
+        root.Connect(Node.SignalName.TreeExiting, _shutdownCallback.Value);
+        root.Connect(Window.SignalName.FocusEntered, _focusEnteredCallback.Value);
+        root.Connect(Window.SignalName.FocusExited, _focusExitedCallback.Value);
+
         var timer = new Godot.Timer
         {
             Name = DispatcherNodeName,
@@ -174,15 +187,13 @@ public static class Sts2GodotMainThreadPump
 
         _timer = timer;
         _timerCallback = Callable.From(TickOnMainThread);
-        _shutdownCallback = Callable.From(CloseShutdownGate);
         var installCallback = Callable.From(() =>
         {
             Log.Info("[spirectl] Live bridge main-thread dispatcher deferred scene-tree add running.");
             root.AddChild(timer);
-            root.AddChild(new DispatcherDiagnosticsNode(context));
             timer.Connect(Godot.Timer.SignalName.Timeout, _timerCallback.Value);
-            // Close the gate from the tree-exit signal because the virtual exit notification is not delivered
-            // to this mod-created node in the embedded host.
+            // Children leave the tree before the root does, so once installed this closes the gate earlier
+            // than the root connection above. Closing is idempotent.
             timer.Connect(Node.SignalName.TreeExiting, _shutdownCallback.Value);
             ReconcileTickTimerDemand();
             Log.Info("[spirectl] Live bridge main-thread dispatcher tick timer installed dormant.");
@@ -200,6 +211,10 @@ public static class Sts2GodotMainThreadPump
             Log.Info("[spirectl] Live bridge main-thread dispatcher shutdown gate closed.");
         }
     }
+
+    private static void OnRootWindowFocusEntered() => _context?.SetApplicationFocused(true);
+
+    private static void OnRootWindowFocusExited() => _context?.SetApplicationFocused(false);
 
     private static void SchedulePostedWorkDrain()
         => ShutdownGate.Run(() => _drainCallback?.CallDeferred());
@@ -257,29 +272,6 @@ public static class Sts2GodotMainThreadPump
         else
         {
             _timer.Stop();
-        }
-    }
-
-    private sealed partial class DispatcherDiagnosticsNode(Sts2GodotSynchronizationContext context) : Node
-    {
-        private const int NotificationWmFocusIn = 1004;
-        private const int NotificationWmFocusOut = 1005;
-        private const int ApplicationFocusInNotification = 2016;
-        private const int ApplicationFocusOutNotification = 2017;
-
-        public override void _Notification(int what)
-        {
-            switch (what)
-            {
-                case NotificationWmFocusIn:
-                case ApplicationFocusInNotification:
-                    context.SetApplicationFocused(true);
-                    break;
-                case NotificationWmFocusOut:
-                case ApplicationFocusOutNotification:
-                    context.SetApplicationFocused(false);
-                    break;
-            }
         }
     }
 }

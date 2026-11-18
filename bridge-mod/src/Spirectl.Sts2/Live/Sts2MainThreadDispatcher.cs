@@ -352,7 +352,12 @@ public interface IMainThreadDispatcherDiagnostics
 
     string? DispatcherNote { get; }
 
+    /// <summary>
+    /// Whether the game's root window has focus, or null until the first focus change is observed. A host that
+    /// starts focused and never loses focus keeps reporting null.
+    /// </summary>
     bool? IsApplicationFocused { get; }
 
+    /// <summary>When <see cref="IsApplicationFocused"/> last changed, or null if it never has.</summary>
     DateTimeOffset? LastFocusChangedAtUtc { get; }
 }

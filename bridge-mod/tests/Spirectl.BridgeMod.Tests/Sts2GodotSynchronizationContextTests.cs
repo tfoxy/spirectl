@@ -131,5 +131,25 @@ public sealed class Sts2GodotSynchronizationContextTests
         Assert.Equal([1, 2], order);
         Assert.Equal(0, context.QueueDepth);
     }
+
+    [Fact]
+    public void SetApplicationFocusedRecordsOnlyTransitions()
+    {
+        var context = new Sts2GodotSynchronizationContext(() => { });
+        Assert.Null(context.IsApplicationFocused);
+        Assert.Null(context.LastFocusChangedAtUtc);
+
+        context.SetApplicationFocused(true);
+        var focusedAt = context.LastFocusChangedAtUtc;
+        Assert.True(context.IsApplicationFocused);
+        Assert.NotNull(focusedAt);
+
+        context.SetApplicationFocused(true);
+        Assert.Equal(focusedAt, context.LastFocusChangedAtUtc);
+
+        context.SetApplicationFocused(false);
+        Assert.False(context.IsApplicationFocused);
+        Assert.True(context.LastFocusChangedAtUtc >= focusedAt);
+    }
 }
 #endif
