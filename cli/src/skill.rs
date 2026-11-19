@@ -21,6 +21,12 @@ const SKILL_PACK: &[SkillPackFile] = &[
         contents: include_str!("../../skills/spirectl/references/cli-runtime.md"),
     },
     SkillPackFile {
+        source_path: "skills/spirectl/references/dev-console.md",
+        relative_path: "references/dev-console.md",
+        kind: SkillPackFileKind::Reference,
+        contents: include_str!("../../skills/spirectl/references/dev-console.md"),
+    },
+    SkillPackFile {
         source_path: "skills/spirectl/references/library-integration.md",
         relative_path: "references/library-integration.md",
         kind: SkillPackFileKind::Reference,

@@ -177,6 +177,59 @@ pub fn console_command_json(response: &proto::ConsoleCommandResponse) -> Value {
     })
 }
 
+pub fn console_catalog_json(response: &proto::ConsoleCommandCatalogResponse) -> Value {
+    json!({
+        "requestId": response.request_id,
+        "source": data_source_name(enum_value(response.source)),
+        "provisional": response.provisional,
+        "complete": response.source == proto::DataSource::Live as i32 && !response.provisional,
+        "commands": response.commands.iter().map(|command| json!({
+            "name": command.name, "usage": command.usage, "description": command.description,
+            "networked": command.networked, "debugOnly": command.debug_only,
+            "dangerous": crate::commands::console_command_requires_dangerous(&command.name),
+            "requires": crate::console_catalog::console_command_requirement(&command.name),
+        })).collect::<Vec<_>>(),
+        "count": response.commands.len(),
+        "notices": response.notices.iter().map(console_command_notice_json).collect::<Vec<_>>(),
+    })
+}
+
+pub fn console_completion_json(
+    response: &proto::ConsoleCompletionResponse,
+    preceding: &[String],
+    prefix: &str,
+) -> Value {
+    let mut seen = std::collections::HashSet::new();
+    let candidates: Vec<_> = response
+        .candidates
+        .iter()
+        .filter(|value| seen.insert(value.as_str()))
+        .collect();
+    let details: Vec<_> = candidates
+        .iter()
+        .map(|value| {
+            let label = response
+                .candidate_details
+                .iter()
+                .find(|detail| &detail.value == *value)
+                .map(|detail| detail.label.as_str())
+                .filter(|label| !label.is_empty());
+            json!({"value": value, "label": label})
+        })
+        .collect();
+    json!({
+        "requestId": response.request_id, "command": response.command,
+        "knownCommand": response.known_command, "position": response.argument_index,
+        "prefix": prefix, "preceding": preceding, "candidates": candidates, "candidateDetails": details,
+        "count": candidates.len(), "commonPrefix": response.common_prefix,
+        "completionType": response.completion_type,
+        "source": data_source_name(enum_value(response.source)),
+        "provisional": response.provisional,
+        "complete": response.source == proto::DataSource::Live as i32 && !response.provisional,
+        "notices": response.notices.iter().map(console_command_notice_json).collect::<Vec<_>>(),
+    })
+}
+
 fn console_command_notice_json(notice: &proto::ConsoleCommandNotice) -> Value {
     json!({
         "code": notice.code,

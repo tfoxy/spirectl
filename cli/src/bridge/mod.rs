@@ -148,11 +148,12 @@ pub(crate) use output_json::{
 };
 pub use output_json::{
     action_kind_name, asset_artifact_kind_name, attachment_state_name, bridge_error_code_name,
-    bridge_error_exit_code, bridge_error_payload, console_command_json, data_source_name,
-    handshake_json, hot_reload_response_json, hot_reload_status_json,
-    inspect_actions_environment_blocked_json, inspect_actions_json, inspect_actions_static_json,
-    inspect_actions_unavailable_json, logs_json, multiplayer_role_name, perspective_scope_name,
-    remote_client_orchestration_state_name, transport_kind_name,
+    bridge_error_exit_code, bridge_error_payload, console_catalog_json, console_command_json,
+    console_completion_json, data_source_name, handshake_json, hot_reload_response_json,
+    hot_reload_status_json, inspect_actions_environment_blocked_json, inspect_actions_json,
+    inspect_actions_static_json, inspect_actions_unavailable_json, logs_json,
+    multiplayer_role_name, perspective_scope_name, remote_client_orchestration_state_name,
+    transport_kind_name,
 };
 
 mod client;

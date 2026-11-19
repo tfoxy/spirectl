@@ -94,9 +94,10 @@ impl proto::bridge_service_server::BridgeService for StubBridgeGrpcService {
         _request: tonic::Request<proto::WatchCombatEventsRequest>,
     ) -> Result<tonic::Response<Self::WatchCombatEventsStream>, tonic::Status> {
         // The stub bridge has no live combat; emit an empty (immediately-completing) stream.
-        Ok(tonic::Response::new(Box::pin(tokio_stream::iter(
-            Vec::<Result<proto::CombatEvent, tonic::Status>>::new(),
-        ))))
+        Ok(tonic::Response::new(Box::pin(tokio_stream::iter(Vec::<
+            Result<proto::CombatEvent, tonic::Status>,
+        >::new(
+        )))))
     }
 
     async fn execute_action(
@@ -105,6 +106,24 @@ impl proto::bridge_service_server::BridgeService for StubBridgeGrpcService {
     ) -> Result<tonic::Response<proto::ActionResult>, tonic::Status> {
         Ok(tonic::Response::new(
             self.inner.execute_action(request.into_inner()),
+        ))
+    }
+
+    async fn list_console_commands(
+        &self,
+        request: tonic::Request<proto::ConsoleCommandCatalogRequest>,
+    ) -> Result<tonic::Response<proto::ConsoleCommandCatalogResult>, tonic::Status> {
+        Ok(tonic::Response::new(
+            self.inner.list_console_commands(request.into_inner()),
+        ))
+    }
+
+    async fn complete_console_arguments(
+        &self,
+        request: tonic::Request<proto::ConsoleCompletionRequest>,
+    ) -> Result<tonic::Response<proto::ConsoleCompletionResult>, tonic::Status> {
+        Ok(tonic::Response::new(
+            self.inner.complete_console_arguments(request.into_inner()),
         ))
     }
 
@@ -303,7 +322,8 @@ impl proto::bridge_service_server::BridgeService for StubBridgeGrpcService {
         request: tonic::Request<proto::RuntimeSceneControlUnhoverRequest>,
     ) -> Result<tonic::Response<proto::RuntimeSceneControlUnhoverResult>, tonic::Status> {
         Ok(tonic::Response::new(
-            self.inner.unhover_runtime_scene_control(request.into_inner()),
+            self.inner
+                .unhover_runtime_scene_control(request.into_inner()),
         ))
     }
 

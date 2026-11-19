@@ -658,6 +658,7 @@ struct AssetExtractBridgeService {
 
 #[tonic::async_trait]
 impl BridgeService for AssetExtractBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
 

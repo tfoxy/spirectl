@@ -206,6 +206,9 @@ sts2 --json reference colors
 sts2 --json reference colors aqua gold screenBackdrop
 sts2 --json reference version
 sts2 --json dev wait-for-transitions --timeout-ms 5000 --interval-ms 50 --stable-samples 3
+sts2 --json dev console commands
+sts2 --json dev console args fight --prefix KNIGHTS
+sts2 --json dev console args card STRIKE --position 1
 sts2 --json dev console help
 sts2 --json dev console draw 3
 sts2 --json dev console help draw
@@ -755,6 +758,9 @@ sts2 --json dev logs --limit 50 --target bridge.state
 Console commands:
 
 ```bash
+sts2 --json dev console commands
+sts2 --json dev console args fight --prefix KNIGHTS
+sts2 --json dev console args card STRIKE --position 1
 sts2 --json dev console help
 sts2 --json dev console draw 3
 sts2 --json dev console help draw
@@ -763,7 +769,44 @@ sts2 --mode dangerous --json dev console achievement ...
 sts2 --mode dangerous --json dev console cloud ...
 ```
 
-`dev console` accepts the first token after `console` as `command` and all remaining tokens as `args`; the JSON payload includes the canonical `line` joined with single spaces. Runtime console rejection exits nonzero with `console_command_rejected` while preserving the console output payload.
+`dev console commands` lists registered console commands, excluding the special `help` command.
+`dev console args <command> [PRECEDING...] [--prefix P] [--position N]` lists argument candidates.
+The zero-based position defaults to the number of preceding tokens; a smaller position truncates them
+and a larger position pads them with empty strings. Tokens cannot contain whitespace. Non-JSON output
+prints one `name  usage` or `value  label` per line (bare `value` when there is no label).
+
+`commands` and `args` are reserved discovery names. For other names, `dev console` accepts the first
+token as `command` and all remaining tokens as `args`, including flag-like tokens such as
+`help --verbose`. The execution payload includes the canonical `line` joined with single spaces.
+Runtime console rejection exits nonzero with `console_command_rejected` while preserving the output.
+`achievement`, `cloud`, and `unlock` require `--mode dangerous`; other commands use normal mode.
+
+Discovery JSON shapes:
+
+```text
+commands: {requestId, source, complete, provisional, commands:[{name, usage, description,
+           networked, debugOnly, dangerous, requires}], count, notices:[{code,message,provisional}]}
+args:     {requestId, command, knownCommand, position, prefix, preceding, candidates,
+           candidateDetails:[{value,label}], count, commonPrefix, completionType, source,
+           complete, provisional, notices}
+```
+
+`requires` is `none`, `run`, `combat`, or `unknown` (for commands outside the base-game table).
+`completionType` is `command`, `subcommand`, or `argument`. Live discovery uses `source:"live"` and
+`complete:true`; stub data uses `source:"stub"`, `provisional:true`, and `complete:false`.
+Live results include mod behavior: mods can add commands, decorate candidates with display names
+(exposed as `candidateDetails[].label`), and change matching; pass `value` to the console.
+`candidates` contains the same insertable values, deduplicated in order; empty labels are null.
+`commonPrefix` is the console replacement line, including the command and preceding arguments.
+Only an unreachable bridge triggers fallback to the configured toolchain's `decompile/sts2` reference.
+Static discovery uses `source:"static-reference"`, `complete:false`, `provisional:true`, and a
+`static-fallback-incomplete` notice because mods and content filters can change commands and ids.
+Unsupported static positions return no candidates with `static-fallback-unsupported`. Errors returned
+by a reachable bridge are preserved. With no bridge or reference, the bridge error includes a hint to
+run `sts2 project recover --kind decompile`.
+
+See the [developer console reference](../skills/spirectl/references/dev-console.md) for scene jumps and
+the base-game command table.
 
 Direct creature heal (devtool):
 

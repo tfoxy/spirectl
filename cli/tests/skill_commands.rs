@@ -70,11 +70,17 @@ fn skill_install_writes_project_local_skill_by_default() {
     assert_eq!(payload["skillDir"], skill_dir.to_string_lossy().as_ref());
     assert_eq!(payload["path"], installed_path.to_string_lossy().as_ref());
     assert_eq!(payload["sourcePath"], "skills/spirectl/SKILL.md");
-    assert_eq!(payload["installedFiles"].as_array().unwrap().len(), 6);
+    assert_eq!(payload["installedFiles"].as_array().unwrap().len(), 7);
     assert_eq!(payload["installedFiles"][0]["relativePath"], "SKILL.md");
     assert_eq!(payload["installedFiles"][0]["kind"], "skill");
     assert!(installed.contains("name: spirectl"));
     assert!(installed.contains("references/cli-runtime.md"));
+    assert!(installed.contains("references/dev-console.md"));
+    let console_reference = fs::read_to_string(skill_dir.join("references/dev-console.md"))
+        .expect("installed console reference");
+    assert!(console_reference.contains("Jump to a scene"));
+    assert!(console_reference.contains("dev console args fight"));
+    assert!(console_reference.contains("static-reference"));
     assert!(installed.contains("cargo run -q -p sts2 --"));
     assert!(
         fs::read_to_string(&runtime_reference)

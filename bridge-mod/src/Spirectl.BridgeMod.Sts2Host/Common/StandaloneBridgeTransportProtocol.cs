@@ -54,6 +54,8 @@ internal enum StandaloneBridgeRpcMethod : ushort
     GetCombatPreview = 53,
     GetMapDrawings = 54,
     UnhoverRuntimeSceneControl = 55,
+    ListConsoleCommands = 56,
+    CompleteConsoleArguments = 57,
 }
 
 internal enum StandaloneBridgeResponseStatus : ushort

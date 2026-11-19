@@ -4,12 +4,12 @@ use std::thread;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use super::{
-    execute_assert_json, execute_console_json, execute_dev_heal_json, execute_game_info_json,
-    execute_load_fixture_json, execute_logs_json, execute_runtime_scene_children_json,
-    execute_runtime_scene_hover_json, execute_runtime_scene_node_json,
-    execute_runtime_scene_set_visible_json, execute_runtime_scene_tree_json,
-    execute_runtime_scene_unhover_json, execute_screenshot_diff_json, execute_screenshot_json,
-    execute_wait_for_json, handshake_request,
+    execute_assert_json, execute_dev_heal_json, execute_game_info_json, execute_load_fixture_json,
+    execute_logs_json, execute_runtime_scene_children_json, execute_runtime_scene_hover_json,
+    execute_runtime_scene_node_json, execute_runtime_scene_set_visible_json,
+    execute_runtime_scene_tree_json, execute_runtime_scene_unhover_json,
+    execute_screenshot_diff_json, execute_screenshot_json, execute_wait_for_json,
+    handshake_request,
 };
 use crate::{AppContext, AppError, RenderedCommand, bridge, game_build, lifecycle};
 use crate::{
@@ -47,9 +47,7 @@ pub(crate) fn handle_dev(
         DevSubcommand::LogHealth(args) => {
             render_value_success(execute_log_health_json(args, context)?, context.json_output)
         }
-        DevSubcommand::Console(args) => {
-            render_value_success(execute_console_json(args, context)?, context.json_output)
-        }
+        DevSubcommand::Console(args) => crate::console_catalog::handle_console(args, context),
         DevSubcommand::Tutorials(args) => {
             let response = bridge_client(context)
                 .execute_action(bridge::proto::ActionRequest {

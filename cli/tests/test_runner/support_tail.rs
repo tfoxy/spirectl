@@ -79,6 +79,7 @@ struct TransitioningBridgeService {
 
 #[tonic::async_trait]
 impl BridgeService for TransitioningBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_and_models_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_hot_reload_unimplemented_rpc_stubs!();
@@ -296,6 +297,7 @@ impl StaticBridgeService {
 
 #[tonic::async_trait]
 impl BridgeService for StaticBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_and_models_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_hot_reload_unimplemented_rpc_stubs!();
@@ -494,6 +496,7 @@ struct HotReloadBridgeService {
 #[cfg(unix)]
 #[tonic::async_trait]
 impl BridgeService for HotReloadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_and_models_unimplemented!();
     impl_debug_session_rpc_stubs!();
 
@@ -766,6 +769,7 @@ struct FixtureLoadBridgeService;
 #[cfg(unix)]
 #[tonic::async_trait]
 impl BridgeService for FixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_and_models_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_hot_reload_unimplemented_rpc_stubs!();
@@ -987,6 +991,7 @@ struct NormalizedFixtureLoadBridgeService;
 #[cfg(unix)]
 #[tonic::async_trait]
 impl BridgeService for NormalizedFixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_and_models_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_hot_reload_unimplemented_rpc_stubs!();
@@ -1223,6 +1228,7 @@ struct LogsFailingBridgeService;
 #[cfg(unix)]
 #[tonic::async_trait]
 impl BridgeService for LogsFailingBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_and_models_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_hot_reload_unimplemented_rpc_stubs!();

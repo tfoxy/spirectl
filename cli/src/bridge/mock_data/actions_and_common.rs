@@ -701,7 +701,9 @@ pub(super) fn unwrap_runtime_scene_unhover(
     result: proto::RuntimeSceneControlUnhoverResult,
 ) -> Result<proto::RuntimeSceneControlUnhoverResponse, proto::BridgeError> {
     match result.result {
-        Some(proto::runtime_scene_control_unhover_result::Result::Success(response)) => Ok(response),
+        Some(proto::runtime_scene_control_unhover_result::Result::Success(response)) => {
+            Ok(response)
+        }
         Some(proto::runtime_scene_control_unhover_result::Result::Error(error)) => Err(error),
         None => Err(error(
             proto::BridgeErrorCode::RuntimeFailure,
@@ -804,6 +806,34 @@ pub(super) fn unwrap_game_close(
         None => Err(error(
             proto::BridgeErrorCode::RuntimeFailure,
             "Game close response was missing both success and error payloads.",
+            &[],
+        )),
+    }
+}
+
+pub(super) fn unwrap_console_command_catalog(
+    result: proto::ConsoleCommandCatalogResult,
+) -> Result<proto::ConsoleCommandCatalogResponse, proto::BridgeError> {
+    match result.result {
+        Some(proto::console_command_catalog_result::Result::Success(response)) => Ok(response),
+        Some(proto::console_command_catalog_result::Result::Error(error)) => Err(error),
+        None => Err(error(
+            proto::BridgeErrorCode::RuntimeFailure,
+            "bridge returned an empty console discovery result.",
+            &[],
+        )),
+    }
+}
+
+pub(super) fn unwrap_console_completion(
+    result: proto::ConsoleCompletionResult,
+) -> Result<proto::ConsoleCompletionResponse, proto::BridgeError> {
+    match result.result {
+        Some(proto::console_completion_result::Result::Success(response)) => Ok(response),
+        Some(proto::console_completion_result::Result::Error(error)) => Err(error),
+        None => Err(error(
+            proto::BridgeErrorCode::RuntimeFailure,
+            "bridge returned an empty console discovery result.",
             &[],
         )),
     }

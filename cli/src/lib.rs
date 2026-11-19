@@ -109,6 +109,7 @@ mod cli_args;
 mod commands;
 mod config;
 mod config_resolve;
+mod console_catalog;
 mod context;
 mod endpoint;
 mod error;

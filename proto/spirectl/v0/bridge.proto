@@ -31,6 +31,8 @@ service BridgeService {
   rpc LoadFixture(FixtureLoadRequest) returns (FixtureLoadResult);
   rpc RecordFixture(RecordedFixtureRequest) returns (RecordedFixtureResult);
   rpc GetLogs(LogsRequest) returns (LogsResult);
+  rpc ListConsoleCommands(ConsoleCommandCatalogRequest) returns (ConsoleCommandCatalogResult);
+  rpc CompleteConsoleArguments(ConsoleCompletionRequest) returns (ConsoleCompletionResult);
   rpc ExecuteConsoleCommand(ConsoleCommandRequest) returns (ConsoleCommandResult);
   rpc GetDebugStatus(DebugStatusRequest) returns (DebugStatusResult);
   rpc StartDebugSession(DebugSessionStartRequest) returns (DebugSessionStartResult);

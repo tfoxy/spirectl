@@ -814,14 +814,170 @@
             "summary": "Structured console execution notices."
           }
         ],
-        "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+        "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
       },
       "readOnly": false,
       "recommendedUsage": [
         "Use console for developer setup and validation commands such as help, help draw, draw 3, or die when semantic actions are not the right surface."
       ],
       "status": "implemented",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "limitations": [
+        "Static fallback requires a local decompiled reference and can omit mods or content filters.",
+        "commands and args are reserved CLI discovery names."
+      ],
+      "mapsTo": [
+        "dev console commands"
+      ],
+      "name": "console_commands",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "requestId",
+            "summary": "CLI-generated request id."
+          },
+          {
+            "path": "commands",
+            "summary": "Descriptors: name, usage, description, networked, debugOnly, dangerous, requires (none, run, combat, or unknown)."
+          },
+          {
+            "path": "count",
+            "summary": "Number of commands; excludes special help."
+          },
+          {
+            "path": "source",
+            "summary": "live, stub, or static-reference."
+          },
+          {
+            "path": "complete",
+            "summary": "True only for a non-provisional live catalog."
+          },
+          {
+            "path": "notices",
+            "summary": "Structured notices, including static-fallback-incomplete."
+          }
+        ],
+        "summary": "Registered command descriptors with safety and runtime requirements, provenance, and completeness."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "List commands before invoking the console; check dangerous and requires metadata."
+      ],
+      "status": "implemented",
+      "summary": "List registered developer console commands; use an incomplete local reference when the bridge is unreachable."
+    },
+    {
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "description": "Console command whose argument candidates to list.",
+            "type": "string"
+          },
+          "position": {
+            "description": "Zero-based argument position; defaults to preceding length. Truncates or pads preceding with empty tokens.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "preceding": {
+            "description": "Completed arguments preceding the token to complete; tokens cannot contain whitespace.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "prefix": {
+            "description": "Partial token to complete; defaults to empty and cannot contain whitespace.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command"
+        ],
+        "type": "object"
+      },
+      "limitations": [
+        "Static fallback is incomplete; unsupported command positions return no candidates with static-fallback-unsupported.",
+        "Only unreachable transports trigger fallback; bridge-returned errors are preserved."
+      ],
+      "mapsTo": [
+        "dev console args"
+      ],
+      "name": "console_args",
+      "outputShape": {
+        "primaryFields": [
+          {
+            "path": "requestId",
+            "summary": "CLI-generated request id."
+          },
+          {
+            "path": "command",
+            "summary": "Requested console command."
+          },
+          {
+            "path": "knownCommand",
+            "summary": "Whether the command is registered in the selected source."
+          },
+          {
+            "path": "position",
+            "summary": "Zero-based argument position after truncating or padding preceding."
+          },
+          {
+            "path": "prefix",
+            "summary": "Partial token being completed."
+          },
+          {
+            "path": "preceding",
+            "summary": "Completed preceding tokens, including any empty padding."
+          },
+          {
+            "path": "candidates",
+            "summary": "Insertable candidate values, deduplicated in order."
+          },
+          {
+            "path": "candidateDetails",
+            "summary": "Insertable value and optional display label for each candidate."
+          },
+          {
+            "path": "count",
+            "summary": "Number of candidates."
+          },
+          {
+            "path": "commonPrefix",
+            "summary": "Common candidate prefix."
+          },
+          {
+            "path": "completionType",
+            "summary": "command, subcommand, or argument."
+          },
+          {
+            "path": "source",
+            "summary": "live, stub, or static-reference."
+          },
+          {
+            "path": "complete",
+            "summary": "True only for non-provisional live completion."
+          },
+          {
+            "path": "notices",
+            "summary": "Structured notices, including incomplete or unsupported static rules."
+          }
+        ],
+        "summary": "Argument candidates with the normalized preceding tokens, position, prefix, provenance, and completeness."
+      },
+      "readOnly": true,
+      "recommendedUsage": [
+        "Use to discover encounter, room, event, and other argument ids instead of guessing."
+      ],
+      "status": "implemented",
+      "summary": "Complete developer console arguments; use an incomplete local reference when the bridge is unreachable."
     },
     {
       "inputSchema": {

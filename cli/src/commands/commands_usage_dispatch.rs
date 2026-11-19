@@ -38,7 +38,11 @@ pub(crate) fn canonical_usage_command(command: &Commands) -> &'static str {
         Commands::Dev(command) => match &command.command {
             DevSubcommand::Logs(_) => "dev logs",
             DevSubcommand::LogHealth(_) => "dev log-health",
-            DevSubcommand::Console(_) => "dev console",
+            DevSubcommand::Console(args) => match &args.discovery {
+                Some(crate::ConsoleSubcommand::Commands) => "dev console commands",
+                Some(crate::ConsoleSubcommand::Args(_)) => "dev console args",
+                None => "dev console",
+            },
             DevSubcommand::Heal(_) => "dev heal",
             DevSubcommand::Tutorials(_) => "dev tutorials",
             DevSubcommand::Diagnostics(_) => "dev diagnostics",

@@ -353,37 +353,57 @@
     {
       "command": "dev console",
       "example": "sts2 --json dev console help",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
     },
     {
       "command": "dev console",
       "example": "sts2 --json dev console draw 3",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
     },
     {
       "command": "dev console",
       "example": "sts2 --json dev console help draw",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
     },
     {
       "command": "dev console",
       "example": "sts2 --json dev console die",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
     },
     {
       "command": "dev console",
       "example": "sts2 --mode dangerous --json dev console achievement",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
     },
     {
       "command": "dev console",
       "example": "sts2 --mode dangerous --json dev console cloud",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
     },
     {
       "command": "dev console",
       "example": "sts2 --mode dangerous --json dev console unlock",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
+    },
+    {
+      "command": "dev console commands",
+      "example": "sts2 --json dev console commands",
+      "summary": "List registered developer console commands; use an incomplete local reference when the bridge is unreachable."
+    },
+    {
+      "command": "dev console args",
+      "example": "sts2 --json dev console args fight --prefix KNIGHTS",
+      "summary": "Complete developer console arguments; use an incomplete local reference when the bridge is unreachable."
+    },
+    {
+      "command": "dev console args",
+      "example": "sts2 --json dev console args room",
+      "summary": "Complete developer console arguments; use an incomplete local reference when the bridge is unreachable."
+    },
+    {
+      "command": "dev console args",
+      "example": "sts2 --json dev console args card STRIKE --position 1",
+      "summary": "Complete developer console arguments; use an incomplete local reference when the bridge is unreachable."
     },
     {
       "command": "dev heal",

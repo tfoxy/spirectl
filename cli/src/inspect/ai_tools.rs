@@ -521,6 +521,36 @@ pub(crate) fn ai_tool_command_argv(name: &str, arguments: Value) -> Result<Vec<S
                 take_optional_scalar_string(name, &mut arguments, "rpcTimeoutMs")?,
             );
         }
+        "console_commands" => {
+            argv.extend(
+                ["dev", "console", "commands"]
+                    .into_iter()
+                    .map(str::to_string),
+            );
+        }
+        "console_args" => {
+            argv.extend(["dev", "console", "args"].into_iter().map(str::to_string));
+            argv.push(take_required_scalar_string(
+                name,
+                &mut arguments,
+                "command",
+            )?);
+            push_optional_scalar_flag(
+                &mut argv,
+                "--prefix",
+                take_optional_scalar_string(name, &mut arguments, "prefix")?,
+            );
+            push_optional_scalar_flag(
+                &mut argv,
+                "--position",
+                take_optional_scalar_string(name, &mut arguments, "position")?,
+            );
+            push_trailing_scalar_args(
+                name,
+                &mut argv,
+                take_optional_array(name, &mut arguments, "preceding")?,
+            )?;
+        }
         "console" => {
             let mode = take_optional_scalar_string(name, &mut arguments, "mode")?;
             if mode.as_deref().is_some_and(|mode| mode != "dangerous") {

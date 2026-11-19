@@ -189,6 +189,8 @@ internal sealed class StandaloneBridgeRpcDiagnostics
             StandaloneBridgeRpcMethod.RecordFixture => RecordedFixtureRequest.Parser.ParseFrom(request.Payload),
             StandaloneBridgeRpcMethod.GetHotReloadStatus => HotReloadStatusRequest.Parser.ParseFrom(request.Payload),
             StandaloneBridgeRpcMethod.RequestHotReload => HotReloadRequest.Parser.ParseFrom(request.Payload),
+            StandaloneBridgeRpcMethod.ListConsoleCommands => ConsoleCommandCatalogRequest.Parser.ParseFrom(request.Payload),
+            StandaloneBridgeRpcMethod.CompleteConsoleArguments => ConsoleCompletionRequest.Parser.ParseFrom(request.Payload),
             StandaloneBridgeRpcMethod.ExecuteConsoleCommand => ConsoleCommandRequest.Parser.ParseFrom(request.Payload),
             _ => null,
         };

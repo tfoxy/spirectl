@@ -887,7 +887,8 @@ pub enum DevSubcommand {
     Logs(LogsArgs),
     #[command(name = "log-health")]
     LogHealth(LogHealthArgs),
-    Console(ConsoleArgs),
+    /// Execute a game command, or discover commands and argument candidates.
+    Console(DevConsoleArgs),
     Heal(DevHealArgs),
     /// Persist tutorial settings for the active profile through the game.
     Tutorials(DevTutorialsArgs),
@@ -969,6 +970,44 @@ pub struct DevHealArgs {
         help = "Set current HP to max HP instead of adding an amount. Also revives a dead creature. NOTE: host-direct mutation can desync real remote network clients; fine for couch co-op's single real player."
     )]
     pub full: bool,
+}
+
+#[derive(Debug, Clone, Args)]
+#[command(
+    args_conflicts_with_subcommands = true,
+    subcommand_negates_reqs = true,
+    disable_help_subcommand = true,
+    arg_required_else_help = true
+)]
+pub struct DevConsoleArgs {
+    #[command(subcommand)]
+    pub discovery: Option<ConsoleSubcommand>,
+
+    #[arg(help = "STS2 command name (commands and args are reserved for discovery).")]
+    pub command: Option<String>,
+
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+    pub args: Vec<String>,
+}
+
+#[derive(Debug, Clone, Subcommand)]
+pub enum ConsoleSubcommand {
+    /// List registered game commands (excludes the special help command).
+    Commands,
+    /// Complete an argument using the game's own candidates.
+    Args(ConsoleCompletionArgs),
+}
+
+#[derive(Debug, Clone, Args)]
+pub struct ConsoleCompletionArgs {
+    pub command: String,
+    /// Completed arguments before the token to complete.
+    pub preceding: Vec<String>,
+    #[arg(long, default_value = "")]
+    pub prefix: String,
+    /// Zero-based argument position; truncates or pads preceding arguments.
+    #[arg(long)]
+    pub position: Option<usize>,
 }
 
 #[derive(Debug, Clone, Args)]

@@ -42,6 +42,8 @@ Stable enough for agent use today:
 - `log_health`
 - `diagnostics`
 - `console`
+- `console_commands`
+- `console_args`
 - `hot_reload_status`
 - `hot_reload`
 - `load_fixture`
@@ -263,6 +265,30 @@ For overlay flows, call `state` first and prefer typed `cardOverlay` data plus a
 Output expectations: unchanged CLI action result envelope. Expect structured acceptance or failure details from the runtime. Failure payloads preserve `actionFailure`, stable `reasonCode` values such as `wrong-screen`, `wrong-player`, `not-visible`, `not-enabled`, `missing-hook`, `ambiguous-hook`, `stale-id`, `unsupported-perspective`, and `dangerous-mode-required`, plus `screen`, `playerId`, `perspective`, and checked hook paths when relevant. Do not infer legality from prose messages.
 
 Dangerous raw-input fallbacks such as `sts2 --mode dangerous act mouse click ...` are intentionally excluded from this tool surface.
+
+### `console_commands` and `console_args`
+
+Purpose: discover registered developer console commands and the game's argument-completion candidates.
+
+Maps to `sts2 --json dev console commands` and
+`sts2 --json dev console args <command> [PRECEDING...] [--prefix P] [--position N]`.
+Both tools are read-only and use normal mode.
+
+`console_commands` takes no arguments. It returns `requestId`, `source`, `complete`, `provisional`,
+`commands`, `count`, and `notices`. Each command has `name`, `usage`, `description`, `networked`,
+`debugOnly`, `dangerous`, and `requires` (`none`, `run`, `combat`, or `unknown`). Special `help` is excluded.
+
+`console_args` takes required `command` and optional `preceding` (string array), `prefix` (string),
+and `position` (nonnegative integer). Position defaults to the length of `preceding`; it truncates or
+pads preceding tokens with empty strings. Tokens cannot contain whitespace. Its result includes
+`requestId`, `command`, `knownCommand`, `position`, `prefix`, `preceding`, `candidates`, `candidateDetails` (`value`, optional `label`), `count`,
+`commonPrefix`, `completionType`, `source`, `complete`, `provisional`, and `notices`.
+
+Live results use `source:"live"`, `complete:true`. Only unreachable transports trigger fallback to a
+local decompiled reference, marked `source:"static-reference"`, `complete:false`, with
+`static-fallback-incomplete`. Unsupported static positions carry `static-fallback-unsupported` and no
+candidates. Bridge-returned errors remain errors. Stub results use `source:"stub"`, `provisional:true`,
+`complete:false`. See the [console reference](../skills/spirectl/references/dev-console.md) for examples.
 
 ### `console`
 

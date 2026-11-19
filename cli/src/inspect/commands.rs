@@ -400,7 +400,7 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
     },
     CommandInfo {
         name: "dev console",
-        summary: "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge.",
+        summary: "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode.",
         status: "implemented",
         read_only: false,
         examples: &[
@@ -411,6 +411,24 @@ pub(crate) const COMMANDS: &[CommandInfo] = &[
             "sts2 --mode dangerous --json dev console achievement",
             "sts2 --mode dangerous --json dev console cloud",
             "sts2 --mode dangerous --json dev console unlock",
+        ],
+    },
+    CommandInfo {
+        name: "dev console commands",
+        summary: "List registered developer console commands; use an incomplete local reference when the bridge is unreachable.",
+        status: "implemented",
+        read_only: true,
+        examples: &["sts2 --json dev console commands"],
+    },
+    CommandInfo {
+        name: "dev console args",
+        summary: "Complete developer console arguments; use an incomplete local reference when the bridge is unreachable.",
+        status: "implemented",
+        read_only: true,
+        examples: &[
+            "sts2 --json dev console args fight --prefix KNIGHTS",
+            "sts2 --json dev console args room",
+            "sts2 --json dev console args card STRIKE --position 1",
         ],
     },
     CommandInfo {

@@ -146,6 +146,20 @@ public sealed partial class GrpcBridgeService(BridgeRuntime runtime) : BridgeSer
         return new LogsResult { Success = response };
     }
 
+    public ConsoleCommandCatalogResult HandleListConsoleCommands(ConsoleCommandCatalogRequest request)
+        => _protocol.HandleListConsoleCommands(request);
+
+    public ConsoleCompletionResult HandleCompleteConsoleArguments(ConsoleCompletionRequest request)
+        => _protocol.HandleCompleteConsoleArguments(request);
+
+    public override Task<ConsoleCommandCatalogResult> ListConsoleCommands(
+        ConsoleCommandCatalogRequest request, ServerCallContext context)
+        => Task.FromResult(HandleListConsoleCommands(request));
+
+    public override Task<ConsoleCompletionResult> CompleteConsoleArguments(
+        ConsoleCompletionRequest request, ServerCallContext context)
+        => Task.FromResult(HandleCompleteConsoleArguments(request));
+
     public ConsoleCommandResult HandleExecuteConsoleCommand(ConsoleCommandRequest request)
     {
         var command = request.Command?.Trim() ?? string.Empty;

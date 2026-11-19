@@ -12,7 +12,7 @@ using Spirectl.Sts2.Core.Protocol;
 namespace Spirectl.Sts2.Live;
 
 
-public sealed class Sts2ConsoleCommandExecutor : IConsoleCommandExecutor
+public sealed class Sts2ConsoleCommandExecutor : IConsoleCommandExecutor, IConsoleCommandCatalog
 {
     private const string LogTarget = "bridge.dev-console";
 
@@ -139,6 +139,69 @@ public sealed class Sts2ConsoleCommandExecutor : IConsoleCommandExecutor
                 ]);
         }
     }
+
+    public ConsoleCommandCatalogSnapshot List(string requestId)
+        => Sts2MainThreadDispatcher.Invoke(() =>
+        {
+            try
+            {
+                var commands = GetCommands(GetConsole()).Values
+                    .Select(cmd => ConsoleCommandCatalogMapping.Descriptor(
+                        cmd.CmdName, cmd.Args, cmd.Description, cmd.IsNetworked, cmd.DebugOnly))
+                    .OrderBy(cmd => cmd.Name, StringComparer.Ordinal).ToArray();
+                return new ConsoleCommandCatalogSnapshot(requestId, commands, DataSourceKind.Live, false, []);
+            }
+            catch (Exception ex)
+            {
+                return new ConsoleCommandCatalogSnapshot(requestId, [], DataSourceKind.Live, false, [],
+                    DiscoveryFailure(ex));
+            }
+        });
+
+    public ConsoleCompletionSnapshot Complete(ConsoleCompletionRequestSnapshot request)
+        => Sts2MainThreadDispatcher.Invoke(() =>
+        {
+            try
+            {
+                var console = GetConsole();
+                var command = request.Command.ToLowerInvariant();
+                var known = GetCommands(console).TryGetValue(command, out var cmd);
+                var runState = RunManager.Instance?.DebugOnlyGetState();
+                var player = runState is null ? null : LocalContext.GetMe(runState);
+                var result = known
+                    ? cmd!.GetArgumentCompletions(player,
+                        ConsoleCommandCatalogMapping.Arguments(request.Args, request.Prefix))
+                    : console.GetCompletionResults(command);
+                return new ConsoleCompletionSnapshot(
+                    request.RequestId, command, known, request.Args.Count,
+                    result.Candidates.ToArray(), result.CommonPrefix,
+                    ConsoleCommandCatalogMapping.CompletionType(result.Type.ToString()),
+                    known ? ConsoleCommandCatalogMapping.CommandPrefix(command, request.Args) : result.CommandPrefix,
+                    DataSourceKind.Live, false, []);
+            }
+            catch (Exception ex)
+            {
+                return new ConsoleCompletionSnapshot(request.RequestId, request.Command, false,
+                    request.Args.Count, [], "", "argument", "", DataSourceKind.Live, false, [],
+                    DiscoveryFailure(ex));
+            }
+        });
+
+    private ConsoleCommandFailure DiscoveryFailure(Exception exception)
+    {
+        var unwrapped = exception is TargetInvocationException { InnerException: not null }
+            ? exception.InnerException : exception;
+        _logStream.Write(BridgeLogLevel.Error, LogTarget,
+            $"Console command discovery failed with an unhandled runtime exception: {unwrapped}");
+        return new ConsoleCommandFailure(ConsoleCommandFailureCode.RuntimeFailure,
+            "Console command discovery failed with an unhandled runtime exception.",
+            [new ConsoleCommandDetail("exception", unwrapped.GetType().FullName ?? unwrapped.GetType().Name,
+                unwrapped.Message)]);
+    }
+
+    private static Dictionary<string, AbstractConsoleCmd> GetCommands(DevConsole console)
+        => CommandsField.GetValue(console) as Dictionary<string, AbstractConsoleCmd>
+            ?? throw new InvalidOperationException("The console command registry is unavailable.");
 
     private DevConsole GetConsole()
         => _console ??= new DevConsole(shouldAllowDebugCommands: true);

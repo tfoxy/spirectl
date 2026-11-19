@@ -56,6 +56,7 @@ struct PresentationWatchBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for PresentationWatchBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_runtime_scene_set_visible_unimplemented!();
     impl_unimplemented_bridge_rpc!(
@@ -444,6 +445,7 @@ impl DebuggerEventBridgeService {
 
 #[tonic::async_trait]
 impl BridgeService for DebuggerEventBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
 
     async fn handshake(

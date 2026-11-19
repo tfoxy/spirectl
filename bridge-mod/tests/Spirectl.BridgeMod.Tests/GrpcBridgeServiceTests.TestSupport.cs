@@ -99,7 +99,7 @@ public sealed partial class GrpcBridgeServiceTests
         });
     }
 
-    private static BridgeRuntime RuntimeWithConsoleExecutor(IConsoleCommandExecutor consoleCommandExecutor)
+    private static BridgeRuntime RuntimeWithConsoleExecutor(IConsoleCommandExecutor consoleCommandExecutor, IConsoleCommandCatalog? catalog = null)
     {
         return BridgeRuntime.Create(new BridgeRuntimeOptions
         {
@@ -136,6 +136,7 @@ public sealed partial class GrpcBridgeServiceTests
             BridgeHost = new FixedBridgeHost(new BridgeHostStatus("ipc", true, "Live IPC bridge host running.")),
             HotReloadControl = new PlaceholderHotReloadControl(),
             ConsoleCommandExecutor = consoleCommandExecutor,
+            ConsoleCommandCatalog = catalog,
         });
     }
 
@@ -374,6 +375,22 @@ public sealed partial class GrpcBridgeServiceTests
                 Accepted = result.Accepted,
             };
         }
+    }
+
+    private sealed class FixedConsoleCommandCatalog(bool fail = false) : IConsoleCommandCatalog
+    {
+        private ConsoleCommandFailure? Error => fail
+            ? new(ConsoleCommandFailureCode.RuntimeFailure, "discovery failed",
+                [new ConsoleCommandDetail("catalog", "test", "test failure")]) : null;
+
+        public ConsoleCommandCatalogSnapshot List(string requestId)
+            => new(requestId, [ConsoleCommandCatalogMapping.Descriptor("fight", "<id>", "Start an encounter", true, false)],
+                DataSourceKind.Live, false, [new("catalog-notice", "test notice", false)], Error);
+
+        public ConsoleCompletionSnapshot Complete(ConsoleCompletionRequestSnapshot request)
+            => new(request.RequestId, request.Command, true, request.Args.Count, ["KNIGHTS_ELITE (Knight Gang)"],
+                "fight KNIGHTS_ELITE ", "argument", ConsoleCommandCatalogMapping.CommandPrefix(request.Command, request.Args),
+                DataSourceKind.Live, false, [new("completion-notice", "test notice", false)], Error);
     }
 
     private sealed class FixedConsoleCommandExecutor(bool success) : IConsoleCommandExecutor

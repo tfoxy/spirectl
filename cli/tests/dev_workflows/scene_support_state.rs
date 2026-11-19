@@ -47,6 +47,7 @@ impl TransitionStatusBridgeService {
 
 #[tonic::async_trait]
 impl BridgeService for TransitionStatusBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_debug_session_rpc_stubs!();
     impl_state_watch_unimplemented!();
 
@@ -239,6 +240,7 @@ impl BridgeService for TransitionStatusBridgeService {
 
 #[tonic::async_trait]
 impl BridgeService for TransitioningBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     type WatchStateStream = std::pin::Pin<
         Box<
             dyn tokio_stream::Stream<
@@ -542,6 +544,7 @@ struct ErroringStateBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for ErroringStateBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     type WatchStateStream = std::pin::Pin<
         Box<
             dyn tokio_stream::Stream<
@@ -837,6 +840,7 @@ struct DiagnosticsBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for DiagnosticsBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_runtime_scene_set_visible_unimplemented!();
@@ -1061,6 +1065,7 @@ struct FixtureLoadBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for FixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_runtime_scene_set_visible_unimplemented!();
@@ -1326,6 +1331,7 @@ struct NormalizedFixtureLoadBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for NormalizedFixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_runtime_scene_set_visible_unimplemented!();

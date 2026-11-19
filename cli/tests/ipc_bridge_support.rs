@@ -13,6 +13,24 @@ use tokio::net::{TcpListener, UnixListener};
 use tokio_stream::StreamExt;
 use tonic::Request;
 
+#[macro_export]
+macro_rules! impl_console_discovery_rpc_stubs {
+    () => {
+        impl_unimplemented_bridge_rpc!(
+            list_console_commands,
+            sts2::bridge::proto::ConsoleCommandCatalogRequest,
+            sts2::bridge::proto::ConsoleCommandCatalogResult,
+            "console discovery is not exercised by this test service"
+        );
+        impl_unimplemented_bridge_rpc!(
+            complete_console_arguments,
+            sts2::bridge::proto::ConsoleCompletionRequest,
+            sts2::bridge::proto::ConsoleCompletionResult,
+            "console discovery is not exercised by this test service"
+        );
+    };
+}
+
 pub fn spawn_unix_bridge_service<T>(
     listener: UnixListener,
     service: T,
@@ -235,6 +253,34 @@ where
             Ok(response) => response.into_inner().encode_to_vec(),
             Err(status) => proto::ActionResult {
                 result: Some(proto::action_result::Result::Error(
+                    bridge_error_from_status(&status),
+                )),
+            }
+            .encode_to_vec(),
+        },
+        ipc_protocol::Method::ListConsoleCommands => match service
+            .list_console_commands(Request::new(proto::ConsoleCommandCatalogRequest::decode(
+                payload.as_slice(),
+            )?))
+            .await
+        {
+            Ok(response) => response.into_inner().encode_to_vec(),
+            Err(status) => proto::ConsoleCommandCatalogResult {
+                result: Some(proto::console_command_catalog_result::Result::Error(
+                    bridge_error_from_status(&status),
+                )),
+            }
+            .encode_to_vec(),
+        },
+        ipc_protocol::Method::CompleteConsoleArguments => match service
+            .complete_console_arguments(Request::new(proto::ConsoleCompletionRequest::decode(
+                payload.as_slice(),
+            )?))
+            .await
+        {
+            Ok(response) => response.into_inner().encode_to_vec(),
+            Err(status) => proto::ConsoleCompletionResult {
+                result: Some(proto::console_completion_result::Result::Error(
                     bridge_error_from_status(&status),
                 )),
             }

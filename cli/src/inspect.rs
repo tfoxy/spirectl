@@ -131,6 +131,26 @@ pub(crate) fn console_schema() -> Value {
     object_schema(properties, &["command"])
 }
 
+pub(crate) fn console_args_schema() -> Value {
+    let mut properties = Map::new();
+    properties.insert(
+        "command".into(),
+        schema_string("Console command whose argument candidates to list."),
+    );
+    properties.insert("preceding".into(), json!({
+        "type": "array", "items": {"type": "string"},
+        "description": "Completed arguments preceding the token to complete; tokens cannot contain whitespace."
+    }));
+    properties.insert(
+        "prefix".into(),
+        schema_string(
+            "Partial token to complete; defaults to empty and cannot contain whitespace.",
+        ),
+    );
+    properties.insert("position".into(), schema_integer("Zero-based argument position; defaults to preceding length. Truncates or pads preceding with empty tokens.", 0));
+    object_schema(properties, &["command"])
+}
+
 pub(crate) fn wait_or_assert_schema(include_wait_controls: bool) -> Value {
     let mut properties = Map::new();
     properties.insert(

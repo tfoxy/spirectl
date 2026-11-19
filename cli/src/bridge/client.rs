@@ -6,6 +6,53 @@ pub struct RuntimeBridgeClient {
 }
 
 impl RuntimeBridgeClient {
+    // Keep transport failures outside the RPC result so discovery never masks a
+    // bridge-returned error with a static approximation.
+    pub(crate) fn discover_console_commands(
+        &self,
+        request: proto::ConsoleCommandCatalogRequest,
+    ) -> Result<Result<proto::ConsoleCommandCatalogResponse, proto::BridgeError>, proto::BridgeError>
+    {
+        self.console_discovery_envelope(
+            ipc_protocol::Method::ListConsoleCommands,
+            request,
+            |client, request| client.service.list_console_commands(request),
+        )
+        .map(unwrap_console_command_catalog)
+    }
+
+    pub(crate) fn discover_console_arguments(
+        &self,
+        request: proto::ConsoleCompletionRequest,
+    ) -> Result<Result<proto::ConsoleCompletionResponse, proto::BridgeError>, proto::BridgeError>
+    {
+        self.console_discovery_envelope(
+            ipc_protocol::Method::CompleteConsoleArguments,
+            request,
+            |client, request| client.service.complete_console_arguments(request),
+        )
+        .map(unwrap_console_completion)
+    }
+
+    fn console_discovery_envelope<Request, Envelope>(
+        &self,
+        method: ipc_protocol::Method,
+        request: Request,
+        mock: impl FnOnce(&MockBridgeClient, Request) -> Envelope,
+    ) -> Result<Envelope, proto::BridgeError>
+    where
+        Request: Message,
+        Envelope: Message + Default,
+    {
+        match &self.inner {
+            BridgeClientKind::Mock(client) => Ok(mock(client, request)),
+            BridgeClientKind::Ipc(client) => client.call(method, request, Ok),
+            BridgeClientKind::Tcp(client) => client.call(method, request, Ok),
+            BridgeClientKind::Invalid(client) => Err(client.transport_error()),
+            BridgeClientKind::Unavailable(client) => Err(client.transport_error()),
+        }
+    }
+
     pub fn from_config(config: &TransportConfig) -> Self {
         let inner = match config.kind {
             ConfigTransportKind::Mock => {
@@ -58,6 +105,20 @@ impl RuntimeBridgeClient {
         request: proto::ActionRequest,
     ) -> Result<proto::ActionResponse, proto::BridgeError> {
         self.inner.execute_action(request)
+    }
+
+    pub fn list_console_commands(
+        &self,
+        request: proto::ConsoleCommandCatalogRequest,
+    ) -> Result<proto::ConsoleCommandCatalogResponse, proto::BridgeError> {
+        self.inner.list_console_commands(request)
+    }
+
+    pub fn complete_console_arguments(
+        &self,
+        request: proto::ConsoleCompletionRequest,
+    ) -> Result<proto::ConsoleCompletionResponse, proto::BridgeError> {
+        self.inner.complete_console_arguments(request)
     }
 
     pub fn execute_console_command(
@@ -420,6 +481,36 @@ impl BridgeClientKind {
             Self::Mock(client) => unwrap_action(client.service.execute_action(request)),
             Self::Ipc(client) => client.execute_action(request),
             Self::Tcp(client) => client.execute_action(request),
+            Self::Invalid(client) => Err(client.transport_error()),
+            Self::Unavailable(client) => Err(client.transport_error()),
+        }
+    }
+
+    fn list_console_commands(
+        &self,
+        request: proto::ConsoleCommandCatalogRequest,
+    ) -> Result<proto::ConsoleCommandCatalogResponse, proto::BridgeError> {
+        match self {
+            Self::Mock(client) => {
+                unwrap_console_command_catalog(client.service.list_console_commands(request))
+            }
+            Self::Ipc(client) => client.list_console_commands(request),
+            Self::Tcp(client) => client.list_console_commands(request),
+            Self::Invalid(client) => Err(client.transport_error()),
+            Self::Unavailable(client) => Err(client.transport_error()),
+        }
+    }
+
+    fn complete_console_arguments(
+        &self,
+        request: proto::ConsoleCompletionRequest,
+    ) -> Result<proto::ConsoleCompletionResponse, proto::BridgeError> {
+        match self {
+            Self::Mock(client) => {
+                unwrap_console_completion(client.service.complete_console_arguments(request))
+            }
+            Self::Ipc(client) => client.complete_console_arguments(request),
+            Self::Tcp(client) => client.complete_console_arguments(request),
             Self::Invalid(client) => Err(client.transport_error()),
             Self::Unavailable(client) => Err(client.transport_error()),
         }
@@ -1098,6 +1189,28 @@ impl IpcBridgeClient {
         self.call(ipc_protocol::Method::ExecuteAction, request, unwrap_action)
     }
 
+    fn list_console_commands(
+        &self,
+        request: proto::ConsoleCommandCatalogRequest,
+    ) -> Result<proto::ConsoleCommandCatalogResponse, proto::BridgeError> {
+        self.call(
+            ipc_protocol::Method::ListConsoleCommands,
+            request,
+            unwrap_console_command_catalog,
+        )
+    }
+
+    fn complete_console_arguments(
+        &self,
+        request: proto::ConsoleCompletionRequest,
+    ) -> Result<proto::ConsoleCompletionResponse, proto::BridgeError> {
+        self.call(
+            ipc_protocol::Method::CompleteConsoleArguments,
+            request,
+            unwrap_console_completion,
+        )
+    }
+
     fn execute_console_command(
         &self,
         request: proto::ConsoleCommandRequest,
@@ -1692,6 +1805,28 @@ impl TcpBridgeClient {
         request: proto::ActionRequest,
     ) -> Result<proto::ActionResponse, proto::BridgeError> {
         self.call(ipc_protocol::Method::ExecuteAction, request, unwrap_action)
+    }
+
+    fn list_console_commands(
+        &self,
+        request: proto::ConsoleCommandCatalogRequest,
+    ) -> Result<proto::ConsoleCommandCatalogResponse, proto::BridgeError> {
+        self.call(
+            ipc_protocol::Method::ListConsoleCommands,
+            request,
+            unwrap_console_command_catalog,
+        )
+    }
+
+    fn complete_console_arguments(
+        &self,
+        request: proto::ConsoleCompletionRequest,
+    ) -> Result<proto::ConsoleCompletionResponse, proto::BridgeError> {
+        self.call(
+            ipc_protocol::Method::CompleteConsoleArguments,
+            request,
+            unwrap_console_completion,
+        )
     }
 
     fn execute_console_command(
@@ -2484,5 +2619,72 @@ mod ipc_socket_path_length_tests {
             resolve_ipc_bridge_client(&config),
             BridgeClientKind::Invalid(_)
         ));
+    }
+}
+
+#[cfg(test)]
+mod console_discovery_tests {
+    use super::*;
+
+    #[test]
+    fn console_discovery_preserves_bridge_error_provenance_over_tcp() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap().to_string();
+        let server = std::thread::spawn(move || {
+            for method in [
+                ipc_protocol::Method::ListConsoleCommands,
+                ipc_protocol::Method::CompleteConsoleArguments,
+            ] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request = ipc_protocol::read_request_frame(&mut stream).unwrap();
+                assert_eq!(request.method, method);
+                let error = proto::BridgeError {
+                    code: proto::BridgeErrorCode::TransportConnectionFailed as i32,
+                    message: "remote error".into(),
+                    ..Default::default()
+                };
+                if method == ipc_protocol::Method::ListConsoleCommands {
+                    ipc_protocol::write_message_response(
+                        &mut stream,
+                        &proto::ConsoleCommandCatalogResult {
+                            result: Some(proto::console_command_catalog_result::Result::Error(
+                                error,
+                            )),
+                        },
+                    )
+                    .unwrap();
+                } else {
+                    ipc_protocol::write_message_response(
+                        &mut stream,
+                        &proto::ConsoleCompletionResult {
+                            result: Some(proto::console_completion_result::Result::Error(error)),
+                        },
+                    )
+                    .unwrap();
+                }
+            }
+        });
+        let client = RuntimeBridgeClient::from_config(&TransportConfig {
+            kind: ConfigTransportKind::Tcp,
+            tcp_address: Some(address),
+            ..Default::default()
+        });
+        assert_eq!(
+            client
+                .discover_console_commands(Default::default())
+                .unwrap()
+                .unwrap_err()
+                .message,
+            "remote error"
+        );
+        assert_eq!(
+            client
+                .discover_console_arguments(Default::default())
+                .unwrap()
+                .unwrap_err()
+                .message,
+            "remote error"
+        );
+        server.join().unwrap();
     }
 }

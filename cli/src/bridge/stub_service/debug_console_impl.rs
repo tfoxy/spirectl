@@ -330,6 +330,100 @@ impl StubBridgeService {
         }
     }
 
+    pub fn list_console_commands(
+        &self,
+        request: proto::ConsoleCommandCatalogRequest,
+    ) -> proto::ConsoleCommandCatalogResult {
+        proto::ConsoleCommandCatalogResult {
+            result: Some(proto::console_command_catalog_result::Result::Success(
+                proto::ConsoleCommandCatalogResponse {
+                    request_id: request.request_id,
+                    commands: mock_console_catalog(),
+                    source: proto::DataSource::Stub as i32,
+                    provisional: true,
+                    notices: Vec::new(),
+                },
+            )),
+        }
+    }
+
+    pub fn complete_console_arguments(
+        &self,
+        request: proto::ConsoleCompletionRequest,
+    ) -> proto::ConsoleCompletionResult {
+        let command = request.command.to_ascii_lowercase();
+        let catalog = mock_console_catalog();
+        let known_command = catalog.iter().any(|cmd| cmd.name == command);
+        let prefix = if known_command {
+            &request.prefix
+        } else {
+            &command
+        };
+        let candidates: Vec<_> = if known_command {
+            mock_console_candidates(&command, request.args.len())
+        } else {
+            catalog.into_iter().map(|cmd| cmd.name).collect()
+        }
+        .into_iter()
+        .filter(|value| {
+            value
+                .to_ascii_lowercase()
+                .starts_with(&prefix.to_ascii_lowercase())
+        })
+        .collect();
+        let candidate_details: Vec<_> = candidates
+            .into_iter()
+            .map(|raw| {
+                let (value, label) = raw
+                    .strip_suffix(')')
+                    .and_then(|raw| raw.split_once(" ("))
+                    .map(|(value, label)| (value.to_string(), label.to_string()))
+                    .unwrap_or_else(|| (raw.clone(), String::new()));
+                proto::ConsoleCompletionCandidate { value, label, raw }
+            })
+            .collect();
+        let candidates: Vec<_> = candidate_details
+            .iter()
+            .map(|detail| detail.value.clone())
+            .collect();
+        let command_prefix = if known_command {
+            format!(
+                "{} {}",
+                command,
+                if request.args.is_empty() {
+                    String::new()
+                } else {
+                    format!("{} ", request.args.join(" "))
+                }
+            )
+        } else {
+            String::new()
+        };
+        let common_prefix = if candidates.len() == 1 {
+            format!("{}{} ", command_prefix, candidates[0])
+        } else {
+            String::new()
+        };
+        proto::ConsoleCompletionResult {
+            result: Some(proto::console_completion_result::Result::Success(
+                proto::ConsoleCompletionResponse {
+                    request_id: request.request_id,
+                    command,
+                    known_command,
+                    argument_index: request.args.len() as u32,
+                    candidates,
+                    candidate_details,
+                    common_prefix,
+                    completion_type: if known_command { "argument" } else { "command" }.into(),
+                    command_prefix,
+                    source: proto::DataSource::Stub as i32,
+                    provisional: true,
+                    notices: Vec::new(),
+                },
+            )),
+        }
+    }
+
     pub fn execute_console_command(
         &self,
         request: proto::ConsoleCommandRequest,
@@ -373,5 +467,4 @@ impl StubBridgeService {
             )),
         }
     }
-
 }

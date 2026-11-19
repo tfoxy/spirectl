@@ -475,7 +475,27 @@
       "name": "dev console",
       "readOnly": false,
       "status": "implemented",
-      "summary": "Execute an explicit mode-gated STS2 in-game developer console command through the live bridge."
+      "summary": "Execute an STS2 developer console command; achievement, cloud, and unlock require dangerous mode."
+    },
+    {
+      "examples": [
+        "sts2 --json dev console commands"
+      ],
+      "name": "dev console commands",
+      "readOnly": true,
+      "status": "implemented",
+      "summary": "List registered developer console commands; use an incomplete local reference when the bridge is unreachable."
+    },
+    {
+      "examples": [
+        "sts2 --json dev console args fight --prefix KNIGHTS",
+        "sts2 --json dev console args room",
+        "sts2 --json dev console args card STRIKE --position 1"
+      ],
+      "name": "dev console args",
+      "readOnly": true,
+      "status": "implemented",
+      "summary": "Complete developer console arguments; use an incomplete local reference when the bridge is unreachable."
     },
     {
       "examples": [

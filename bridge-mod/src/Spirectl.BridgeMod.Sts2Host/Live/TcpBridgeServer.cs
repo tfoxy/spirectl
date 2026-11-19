@@ -214,6 +214,10 @@ public sealed class TcpBridgeServer(BridgeRuntime runtime, HostedBridgeHost host
                 Spirectl.Proto.V0.RuntimeSceneSetVisibleRequest.Parser.ParseFrom(request.Payload)),
             StandaloneBridgeRpcMethod.HoverRuntimeSceneControl => _service.HandleHoverRuntimeSceneControl(
                 Spirectl.Proto.V0.RuntimeSceneControlHoverRequest.Parser.ParseFrom(request.Payload)),
+            StandaloneBridgeRpcMethod.ListConsoleCommands => _service.HandleListConsoleCommands(
+                Spirectl.Proto.V0.ConsoleCommandCatalogRequest.Parser.ParseFrom(request.Payload)),
+            StandaloneBridgeRpcMethod.CompleteConsoleArguments => _service.HandleCompleteConsoleArguments(
+                Spirectl.Proto.V0.ConsoleCompletionRequest.Parser.ParseFrom(request.Payload)),
             StandaloneBridgeRpcMethod.UnhoverRuntimeSceneControl => _service.HandleUnhoverRuntimeSceneControl(
                 Spirectl.Proto.V0.RuntimeSceneControlUnhoverRequest.Parser.ParseFrom(request.Payload)),
             StandaloneBridgeRpcMethod.GetRuntimeTransitionStatus => _service.HandleGetRuntimeTransitionStatus(

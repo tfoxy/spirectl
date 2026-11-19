@@ -45,6 +45,7 @@ public sealed record BridgeRuntimeOptions
     public IRecordedFixtureProvider? RecordedFixtureProvider { get; init; }
     public IHotReloadControl? HotReloadControl { get; init; }
     public IConsoleCommandExecutor? ConsoleCommandExecutor { get; init; }
+    public IConsoleCommandCatalog? ConsoleCommandCatalog { get; init; }
     public IModInspector? ModInspector { get; init; }
     public IModelCatalogProvider? ModelCatalogProvider { get; init; }
     public IBridgeRuntimeMainThreadInvoker? MainThreadInvoker { get; init; }

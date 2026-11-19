@@ -74,3 +74,35 @@ fn mock_screen_type(scenario: MockScenario) -> &'static str {
         MockScenario::Lobby | MockScenario::LobbyReady => START_RUN_LOBBY_SCREEN_ID,
     }
 }
+
+fn mock_console_catalog() -> Vec<proto::ConsoleCommandDescriptor> {
+    [
+        ("event", "<id>", "Enter an event"),
+        ("fight", "<id>", "Start an encounter"),
+        ("room", "<type>", "Enter a room"),
+    ]
+    .into_iter()
+    .map(
+        |(name, usage, description)| proto::ConsoleCommandDescriptor {
+            name: name.into(),
+            usage: usage.into(),
+            description: description.into(),
+            networked: true,
+            debug_only: true,
+        },
+    )
+    .collect()
+}
+
+fn mock_console_candidates(command: &str, position: usize) -> Vec<String> {
+    if position != 0 {
+        return Vec::new();
+    }
+    let values: &[&str] = match command {
+        "fight" => &["KNIGHTS_ELITE (Knight Gang)", "SLIMES"],
+        "room" => &["Monster", "Event", "Shop"],
+        "event" => &["TEST_EVENT", "ANOTHER_EVENT"],
+        _ => &[],
+    };
+    values.iter().map(|value| (*value).to_string()).collect()
+}

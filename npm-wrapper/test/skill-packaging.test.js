@@ -15,6 +15,7 @@ test("repo skill packaging stays aligned across the skill and public docs", () =
   const skill = readRepoFile("skills/spirectl/SKILL.md");
   const runtimeReference = readRepoFile("skills/spirectl/references/cli-runtime.md");
   const libraryReference = readRepoFile("skills/spirectl/references/library-integration.md");
+  const consoleReference = readRepoFile("skills/spirectl/references/dev-console.md");
   const aiSkillDoc = readRepoFile("docs/ai-skill.md");
   const capabilities = readRepoFile("docs/capabilities.md");
   const npmReadme = readRepoFile("npm-wrapper/README.md");
@@ -29,6 +30,11 @@ test("repo skill packaging stays aligned across the skill and public docs", () =
   assert.match(skill, /inspect state-schema/);
   assert.match(skill, /references\/render-assets\.md/);
   assert.match(skill, /references\/cli-runtime\.md/);
+  assert.match(skill, /references\/dev-console\.md/);
+  assert.match(consoleReference, /Jump to a scene/);
+  assert.match(consoleReference, /dev console args fight/);
+  assert.match(consoleReference, /static-reference/);
+  assert.match(consoleReference, /\| fight \|/);
   assert.match(skill, /semantic `act`/i);
   assert.match(skill, /dangerous mode/i);
   assert.match(skill, /Node wrapper/);

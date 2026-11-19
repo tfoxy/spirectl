@@ -54,6 +54,7 @@ public static class Sts2BridgeRuntimeFactory
             var runtimeSceneProvider = new Sts2RuntimeSceneProvider(shared.ScreenLocator, logStream);
 
             // The live incremental scene-delta watcher powers the high-frequency "mirror".
+            var console = new Sts2ConsoleCommandExecutor(logStream);
             runtime = new BridgeRuntime(new BridgeRuntimeServices(
                 new BridgeRuntimeObservationServices(
                     shared.StateExtractor, shared.PerspectiveProvider,
@@ -71,7 +72,7 @@ public static class Sts2BridgeRuntimeFactory
                     new Sts2LiveDebugRuntimeHooks()),
                     new Sts2ScenarioProvider(shared.StateExtractor, shared.PerspectiveProvider, fixtureLoader, logStream),
                     new Sts2RecordedFixtureProvider(shared.StateExtractor, shared.PerspectiveProvider, logStream),
-                    new ReflectionHotReloadControl(logStream), new Sts2ConsoleCommandExecutor(logStream), new Sts2ModInspector(logStream)),
+                    new ReflectionHotReloadControl(logStream), console, new Sts2ModInspector(logStream), console),
                 new BridgeRuntimeLifecycleServices(host, new Sts2LifecycleControl(logStream), new Sts2MainThreadInvoker())));
 
             runtime.AttachLifetime(profilingScope, animationScope, geoClipScope, spineScope);

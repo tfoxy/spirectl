@@ -40,3 +40,65 @@ message ConsoleCommandResult {
     BridgeError error = 2;
   }
 }
+
+message ConsoleCommandCatalogRequest { string request_id = 1; }
+
+message ConsoleCommandDescriptor {
+  string name = 1;
+  string usage = 2;
+  string description = 3;
+  bool networked = 4;
+  bool debug_only = 5;
+}
+
+message ConsoleCommandCatalogResponse {
+  string request_id = 1;
+  repeated ConsoleCommandDescriptor commands = 2;
+  DataSource source = 3;
+  bool provisional = 4;
+  repeated ConsoleCommandNotice notices = 5;
+}
+
+message ConsoleCommandCatalogResult {
+  oneof result {
+    ConsoleCommandCatalogResponse success = 1;
+    BridgeError error = 2;
+  }
+}
+
+message ConsoleCompletionRequest {
+  string request_id = 1;
+  string command = 2;
+  // Completed arguments preceding the partial token, preserving empty positions.
+  repeated string args = 3;
+  string prefix = 4;
+}
+
+message ConsoleCompletionCandidate {
+  string value = 1;
+  string label = 2;
+  string raw = 3;
+}
+
+message ConsoleCompletionResponse {
+  string request_id = 1;
+  string command = 2;
+  bool known_command = 3;
+  uint32 argument_index = 4;
+  // Insertable values, in the same order as candidate_details.
+  repeated string candidates = 5;
+  string common_prefix = 6;
+  string completion_type = 7;
+  string command_prefix = 8;
+  DataSource source = 9;
+  bool provisional = 10;
+  repeated ConsoleCommandNotice notices = 11;
+  repeated ConsoleCompletionCandidate candidate_details = 12;
+}
+
+message ConsoleCompletionResult {
+  oneof result {
+    ConsoleCompletionResponse success = 1;
+    BridgeError error = 2;
+  }
+}

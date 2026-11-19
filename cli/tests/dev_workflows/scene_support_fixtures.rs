@@ -2,6 +2,7 @@ struct LobbyFixtureLoadBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for LobbyFixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_runtime_scene_set_visible_unimplemented!();
@@ -251,6 +252,7 @@ struct MainMenuFixtureLoadBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for MainMenuFixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_runtime_scene_set_visible_unimplemented!();
@@ -483,6 +485,7 @@ struct MapFixtureLoadBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for MapFixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_runtime_scene_set_visible_unimplemented!();
@@ -714,6 +717,7 @@ struct RewardsFixtureLoadBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for RewardsFixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_runtime_scene_set_visible_unimplemented!();

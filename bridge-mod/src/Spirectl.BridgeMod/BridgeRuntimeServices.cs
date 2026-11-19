@@ -60,7 +60,8 @@ public sealed record BridgeRuntimeDevelopmentServices(
     IRecordedFixtureProvider RecordedFixtureProvider,
     IHotReloadControl? HotReloadControl = null,
     IConsoleCommandExecutor? ConsoleCommandExecutor = null,
-    IModInspector? ModInspector = null);
+    IModInspector? ModInspector = null,
+    IConsoleCommandCatalog? ConsoleCommandCatalog = null);
 
 /// <summary>Host ownership and lifecycle dispatch.</summary>
 public sealed record BridgeRuntimeLifecycleServices(

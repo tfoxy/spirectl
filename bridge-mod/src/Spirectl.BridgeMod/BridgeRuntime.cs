@@ -85,7 +85,7 @@ public sealed class BridgeRuntime : IDisposable
             new BridgeRuntimeDevelopmentServices(
                 options.FixtureLoader ?? new PlaceholderFixtureLoader(), options.DebugControl ?? new PlaceholderDebugControl(),
                 options.ScenarioProvider ?? new PlaceholderScenarioProvider(), options.RecordedFixtureProvider ?? new PlaceholderRecordedFixtureProvider(),
-                options.HotReloadControl, options.ConsoleCommandExecutor, options.ModInspector),
+                options.HotReloadControl, options.ConsoleCommandExecutor, options.ModInspector, options.ConsoleCommandCatalog),
             new BridgeRuntimeLifecycleServices(
                 options.BridgeHost, options.LifecycleControl ?? new PlaceholderLifecycleControl(), options.MainThreadInvoker)));
     }
@@ -116,6 +116,7 @@ public sealed class BridgeRuntime : IDisposable
         RecordedFixtureProvider = services.Development.RecordedFixtureProvider;
         HotReloadControl = services.Development.HotReloadControl ?? new PlaceholderHotReloadControl();
         ConsoleCommandExecutor = services.Development.ConsoleCommandExecutor ?? new PlaceholderConsoleCommandExecutor();
+        ConsoleCommandCatalog = services.Development.ConsoleCommandCatalog ?? new PlaceholderConsoleCommandCatalog();
         ModInspector = services.Development.ModInspector ?? new PlaceholderModInspector();
         BridgeHost = services.Lifecycle.BridgeHost;
         LifecycleControl = services.Lifecycle.LifecycleControl;
@@ -154,6 +155,7 @@ public sealed class BridgeRuntime : IDisposable
     public IHotReloadControl HotReloadControl { get; }
 
     public IConsoleCommandExecutor ConsoleCommandExecutor { get; }
+    public IConsoleCommandCatalog ConsoleCommandCatalog { get; }
 
     public IModInspector ModInspector { get; }
 
@@ -298,6 +300,12 @@ public sealed class BridgeRuntime : IDisposable
     {
         return ActionHandler.Execute(request);
     }
+
+    public ConsoleCommandCatalogSnapshot ListConsoleCommands(string requestId)
+        => ConsoleCommandCatalog.List(requestId);
+
+    public ConsoleCompletionSnapshot CompleteConsoleArguments(ConsoleCompletionRequestSnapshot request)
+        => ConsoleCommandCatalog.Complete(request);
 
     public ConsoleCommandExecutionResult ExecuteConsoleCommand(ConsoleCommandRequestSnapshot request)
     {

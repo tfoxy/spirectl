@@ -189,7 +189,7 @@ fn parses_dev_console_command_and_args() {
         Commands::Dev(DevCommand {
             command: DevSubcommand::Console(args),
         }) => {
-            assert_eq!(args.command, "draw");
+            assert_eq!(args.command.as_deref(), Some("draw"));
             assert_eq!(args.args, vec!["3"]);
         }
         _ => panic!("unexpected command shape"),
@@ -203,7 +203,7 @@ fn parses_dev_console_args_that_look_like_flags() {
         Commands::Dev(DevCommand {
             command: DevSubcommand::Console(args),
         }) => {
-            assert_eq!(args.command, "help");
+            assert_eq!(args.command.as_deref(), Some("help"));
             assert_eq!(args.args, vec!["--verbose"]);
         }
         _ => panic!("unexpected command shape"),
@@ -393,7 +393,7 @@ fn ai_tool_hot_reload_forwards_dev_mode_and_reload_flags() {
 }
 
 #[test]
-fn ai_tool_console_forwards_dev_mode_by_default() {
+fn ai_tool_console_uses_normal_mode_by_default() {
     let argv = ai_tool_command_argv(
         "console",
         json!({
@@ -406,6 +406,60 @@ fn ai_tool_console_forwards_dev_mode_by_default() {
     assert_eq!(
         argv,
         vec!["sts2", "--json", "dev", "console", "help", "--", "draw"]
+    );
+}
+
+#[test]
+fn ai_tool_console_discovery_maps_arguments_and_parses_normalized_position() {
+    let argv = ai_tool_command_argv("console_commands", json!({})).unwrap();
+    assert_eq!(argv, ["sts2", "--json", "dev", "console", "commands"]);
+    let argv = ai_tool_command_argv(
+        "console_args",
+        json!({
+            "command": "card", "preceding": ["PAPER_BLADE"], "prefix": "de", "position": 2
+        }),
+    )
+    .unwrap();
+    let cli = Cli::try_parse_from(argv).unwrap();
+    assert_eq!(cli.mode, Mode::Normal);
+    let Commands::Dev(DevCommand {
+        command: DevSubcommand::Console(args),
+    }) = cli.command
+    else {
+        panic!("console")
+    };
+    let Some(ConsoleSubcommand::Args(args)) = args.discovery else {
+        panic!("args")
+    };
+    assert_eq!(args.prefix, "de");
+    assert_eq!(
+        crate::console_catalog::console_completion_preceding(&args).unwrap(),
+        ["PAPER_BLADE", ""]
+    );
+    assert!(ai_tool_command_argv("console_args", json!({})).is_err());
+    assert!(ai_tool_command_argv("console_commands", json!({"unexpected": true})).is_err());
+}
+
+#[test]
+fn ai_tool_console_discovery_catalog_is_read_only_with_argument_schema() {
+    let catalog = ai_tool_catalog();
+    for (name, command) in [
+        ("console_commands", "dev console commands"),
+        ("console_args", "dev console args"),
+    ] {
+        let tool = catalog.iter().find(|tool| tool["name"] == name).unwrap();
+        assert_eq!(tool["readOnly"], true);
+        assert_eq!(tool["mapsTo"][0], command);
+    }
+    let tool = catalog
+        .iter()
+        .find(|tool| tool["name"] == "console_args")
+        .unwrap();
+    assert_eq!(tool["inputSchema"]["required"], json!(["command"]));
+    assert_eq!(tool["inputSchema"]["properties"]["position"]["minimum"], 0);
+    assert_eq!(
+        tool["inputSchema"]["properties"]["preceding"]["items"]["type"],
+        "string"
     );
 }
 
@@ -2347,4 +2401,72 @@ fn mouse_coordinate_space_rejects_unknown_space() {
         ])
         .is_err()
     );
+}
+
+#[test]
+fn parses_dev_console_discovery_subcommands() {
+    let cli = Cli::parse_from(["sts2", "dev", "console", "commands"]);
+    let Commands::Dev(DevCommand {
+        command: DevSubcommand::Console(args),
+    }) = cli.command
+    else {
+        panic!("unexpected command shape");
+    };
+    assert!(matches!(args.discovery, Some(ConsoleSubcommand::Commands)));
+    assert!(args.command.is_none());
+    assert_eq!(
+        canonical_usage_command(&Cli::parse_from(["sts2", "dev", "console", "commands"]).command),
+        "dev console commands"
+    );
+
+    let cli = Cli::parse_from([
+        "sts2",
+        "dev",
+        "console",
+        "args",
+        "card",
+        "STRIKE",
+        "--prefix",
+        "de",
+        "--position",
+        "2",
+    ]);
+    let Commands::Dev(DevCommand {
+        command: DevSubcommand::Console(args),
+    }) = cli.command
+    else {
+        panic!("unexpected command shape");
+    };
+    let Some(ConsoleSubcommand::Args(args)) = args.discovery else {
+        panic!("expected args subcommand");
+    };
+    assert_eq!(args.command, "card");
+    assert_eq!(args.preceding, ["STRIKE"]);
+    assert_eq!(args.prefix, "de");
+    assert_eq!(args.position, Some(2));
+}
+
+#[test]
+fn parses_dev_console_help_and_reserved_names_as_passthrough_args() {
+    for tail in [
+        vec!["help", "draw"],
+        vec!["help", "--verbose"],
+        vec!["help", "commands"],
+        vec!["draw", "3"],
+        vec!["help", "args"],
+    ] {
+        let cli =
+            Cli::try_parse_from([vec!["sts2", "dev", "console"], tail.clone()].concat()).unwrap();
+        let Commands::Dev(DevCommand {
+            command: DevSubcommand::Console(args),
+        }) = cli.command
+        else {
+            panic!("unexpected command shape");
+        };
+        assert!(args.discovery.is_none());
+        assert_eq!(args.command.as_deref(), Some(tail[0]));
+        assert_eq!(args.args, tail[1..]);
+    }
+    assert!(Cli::try_parse_from(["sts2", "dev", "console"]).is_err());
+    assert!(Cli::try_parse_from(["sts2", "dev", "console", "args"]).is_err());
 }

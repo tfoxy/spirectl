@@ -2,6 +2,7 @@ struct RestSiteFixtureLoadBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for RestSiteFixtureLoadBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_runtime_scene_set_visible_unimplemented!();
@@ -234,6 +235,7 @@ struct RuntimeSceneBridgeService;
 
 #[tonic::async_trait]
 impl BridgeService for RuntimeSceneBridgeService {
+    crate::impl_console_discovery_rpc_stubs!();
     impl_state_watch_unimplemented!();
     impl_debug_session_rpc_stubs!();
     impl_unimplemented_bridge_rpc!(
