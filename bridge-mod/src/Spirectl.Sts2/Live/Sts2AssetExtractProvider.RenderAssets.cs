@@ -29,12 +29,8 @@ public sealed partial class Sts2AssetExtractProvider
         out IReadOnlyList<string> notes,
         out string failNote);
 
-    // Stage-A1 size-addressable combat-background renders: the request's capture viewport override
-    // (RenderWidth/RenderHeight, both positive) or the live root viewport size when absent — used ONLY
-    // by the two combat-background render branches (the literal-scene branch and the composed alias);
-    // every other render mode keeps calling ResolveRootViewportSize() directly and is byte-identical.
-    // TryResolveCombatBackgroundFrame already centers its runtime BgContainer framing on whatever
-    // viewport it is given, so a 2520x1080 request renders the widescreen capture the mirror stage needs.
+    // Background stills use the requested capture viewport when both dimensions are positive;
+    // requests without a complete size retain the live root viewport.
     private static Vector2I ResolveRequestedViewportSize(AssetExtractRequestSnapshot request)
         => request is { RenderWidth: > 0, RenderHeight: > 0 }
             ? new Vector2I(request.RenderWidth.Value, request.RenderHeight.Value)
@@ -2770,7 +2766,7 @@ public sealed partial class Sts2AssetExtractProvider
         // translated to the requested viewport's center — what the web mirror composes on a widened stage) and
         // stabilizes particles for a deterministic still. The size-less default path (recon stills) keeps the
         // live root viewport, the game's own aspect lerp, and its live particles — byte-identical to before.
-        var explicitEventRenderSize = request is { RenderWidth: > 0, RenderHeight: > 0 };
+        var explicitBackgroundRenderSize = request is { RenderWidth: > 0, RenderHeight: > 0 };
         if (subtreeConfigured)
         {
             // Configured above; the family branches below must not re-touch the detached subtree (the spine arm
@@ -2779,14 +2775,14 @@ public sealed partial class Sts2AssetExtractProvider
         else if (TryResolveEventBackgroundFrame(
                 request,
                 ResolveRequestedViewportSize(request),
-                mirrorCentered: explicitEventRenderSize,
+                mirrorCentered: explicitBackgroundRenderSize,
                 out var backgroundFrame))
         {
             renderMode = "flattened-full-scene-background";
             warmupFrames = 3;
             frameOverride = backgroundFrame;
             notes.Add("Rendered full-frame background scene with the in-game ancient background container transform.");
-            if (explicitEventRenderSize)
+            if (explicitBackgroundRenderSize)
             {
                 notes.Add("Centered the 16:9 reference event-background frame in the requested capture viewport.");
                 notes.AddRange(StabilizeBackgroundParticles(instantiated, "event background still"));
@@ -2806,13 +2802,20 @@ public sealed partial class Sts2AssetExtractProvider
                 QueueRedrawCanvasItems(instantiated);
             };
         }
-        else if (TryResolveCharacterSelectBackgroundFrame(request, ResolveRootViewportSize(), out var characterSelectFrame))
+        else if (TryResolveCharacterSelectBackgroundFrame(request, ResolveRequestedViewportSize(request), out var characterSelectFrame))
         {
             renderMode = "flattened-character-select-background";
             warmupFrames = 3;
             frameOverride = characterSelectFrame;
-            instantiated = CreateCharacterSelectBackgroundRenderRoot(instantiated, characterSelectFrame.ViewportSize);
+            instantiated = CreateCharacterSelectBackgroundRenderRoot(instantiated,
+                new Vector2I((int)characterSelectFrame.ControlSize.X, (int)characterSelectFrame.ControlSize.Y));
             notes.Add("Rendered full-frame character-select background scene inside the in-game lobby background container transform.");
+            if (explicitBackgroundRenderSize)
+            {
+                notes.Add("Centered the reference character-select composition in the requested capture viewport.");
+                notes.AddRange(StabilizeBackgroundParticles(instantiated, "character-select background still"));
+            }
+
             if (TryConfigureSpineFirstFramePreview(instantiated, out var animationName))
             {
                 notes.Add(
@@ -3254,7 +3257,7 @@ public sealed partial class Sts2AssetExtractProvider
                 "PackedScene.instantiate() returned null.");
         }
 
-        if (!TryResolveCharacterSelectBackgroundFrame(request, ResolveRootViewportSize(), out var frame))
+        if (!TryResolveCharacterSelectBackgroundFrame(request, ResolveRequestedViewportSize(request), out var frame))
         {
             instantiated.QueueFree();
             return Failure(
@@ -3264,11 +3267,17 @@ public sealed partial class Sts2AssetExtractProvider
                 "The requested resource path was not recognized as a character-select background scene.");
         }
 
-        var renderRoot = CreateCharacterSelectBackgroundRenderRoot(instantiated, frame.ViewportSize);
+        var renderRoot = CreateCharacterSelectBackgroundRenderRoot(instantiated,
+            new Vector2I((int)frame.ControlSize.X, (int)frame.ControlSize.Y));
         var notes = new List<string>
         {
             "Rendered full-frame character-select background scene inside the in-game lobby background container transform.",
         };
+        if (request is { RenderWidth: > 0, RenderHeight: > 0 })
+        {
+            notes.Add("Centered the reference character-select composition in the requested capture viewport.");
+            notes.AddRange(StabilizeBackgroundParticles(renderRoot, "character-select background still"));
+        }
 
         if (TryConfigureSpineFirstFramePreview(renderRoot, out var animationName))
         {

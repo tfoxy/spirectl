@@ -65,8 +65,8 @@ public sealed record AssetExtractRequestSnapshot(
     // Encode without an alpha channel (RGBA8 -> RGB8 before the encoder sees it). Forced for jpg, which has
     // no alpha at all. False => today's behaviour exactly.
     bool ImageOpaque = false,
-    // Event-backdrop FRAME override ("x,y,scale" in 1080-design units) for explicit-size event background
-    // renders — see EmbeddableAssetRequest.EventBackgroundFrame. Null/malformed => the reference lerp.
+    // Background FRAME override ("x,y,scale" in 1080-design units) for explicit-size event/character-select
+    // renders — see EmbeddableAssetRequest.EventBackgroundFrame. Null/malformed => the reference composition.
     string? EventBackgroundFrame = null,
     // Scene-SUBTREE still: render ONLY the node at this scene-relative path (detached from a never-tree-entered
     // instantiation of the scene, so no _Ready/_EnterTree script runs — the merchant-room crash class cannot

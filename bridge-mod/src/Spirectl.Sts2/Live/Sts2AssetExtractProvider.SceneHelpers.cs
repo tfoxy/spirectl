@@ -329,12 +329,24 @@ public sealed partial class Sts2AssetExtractProvider
         var viewportSize = new Vector2I(
             Math.Max(1, rootViewportSize.X),
             Math.Max(1, rootViewportSize.Y));
+        var explicitSize = request is { RenderWidth: > 0, RenderHeight: > 0 };
+        // The frame positions the synthetic composition root; its AnimatedBg transform stays inside it.
+        var resolved = explicitSize
+            ? Sts2EventBackgroundFrameMath.CenterFrame(
+                Sts2EventBackgroundFrameMath.TryParseFrameSpec(request.EventBackgroundFrame)
+                    ?? new Sts2EventBackgroundFrameMath.EventFrame(0f, 0f, 1f),
+                viewportSize.X,
+                viewportSize.Y)
+            : new Sts2EventBackgroundFrameMath.EventFrame(0f, 0f, 1f);
+        var compositionSize = explicitSize
+            ? new Vector2(Sts2EventBackgroundFrameMath.ReferenceWidth, Sts2EventBackgroundFrameMath.ReferenceHeight)
+            : new Vector2(viewportSize.X, viewportSize.Y);
         frame = new SceneRenderFrame(
             viewportSize,
+            new Vector2(resolved.PositionX, resolved.PositionY),
+            new Vector2(resolved.Scale, resolved.Scale),
             Vector2.Zero,
-            Vector2.One,
-            Vector2.Zero,
-            new Vector2(viewportSize.X, viewportSize.Y));
+            compositionSize);
         return true;
     }
 
@@ -1450,8 +1462,7 @@ public sealed partial class Sts2AssetExtractProvider
     private static IReadOnlyList<string> StabilizeCombatBackgroundAliasPreview(Node root)
         => StabilizeBackgroundParticles(root, "combat background alias");
 
-    // Shared by the combat-background alias lane and the explicit-size event-backdrop still lane: a still that
-    // may live forever under an immutable URL must not depend on where each emitter's simulation happened to be
+    // Background stills that live under immutable URLs must not depend on each emitter's simulation state
     // at capture time, so every Particles2D is silenced and hidden. `context` only labels the note.
     private static IReadOnlyList<string> StabilizeBackgroundParticles(Node root, string context)
     {

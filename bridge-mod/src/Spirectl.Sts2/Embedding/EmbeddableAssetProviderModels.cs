@@ -28,12 +28,12 @@ public sealed record EmbeddableAssetRequest(
     float? ImageQuality = null,
     // Drop the alpha channel before encoding (RGBA8 -> RGB8). Implied by jpg, which cannot carry alpha.
     bool ImageOpaque = false,
-    // Event-backdrop FRAME override for an explicit-size event background render: "x,y,scale" in 1080-design
-    // units — the LIVE backdrop container transform the caller probed, which the render re-centers into the
+    // Background FRAME override for an explicit-size render: "x,y,scale" in 1080-design units.
+    // For events it is the live backdrop container transform, which the render re-centers into the
     // requested viewport instead of predicting the game's placement from the recovered aspect lerp (the game's
     // real constants have drifted from it).
-    // Only read by the explicit-size event-background branch. Null (or malformed) => the reference lerp,
-    // byte-identical to a request that omits it.
+    // Explicit-size character-select backgrounds apply it to their synthetic composition root, retaining the
+    // AnimatedBg transform inside that root. Null/malformed keeps the family's reference composition.
     string? EventBackgroundFrame = null);
 
 public sealed record EmbeddableAssetBatchRequest(IReadOnlyList<EmbeddableAssetRequest> Requests, bool FailFast = false);
