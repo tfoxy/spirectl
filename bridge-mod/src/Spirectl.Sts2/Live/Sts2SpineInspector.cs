@@ -545,6 +545,7 @@ internal static class Sts2SpineInspector
 
         ScheduledByInstance[instanceId] =
             new ScheduledAnim(currentAnim, currentLooping, currentDurMsec, nextAnim, nextLooping, startedAtMsec);
+        NotifyScheduleRecorded(instanceId, ScheduledByInstance[instanceId]);
     }
 
     // Record a DIRECT MegaAnimationState.SetAnimation on track 0 (the path most spine nodes are driven by:
@@ -596,8 +597,7 @@ internal static class Sts2SpineInspector
 
         if (!ScheduledByInstance.TryGetValue(instanceId, out var scheduled))
         {
-            ScheduledByInstance[instanceId] =
-                new ScheduledAnim(nextAnim, nextLooping, 0, null, false, Time.GetTicksMsec());
+            RecordScheduledAnimation(instanceId, nextAnim, nextLooping, 0, null, false, Time.GetTicksMsec());
             return;
         }
 
@@ -606,8 +606,21 @@ internal static class Sts2SpineInspector
             return;
         }
 
-        ScheduledByInstance[instanceId] = scheduled with { NextAnim = nextAnim, NextLooping = nextLooping };
+        var updated = scheduled with { NextAnim = nextAnim, NextLooping = nextLooping };
+        ScheduledByInstance[instanceId] = updated;
+        NotifyScheduleRecorded(instanceId, updated);
     }
+
+    private static void NotifyScheduleRecorded(ulong instanceId, ScheduledAnim scheduled)
+        => Sts2SpineAnimationSchedules.NotifyRecorded(new(
+            instanceId, scheduled.CurrentAnim, scheduled.CurrentLooping, scheduled.CurrentDurMsec,
+            scheduled.NextAnim, scheduled.NextLooping, scheduled.StartedAtMsec));
+
+    internal static Sts2SpineAnimationSchedules.Schedule? ReadRecordedSchedule(ulong instanceId)
+        => ScheduledByInstance.TryGetValue(instanceId, out var scheduled)
+            ? new(instanceId, scheduled.CurrentAnim, scheduled.CurrentLooping, scheduled.CurrentDurMsec,
+                scheduled.NextAnim, scheduled.NextLooping, scheduled.StartedAtMsec)
+            : null;
 
     // Drop a node's live-anim tracking when the watcher evicts it (vanished/freed). Early-returns for any node
     // we never connected (the common case), so it never calls Godot signal APIs on non-spine nodes. A freed

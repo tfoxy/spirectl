@@ -445,6 +445,7 @@ internal static class Sts2SpineAnimationHooks
             }
 
             Sts2SpineInspector.RecordTimeScale(nodeId, scale);
+            Sts2SpineAnimationSchedules.NotifyPlaybackScaleChanged(nodeId, scale);
         }
         catch
         {

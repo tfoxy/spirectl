@@ -89,3 +89,60 @@ internal static class Sts2SpineSchedule
         return 0;
     }
 }
+
+/// <summary>Read-only notifications for recorded track-0 animation schedules.</summary>
+public static class Sts2SpineAnimationSchedules
+{
+    /// <summary>Game-produced animation names and timing, keyed by the driven node's instance id.</summary>
+    public sealed record Schedule(
+        ulong InstanceId, string CurrentAnim, bool CurrentLooping, double CurrentDurMsec,
+        string? NextAnim, bool NextLooping, ulong StartedAtMsec);
+
+    /// <summary>
+    /// Raised synchronously after each schedule write, including a queued return. Ignored requests do not fire.
+    /// Subscribers must defer game reads by one frame and unsubscribe when no longer needed.
+    /// </summary>
+    public static event Action<Schedule>? Recorded;
+
+    /// <summary>
+    /// Raised after the game sets playback scale, including repeated pause requests.
+    /// Subscribers must defer game reads by one frame and unsubscribe when no longer needed.
+    /// </summary>
+    public static event Action<ulong, float>? PlaybackScaleChanged;
+
+    /// <summary>Use the same representative sample as the still-frame baker.</summary>
+    public static float ChooseSampleTime(string? animationName, float durationSeconds, float? pausedSeconds = null)
+        => Sts2SpineStillFrame.ChooseSample(animationName, durationSeconds, pausedSeconds).Seconds;
+
+    /// <summary>Resolve a recorded schedule at a monotonic timestamp, including a finished one-shot's rest.</summary>
+    public static (string? Anim, double TrackTime, bool Looping, bool Paused) ResolveAt(Schedule schedule, ulong nowMsec)
+        => Sts2SpineSchedule.ResolveScheduledAnim(
+            schedule.CurrentAnim, schedule.CurrentLooping, schedule.CurrentDurMsec,
+            schedule.NextAnim, schedule.NextLooping, Math.Max(0, (double)nowMsec - schedule.StartedAtMsec));
+
+#if ENABLE_STS2_LIVE_HOST
+    /// <summary>Read a recorded schedule without probing a native animation track.</summary>
+    public static Schedule? ReadRecorded(ulong instanceId) => Sts2SpineInspector.ReadRecordedSchedule(instanceId);
+#endif
+
+    internal static void NotifyPlaybackScaleChanged(ulong instanceId, float scale)
+    {
+        if (PlaybackScaleChanged is not { } handlers) return;
+        foreach (Action<ulong, float> handler in handlers.GetInvocationList())
+        {
+            try { handler(instanceId, scale); }
+            catch { }
+        }
+    }
+
+    internal static void NotifyRecorded(Schedule schedule)
+    {
+        if (Recorded is not { } handlers) return;
+        foreach (Action<Schedule> handler in handlers.GetInvocationList())
+        {
+            // An observer must not interrupt the game's animation request or other observers.
+            try { handler(schedule); }
+            catch { }
+        }
+    }
+}
