@@ -169,6 +169,13 @@ internal static class Sts2TweenRecorderHooks
                 return;
             }
 
+            try { Sts2TweenScheduleHooks.Install(); }
+            catch (Exception ex)
+            {
+                logStream.Write(BridgeLogLevel.Warn, LogTarget,
+                    $"Skipping raw tween schedules: {ex.GetType().Name}: {ex.Message}");
+            }
+
             _installed = true;
 
             if (enable)

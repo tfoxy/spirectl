@@ -474,6 +474,7 @@
     <Compile Include="Live/Sts2TreasureRoomScreenInspector.cs" />
     <Compile Include="Live/Sts2TweenEndpointMath.cs" />
     <Compile Include="Live/Sts2TweenRecorderHooks.cs" />
+    <Compile Include="Live/Sts2TweenScheduleHooks.cs" />
     <Compile Include="Live/Sts2VfxSpawnEventHooks.cs" />
   </ItemGroup>
 
