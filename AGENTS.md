@@ -34,6 +34,12 @@ Use [docs/capabilities.md](docs/capabilities.md), [docs/known-gaps.md](docs/know
 - Keep behavior safe by default. Do not silently mutate original game files or machine-specific installs.
 - Treat protobuf as a core API surface: evolve additively, never reuse field numbers, and update CLI/docs/tests when contracts change.
 - Keep authored fixtures/tests diff-friendly and YAML-first where applicable.
+- **No polling: find the hook.** Do not add a timer, a loop, a repeated read or a "cheap fact" check to learn that
+  something in the game changed. Find the game's own signal (an event, a screen change, a typed Harmony postfix on
+  the method that changes the fact) and act on it, deferring any game read out of the signal callback by one frame.
+  If no hook resolves, stop and report what you looked for; do not fall back to a poll. Polling is allowed only
+  where the maintainer has explicitly allowed it for that case. A poll that already exists in code you touch stays
+  as it is and is listed in your report; do not extend it or copy its pattern.
 
 ## Modes And Safety
 
@@ -41,11 +47,35 @@ Use [docs/capabilities.md](docs/capabilities.md), [docs/known-gaps.md](docs/know
 - **Dev:** fixtures, assertions, logs, traces, screenshots, deploy/restart/verify workflows, and explicit omniscient inspection for validation.
 - **Dangerous:** raw input, destructive resets, brittle file mutation helpers. Dangerous behavior must be explicit in naming/help text.
 
-### Live bridge is always available
+### Live game runs
 
-Always assume a live bridge is running and reachable: prefer validating against the live host (state RPCs, asset extraction, screenshots) over mocks or fixtures alone. Assume you may freely restart the game and redeploy the bridge mod to set up or reset state — `./scripts/build-fixture.sh <fixture>` rebuilds the CLI, installs the bridge, launches the game, and loads a fixture in one step. Do not treat a missing live host as a blocker; bring one up.
+Prefer validating against a live host (state RPCs, asset extraction, screenshots) over mocks or fixtures alone, and
+do not treat a missing live host as a blocker: bring one up. `./scripts/build-fixture.sh <fixture>` rebuilds the CLI,
+installs the bridge, launches the game, and loads a fixture in one step. Restart and redeploy the instances you
+launched; a game the user or another session is running is not yours to restart.
+
+- **Automated runs of the game** use Godot `--headless` or a private `gamescope --backend headless` compositor —
+  never Xvfb, and never a window on the user's desktop without asking first. `sts2 game launch` (and so
+  `build-fixture.sh`) opens a normal game window, so run it inside such a compositor or ask before running it.
+- Prefer the headless compositor for screenshots and rendered or GPU checks; Godot `--headless` changes rendering and
+  idle behaviour, so keep it for checks that need no rendered graphics.
 
 Machine-specific STS2 install paths, assemblies, resources, and mods paths belong in ignored local config such as `sts2.local.yaml`, not committed docs or source comments. For static inspection and live host integration, prefer configured authoritative roots over copied repo-local or sibling `libs/` folders.
+
+## Artifact Policy
+
+Do not commit official STS2 assets, extracted or generated asset output, screenshots, copied game DLLs, build
+output, or `dist/` output.
+
+Do not add hard-coded user-specific absolute filesystem paths to committed code, scripts, configuration, or
+documentation — including as environment-variable defaults. Treat personal assets as local state: copy or modify
+them only when explicitly asked, and never automate replenishing them from a personal path.
+
+## Reporting Visual Evidence
+
+Whenever you claim something was proved visually (a screenshot, a crop, a pixel comparison, a before/after render),
+list the concrete image file path(s) that back the claim in the final summary. No visual claim without its image
+path.
 
 ## Coding Workflow
 
@@ -60,7 +90,10 @@ When making changes:
 7. Report concise validation summaries, including any command failures or environment blockers.
 8. Avoid mixing unrelated concerns in one change.
 9. Do not revert or overwrite unrelated user changes.
-10. Do not use git worktrees unless explicitly requested.
+10. Use a worktree when a change should not touch the main checkout: `scripts/create-worktree.sh <name>` makes one
+    with an isolated game instance, then run `scripts/install-agent-config.sh` in it. Leave the main checkout on
+    clean `main`: `../sts2-couch-coop` aliases this checkout's TypeScript source and builds its C# projects, so a
+    branch or an uncommitted edit here changes what every session there builds and tests against.
 
 Do not:
 
@@ -74,8 +107,10 @@ Do not:
 
 Full rules, and the release runbook, in [docs/commit-and-release.md](docs/commit-and-release.md).
 
-- **Commit your finished work** — don't leave it uncommitted or ask whether to. Never `git push`, and
-  never create a tag: both are the maintainer's call.
+- **Commit your finished work** — don't leave it uncommitted or ask whether to. Do not push or create
+  tags without an explicit request: a tag push fires a real release.
+- A single self-contained change commits straight to `main`. Multi-step work goes on a branch and comes
+  back as one squash commit. Do not commit broken or half-finished work; report it and stop instead.
 - On `main`, `scripts/githooks/commit-msg` enforces the format. **Feature branches are unchecked**;
   `main` gets one squash commit per change.
 
