@@ -24,6 +24,21 @@
     <Sts2AssembliesDir Condition="'$(Sts2AssembliesDir)' == '' and '$(SpirectlDetectedGodotSharpPath)' != ''">$([System.IO.Path]::GetDirectoryName('$(SpirectlDetectedGodotSharpPath)'))</Sts2AssembliesDir>
   </PropertyGroup>
 
+  <!--
+    A consumer that builds these projects from its own checkout (a ProjectReference across repositories) can pass
+    SpirectlConsumerBuildDir as a global property to keep its builds out of this checkout's obj/ and bin/. Several
+    checkouts and this repo's own builds otherwise compile the same project into one folder at once, and one build's
+    incremental clean or code generation breaks another's. Global properties flow to a project's own references, so
+    each project gets its own subfolder. Configuration is not set yet when this file is read; an unset one is the
+    SDK's Debug default. Restore output stays in obj/, where restore wrote it.
+  -->
+  <PropertyGroup Condition="'$(SpirectlConsumerBuildDir)' != ''">
+    <_SpirectlConsumerConfiguration>$(Configuration)</_SpirectlConsumerConfiguration>
+    <_SpirectlConsumerConfiguration Condition="'$(_SpirectlConsumerConfiguration)' == ''">Debug</_SpirectlConsumerConfiguration>
+    <IntermediateOutputPath>$([MSBuild]::EnsureTrailingSlash('$(SpirectlConsumerBuildDir)'))$(MSBuildProjectName)/obj/$(_SpirectlConsumerConfiguration)/</IntermediateOutputPath>
+    <OutputPath>$([MSBuild]::EnsureTrailingSlash('$(SpirectlConsumerBuildDir)'))$(MSBuildProjectName)/bin/$(_SpirectlConsumerConfiguration)/</OutputPath>
+  </PropertyGroup>
+
   <!-- Which game-API lane the live-host sources compile against. Needs $(Sts2AssembliesDir), so it imports
        after the block above resolves it. -->
   <Import Project="$(MSBuildThisFileDirectory)Sts2GameApi.props" />

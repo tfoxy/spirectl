@@ -90,6 +90,22 @@ metadata. Compile it with the game assemblies present:
 The Embedded profile does not expose current semantic state or combat-event subscriptions; the Full profile
 continues to expose both.
 
+### Build output for a cross-repository reference
+
+A project reference across repositories builds these projects inside this checkout's `obj/` and `bin/`, where
+other consumer checkouts and this repo's own builds write too, so concurrent builds can break each other. Pass
+`SpirectlConsumerBuildDir` to put each spirectl project's output under your own directory instead:
+
+```xml
+<ProjectReference Include="../spirectl/bridge-mod/src/Spirectl.BridgeMod/Spirectl.BridgeMod.csproj"
+                  AdditionalProperties="SpirectlConsumerBuildDir=$(MSBuildThisFileDirectory)obj/spirectl/" />
+```
+
+Each project then builds into `<dir>/<project name>/obj|bin/<Configuration>/`. The property flows to the
+project's own references, so give every reference to the same project the same value; a different value is a
+second build of it. Restore output stays in the project's `obj/`. A reference that also renames the assembly or
+changes the profile can instead set `IntermediateOutputPath` and `OutputPath` directly.
+
 ## Current-state subscription pacing
 
 `Full` profile only.
