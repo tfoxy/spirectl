@@ -66,6 +66,11 @@ Changelog: none'
 accepts "perf with a trailer"        'perf(bridge): reuse the producer buffer across frames
 
 Changelog: Halves allocation churn in long capture sessions.'
+accepts "Changelog with Co-Authored-By below it" 'feat(bridge): let a consumer build in its own folder
+
+Changelog: A cross-repository project reference can pass a property to keep its builds
+  out of the checkout.
+Co-Authored-By: Fixture <fixture@example.invalid>'
 accepts "a breaking change"          'feat(proto)!: drop the v0 frame reader
 
 BREAKING CHANGE: consumers pinned to frame version 0 must regenerate.
@@ -132,6 +137,14 @@ rejects "a misspelled trailer"  'fix(validation): scan tracked blobs reliably
 
 changelog: something happened' \
         'spelled exactly'
+rejects "a Changelog cut off from the trailer block" 'feat(bridge): let a consumer build in its own folder
+
+Body.
+
+Changelog: A cross-repository project reference can pass a property to keep its builds out.
+
+Co-Authored-By: Fixture <fixture@example.invalid>' \
+        'not in the trailer block'
 rejects "uppercase type"        'Fix: scan tracked blobs reliably
 
 Changelog: none' \

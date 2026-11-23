@@ -66,6 +66,13 @@ Rules that keep it cheap:
   it makes "is this visible to a consumer?" a decision rather than an omission.
 - Write it for someone integrating this, not for the reviewer of the diff: what changes in their
   build, their call site, their output. Name the flag, the command, the export.
+- **It may wrap.** Continuation lines are indented, and the collector rejoins them into one
+  sentence.
+- **It sits in the last paragraph.** Git reads trailers from the final paragraph only, so other
+  trailers such as `Co-Authored-By:` go directly below it with no blank line between. The hook
+  rejects a `Changelog:` line that is cut off from that block; the collector still reads the
+  history written that way. `scripts/test-collect-changelog.sh` and `scripts/test-commit-msg-hook.sh`
+  hold both cases.
 - `Refs: sts2-couch-coop@<sha>` is an optional second trailer for work that spans the repos.
 
 ## Branches and merging

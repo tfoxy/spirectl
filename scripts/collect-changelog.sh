@@ -35,14 +35,41 @@ heading_for() { # heading_for <type>
   esac
 }
 
+# The commit's first `Changelog:` trailer, flattened to one line.
+#
+# A trailer whose value WRAPS reaches us as several lines, and so does a commit carrying several
+# trailers. Under `separator=%x0A` those two cases are indistinguishable, so taking the first line
+# dropped every continuation, publishing a sentence that stops mid-clause.
+#
+# Separating MULTIPLE trailers with a byte no trailer can contain tells them apart again: after
+# that, every remaining newline is a continuation and folds to a space.
+#
+# Git only reads trailers from the LAST paragraph. A `Changelog:` line followed by a blank line and
+# a `Co-Authored-By:` paragraph is therefore no trailer at all, and the hook let that layout onto
+# main for a stretch of history. So when the trailer block has none, fall back to the first
+# `Changelog:` line in the message, with its indented continuation lines.
+changelog_trailer() { # changelog_trailer <sha>
+  local raw
+  raw="$(git log -1 --format='%(trailers:key=Changelog,valueonly,separator=%x1F)' "$1")"
+  if [ -z "${raw//[[:space:]]/}" ]; then
+    raw="$(git log -1 --format=%B "$1" | awk '
+      found && /^[[:space:]]+[^[:space:]]/ { print; next }
+      found { exit }
+      /^Changelog:/ { found = 1; sub(/^Changelog:/, ""); print }')"
+  fi
+  printf '%s' "$raw" \
+    | tr '\n' ' ' \
+    | cut -d$'\x1f' -f1 \
+    | sed -e 's/[[:space:]]\{1,\}/ /g' -e 's/^ //' -e 's/ $//'
+}
+
 emitted=0
 for want in feat fix perf; do
   section=""
   while IFS=$'\t' read -r sha subject; do
     [ -n "$sha" ] || continue
     printf '%s' "$subject" | grep -Eq "^$want(\(|!|:)" || continue
-    entry="$(git log -1 --format='%(trailers:key=Changelog,valueonly,separator=%x0A)' "$sha" \
-             | sed -e 's/[[:space:]]\{1,\}/ /g' -e 's/^ //' -e 's/ $//' | grep -v '^$' | head -1)"
+    entry="$(changelog_trailer "$sha")"
     [ -n "$entry" ] || continue
     [ "$entry" = "none" ] && continue
     section+="- $entry"$'\n'
@@ -62,7 +89,7 @@ missing=""
 while IFS=$'\t' read -r sha subject; do
   [ -n "$sha" ] || continue
   printf '%s' "$subject" | grep -Eq '^(feat|fix|perf)(\(|!|:)' || continue
-  git log -1 --format='%(trailers:key=Changelog,valueonly)' "$sha" | grep -q '[^[:space:]]' && continue
+  [ -n "$(changelog_trailer "$sha")" ] && continue
   missing+="  ${sha:0:9}  $subject"$'\n'
 done < <(git log --no-merges --reverse --format='%H%x09%s' "$range")
 
