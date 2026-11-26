@@ -730,7 +730,7 @@ public sealed class Sts2ModelCatalogProvider : IModelCatalogProvider
         }
 
         var clone = model.ToMutable();
-        clone.UpgradeInternal();
+        Sts2CardUpgradeCompatibility.UpgradePreview(clone);
         var upgradedDynamicVars = ResolveCardDynamicVars(clone);
         var currentEnergyCost = model.EnergyCost.GetWithModifiers(CostModifiers.None);
         var upgradedEnergyCost = clone.EnergyCost.GetWithModifiers(CostModifiers.None);
