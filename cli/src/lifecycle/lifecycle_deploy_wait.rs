@@ -1548,6 +1548,14 @@ fn deploy_bridge(
     let install_release_info = game_build::read_release_info(&layout.game_path)
         .or_else(|| game_build::read_release_info_for_assemblies_dir(&layout.assemblies_dir));
     ensure_known_install_lane(command_name, install_release_info.as_ref())?;
+    let warnings: Vec<_> = install_release_info
+        .as_ref()
+        .and_then(|info| game_build::untested_game_build_diagnostic(&info.version))
+        .into_iter()
+        .collect();
+    for warning in &warnings {
+        eprintln!("warning: {}", warning["message"].as_str().unwrap_or_default());
+    }
     let install_lane = install_release_info
         .as_ref()
         .and_then(game_build::GameReleaseInfo::api_lane)
@@ -1699,6 +1707,7 @@ fn deploy_bridge(
             "publishDir": publish_dir.display().to_string()
         },
         "acquisition": acquisition,
+        "warnings": warnings,
         "buildIdentity": {
             "contentHash": content_hash,
             "installedContentHash": installed_hash
@@ -1967,6 +1976,7 @@ fn stage_source_bridge(
     )?;
     Ok(json!({
         "kind": if build { "source-build" } else { "source-publish" },
+        "warnings": game_build::untested_game_build_diagnostic(&target.version).into_iter().collect::<Vec<_>>(),
         "repoRoot": repo_root.display().to_string(),
         "publishDir": publish_dir.display().to_string(),
         "sts2ApiLane": game_build_stamp.api_lane,

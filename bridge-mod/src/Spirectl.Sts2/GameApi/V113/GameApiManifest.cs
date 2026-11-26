@@ -19,7 +19,7 @@ namespace Spirectl.Sts2.Live.GameApi;
 
 /// <summary>
 /// The v113 lane's startup contract: every game member the bridge reaches by name or by an exact parameter
-/// list, where a rename or an added parameter would otherwise degrade silently instead of failing.
+/// list, where a rename or an added parameter would otherwise degrade silently. Non-critical misses are reported without refusing startup.
 ///
 /// <para>
 /// Deliberately NOT every by-name read in the bridge. Scope is (a) the members that differ between supported

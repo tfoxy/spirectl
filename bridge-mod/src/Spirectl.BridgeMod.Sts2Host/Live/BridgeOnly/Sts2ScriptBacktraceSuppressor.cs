@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Threading;
 using Godot;
 using HarmonyLib;
+using Spirectl.Sts2.Core.Protocol;
 
 namespace Spirectl.Sts2.Live;
 
@@ -80,6 +81,13 @@ internal static class Sts2ScriptBacktraceSuppressor
     /// </summary>
     public static IDisposable Arm(Action<string> log)
     {
+        if (Sts2CompatibilityReport.Process.HasIssue("manifest_load_failed"))
+        {
+            Sts2CompatibilityReport.Process.Record("hook_install_skipped", nameof(Sts2ScriptBacktraceSuppressor),
+                "The game API manifest could not load; diagnostic hooks remain disabled.");
+            return new Scope(false);
+        }
+
         if (!Enabled)
         {
             log($"backtrace suppression is disabled by {EnableEnv}; the sweep pays the engine's stock error path.");

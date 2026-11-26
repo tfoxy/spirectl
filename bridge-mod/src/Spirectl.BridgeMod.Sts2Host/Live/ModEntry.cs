@@ -45,7 +45,9 @@ public static class ModEntry
             logStream.Write(BridgeLogLevel.Info, "bridge.bootstrap", "Live bridge runtime created.");
             logStream.Write(BridgeLogLevel.Info, "bridge.bootstrap", "Live bridge main-thread dispatcher installed.");
             var runtime = Sts2BridgeRuntimeFactory.CreateLiveRuntime(_host, logStream);
-            new Sts2KaiserCrabVisualHooks(Sts2EncounterVisualEventStore.Shared, logStream).Install();
+            new Sts2CompatibilityHookInstaller(Sts2CompatibilityReport.Process, logStream).Install(
+                nameof(Sts2KaiserCrabVisualHooks),
+                log => new Sts2KaiserCrabVisualHooks(Sts2EncounterVisualEventStore.Shared, log).Install());
 
             _server = HostedBridgeServerFactory.Create(runtime, _host, endpoint);
             _server.StartAsync().GetAwaiter().GetResult();

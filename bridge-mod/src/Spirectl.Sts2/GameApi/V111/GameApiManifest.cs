@@ -21,7 +21,7 @@ namespace Spirectl.Sts2.Live.GameApi;
 
 /// <summary>
 /// The v111 lane's startup contract: every game member the bridge reaches by name or by an exact parameter
-/// list, where a rename or an added parameter would otherwise degrade silently instead of failing.
+/// list, where a rename or an added parameter would otherwise degrade silently. Non-critical misses are reported without refusing startup.
 ///
 /// <para>
 /// Deliberately NOT every by-name read in the bridge. Scope is (a) the members that differ between supported
@@ -133,7 +133,7 @@ internal static class GameApiManifest
         // ── The queued-return transition a frozen spine node can only get from the mirror's replay ───
         // Both of these went missing in practice as a CALL, not as a member: the game kept declaring them and
         // stopped routing the character animator through them, and the mirror silently reported the last
-        // one-shot forever. A member that disappears must refuse instead of degrading the same way again.
+        // one-shot forever. A missing member is retained in the compatibility report.
         new(typeof(AnimState), nameof(AnimState.GetNextState), GameApiMemberKind.Method,
             [],
             "resolves which clip this build queued behind a one-shot, so a played animation ends on the "

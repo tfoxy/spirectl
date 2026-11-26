@@ -152,7 +152,7 @@ fn create_fake_game_layout() -> tempfile::TempDir {
     fs::create_dir_all(&mods_dir).expect("create mods dir");
     fs::write(assemblies_dir.join("sts2.dll"), []).expect("write sts2 dll");
     fs::write(assemblies_dir.join("GodotSharp.dll"), []).expect("write godot dll");
-    write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
+    write_game_release_info(game_dir.path(), "v0.111.0", 1_692_500_715);
     game_dir
 }
 

@@ -37,17 +37,19 @@ public static class Sts2BridgeRuntimeFactory
             // SPIRECTL_SPINE_GEOCLIP_BAKE unset this returns before doing anything.
             Sts2SpineGeoClipBaker.Install(logStream);
 
+            var hooks = new Sts2CompatibilityHookInstaller(Sts2CompatibilityReport.Process, logStream);
+
             // Asset-load crash guards are opt-in because their empty placeholders intentionally change rendering.
             if (Sts2AssetLoadGuardOptions.IsEnabled())
             {
-                Sts2HeadlessTextureLoadHooks.Install(logStream);
-                Sts2AncientEventHeadlessHooks.Install(logStream);
+                hooks.Install(nameof(Sts2HeadlessTextureLoadHooks), log => Sts2HeadlessTextureLoadHooks.Install(log));
+                hooks.Install(nameof(Sts2AncientEventHeadlessHooks), log => Sts2AncientEventHeadlessHooks.Install(log));
             }
 
             // Background throttling is an explicit developer override of the game's power-saving behavior.
             if (Sts2BackgroundThrottleOptions.IsEnabled())
             {
-                Sts2BackgroundThrottleHooks.Install(logStream);
+                hooks.Install(nameof(Sts2BackgroundThrottleHooks), log => Sts2BackgroundThrottleHooks.Install(log));
             }
 
             var fixtureLoader = new Sts2FixtureLoader(shared.ScreenLocator, logStream, shared.SelectedCardViewState);

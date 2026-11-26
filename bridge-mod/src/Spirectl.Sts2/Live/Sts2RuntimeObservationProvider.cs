@@ -278,7 +278,7 @@ public sealed class Sts2RuntimeObservationProvider : IRuntimeObservationProvider
                         DrawPile: drawPile,
                         DiscardPile: discardPile,
                         ExhaustPile: exhaustPile,
-                        CanRemovePotions: SafeBool(() => GameApiPlayer.CanRemoveOrUsePotions(player), fallback: true)),
+                        CanRemovePotions: ResolvePotionPermission(() => GameApiPlayer.CanRemoveOrUsePotions(player))),
                     creature,
                     player);
             })
@@ -2151,6 +2151,8 @@ public sealed class Sts2RuntimeObservationProvider : IRuntimeObservationProvider
             ?? Sts2LiveIntrospection.GetMemberValue(Sts2LiveIntrospection.GetMemberValue(potion, "Id"), "Entry")?.ToString()
             ?? potion.GetType().Name;
     }
+
+    internal static bool ResolvePotionPermission(Func<bool> getter) => SafeBool(getter, fallback: false);
 
     private static bool SafeBool(Func<bool> getter, bool fallback = false)
     {

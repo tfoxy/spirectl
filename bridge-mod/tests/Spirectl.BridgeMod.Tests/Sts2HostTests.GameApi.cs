@@ -20,9 +20,8 @@ public sealed partial class Sts2HostTests(ITestOutputHelper output)
     {
         var missing = Sts2GameApiProbe.FindMissing(GameApiManifest.Requirements);
 
-        // Reported as the refusal the bridge would print at startup, so a failing leg reads exactly like the
-        // thing a maintainer has to act on.
-        Assert.True(missing.Count == 0, Sts2GameApiProbe.BuildRefusal(missing, InstalledBuildLabel));
+        // Verification remains strict even though optional runtime failures only degrade the bridge.
+        Assert.True(missing.Count == 0, Sts2GameApiProbe.DescribeMissing(missing, InstalledBuildLabel));
         Assert.NotEmpty(GameApiManifest.Requirements);
 
         // And the clean verdict, in the startup log's own words: the lane, and how many members it declares.
@@ -48,11 +47,11 @@ public sealed partial class Sts2HostTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void GameApiProbeRefusalNamesTheLaneAndEveryMissingMember()
+    public void GameApiProbeDiagnosticNamesTheLaneAndEveryMissingMember()
     {
-        var refusal = Sts2GameApiProbe.BuildRefusal(["Some.Game.Type.SomeMember — because"], "v9.99.9");
+        var refusal = Sts2GameApiProbe.DescribeMissing(["Some.Game.Type.SomeMember — because"], "v9.99.9");
 
-        Assert.Contains("refuses to start", refusal);
+        Assert.Contains("compatibility check found", refusal);
         Assert.Contains(GameApiLane.Name, refusal);
         Assert.Contains("v9.99.9", refusal);
         Assert.Contains("Some.Game.Type.SomeMember", refusal);
@@ -60,24 +59,17 @@ public sealed partial class Sts2HostTests(ITestOutputHelper output)
     }
 
     /// <summary>
-    /// The refusal for the worse failure: the lane's manifest cannot be loaded at all.
+    /// A manifest that cannot load is reported with both build identities.
     /// </summary>
-    /// <remarks>
-    /// Seen for real on Sep 15 2026, on an install switched from stable to the public beta while a bridge
-    /// compiled for v0.107.1 was still deployed. The v107 lane aliases a per-player lobby record that the
-    /// beta removed, so the CLR failed the type load while JITting the manifest's initialiser — before a
-    /// single requirement was evaluated, which is why <see cref="Sts2GameApiProbe.BuildRefusal"/> could not
-    /// fire. What escaped was a bare `Could not load type '…LobbyPlayer'` naming a GAME type, in a stack
-    /// that mentioned neither the lane nor either build. This is that message, said properly.
-    /// </remarks>
     [Fact]
-    public void GameApiProbeRefusesALaneItCannotEvenLoadAndNamesBothBuilds()
+    public void GameApiProbeReportsALaneItCannotLoadAndNamesBothBuilds()
     {
-        var refusal = Sts2GameApiProbe.BuildLaneLoadRefusal(
+        var refusal = Sts2GameApiProbe.DescribeLaneLoadFailure(
             new TypeLoadException("Could not load type 'A.Game.Type' from assembly 'sts2'."),
             "v9.99.9");
 
-        Assert.Contains("refuses to start", refusal);
+        Assert.Contains("is degraded", refusal);
+        Assert.DoesNotContain("refuses to start", refusal);
         Assert.Contains(GameApiLane.Name, refusal);
         Assert.Contains("v9.99.9", refusal);
         Assert.Contains("A.Game.Type", refusal);

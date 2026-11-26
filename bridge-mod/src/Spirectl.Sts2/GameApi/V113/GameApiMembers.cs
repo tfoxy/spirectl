@@ -81,7 +81,7 @@ internal static class GameApiCombat
 /// <summary>
 /// Game member names the bridge reads BY NAME (through <see cref="Sts2LiveIntrospection"/>) rather than by
 /// binding. A rename here is invisible to the compiler, so the names are pinned per lane and checked at
-/// startup by <see cref="Sts2GameApiProbe"/> instead of falling back to a plausible default.
+/// startup by <see cref="Sts2GameApiProbe"/> and retained in the compatibility report.
 /// </summary>
 internal static class GameApiNames
 {

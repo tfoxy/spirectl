@@ -7,6 +7,7 @@ option csharp_namespace = "Spirectl.Proto.V0";
 import "spirectl/v0/actions.proto";
 import "spirectl/v0/common.proto";
 import "spirectl/v0/errors.proto";
+import "google/protobuf/struct.proto";
 
 message HandshakeRequest {
   string cli_version = 1;
@@ -27,6 +28,8 @@ message HandshakeResponse {
   repeated Capability capabilities = 9;
   repeated ActionDescriptor supported_actions = 10;
   BridgeBuildIdentity build_identity = 11;
+  // Optional compatibility report. diagnostic.degraded lists unavailable members/hook families.
+  google.protobuf.Struct diagnostic = 12;
 }
 
 message BridgeBuildIdentity {
@@ -47,7 +50,7 @@ message BridgeBuildIdentity {
   // and no game hash — it can claim only the lane, and no hash is invented for
   // it. Empty therefore means "cannot claim one", never "matches anything".
 
-  // The src/Spirectl.Sts2/GameApi/<lane>/ sources that were compiled, e.g. "v107".
+  // The src/Spirectl.Sts2/GameApi/<lane>/ sources that were compiled, e.g. "v111".
   string sts2_api_lane = 5;
   // release_info.json "version" of the install compiled against, e.g. "v0.111.0".
   string built_against_game_version = 6;

@@ -282,7 +282,7 @@ These commands return real structured envelopes. `state`, `state full`, `state s
 
 `dev wait-for-transitions` is a developer bounded wait for scriptable capture and automation. It polls live runtime transition diagnostics until there are stable quiescent samples, treating finite screen transitions, finite running tweens, and non-looping playing animations as blockers while ignoring infinite/idle loops. The JSON response includes attempts, elapsed time, the final status, `blockingCount`, `ignoredInfiniteCount`, `screen`, and compact blocker diagnostics.
 
-`characterSelect` covers start-run lobbies (including native Blitz) and load-run lobbies. On API lane `v113`, `characterSelect.lobby.gameMode` uses the same spelling as `run.gameMode` (for example, `Standard` or `Blitz`). A start-run lobby also exposes `maxBlitzAscension`, the minimum Blitz cap across its roster (absent when empty), and each player exposes `maxBlitzAscensionUnlocked`. These three fields are omitted on `v107`/`v111`; a load-run lobby exposes only `gameMode` among them. A present cap of `0` means zero, while an absent field means unavailable. Existing lobby `ascension` / `maxAscension` describe the selection/cap for the current game mode; load-run lobbies keep the saved ascension with no selectable range (`maxAscension: 0`). Per-player `maxMultiplayerAscensionUnlocked` remains the Standard multiplayer cap.
+`characterSelect` covers start-run lobbies (including native Blitz) and load-run lobbies. On API lane `v113`, `characterSelect.lobby.gameMode` uses the same spelling as `run.gameMode` (for example, `Standard` or `Blitz`). A start-run lobby also exposes `maxBlitzAscension`, the minimum Blitz cap across its roster (absent when empty), and each player exposes `maxBlitzAscensionUnlocked`. These three fields are omitted on `v111`; a load-run lobby exposes only `gameMode` among them. A present cap of `0` means zero, while an absent field means unavailable. Existing lobby `ascension` / `maxAscension` describe the selection/cap for the current game mode; load-run lobbies keep the saved ascension with no selectable range (`maxAscension: 0`). Per-player `maxMultiplayerAscensionUnlocked` remains the Standard multiplayer cap.
 
 `models` exports immutable live model metadata for `characters`, `cards`, `relics`, `potions`, `events`, `ancients`, `acts`, `monsters`, `encounters`, `powers`, `orbs`, `afflictions`, `enchantments`, `card-pools`, `relic-pools`, `potion-pools`, `modifiers`, and `achievements`. Character output includes localized character select text such as `characterSelectTitle`, `characterSelectDesc`, and `unlockText`, plus opaque `model://characters/<id>/...` asset keys for renderable character assets. Cards include canonical costs, X-cost flags, tags, keywords, max upgrade level, `dynamicVars`, and an optional single-step `upgrade` preview containing changed dynamic vars and/or changed `energyCost`; mutable instance upgrade state still lives in runtime state through `upgradeLevel` plus sparse state overrides when model data is insufficient. `events` includes normal events and ancient events; `ancients` is a filtered convenience family with the same event shape and ancient-specific fields such as `epithet` and map/run-history asset keys. The added combat and catalog families include stable common metadata such as `typeName`, `categorySortingId`, `entrySortingId`, and `shouldReceiveCombatHooks` when the game model exposes it. Cross-family references stay as model ID arrays, for example encounter `monsterIds`, pool content IDs, and modifier mutual exclusions. Where the live model exposes a real authored resource, companion `*Path` fields expose the normalized `res://` path. For example, `characterSelectBgAssetKey` remains the rendered/fallback asset key, while `characterSelectBgPath` is the authored Godot scene path such as `res://scenes/screens/char_select/char_select_bg_ironclad.tscn`. Virtual model renders such as `visualsAssetKey` do not have synthetic path companions.
 
@@ -1214,7 +1214,7 @@ payload is valid for one build and not another. A payload in the wrong install *
 game under a correctly-installed bridge is exactly that, so the identity is bound at both ends.
 
 `bridge-mod/Sts2GameApi.props` is the one table mapping an install's `release_info.json` `version` to an
-**STS2 API lane** (`v107`, `v111`, `v113`). MSBuild reads it to choose which `src/Spirectl.Sts2/GameApi/<lane>/`
+**STS2 API lane** (`v111`, `v113`). MSBuild reads it to choose which `src/Spirectl.Sts2/GameApi/<lane>/`
 sources compile, the CouchCoop repo imports it, and `cli/build.rs` compiles it into the CLI —
 `scripts/sts2-api-lanes.sh` prints the lane list for shell callers. There is no second copy to keep in sync.
 
@@ -1230,7 +1230,8 @@ declaration-only STS2 reference SDK, which has no `release_info.json` and no gam
 its lane and the reference package version it was built from, and nothing else
 (`identitySource: "reference-sdk"`, with `version` and `mainAssemblyHash` null). No hash is invented for it,
 so `null` there means "this payload cannot claim one" — never "matches anything". Installation refuses
-an unreadable or unmapped game version with `bridge_release_lane_unresolved`.
+an unreadable version, an unparseable version, or a version below the oldest lane floor with
+`bridge_release_lane_unresolved`.
 
 The same three fields ride the handshake (`liveBridge.buildIdentity.sts2ApiLane`,
 `.builtAgainstGameVersion`, `.builtAgainstMainAssemblyHash`), so the *loaded* bridge can be checked as well as
@@ -1240,7 +1241,7 @@ or `unknown`, the install identity, both bridge claims, and a per-field `mismatc
 `{source, field, expected, found}`. The compact output carries `bridge.gameBuildStatus` always and the full
 comparison only when it mismatched. An `unknown` comparison includes a structured `reason` with `code` and
 `message`; compact output exposes it as `bridge.gameBuildReason`. It distinguishes unreadable install
-identity, an unmapped game version, and absent comparable bridge claims. An unmapped version stays
+identity, an unsupported game version, and absent comparable bridge claims. An unsupported version stays
 `unknown` even if a bridge claims the same version or hash, unless another claim proves a mismatch.
 A mismatch is `game_version_mismatch` at exit 4; it outranks
 `stale_live_host` and `deployed_version_mismatch`, because those two mean "rebuild for newer bridge source"
@@ -1251,10 +1252,11 @@ Released payloads are per lane end to end. `scripts/package-bridge-release.sh --
 `scripts/verify-bridge-release.sh --lane <lane>` checks the name and the manifest's own lane claim agree, and
 `install-bridge`'s cache is `<artifacts>/live-bridge/release-cache/<version>/<lane>/`. The lane is resolved
 from the install before a payload is selected, so `--no-build` installs the payload matching this install or
-refuses, and a best-effort payload is never installed:
+refuses:
 
-- `bridge_release_lane_unresolved` — the install's build cannot be identified, or its version has no lane.
-- `cli_lane_table_stale` — this CLI lacks the install's version, but the source checkout maps it; rebuild
+- `bridge_release_lane_unresolved` — the install's build cannot be identified, its version is invalid, or
+  it is below the oldest lane floor.
+- `cli_lane_table_stale` — this CLI cannot resolve the install's version, but the source checkout can; rebuild
   the CLI with `scripts/install-cli.sh`.
 - `bridge_release_lane_unreleasable` — the lane is supported but no release covers it (see below).
 - `bridge_release_cache_missing` — naming the lane and the expected archive, when no payload for it is cached.
@@ -1264,9 +1266,35 @@ refuses, and a best-effort payload is never installed:
   versions. No bridge files are copied into the mods directory on refusal. The JSON error carries
   `expectedLane`, `compiledLane` (null when absent), and `hostDll` for compiled lane failures.
 
+The lane table in `bridge-mod/Sts2GameApi.props` contains numeric version floors, not exact version
+matches: v0.111.0 selects `v111`, and v0.113.0 or newer selects `v113`. Versions must have the form
+`vMAJOR.MINOR.PATCH`. The separate `Sts2GameApiTestedBuilds` list records tested versions for reporting;
+it does not restrict lane selection. A supported version absent from that list still builds and installs,
+with an `untested_game_build` warning naming the game version, selected lane and table file. This includes
+newer builds such as v0.114.1 and v0.120.0. Install results carry structured `warnings`; source acquisition
+results also carry them. `bridge-health` includes this diagnostic with severity `info` under
+`compatibility.gameBuild.diagnostics` (compact: `bridge.gameBuildDiagnostics`). An untested build alone
+does not cause a mismatch or a failing health exit code. Compiled DLL lane, game version and hash checks
+still apply: a source DLL built against another install must be rebuilt.
+
+Runtime compatibility is checked separately from build identity. A missing non-critical manifest member
+or failed hook family leaves the rest of the bridge available. The handshake optionally carries
+`diagnostic.degraded`, an array of `{code, member, lane, gameBuild, reason, critical}`. Codes include
+`missing_game_member`, `manifest_load_failed`, `hook_install_skipped` (when required members or the
+manifest are unavailable), `hook_runtime_failed`, `hook_install_failed`, `hook_install_warning` (for
+installers that already log and skip a failed target), and `method_signature_miss` (for reflected calls
+whose exact argument list no longer matches). A reflected call can use one unambiguous overload with
+optional trailing parameters, supplying their declared defaults; required or ambiguous additions are
+not invoked. Absent names in optional probes stay silent. A failed manifest load skips all hook
+families; known missing postfix dependencies skip their family. Entries retain the first failure per
+code/member for the process lifetime, even after the bounded log evicts the startup warnings. `game bridge-health` includes the same array as `degraded` in
+compact and verbose output; verbose output also retains the original `liveBridge.diagnostic`.
+Degradation alone keeps `reachable_current` and exit 0, with a message calling out the compatibility failures; it does not mask a build mismatch or stale bridge. Missing
+critical members still refuse startup; no current manifest requirement is marked critical.
+
 The lane table is compiled into `sts2`. Updating the checkout alone does not update an installed CLI.
 For an unmapped version, installation reports `game build vX has no API lane in this sts2 build (known:
-v0.107.1→v107, …)`. If `bridge-mod/Sts2GameApi.props` can be found above the working directory or CLI
+v0.111.0→v111, …)`. If `bridge-mod/Sts2GameApi.props` can be found above the working directory or CLI
 executable and maps that version, the diagnostic adds `this sts2 build predates lane vNNN (mapped in
 <path>); rebuild with scripts/install-cli.sh` and uses `cli_lane_table_stale`. The source table provides
 diagnostics only; it never selects an otherwise unknown payload. JSON includes `gameVersion`,

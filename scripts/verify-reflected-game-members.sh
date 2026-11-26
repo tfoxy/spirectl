@@ -7,8 +7,7 @@
 # emitted — and none of the ones the code spells as a string. A read through
 # Sts2LiveIntrospection returns null when the name is gone, the state projection turns that into
 # `0` / `false` / `null`, and the bridge starts, runs and reports plausible wrong numbers. That is
-# the failure this sweep is for: it found `_playersReadyToBeginEnemyTurn`, present on v0.107.1 and
-# gone on v0.111.0, which left the host-local seat turn watcher silently inert on the newer build.
+# the failure this sweep guards against: a renamed member can silently disable a watcher.
 #
 # What it does NOT cover. The lane seam (`GameApi/V*/`) is excluded: those names are per-build ON
 # PURPOSE, so "differs between builds" is not a finding there. The lane seam has its own, stronger

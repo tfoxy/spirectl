@@ -334,6 +334,7 @@ impl StubBridgeService {
                         ),
                     ],
                     supported_actions,
+                    diagnostic: None,
                 },
             )),
         }

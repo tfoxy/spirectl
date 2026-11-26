@@ -1194,13 +1194,13 @@ async fn game_bridge_health_allows_missing_deployed_manifest_when_live_bridge_is
 /// that was correctly installed for the previous build. The payload still
 /// loads, so nothing else notices — until it walks a lobby and throws. Here the
 /// deployed manifest says it was built for the public beta (`v0.111.0` -> lane
-/// `v111`) while the install's own `release_info.json` says stable (`v0.107.1`
-/// -> `v107`), and the loaded bridge agrees with the manifest.
+/// `v111`) while the install's own `release_info.json` says a newer build (`v0.113.0`
+/// -> `v113`), and the loaded bridge agrees with the manifest.
 #[cfg(unix)]
 #[tokio::test]
 async fn game_bridge_health_reports_a_bridge_built_for_another_game_build() {
     let game_dir = create_unversioned_fake_game_layout();
-    write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
+    write_game_release_info(game_dir.path(), "v0.113.0", 1_692_500_715);
     let socket_path = game_dir.path().join("game-build-health.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu).with_build_identity(
@@ -1253,8 +1253,8 @@ async fn game_bridge_health_reports_a_bridge_built_for_another_game_build() {
     assert_eq!(payload["health"]["bridge"]["gameBuildStatus"], "mismatch");
 
     let game_build = &payload["health"]["compatibility"]["gameBuild"];
-    assert_eq!(game_build["install"]["version"], "v0.107.1");
-    assert_eq!(game_build["install"]["apiLane"], "v107");
+    assert_eq!(game_build["install"]["version"], "v0.113.0");
+    assert_eq!(game_build["install"]["apiLane"], "v113");
     assert_eq!(game_build["install"]["mainAssemblyHash"], 1_692_500_715i64);
     assert_eq!(game_build["liveBridge"]["sts2ApiLane"], "v111");
     assert_eq!(
@@ -1368,7 +1368,7 @@ async fn game_bridge_health_accepts_a_bridge_built_for_the_configured_game_build
 #[tokio::test]
 async fn game_bridge_health_catches_a_released_payload_from_its_lane_alone() {
     let game_dir = create_unversioned_fake_game_layout();
-    write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
+    write_game_release_info(game_dir.path(), "v0.113.0", 1_692_500_715);
     let socket_path = game_dir.path().join("game-build-lane-only.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu).with_build_identity(
@@ -1435,7 +1435,7 @@ async fn game_bridge_health_catches_a_released_payload_from_its_lane_alone() {
         serde_json::json!([{
             "source": "live",
             "field": "sts2ApiLane",
-            "expected": "v107",
+            "expected": "v113",
             "found": "v111"
         }])
     );
@@ -1498,7 +1498,7 @@ async fn game_bridge_health_reports_unknown_when_the_install_build_is_unreadable
     assert_eq!(game_build["mismatches"], serde_json::json!([]));
     assert_eq!(
         game_build["knownApiLanes"],
-        serde_json::json!(["v107", "v111"])
+        serde_json::json!(["v111", "v113"])
     );
     server.abort();
 }
@@ -1511,7 +1511,7 @@ async fn game_bridge_health_reports_unknown_when_the_install_build_is_unreadable
 #[tokio::test]
 async fn game_bridge_health_reports_a_live_bridge_version_mismatch_first() {
     let game_dir = create_unversioned_fake_game_layout();
-    write_game_release_info(game_dir.path(), "v0.107.1", 1_692_500_715);
+    write_game_release_info(game_dir.path(), "v0.113.0", 1_692_500_715);
     let socket_path = game_dir.path().join("live-version-mismatch.sock");
     let listener = UnixListener::bind(&socket_path).expect("bind unix listener");
     let service = StubBridgeGrpcService::new(MockScenario::MainMenu)

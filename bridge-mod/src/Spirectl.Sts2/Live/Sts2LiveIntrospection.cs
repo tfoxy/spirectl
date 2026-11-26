@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Reflection;
+using Spirectl.Sts2.Core.Protocol;
 #if ENABLE_STS2_LIVE_HOST
 using Godot;
 #endif
@@ -9,6 +11,10 @@ internal static class Sts2LiveIntrospection
 {
     private const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     private const BindingFlags StaticFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+
+    private sealed record MethodCandidate(MethodInfo Method, ParameterInfo[] Parameters);
+    private static readonly ConcurrentDictionary<(Type Type, string Name), MethodCandidate[]> Methods = new();
+    private static readonly ConcurrentDictionary<(Type Type, string Name), byte> ReportedMethodMisses = new();
 
     /// <summary>
     /// Assembly-qualified name of the game's active-screen context — the object that knows which screen is
@@ -303,7 +309,7 @@ internal static class Sts2LiveIntrospection
         }
 
         var method = FindMethod(target.GetType(), methodName, arguments);
-        return method?.Invoke(target, arguments);
+        return method?.Method.Invoke(target, CompleteArguments(method, arguments));
     }
 
     public static bool TryInvokeMethod(object? target, string methodName, params object?[] arguments)
@@ -319,7 +325,7 @@ internal static class Sts2LiveIntrospection
             return false;
         }
 
-        method.Invoke(target, arguments);
+        method.Method.Invoke(target, CompleteArguments(method, arguments));
         return true;
     }
 
@@ -335,6 +341,11 @@ internal static class Sts2LiveIntrospection
             var method = FindParameterlessMethod(target.GetType(), methodName);
             if (method is null)
             {
+                if (TryInvokeMethod(target, methodName))
+                {
+                    return true;
+                }
+
                 continue;
             }
 
@@ -364,38 +375,106 @@ internal static class Sts2LiveIntrospection
         return null;
     }
 
-    private static MethodInfo? FindMethod(Type type, string methodName, object?[] arguments)
+    private static MethodCandidate? FindMethod(Type type, string methodName, object?[] arguments)
     {
-        return type
+        var candidates = Methods.GetOrAdd((type, methodName), static key => [.. key.Type
             .GetMethods(InstanceFlags)
-            .FirstOrDefault(method =>
+            .Where(method => method.Name == key.Name && !method.ContainsGenericParameters)
+            .Select(method => new MethodCandidate(method, method.GetParameters()))]);
+
+        if (candidates.Length == 0)
+        {
+            // Optional name probes are not evidence of signature drift.
+            return null;
+        }
+
+        foreach (var candidate in candidates)
+        {
+            if (candidate.Parameters.Length == arguments.Length && AcceptsArguments(candidate.Parameters, arguments))
             {
-                if (!string.Equals(method.Name, methodName, StringComparison.Ordinal))
+                return candidate;
+            }
+        }
+
+        MethodCandidate? fallback = null;
+        foreach (var candidate in candidates)
+        {
+            if (candidate.Parameters.Length <= arguments.Length || !AcceptsArguments(candidate.Parameters, arguments))
+            {
+                continue;
+            }
+
+            var optional = true;
+            for (var index = arguments.Length; index < candidate.Parameters.Length; index++)
+            {
+                if (!candidate.Parameters[index].HasDefaultValue)
                 {
-                    return false;
+                    optional = false;
+                    break;
                 }
+            }
 
-                var parameters = method.GetParameters();
-                if (parameters.Length != arguments.Length)
-                {
-                    return false;
-                }
+            if (!optional)
+            {
+                continue;
+            }
 
-                for (var index = 0; index < parameters.Length; index++)
-                {
-                    var argument = arguments[index];
-                    if (argument is null)
-                    {
-                        continue;
-                    }
+            if (fallback is not null)
+            {
+                ReportMethodMiss(type, methodName, "Multiple overloads accept optional trailing arguments; invocation refused.");
+                return null;
+            }
 
-                    if (!parameters[index].ParameterType.IsInstanceOfType(argument))
-                    {
-                        return false;
-                    }
-                }
+            fallback = candidate;
+        }
 
-                return true;
-            });
+        ReportMethodMiss(type, methodName, fallback is null
+            ? "No compatible method signature was found; the dependent operation is unavailable."
+            : "Exact argument count no longer matches; using the single overload with optional trailing arguments.");
+        return fallback;
+    }
+
+    private static bool AcceptsArguments(ParameterInfo[] parameters, object?[] arguments)
+    {
+        if (parameters.Length < arguments.Length)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < arguments.Length; index++)
+        {
+            if (arguments[index] is { } argument && !parameters[index].ParameterType.IsInstanceOfType(argument))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static object?[] CompleteArguments(MethodCandidate method, object?[] arguments)
+    {
+        var parameters = method.Parameters;
+        if (parameters.Length == arguments.Length)
+        {
+            return arguments;
+        }
+
+        var completed = new object?[parameters.Length];
+        arguments.CopyTo(completed, 0);
+        for (var index = arguments.Length; index < completed.Length; index++)
+        {
+            completed[index] = Type.Missing;
+        }
+
+        return completed;
+    }
+
+    private static void ReportMethodMiss(Type type, string methodName, string reason)
+    {
+        if (ReportedMethodMisses.TryAdd((type, methodName), 0))
+        {
+            Sts2CompatibilityReport.Process.Record("method_signature_miss", $"{type.FullName}.{methodName}", reason);
+        }
     }
 }

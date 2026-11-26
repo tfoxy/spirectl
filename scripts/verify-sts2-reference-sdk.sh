@@ -11,7 +11,7 @@ lockfile="$sdk_dir/packages.lock.json"
   exit 1
 }
 
-grep -Fq 'Version="[0.107.0-beta]"' "$project" || {
+grep -Fq 'Version="[0.111.0-beta]"' "$project" || {
   echo "STS2 reference package must use the reviewed exact version" >&2
   exit 1
 }
@@ -31,8 +31,8 @@ grep -Fq 'Version="[4.5.1]"' "$project" || {
 jq -e '
   .version == 1
   and .dependencies["net9.0"]["FuYnAloft.Sts2.References"].type == "Direct"
-  and .dependencies["net9.0"]["FuYnAloft.Sts2.References"].requested == "[0.107.0-beta, 0.107.0-beta]"
-  and .dependencies["net9.0"]["FuYnAloft.Sts2.References"].resolved == "0.107.0-beta"
+  and .dependencies["net9.0"]["FuYnAloft.Sts2.References"].requested == "[0.111.0-beta, 0.111.0-beta]"
+  and .dependencies["net9.0"]["FuYnAloft.Sts2.References"].resolved == "0.111.0-beta"
   and (.dependencies["net9.0"]["FuYnAloft.Sts2.References"].contentHash | type == "string" and length > 0)
   and .dependencies["net9.0"].GodotSharp.type == "Direct"
   and .dependencies["net9.0"].GodotSharp.requested == "[4.5.1, 4.5.1]"
@@ -71,4 +71,4 @@ diff -u "$expected" "$actual" || {
   exit 1
 }
 
-echo "verify-sts2-reference-sdk: ok (FuYnAloft.Sts2.References 0.107.0-beta)"
+echo "verify-sts2-reference-sdk: ok (FuYnAloft.Sts2.References 0.111.0-beta)"

@@ -102,7 +102,7 @@ public sealed class Sts2ReferenceDataProvider(ILogStream logStream) : IReference
             TotalModCount: ModManager.Mods.Count);
 
         // WHICH STEAM BRANCH is a question the game's own release record cannot answer — its `branch` is the
-        // release tag ("v0.107.1"), so two installs of the same product whose content differs report the same
+        // release tag ("v0.111.1"), so two installs of the same product whose content differs report the same
         // thing. Resolved separately, and never cached here: it is read from Steam when Steam is up, and a
         // process that asked once before `SteamAPI_Init()` must not be stuck with the weaker answer for ever.
         var steam = Sts2GameBuildIdentity.Resolve();

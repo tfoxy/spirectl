@@ -120,7 +120,7 @@ fn field_diagnostic_json(diagnostic: &proto::FieldDiagnostic) -> Value {
 }
 
 pub fn handshake_json(response: &proto::HandshakeResponse) -> Value {
-    json!({
+    let mut result = json!({
         "schemaVersion": response.schema_version,
         "gameVersion": response.game_version,
         "bridgeVersion": response.bridge_version,
@@ -132,7 +132,11 @@ pub fn handshake_json(response: &proto::HandshakeResponse) -> Value {
         "defaultPerspective": response.default_perspective.as_ref().map(perspective_json),
         "capabilities": response.capabilities.iter().map(capability_json).collect::<Vec<_>>(),
         "supportedActions": response.supported_actions.iter().map(action_descriptor_json).collect::<Vec<_>>()
-    })
+    });
+    if let Some(diagnostic) = &response.diagnostic {
+        result["diagnostic"] = protobuf_struct_json(diagnostic);
+    }
+    result
 }
 
 fn bridge_build_identity_json(identity: &proto::BridgeBuildIdentity) -> Value {
@@ -966,6 +970,51 @@ fn parse_steam_initialization_failure_line(line: &str) -> Option<&str> {
 mod bridge_error_payload_tests {
     use super::*;
     use prost_types::{ListValue, Struct, Value as ProtoValue, value::Kind};
+
+    #[test]
+    fn handshake_json_preserves_compatibility_diagnostic() {
+        let response = proto::HandshakeResponse {
+            diagnostic: Some(Struct {
+                fields: [(
+                    "degraded".to_string(),
+                    ProtoValue {
+                        kind: Some(Kind::ListValue(ListValue {
+                            values: vec![ProtoValue {
+                                kind: Some(Kind::StructValue(Struct {
+                                    fields: [(
+                                        "member".to_string(),
+                                        ProtoValue {
+                                            kind: Some(Kind::StringValue(
+                                                "type.member".to_string(),
+                                            )),
+                                        },
+                                    )]
+                                    .into_iter()
+                                    .collect(),
+                                })),
+                            }],
+                        })),
+                    },
+                )]
+                .into_iter()
+                .collect(),
+            }),
+            ..Default::default()
+        };
+        assert_eq!(
+            handshake_json(&response)["diagnostic"]["degraded"][0]["member"],
+            "type.member"
+        );
+    }
+
+    #[test]
+    fn handshake_json_omits_absent_compatibility_diagnostic() {
+        assert!(
+            handshake_json(&proto::HandshakeResponse::default())
+                .get("diagnostic")
+                .is_none()
+        );
+    }
 
     #[test]
     fn bridge_error_payload_preserves_structured_detail_diagnostic() {

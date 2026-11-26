@@ -88,7 +88,7 @@ public sealed record GameColorSnapshot(string Name, string Hex, float R, float G
 // --- topic: version ---
 
 /// <param name="Branch">
-/// The game's OWN <c>release_info.json</c> branch field, which is its release TAG — "v0.107.1", not a Steam
+/// The game's OWN <c>release_info.json</c> branch field, which is its release TAG — "v0.111.1", not a Steam
 /// branch name. Kept as the game reports it; see <paramref name="SteamBranch"/> for the other question.
 /// </param>
 /// <param name="SteamBranch">

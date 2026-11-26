@@ -2713,7 +2713,7 @@ fn prune_launch_output_logs_keeps_the_newest_runs_per_stream() {
 }
 
 fn release_bridge_zip(version: &str, extra: Option<(&str, &[u8])>) -> Vec<u8> {
-    release_bridge_zip_for_lane(version, "v107", extra)
+    release_bridge_zip_for_lane(version, "v111", extra)
 }
 
 fn release_bridge_zip_for_lane(version: &str, lane: &str, extra: Option<(&str, &[u8])>) -> Vec<u8> {
@@ -2824,17 +2824,17 @@ fn release_info_for(version: &str, hash: i64) -> crate::game_build::GameReleaseI
 fn release_bridge_stages_a_verified_cached_archive_without_downloading() {
     let temp = tempfile::tempdir().expect("temp dir");
     let version = "9.8.7";
-    seed_release_cache_lane(temp.path(), version, "v107");
+    seed_release_cache_lane(temp.path(), version, "v111");
 
     let stage_dir = temp.path().join("stage");
     fs::create_dir_all(&stage_dir).expect("stage dir");
-    let release_info = release_info_for("v0.107.1", 1_692_500_715);
+    let release_info = release_info_for("v0.111.0", 1_692_500_715);
     let acquisition = stage_release_bridge(
         "test",
         temp.path(),
         &stage_dir,
         version,
-        Some("v107"),
+        Some("v111"),
         Some(&release_info),
         &temp.path().join("release_info.json"),
         false,
@@ -2842,13 +2842,13 @@ fn release_bridge_stages_a_verified_cached_archive_without_downloading() {
     .expect("cached release stages");
 
     assert_eq!(acquisition["kind"], "release-cache");
-    assert_eq!(acquisition["sts2ApiLane"], "v107");
+    assert_eq!(acquisition["sts2ApiLane"], "v111");
     let staged = serde_json::from_str::<Value>(
         &fs::read_to_string(stage_dir.join(BRIDGE_MANIFEST_NAME)).expect("staged manifest"),
     )
     .expect("staged manifest JSON");
     assert_eq!(staged["version"], version);
-    assert_eq!(staged["buildIdentity"]["sts2ApiLane"], "v107");
+    assert_eq!(staged["buildIdentity"]["sts2ApiLane"], "v111");
     // A released payload compiles against the declaration-only reference SDK,
     // so it must claim a lane and NOTHING about the game build itself.
     assert_eq!(
@@ -2883,7 +2883,7 @@ fn release_bridge_refuses_a_payload_cached_for_another_game_build() {
 
     let stage_dir = temp.path().join("stage");
     fs::create_dir_all(&stage_dir).expect("stage dir");
-    let release_info = release_info_for("v0.107.1", 1_692_500_715);
+    let release_info = release_info_for("v0.111.0", 1_692_500_715);
     let error = stage_release_bridge(
         "test",
         temp.path(),
@@ -2949,7 +2949,7 @@ fn release_bridge_refuses_a_lane_no_release_covers() {
     seed_release_cache_lane(temp.path(), version, unreleasable);
     let stage_dir = temp.path().join("stage");
     fs::create_dir_all(&stage_dir).expect("stage dir");
-    let release_info = release_info_for("v0.111.0", 1_579_942_752);
+    let release_info = release_info_for("v0.113.0", 1_579_942_752);
 
     let error = stage_release_bridge(
         "test",
@@ -2981,7 +2981,7 @@ fn release_bridge_refuses_a_lane_no_release_covers() {
 fn release_bridge_refuses_when_the_install_build_cannot_be_identified() {
     let temp = tempfile::tempdir().expect("temp dir");
     let version = "9.8.7";
-    seed_release_cache_lane(temp.path(), version, "v107");
+    seed_release_cache_lane(temp.path(), version, "v111");
     let stage_dir = temp.path().join("stage");
     fs::create_dir_all(&stage_dir).expect("stage dir");
     let release_info_path = temp.path().join("release_info.json");
@@ -3009,9 +3009,9 @@ fn release_bridge_refuses_when_the_install_build_cannot_be_identified() {
         message.contains(&release_info_path.display().to_string()),
         "{message}"
     );
-    assert!(message.contains("v107"), "{message}");
+    assert!(message.contains("v111"), "{message}");
 
-    let unmapped_info = release_info_for("v0.999.0", 1);
+    let unmapped_info = release_info_for("v0.100.0", 1);
     let unmapped = stage_release_bridge(
         "test",
         temp.path(),
@@ -3024,7 +3024,7 @@ fn release_bridge_refuses_when_the_install_build_cannot_be_identified() {
     )
     .expect_err("an unmapped game build must refuse");
     assert_eq!(
-        unmapped.payload["error"]["gameVersion"], "v0.999.0",
+        unmapped.payload["error"]["gameVersion"], "v0.100.0",
         "{}",
         unmapped.payload
     );
@@ -3036,7 +3036,7 @@ fn release_bridge_refuses_when_the_install_build_cannot_be_identified() {
         unmapped.payload["error"]["message"]
             .as_str()
             .expect("message")
-            .contains("v0.999.0")
+            .contains("v0.100.0")
     );
 }
 
@@ -3054,7 +3054,7 @@ fn source_bridge_refuses_an_unmapped_build_before_staging_or_msbuild() {
         &temp.path().join("publish"),
         &stage_dir,
         "9.8.7",
-        Some(&release_info_for("v0.999.0", 1)),
+        Some(&release_info_for("v0.100.0", 1)),
         true,
     )
     .expect_err("unmapped builds fail before invoking dotnet");
@@ -3063,7 +3063,7 @@ fn source_bridge_refuses_an_unmapped_build_before_staging_or_msbuild() {
         error.payload["error"]["code"],
         "bridge_release_lane_unresolved"
     );
-    assert_eq!(error.payload["error"]["gameVersion"], "v0.999.0");
+    assert_eq!(error.payload["error"]["gameVersion"], "v0.100.0");
     assert_eq!(
         fs::read_to_string(stage_dir.join("existing")).unwrap(),
         "preserve"
@@ -3077,7 +3077,7 @@ fn source_bridge_refuses_an_unmapped_build_before_staging_or_msbuild() {
     );
     assert_eq!(
         launch_error.payload["error"]["cause"]["gameVersion"],
-        "v0.999.0"
+        "v0.100.0"
     );
     assert!(
         launch_error.payload["error"]["cause"]["message"]
@@ -3113,7 +3113,7 @@ fn release_bridge_rejects_an_archive_whose_manifest_claims_another_lane() {
 
     let stage_dir = temp.path().join("stage");
     fs::create_dir_all(&stage_dir).expect("stage dir");
-    let release_info = release_info_for("v0.107.1", 1_692_500_715);
+    let release_info = release_info_for("v0.111.0", 1_692_500_715);
     let error = stage_release_bridge(
         "test",
         temp.path(),
@@ -3629,7 +3629,7 @@ fn seed_source_bridge(publish: &Path, lane: &str, version: &str) {
 #[test]
 fn bridge_lane_output_paths_are_isolated() {
     let root = Path::new("artifacts/live-bridge");
-    for lane in ["v107", "v111", "v113"] {
+    for lane in ["v111", "v113"] {
         let lane_root = bridge_lane_artifacts_dir(root, lane);
         assert_eq!(
             lane_root.join("host-publish"),
@@ -3642,12 +3642,12 @@ fn bridge_lane_output_paths_are_isolated() {
 #[test]
 fn bridge_lane_source_no_build_refuses_stale_and_missing_metadata() {
     let temp = tempfile::tempdir().unwrap();
-    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.1");
+    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.114.0");
     let target = game_build::read_release_info(&layout.game_path).unwrap();
     let publish = temp.path().join("v113/host-publish");
     let stage = temp.path().join("stage");
     for (lane, version, missing) in [
-        ("v107", "v0.107.1", false),
+        ("v111", "v0.111.0", false),
         ("v113", "v0.113.0", false),
         ("v113", "v0.113.1", true),
     ] {
@@ -3687,7 +3687,7 @@ fn bridge_lane_source_no_build_refuses_stale_and_missing_metadata() {
 fn bridge_lane_source_refuses_different_assemblies_before_build() {
     let temp = tempfile::tempdir().unwrap();
     let mut layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.0");
-    let other = bridge_lane_fixture(&temp.path().join("other"), "v0.107.1");
+    let other = bridge_lane_fixture(&temp.path().join("other"), "v0.111.0");
     layout.assemblies_dir = other.assemblies_dir;
     let target = game_build::read_release_info(&layout.game_path).unwrap();
     let stage = temp.path().join("stage");
@@ -3708,7 +3708,7 @@ fn bridge_lane_source_refuses_different_assemblies_before_build() {
         layout.game_path.to_str().unwrap(),
         layout.assemblies_dir.to_str().unwrap(),
         "v0.113.0",
-        "v0.107.1",
+        "v0.111.0",
     ] {
         assert!(message.contains(value), "{message}");
     }
@@ -3720,10 +3720,11 @@ fn bridge_lane_source_refuses_different_assemblies_before_build() {
 fn bridge_lane_matching_source_publish_stamps_compiled_identity_and_stable_hash() {
     let temp = tempfile::tempdir().unwrap();
     for (lane, version) in [
-        ("v107", "v0.107.1"),
         ("v111", "v0.111.0"),
         ("v113", "v0.113.0"),
         ("v113", "v0.113.1"),
+        ("v113", "v0.114.0"),
+        ("v113", "v0.120.0"),
     ] {
         let layout = bridge_lane_fixture(&temp.path().join(lane), version);
         let target = game_build::read_release_info(&layout.game_path).unwrap();
@@ -3748,6 +3749,14 @@ fn bridge_lane_matching_source_publish_stamps_compiled_identity_and_stable_hash(
             )
             .unwrap();
             assert_eq!(result["sts2ApiLane"], lane);
+            let warnings = result["warnings"].as_array().unwrap();
+            if version == "v0.120.0" {
+                assert_eq!(warnings.len(), 1);
+                assert_eq!(warnings[0]["code"], "untested_game_build");
+                assert_eq!(warnings[0]["apiLane"], lane);
+            } else {
+                assert!(warnings.is_empty());
+            }
             let manifest: Value =
                 serde_json::from_slice(&fs::read(stage.join(BRIDGE_MANIFEST_NAME)).unwrap())
                     .unwrap();
@@ -3774,7 +3783,7 @@ fn bridge_lane_metadata_reader_fails_closed_on_truncation_duplicates_and_nonasse
         assert_eq!(assembly_metadata::read(&dll[..length], key), None);
     }
     assert_eq!(
-        assembly_metadata::read(&bridge_metadata_dll(&[(key, "v107"), (key, "v113")]), key),
+        assembly_metadata::read(&bridge_metadata_dll(&[(key, "v111"), (key, "v113")]), key),
         None
     );
     let mut nonassembly = dll;
@@ -3793,10 +3802,10 @@ fn bridge_lane_deploy_refusal_preserves_existing_mod_and_ignores_shared_publish(
     let mut config = AppConfig::default();
     config.artifacts.dir = temp.path().join("artifacts").display().to_string();
     let root = Path::new(&config.artifacts.dir).join("live-bridge");
-    seed_source_bridge(&root.join("host-publish"), "v107", "v0.107.1");
+    seed_source_bridge(&root.join("host-publish"), "v111", "v0.111.0");
     for stale_lane in [false, true] {
         if stale_lane {
-            seed_source_bridge(&root.join("v113/host-publish"), "v107", "v0.107.1");
+            seed_source_bridge(&root.join("v113/host-publish"), "v111", "v0.111.0");
         }
         let error = deploy_bridge(
             "game install-bridge",
@@ -3818,13 +3827,13 @@ fn bridge_lane_deploy_refusal_preserves_existing_mod_and_ignores_shared_publish(
 #[test]
 fn bridge_lane_matching_deploy_skips_identical_content_and_force_recopies() {
     let temp = tempfile::tempdir().unwrap();
-    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.113.0");
+    let layout = bridge_lane_fixture(&temp.path().join("target"), "v0.114.1");
     let mut config = AppConfig::default();
     config.artifacts.dir = temp.path().join("artifacts").display().to_string();
     seed_source_bridge(
         &Path::new(&config.artifacts.dir).join("live-bridge/v113/host-publish"),
         "v113",
-        "v0.113.0",
+        "v0.114.1",
     );
     for (force, expected, reason) in [
         (false, true, "not_installed"),
@@ -3845,6 +3854,9 @@ fn bridge_lane_matching_deploy_skips_identical_content_and_force_recopies() {
         .unwrap();
         assert_eq!(result["installed"], expected);
         assert_eq!(result["reason"], reason);
+        assert_eq!(result["gameBuild"]["apiLane"], "v113");
+        assert_eq!(result["warnings"][0]["code"], "untested_game_build");
+        assert_eq!(result["warnings"][0]["gameVersion"], "v0.114.1");
         assert!(
             result["build"]["publishDir"]
                 .as_str()

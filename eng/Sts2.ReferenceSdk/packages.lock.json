@@ -4,9 +4,9 @@
     "net9.0": {
       "FuYnAloft.Sts2.References": {
         "type": "Direct",
-        "requested": "[0.107.0-beta, 0.107.0-beta]",
-        "resolved": "0.107.0-beta",
-        "contentHash": "TCGAIrM64/EAXES6eu0f3d+xvDnW+CZIyWO2+vddsoGDMQiFu9wDi1nwgmrqV/Lwh8xio4tYcjY66el7guItnA=="
+        "requested": "[0.111.0-beta, 0.111.0-beta]",
+        "resolved": "0.111.0-beta",
+        "contentHash": "6Wy3jtrdTpPvhhaAeJlIDFQGW8SpGtKdyRodZ9++L5Vqx5pfRLwfVe6imUvCmfb4ryc6VKZiZUu1jehXlQ0gxQ=="
       },
       "GodotSharp": {
         "type": "Direct",

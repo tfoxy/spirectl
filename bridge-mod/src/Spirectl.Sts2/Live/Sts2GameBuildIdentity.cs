@@ -9,7 +9,7 @@ namespace Spirectl.Sts2.Live;
 //
 // Two questions an embedder that keeps anything derived from the game's content has to answer, and neither is
 // answerable from `release_info.json` alone. That file names the BUILD (`version`, `main_assembly_hash`) but its
-// `branch` field is the release tag — "v0.107.1", not "public" — so it cannot tell a stable install from a beta
+// `branch` field is the release tag — "v0.111.1", not "public" — so it cannot tell a stable install from a beta
 // one. The distinction matters because the two branches render different pixels from identical `res://` paths: a
 // cache keyed only on the resource path serves one branch the other's bytes, with no visible cause.
 //

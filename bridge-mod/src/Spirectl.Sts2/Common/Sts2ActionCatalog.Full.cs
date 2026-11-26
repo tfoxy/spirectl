@@ -775,7 +775,8 @@ public static partial class Sts2ActionCatalog
 
         foreach (var potion in activePlayer.Potions ?? [])
         {
-            if (!CanUsePotion("combat", activePlayerId, combat.IsPlayerTurn, potion.OwnerPlayerId)
+            if (!activePlayer.CanRemovePotions
+                || !CanUsePotion("combat", activePlayerId, combat.IsPlayerTurn, potion.OwnerPlayerId)
                 || !potion.Usable)
             {
                 continue;
@@ -837,6 +838,11 @@ public static partial class Sts2ActionCatalog
         string activePlayerId,
         RemoteClientOrchestrationCapabilitySnapshot remoteOrchestration)
     {
+        if (!activePlayer.CanRemovePotions)
+        {
+            return;
+        }
+
         foreach (var potion in activePlayer.Potions ?? [])
         {
             if (!CanUsePotion("combat", activePlayerId, combat.IsPlayerTurn, potion.OwnerPlayerId)

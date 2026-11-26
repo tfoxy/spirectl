@@ -180,6 +180,8 @@ public sealed class BridgeRuntime : IDisposable
             ModelCatalogProvider, ReferenceDataProvider, RuntimeSceneWatcher, StateProvider,
             new EmbeddableRuntimeOptions(LiveSts2HostSupported: true, LiveSts2HostUnsupportedReason: null));
 
+    internal Sts2CompatibilityReport CompatibilityReport { get; set; } = Sts2CompatibilityReport.Process;
+
     public BridgeHandshakeSnapshot DescribeHandshake(BridgeHandshakeRequest request)
     {
         var defaultPerspective = PerspectiveProvider.GetDefaultPerspective();
@@ -238,7 +240,10 @@ public sealed class BridgeRuntime : IDisposable
                         "The current host bridge owns this local player seat and can execute its semantic actions.",
                         Provisional: transport.Provisional)),
             ],
-            SupportedActions: Sts2ActionDescriptorCatalog.Build(playCardImplemented, dangerousMode));
+            SupportedActions: Sts2ActionDescriptorCatalog.Build(playCardImplemented, dangerousMode))
+        {
+            Diagnostic = CompatibilityReport.DescribeDiagnostic(),
+        };
     }
 
     private static BridgeBuildIdentitySnapshot ToHandshakeBuildIdentity(BridgeBuildIdentity identity)

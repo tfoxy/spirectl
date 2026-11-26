@@ -118,7 +118,7 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
 
         var identity = Sts2GameBuildIdentity.Resolve(install);
 
-        Assert.Equal("v0.107.1", identity.Version);
+        Assert.Equal("v0.111.1", identity.Version);
         Assert.Equal(1692500715, identity.MainAssemblyHash);
         Assert.True(identity.HasBranch);
         // Steam is not initialized in a test process, so the Steamworks rung must fall through — not throw —
@@ -242,7 +242,7 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
             _root, "steamapps", "common", "Slay the Spire 2", "SlayTheSpire2.app", "Contents");
         var resources = Path.Combine(contents, "Resources");
         Directory.CreateDirectory(resources);
-        WriteReleaseInfo(resources, "v0.107.1", 1692500715);
+        WriteReleaseInfo(resources, "v0.111.1", 1692500715);
         var modDirectory = Path.Combine(contents, "MacOS", "mods", "couchcoop");
         Directory.CreateDirectory(modDirectory);
 
@@ -251,7 +251,7 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
         // …and from the binary's own directory, which is the rung a Workshop install falls through to.
         Assert.Equal(resources, Sts2GameBuildIdentity.TryWalkToInstallRoot(Path.Combine(contents, "MacOS")));
         // …and what comes back is genuinely readable, which is the whole point of resolving it.
-        Assert.Equal("v0.107.1", Sts2GameBuildIdentity.ResolveContent(resources).Version);
+        Assert.Equal("v0.111.1", Sts2GameBuildIdentity.ResolveContent(resources).Version);
         Assert.Equal(1692500715, Sts2GameBuildIdentity.ResolveContent(resources).MainAssemblyHash);
     }
 
@@ -266,7 +266,7 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
         var resources = Path.Combine(contents, "Resources");
         Directory.CreateDirectory(macOs);
         Directory.CreateDirectory(resources);
-        WriteReleaseInfo(macOs, "v0.107.1", 1692500715);
+        WriteReleaseInfo(macOs, "v0.111.1", 1692500715);
         WriteReleaseInfo(resources, "v0.111.0", 1579942752);
 
         var modDirectory = Path.Combine(macOs, "mods", "couchcoop");
@@ -321,7 +321,7 @@ public sealed class Sts2GameBuildIdentityTests : IDisposable
     private string SeedInstall(
         string installDir,
         string? manifest,
-        string version = "v0.107.1",
+        string version = "v0.111.1",
         int hash = 1692500715)
     {
         var steamApps = Path.Combine(_root, "steamapps");

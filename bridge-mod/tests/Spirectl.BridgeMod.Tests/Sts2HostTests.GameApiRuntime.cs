@@ -5,14 +5,12 @@ using Spirectl.Sts2;
 using Spirectl.Sts2.Core.Actions;
 using Spirectl.Sts2.Core.Logging;
 using Spirectl.Sts2.Core.Perspective;
+using Spirectl.Sts2.Core.Protocol;
+using Spirectl.Sts2.Core.State;
 using Spirectl.Sts2.Live;
 using Spirectl.Sts2.Live.GameApi;
 using Xunit;
-#if STS2_API_V107
-using LobbyPlayer = Sts2Live::MegaCrit.Sts2.Core.Entities.Multiplayer.LobbyPlayer;
-#else
 using LobbyPlayer = Sts2Live::MegaCrit.Sts2.Core.Entities.Multiplayer.StartRunLobbyPlayer;
-#endif
 #if STS2_API_V113
 using CardSelectionScreen = Sts2Live::MegaCrit.Sts2.Core.Nodes.Screens.CardSelection.ICardSelectionScreen;
 #else
@@ -23,6 +21,98 @@ namespace Spirectl.BridgeMod.Tests;
 
 public sealed partial class Sts2HostTests
 {
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(false, "popup")]
+    [InlineData(true, "popup")]
+    [InlineData(true, "targeting")]
+    public void GameApiThrowingPotionPermissionHidesUseAndDiscardActions(bool requiresTarget, string? mode)
+    {
+        var permission = Sts2RuntimeObservationProvider.ResolvePotionPermission(
+            () => throw new MissingMethodException("permission getter changed"));
+        var potion = new PotionStateSnapshot("potion", "Potion", "p1", 0, true, null, ["e1"],
+            RequiresTarget: requiresTarget);
+        var player = new CombatPlayerStateSnapshot("p1", "character", 10, 10, 0, 3, 3, [], [potion],
+            CanRemovePotions: permission);
+        var combat = new CombatStateSnapshot(1, "p1", true, [], [player], [],
+            new Dictionary<string, CombatPlayerStateSnapshot> { ["p1"] = player },
+            Potions: [potion], SelectedPotion: mode is null ? null : new StateSelectedPotionSnapshot(mode, 0));
+
+        Assert.False(player.CanRemovePotions);
+        var actions = Sts2ActionCatalog.CombatActions(combat);
+        Assert.DoesNotContain(actions, action => action.Arguments?.PotionId == potion.Id);
+        var allowed = player with
+        {
+            CanRemovePotions = Sts2RuntimeObservationProvider.ResolvePotionPermission(() => true),
+        };
+        var allowedActions = Sts2ActionCatalog.CombatActions(combat with
+        {
+            Players = [allowed],
+            PlayersById = new Dictionary<string, CombatPlayerStateSnapshot> { ["p1"] = allowed },
+        });
+        Assert.Contains(allowedActions, action => action.Kind == SemanticActionKind.UsePotion);
+        if (mode == "popup")
+        {
+            Assert.Contains(allowedActions, action => action.Kind == SemanticActionKind.DiscardPotion);
+            Assert.Contains(allowedActions, action => action.Kind == (requiresTarget
+                ? SemanticActionKind.StartPotionTargeting : SemanticActionKind.UsePotion));
+        }
+        else if (mode == "targeting")
+        {
+            Assert.Contains(allowedActions, action => action.Kind == SemanticActionKind.SelectTarget);
+        }
+    }
+
+    [Fact]
+    public void GameApiMissingPostfixDependenciesSkipTheirHookFamilies()
+    {
+        (string Family, string[] Members)[] families =
+        [
+            (nameof(Sts2EndTurnReadinessHooks), Sts2EndTurnReadinessHooks.RequiredMembers),
+            (nameof(Sts2SpineAnimationHooks), Sts2SpineAnimationHooks.RequiredMembers),
+        ];
+        foreach (var (family, members) in families)
+        {
+            foreach (var member in members)
+            {
+                var requirement = Assert.Single(GameApiManifest.Requirements.Where(requirement =>
+                    requirement.Describe(includeNote: false).StartsWith(member + "(", StringComparison.Ordinal)));
+                var report = new Sts2CompatibilityReport();
+                report.Record("missing_game_member", requirement.Describe(includeNote: false), "signature changed");
+                var installed = false;
+                new Sts2CompatibilityHookInstaller(report, new InMemoryLogStream()).Install(
+                    family, _ => installed = true, members);
+
+                Assert.False(installed);
+                Assert.Contains(report.Snapshot(), issue => issue.Code == "hook_install_skipped"
+                    && issue.Member == family);
+            }
+        }
+    }
+
+    [Fact]
+    public void GameApiReadinessPostfixPreservesOriginalResultWhenTypedCallsFail()
+    {
+        var postfix = typeof(Sts2EndTurnReadinessHooks).GetMethod("AllPlayersReadyToEndTurnPostfix",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        object?[] arguments = [null, true];
+        postfix.Invoke(null, arguments);
+        Assert.Equal(true, arguments[1]);
+    }
+
+    [Fact]
+    public void GameApiCardUpgradeTargetsResolveEverySupportedInstalledOverload()
+    {
+        var type = typeof(Sts2Live::MegaCrit.Sts2.Core.Models.CardModel);
+        var targets = Sts2CardUpgradeCompatibility.FindTargets(type);
+        Assert.NotEmpty(targets);
+        Assert.All(targets, target => Assert.Equal(typeof(void), target.ReturnType));
+        var expected = type.GetMethods().Where(method => method.Name == "UpgradeInternal"
+            && (method.GetParameters().Length == 0
+                || method.GetParameters() is [var parameter] && parameter.ParameterType == typeof(bool)));
+        Assert.Equal(expected.OrderBy(method => method.ToString()), targets.OrderBy(method => method.ToString()));
+    }
+
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]

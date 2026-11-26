@@ -105,9 +105,8 @@ internal static class CharacterSelectStateBuilder
     /// an early read still sees the stock 4.
     /// </summary>
     /// <remarks>
-    /// No rename fallback. The member is a startup requirement (<see cref="Sts2GameApiProbe"/>), so a build that
-    /// does not expose the cap refuses the bridge instead of quietly sizing every seat limit — admission caps,
-    /// free-slot checks, the host transport's lobby probe — off the stock constant.
+    /// No rename fallback. A missing cap is reported by <see cref="Sts2GameApiProbe"/>; the zero result
+    /// prevents admitting seats against an invented capacity.
     /// </remarks>
     private static int ResolveMaxPlayers(object lobby)
         => StateProjectionValues.ToInt32(Sts2LiveIntrospection.GetMemberValue(lobby, GameApiNames.LobbyMaxPlayers));

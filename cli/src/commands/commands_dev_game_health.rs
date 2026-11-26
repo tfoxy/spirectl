@@ -684,6 +684,21 @@ pub(crate) fn execute_bridge_health_command(
     })
 }
 
+fn bridge_health_report_degradation(mut health: Value) -> Value {
+    if let Some(degraded) = health.pointer("/liveBridge/diagnostic/degraded").cloned() {
+        if health["status"] == "reachable_current"
+            && let Some(issues) = degraded.as_array().filter(|issues| !issues.is_empty())
+        {
+            health["message"] = json!(format!(
+                "Live bridge is reachable and matches the CLI bridge version; runtime compatibility is degraded ({} issue(s)).",
+                issues.len()
+            ));
+        }
+        health["degraded"] = degraded;
+    }
+    health
+}
+
 pub(crate) fn bridge_health_compact_json(full: &Value) -> Value {
     let endpoint = &full["endpoint"];
     let connection = &full["connection"];
@@ -748,6 +763,12 @@ pub(crate) fn bridge_health_compact_json(full: &Value) -> Value {
             .pointer("/compatibility/gameBuild/reason")
             .cloned()
             .unwrap_or(Value::Null);
+    }
+    if let Some(diagnostics) = full.pointer("/compatibility/gameBuild/diagnostics") {
+        compact["bridge"]["gameBuildDiagnostics"] = diagnostics.clone();
+    }
+    if let Some(degraded) = full.pointer("/liveBridge/diagnostic/degraded") {
+        compact["degraded"] = degraded.clone();
     }
     // Carry the full comparison only when it mismatched.
     if full.pointer("/compatibility/gameBuild/status") == Some(&json!("mismatch")) {
@@ -855,7 +876,7 @@ pub(crate) fn bridge_health_json(args: BridgeHealthArgs, context: AppContext<'_>
                     "Live bridge is reachable and matches the CLI bridge version.",
                 )
             };
-            json!({
+            let health = json!({
                 "status": status,
                 "code": code,
                 "message": message,
@@ -872,7 +893,8 @@ pub(crate) fn bridge_health_json(args: BridgeHealthArgs, context: AppContext<'_>
                 "liveBridge": live_bridge_json,
                 "compatibility": { "gameBuild": game_build },
                 "safeNextCommands": bridge_health_next_commands(status)
-            })
+            });
+            bridge_health_report_degradation(health)
         }
         Err(error) => {
             let bridge_code = bridge::bridge_error_code_name(
@@ -1493,6 +1515,13 @@ fn bridge_health_game_build_comparison(
         "knownApiLanes": game_build::api_lanes(),
         "mismatches": mismatches
     });
+    if let Some(mut diagnostic) = install
+        .as_ref()
+        .and_then(|info| game_build::untested_game_build_diagnostic(&info.version))
+    {
+        diagnostic["severity"] = json!("info");
+        result["diagnostics"] = json!([diagnostic]);
+    }
     if status == "unknown" {
         result["reason"] = match install.as_ref() {
             None => json!({
@@ -1807,6 +1836,53 @@ mod game_build_health_tests {
     }
 
     #[test]
+    fn game_build_health_degradation_reaches_full_and_compact_output() {
+        let issues = json!([{
+            "code": "missing_game_member", "member": "type.member", "lane": "v113",
+            "gameBuild": "v0.114.0", "reason": "feature unavailable", "critical": false
+        }]);
+        let health = bridge_health_report_degradation(json!({
+            "status": "reachable_current",
+            "message": "current",
+            "liveBridge": { "diagnostic": { "degraded": issues } }
+        }));
+        assert_eq!(health["status"], "reachable_current");
+        assert!(
+            health["message"]
+                .as_str()
+                .unwrap()
+                .contains("degraded (1 issue(s))")
+        );
+        assert_eq!(health["degraded"], issues);
+        assert_eq!(bridge_health_compact_json(&health)["degraded"], issues);
+    }
+
+    #[test]
+    fn game_build_health_degradation_keeps_mismatch_priority() {
+        let health = bridge_health_report_degradation(json!({
+            "status": "game_version_mismatch", "message": "wrong build",
+            "liveBridge": { "diagnostic": { "degraded": [{ "member": "moved" }] } }
+        }));
+        assert_eq!(health["status"], "game_version_mismatch");
+        assert_eq!(health["message"], "wrong build");
+        assert_eq!(health["degraded"][0]["member"], "moved");
+    }
+
+    #[test]
+    fn game_build_health_older_handshake_omits_degradation() {
+        let health = bridge_health_report_degradation(json!({
+            "status": "reachable_current", "message": "current", "liveBridge": {}
+        }));
+        assert!(health.get("degraded").is_none());
+        assert!(
+            bridge_health_compact_json(&health)
+                .get("degraded")
+                .is_none()
+        );
+        assert_eq!(health["message"], "current");
+    }
+
+    #[test]
     fn game_build_health_explains_an_unidentified_install() {
         let result = bridge_health_game_build_comparison(None, None, &json!({}), None);
         assert_eq!(result["status"], "unknown");
@@ -1824,14 +1900,14 @@ mod game_build_health_tests {
     #[test]
     fn game_build_health_explains_an_unmapped_version_even_when_identity_matches() {
         let result = bridge_health_game_build_comparison(
-            Some(install("v0.999.0")),
+            Some(install("v0.100.0")),
             None,
             &json!({}),
-            Some(&json!({ "gameVersion": "v0.999.0" })),
+            Some(&json!({ "gameVersion": "v0.100.0" })),
         );
         assert_eq!(result["status"], "unknown");
         assert_eq!(result["reason"]["code"], "bridge_release_lane_unresolved");
-        assert_eq!(result["reason"]["gameVersion"], "v0.999.0");
+        assert_eq!(result["reason"]["gameVersion"], "v0.100.0");
         assert!(
             result["reason"]["message"]
                 .as_str()
@@ -1848,9 +1924,50 @@ mod game_build_health_tests {
     }
 
     #[test]
+    fn game_build_health_reports_untested_builds_as_informational() {
+        let result = bridge_health_game_build_comparison(
+            Some(install("v0.120.0")),
+            None,
+            &json!({}),
+            Some(&json!({ "gameVersion": "v0.120.0", "buildIdentity": {
+                "sts2ApiLane": "v113", "builtAgainstGameVersion": "v0.120.0"
+            }})),
+        );
+        assert_eq!(result["status"], "match");
+        assert_eq!(result["mismatches"], json!([]));
+        assert!(result.get("reason").is_none());
+        assert_eq!(result["diagnostics"][0]["code"], "untested_game_build");
+        assert_eq!(result["diagnostics"][0]["severity"], "info");
+        assert_eq!(result["diagnostics"][0]["apiLane"], "v113");
+        let compact = bridge_health_compact_json(&json!({
+            "compatibility": { "gameBuild": result }
+        }));
+        assert_eq!(
+            compact["bridge"]["gameBuildDiagnostics"],
+            result["diagnostics"]
+        );
+    }
+
+    #[test]
+    fn game_build_health_untested_build_keeps_version_and_hash_mismatches() {
+        let result = bridge_health_game_build_comparison(
+            Some(install("v0.114.1")),
+            None,
+            &json!({}),
+            Some(&json!({ "gameVersion": "v0.114.1", "buildIdentity": {
+                "sts2ApiLane": "v113", "builtAgainstGameVersion": "v0.113.0",
+                "builtAgainstMainAssemblyHash": "2"
+            }})),
+        );
+        assert_eq!(result["status"], "mismatch");
+        assert_eq!(result["mismatches"].as_array().unwrap().len(), 2);
+        assert_eq!(result["diagnostics"][0]["code"], "untested_game_build");
+    }
+
+    #[test]
     fn game_build_health_keeps_a_proven_mismatch_ahead_of_an_unknown_lane() {
         let result = bridge_health_game_build_comparison(
-            Some(install("v0.999.0")),
+            Some(install("v0.100.0")),
             None,
             &json!({}),
             Some(&json!({ "gameVersion": "v0.113.0" })),

@@ -29,7 +29,8 @@ assets=(
 
 # One bridge payload per RELEASABLE STS2 API lane, because the bridge binds game
 # members that were renamed between game builds. The lane list comes from
-# bridge-mod/Sts2GameApi.props, never from a copy of it here.
+# bridge-mod/Sts2GameApi.props, never from a copy of it here. Source-only lanes
+# have no release assets and must not be required by this manifest.
 while IFS= read -r lane; do
   assets+=(
     "spirectlbridge-v${version}-${lane}.zip"

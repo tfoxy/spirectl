@@ -1759,7 +1759,7 @@ PY
   rm -f "$output_file"
 }
 
-# The two decompile corpora `reflected-members` compares when none are named: the stable-lane (v107) and
+# The two decompile corpora `reflected-members` compares when none are named: the archived stable-lane (v107) and
 # beta-lane (v111) corpora a CouchCoop checkout keeps under its own .sts2/. The corpora live there because that
 # is where the per-branch `project recover --kind decompile` runs write them; a linked worktree has an EMPTY
 # .sts2/, so the default resolves to the REAL checkout's sibling, not to this working tree's.
@@ -2325,8 +2325,8 @@ build that lacks it. Ordinary output is the script's own report.
 
 Builds. --a and --b each name a decompile corpus (the decompile/ dir, or the toolchain dir holding it) or a
 game assemblies dir; both must be the same kind. Without them the leg compares the two lane corpora a
-CouchCoop checkout keeps: <checkout>/.sts2/toolchain-public/decompile (stable, v107) against
-<checkout>/.sts2/toolchain-public-beta/decompile (beta, v111). The checkout is --couch-root, else
+CouchCoop checkout keeps: <checkout>/.sts2/toolchain-public/decompile (archived stable, v107) against
+<checkout>/.sts2/toolchain-public-beta/decompile (archived beta, v111). The checkout is --couch-root, else
 $SPIRECTL_COUCH_ROOT, else the sibling ../sts2-couch-coop of the real (non-worktree) spirectl checkout.
 
 Source trees. Default is this repo's bridge-mod/src. --root <dir> adds a tree; --no-default-root drops
@@ -2388,7 +2388,7 @@ EOF
       reflected_a="$reflected_home/.sts2/toolchain-public/decompile"
       reflected_b="$reflected_home/.sts2/toolchain-public-beta/decompile"
       reflected_missing=""
-      [[ -d "$reflected_a/sts2" && -d "$reflected_a/GodotSharp" ]] || reflected_missing+=" $reflected_a (stable lane, v107)"
+      [[ -d "$reflected_a/sts2" && -d "$reflected_a/GodotSharp" ]] || reflected_missing+=" $reflected_a (archived stable lane, v107)"
       [[ -d "$reflected_b/sts2" && -d "$reflected_b/GodotSharp" ]] || reflected_missing+=" $reflected_b (beta lane, v111)"
       if [[ -n "$reflected_missing" ]]; then
         reflected_msg="nothing was compared: no game-build pair on this machine. No decompile corpus at:$reflected_missing. To fix: point --couch-root (or SPIRECTL_COUCH_ROOT) at a CouchCoop checkout that has both, name builds with --a/--b, or generate one corpus per build with \`sts2 --config <config> project recover --kind decompile\` (each into its own absolute toolchain.dir). --strict makes this a failure."

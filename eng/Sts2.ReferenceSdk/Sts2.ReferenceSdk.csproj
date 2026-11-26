@@ -11,7 +11,7 @@
     <!-- Build-only inputs. The target below stages the reviewed DLL allowlist. -->
     <PackageReference
       Include="FuYnAloft.Sts2.References"
-      Version="[0.107.0-beta]"
+      Version="[0.111.0-beta]"
       GeneratePathProperty="true"
       PrivateAssets="all"
       ExcludeAssets="all" />

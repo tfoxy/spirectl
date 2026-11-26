@@ -6,20 +6,21 @@
     Rather than fork the bridge per build, the differences are isolated in
     `src/Spirectl.Sts2/GameApi/<lane>/`, and exactly one lane's files are compiled. This file decides which.
 
-    Resolution order (never guess a lane):
+    Resolution order:
       1. an explicit `$(Sts2GameApi)` wins. Packaging and the declaration-only reference SDK build against
          directories that carry no `release_info.json`, so they must pass the lane.
-      2. otherwise detect it: read `$(Sts2AssembliesDir)/../release_info.json` and look its `version` up in
-         the table below.
+      2. otherwise detect it: read `$(Sts2AssembliesDir)/../release_info.json` and select the newest floor at or
+         below its numeric MAJOR.MINOR.PATCH version. Untested builds warn and keep that lane.
       3. otherwise fail the build (`ValidateSts2GameApiLane`), naming the version, this file, and the
          `-p:Sts2GameApi=` escape hatch.
 
     Outputs: `$(Sts2GameApi)` (the lane), `$(Sts2GameVersion)` and `$(Sts2GameMainAssemblyHash)` (the
-    detected game build's identity, both empty when undetectable) and one of the
-    `STS2_API_V107` / `STS2_API_V111` / `STS2_API_V113` compile constants. `Directory.Build.props` stamps all three into
+    detected game build's identity, both empty when undetectable), `$(Sts2GameApiUntested)` and one of the
+    `STS2_API_V111` / `STS2_API_V113` compile constants. `Directory.Build.props` stamps all three into
     the bridge assembly, which is how a loaded bridge can say which build it was compiled for.
 
-    Adding a build: add its `version=lane` row to `Sts2GameApiLaneTable`. Adding a lane: add it to
+    After testing a build: add it to `Sts2GameApiTestedBuilds`. Adding a lane: add its floor to
+    `Sts2GameApiLaneTable`, add its numeric selection below and add it to
     `Sts2GameApiLanes`, create `src/Spirectl.Sts2/GameApi/<lane>/`, and add the lane's `ItemGroup`s to
     `src/Spirectl.Sts2/Spirectl.Sts2.csproj` (plus the alias and host-only adapter links in
     `src/Spirectl.BridgeMod.Sts2Host/Spirectl.BridgeMod.Sts2Host.csproj`).
@@ -31,26 +32,18 @@
     <Sts2GameApiTableFile>$(MSBuildThisFileFullPath)</Sts2GameApiTableFile>
 
     <!-- Every lane that has a `src/Spirectl.Sts2/GameApi/<lane>/` directory, oldest first. -->
-    <Sts2GameApiLanes>v107;v111;v113</Sts2GameApiLanes>
+    <Sts2GameApiLanes>v111;v113</Sts2GameApiLanes>
 
-    <!--
-      THE TABLE. One `<release_info.json version>=<lane>` row per supported game build, semicolon
-      delimited and semicolon fenced at both ends so a row lookup is an exact match on `;<version>=`.
-
-        v0.107.1 -> v107   the stable branch
-        v0.111.0 -> v111   the previous public-beta build
-        v0.113.0 -> v113   the public-beta branch
-        v0.113.1 -> v113   the public-beta patch
-    -->
-    <Sts2GameApiLaneTable>;v0.107.1=v107;v0.111.0=v111;v0.113.0=v113;v0.113.1=v113;</Sts2GameApiLaneTable>
+    <!-- Numeric minimum version per lane, oldest first. Tested builds are reporting only. -->
+    <Sts2GameApiLaneTable>;v0.111.0=v111;v0.113.0=v113;</Sts2GameApiLaneTable>
+    <Sts2GameApiTestedBuilds>v0.111.0;v0.111.1;v0.113.0;v0.113.1;v0.114.0</Sts2GameApiTestedBuilds>
 
     <!--
       THE SUBSET THAT CAN BE RELEASED. A released bridge payload is compiled against the locked,
       declaration-only STS2 reference SDK (`eng/Sts2.ReferenceSdk`), which pins ONE game build's
-      declarations — `FuYnAloft.Sts2.References 0.107.0-beta` today. A lane whose sources need a type or
-      member that package does not declare cannot be built there at all, so it cannot be packaged:
-      `v111`'s `GameApiAliases.cs` needs `StartRunLobbyPlayer`, which the v107 reference package has no
-      declaration for. Verified 2026-09-12: packaging lane v111 fails with CS0234 on that alias.
+      declarations — `FuYnAloft.Sts2.References 0.111.0-beta` today. A lane whose sources need a type or
+      member that package does not declare cannot be built there at all, so it cannot be packaged.
+      Lane `v113` remains source-only until packaging can select its own locked reference package.
       (XML comments cannot carry a double hyphen, so flags are named without one throughout this file.)
 
       So this is a superset relationship, not a duplicate: every releasable lane is a lane, and a lane
@@ -63,7 +56,7 @@
       A non-releasable lane is still fully supported from source: `game install-bridge` detects it and
       builds against the real install.
     -->
-    <Sts2GameApiReleasableLanes>v107</Sts2GameApiReleasableLanes>
+    <Sts2GameApiReleasableLanes>v111</Sts2GameApiReleasableLanes>
   </PropertyGroup>
 
   <!-- (2) Detect the lane from the install the bridge is being compiled against. -->
@@ -75,8 +68,20 @@
          so it is the sharper half of "which build was this compiled against". -->
     <Sts2GameMainAssemblyHash Condition="'$(Sts2GameMainAssemblyHash)' == '' and '$(Sts2GameApiReleaseInfoText)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiReleaseInfoText)', '"main_assembly_hash"[ \t]*:[ \t]*(-?[0-9]+)').Groups[1].Value)</Sts2GameMainAssemblyHash>
 
-    <Sts2GameApiLanePattern Condition="'$(Sts2GameVersion)' != ''">;$([System.Text.RegularExpressions.Regex]::Escape('$(Sts2GameVersion)'))=([^;]+);</Sts2GameApiLanePattern>
-    <Sts2GameApiDetectedLane Condition="'$(Sts2GameApiLanePattern)' != ''">$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiLaneTable)', '$(Sts2GameApiLanePattern)').Groups[1].Value)</Sts2GameApiDetectedLane>
+    <!-- Parse before comparing so malformed versions reach the actionable validation error. -->
+    <Sts2GameApiNumericVersion>$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameVersion)', '^v((0|[1-9][0-9]{0,9})\.(0|[1-9][0-9]{0,9})\.(0|[1-9][0-9]{0,9}))\z').Groups[1].Value)</Sts2GameApiNumericVersion>
+    <!-- System.Version components are signed 32-bit integers. Reject overflow before comparison. -->
+    <Sts2GameApiMajor>$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiNumericVersion)', '^([0-9]+)\.([0-9]+)\.([0-9]+)\z').Groups[1].Value)</Sts2GameApiMajor>
+    <Sts2GameApiMinor>$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiNumericVersion)', '^([0-9]+)\.([0-9]+)\.([0-9]+)\z').Groups[2].Value)</Sts2GameApiMinor>
+    <Sts2GameApiPatch>$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiNumericVersion)', '^([0-9]+)\.([0-9]+)\.([0-9]+)\z').Groups[3].Value)</Sts2GameApiPatch>
+    <Sts2GameApiNumericVersion Condition="'$(Sts2GameApiNumericVersion)' != '' and ('$(Sts2GameApiMajor)' &gt; '2147483647' or '$(Sts2GameApiMinor)' &gt; '2147483647' or '$(Sts2GameApiPatch)' &gt; '2147483647')"></Sts2GameApiNumericVersion>
+    <Sts2GameApiV111Floor>$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiLaneTable)', ';v([^;=]+)=v111;').Groups[1].Value)</Sts2GameApiV111Floor>
+    <Sts2GameApiV113Floor>$([System.Text.RegularExpressions.Regex]::Match('$(Sts2GameApiLaneTable)', ';v([^;=]+)=v113;').Groups[1].Value)</Sts2GameApiV113Floor>
+    <Sts2GameApiDetectedLane Condition="'$(Sts2GameApiNumericVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(Sts2GameApiNumericVersion)', '$(Sts2GameApiV111Floor)'))">v111</Sts2GameApiDetectedLane>
+    <Sts2GameApiDetectedLane Condition="'$(Sts2GameApiNumericVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(Sts2GameApiNumericVersion)', '$(Sts2GameApiV113Floor)'))">v113</Sts2GameApiDetectedLane>
+    <Sts2GameApiTestedBuildFence>;$(Sts2GameApiTestedBuilds);</Sts2GameApiTestedBuildFence>
+    <Sts2GameApiUntested Condition="'$(Sts2GameApiDetectedLane)' != '' and !$(Sts2GameApiTestedBuildFence.Contains(';$(Sts2GameVersion);'))">true</Sts2GameApiUntested>
+    <Sts2GameApiUntested Condition="'$(Sts2GameApiUntested)' == ''">false</Sts2GameApiUntested>
 
     <!-- (1) beats (2): an explicit lane is only overridden by nothing. -->
     <Sts2GameApi Condition="'$(Sts2GameApi)' == ''">$(Sts2GameApiDetectedLane)</Sts2GameApi>
@@ -95,9 +100,6 @@
     <Sts2GameApiLaneIsKnown Condition="'$(Sts2GameApi)' != ''">$(Sts2GameApiLaneFence.Contains(';$(Sts2GameApi);'))</Sts2GameApiLaneIsKnown>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Sts2GameApi)' == 'v107'">
-    <DefineConstants>$(DefineConstants);STS2_API_V107</DefineConstants>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Sts2GameApi)' == 'v111'">
     <DefineConstants>$(DefineConstants);STS2_API_V111</DefineConstants>
   </PropertyGroup>
@@ -107,14 +109,16 @@
   </PropertyGroup>
 
   <!--
-    (3) Refuse rather than guess. Four distinct failures, each with the one thing to change:
-    an unmapped game build, an unreadable/absent release_info.json, an unknown explicit lane, and an
+    (3) Reject builds below the oldest floor or with an unparseable version, an unreadable/absent release_info.json, an unknown explicit lane, and an
     explicit lane that contradicts the install it is being pointed at.
   -->
   <Target Name="ValidateSts2GameApiLane" BeforeTargets="ResolveReferences">
+    <Warning
+      Condition="'$(Sts2GameApiRequired)' == 'true' and '$(Sts2GameApiUntested)' == 'true'"
+      Text="Untested STS2 game build '$(Sts2GameVersion)' uses API lane '$(Sts2GameApi)' selected by the floors in $(Sts2GameApiTableFile). Compatibility has not been verified for this build." />
     <Error
       Condition="'$(Sts2GameApiRequired)' == 'true' and '$(Sts2GameApi)' == '' and '$(Sts2GameVersion)' != ''"
-      Text="STS2 game build '$(Sts2GameVersion)' has no API lane. Add a '$(Sts2GameVersion)=&lt;lane&gt;' row to Sts2GameApiLaneTable in $(Sts2GameApiTableFile) (known lanes: $(Sts2GameApiLanes)), or pass -p:Sts2GameApi=&lt;lane&gt; to pick one explicitly." />
+      Text="STS2 game build '$(Sts2GameVersion)' has no API lane. The version is below the oldest supported floor or is not vMAJOR.MINOR.PATCH. See Sts2GameApiLaneTable in $(Sts2GameApiTableFile) (known lanes: $(Sts2GameApiLanes)), or pass -p:Sts2GameApi=&lt;lane&gt; to pick one explicitly." />
     <Error
       Condition="'$(Sts2GameApiRequired)' == 'true' and '$(Sts2GameApi)' == '' and '$(Sts2GameVersion)' == ''"
       Text="Cannot resolve an STS2 API lane: no readable 'version' in $(Sts2GameApiReleaseInfoPath) (from Sts2AssembliesDir=$(Sts2AssembliesDir)). Pass -p:Sts2GameApi=&lt;lane&gt; (known lanes: $(Sts2GameApiLanes)); the table is in $(Sts2GameApiTableFile)." />

@@ -52,6 +52,7 @@ public sealed partial class BridgeRuntimeProtocolAdapter(BridgeRuntime runtime, 
             Provisional = snapshot.Provisional,
             DefaultPerspective = ToProtoPerspective(snapshot.DefaultPerspective),
             BuildIdentity = ToProtoBridgeBuildIdentity(snapshot.BuildIdentity),
+            Diagnostic = snapshot.Diagnostic is null ? null : ToProtoStruct(snapshot.Diagnostic),
         };
         response.Capabilities.Add(snapshot.Capabilities.Select(ToProtoCapability));
         response.SupportedActions.Add(snapshot.SupportedActions.Select(ToProtoActionDescriptor));

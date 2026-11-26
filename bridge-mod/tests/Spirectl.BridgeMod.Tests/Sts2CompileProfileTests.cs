@@ -204,7 +204,6 @@ public sealed class Sts2CompileProfileTests
     ];
 
     [Theory]
-    [InlineData("V107")]
     [InlineData("V111")]
     [InlineData("V113")]
     public void EmbeddedProfileHasNoExcludedGameApiHelpers(string lane)
@@ -414,18 +413,6 @@ public sealed class Sts2CompileProfileTests
     public static TheoryData<string, string[]> EmbeddedManifestDrops => new()
     {
         {
-            "V107",
-            [
-                "AscensionMember", "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
-                "PlayerCanRemoveOrUsePotions", "ModifyDamage",
-                "PlayerConnected", "PlayerChanged",
-                "CombatPlayersReadyToBeginEnemyTurn",
-                "MainMenuBlurBackstop", ".ctor",
-                "GetLocalInventory", "PurchaseMember", "PurchaseMember", "SmithCountMember",
-                "SingleplayerHolderMember", "MultiplayerHoldersMember", "ActiveHoldersMember",
-            ]
-        },
-        {
             "V111",
             [
                 "AscensionMember", "LobbyMaxPlayers", "LobbyPlayerIds", "LobbyPlayerIds",
@@ -479,7 +466,6 @@ public sealed class Sts2CompileProfileTests
             "SetAnimation", "AddAnimation",
         ];
         Assert.Empty(mustKeep.Where(name => !shared.Contains(name)));
-        if (lane == "V107") Assert.Contains("IsDebugEncounter", shared);
         foreach (var stateOnly in new[] { "LobbyMaxPlayers", "LobbyPlayerIds", "PlayerCanRemoveOrUsePotions", "ModifyDamage" })
         {
             Assert.DoesNotContain(stateOnly, shared);

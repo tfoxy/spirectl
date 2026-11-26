@@ -38,7 +38,10 @@ public sealed record BridgeHandshakeSnapshot(
     bool Provisional,
     PlayerPerspective DefaultPerspective,
     IReadOnlyList<BridgeCapabilitySnapshot> Capabilities,
-    IReadOnlyList<ActionDescriptorSnapshot> SupportedActions);
+    IReadOnlyList<ActionDescriptorSnapshot> SupportedActions)
+{
+    public IReadOnlyDictionary<string, object?>? Diagnostic { get; init; }
+}
 
 public sealed record BridgeTransportSnapshot(
     string TransportKind,

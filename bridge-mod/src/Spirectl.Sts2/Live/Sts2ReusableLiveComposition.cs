@@ -1,6 +1,7 @@
 using Spirectl.Sts2.Core.Actions;
 using Spirectl.Sts2.Core.Logging;
 using Spirectl.Sts2.Core.Perspective;
+using Spirectl.Sts2.Core.Protocol;
 using Spirectl.Sts2.Core.State;
 using Spirectl.Sts2.Live.GameApi;
 
@@ -32,29 +33,32 @@ internal static class Sts2ReusableLiveCompositionFactory
             Sts2MainThreadDispatcher.Capture(Sts2GodotMainThreadPump.Install());
         }
 
-        // Before anything binds to the game: prove the members this build's API lane promises are really
-        // there. A miss throws, because every alternative is a bridge that starts and then reports wrong
-        // numbers — the by-name reader answers null, and the projection turns null into 0/false.
+        // Resolve compatibility first; optional failures leave the rest of the runtime available.
         Sts2GameApiProbe.EnsureCompatible(logStream);
 
-        Sts2MonoModNativeDependencies.EnsureLoaded(logStream);
-        Sts2MultiplayerConnectionHooks.Install(logStream);
-        Sts2SyntheticLobbyNameHooks.Install(logStream);
-        Sts2ChooseACardOverlayHooks.Install(logStream);
-        Sts2RewardsCaptureHooks.Install(logStream);
-        Sts2HandSelectionHooks.Install(logStream);
-        Sts2HostLocalSeatSyncWatcher.Install(logStream);
-        Sts2HostLocalSeatTurnWatcher.Install(logStream);
-        Sts2EndTurnReadinessHooks.Install(logStream);
-        Sts2DamageEventHooks.Install(logStream);
-        Sts2CardUpgradeEventHooks.Install(logStream);
-        Sts2VfxSpawnEventHooks.Install(logStream);
-        Sts2ParticleRestartHooks.Install(logStream);
-        Sts2SpineAnimationHooks.Install(logStream);
-        Sts2TweenRecorderHooks.Install(logStream);
-        Sts2CardFlightHooks.Install(logStream);
-        Sts2DiscardFlightHooks.Install(logStream);
-        Sts2HandHolderHooks.Install(logStream);
+        var hooks = new Sts2CompatibilityHookInstaller(Sts2CompatibilityReport.Process, logStream);
+        hooks.Install(nameof(Sts2MonoModNativeDependencies), log => Sts2MonoModNativeDependencies.EnsureLoaded(log));
+        hooks.Install(nameof(Sts2MultiplayerConnectionHooks), log => Sts2MultiplayerConnectionHooks.Install(log));
+        hooks.Install(nameof(Sts2SyntheticLobbyNameHooks), log => Sts2SyntheticLobbyNameHooks.Install(log));
+        hooks.Install(nameof(Sts2ChooseACardOverlayHooks), log => Sts2ChooseACardOverlayHooks.Install(log));
+        hooks.Install(nameof(Sts2RewardsCaptureHooks), log => Sts2RewardsCaptureHooks.Install(log));
+        hooks.Install(nameof(Sts2HandSelectionHooks), log => Sts2HandSelectionHooks.Install(log));
+        hooks.Install(nameof(Sts2HostLocalSeatSyncWatcher), log => Sts2HostLocalSeatSyncWatcher.Install(log));
+        hooks.Install(nameof(Sts2HostLocalSeatTurnWatcher), log => Sts2HostLocalSeatTurnWatcher.Install(log));
+        hooks.Install(nameof(Sts2EndTurnReadinessHooks), log => Sts2EndTurnReadinessHooks.Install(log),
+            Sts2EndTurnReadinessHooks.RequiredMembers);
+        hooks.Install(nameof(Sts2DamageEventHooks), log => Sts2DamageEventHooks.Install(log));
+        hooks.Install(nameof(Sts2CardUpgradeEventHooks), log => Sts2CardUpgradeEventHooks.Install(log));
+        hooks.Install(nameof(Sts2VfxSpawnEventHooks), log => Sts2VfxSpawnEventHooks.Install(log));
+        hooks.Install(nameof(Sts2ParticleRestartHooks), log => Sts2ParticleRestartHooks.Install(log));
+        hooks.Install(nameof(Sts2SpineAnimationHooks), log => Sts2SpineAnimationHooks.Install(log),
+            Sts2SpineAnimationHooks.RequiredMembers);
+        hooks.Install(nameof(Sts2TweenRecorderHooks), log => Sts2TweenRecorderHooks.Install(log));
+        hooks.Install(nameof(Sts2CardFlightHooks), log => Sts2CardFlightHooks.Install(log));
+        hooks.Install(nameof(Sts2DiscardFlightHooks), log => Sts2DiscardFlightHooks.Install(log));
+        hooks.Install(nameof(Sts2HandHolderHooks), log => Sts2HandHolderHooks.Install(log));
+
+        Sts2CompatibilityReport.Process.WriteStartupSummary(logStream);
 
         var screen = new Sts2ScreenLocator();
         var perspective = new DefaultPerspectiveProvider();

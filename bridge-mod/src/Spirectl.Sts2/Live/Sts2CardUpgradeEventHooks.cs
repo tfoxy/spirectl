@@ -14,15 +14,14 @@ namespace Spirectl.Sts2.Live;
 /// is gated on <c>CombatManager.IsInProgress</c> so out-of-combat upgrades (rest-site smith,
 /// card-reward upgrades) are not streamed.
 ///
-/// The relic that drove the upgrade is not available at <c>UpgradeInternal</c> (it takes no
-/// args), so <c>source_relic_model_id</c> is left empty by the live hook; a fixture authors it
-/// directly into <c>StateCombatState.transient_effects</c>. The hook runs on the game thread;
+/// The relic that drove the upgrade is not available at <c>UpgradeInternal</c>, so
+/// <c>source_relic_model_id</c> is left empty by the live hook; a fixture authors it directly into <c>StateCombatState.transient_effects</c>. The hook runs on the game thread;
 /// publishing is non-blocking. The bridge never populates <c>transient_effects</c> — a host
 /// synthesizes those from this stream.
 /// </summary>
 internal static class Sts2CardUpgradeEventHooks
 {
-    private static readonly object Sync = new();
+    private static readonly System.Threading.Lock Sync = new();
     private static bool _installed;
 
     // Snapshot/preview code calls CardModel.UpgradeInternal on THROWAWAY CLONES every capture (to
@@ -62,25 +61,26 @@ internal static class Sts2CardUpgradeEventHooks
             // Arm the subscriber gate every capture postfix in this file early-outs on.
             Sts2CombatEventCapture.EnsureArmed();
 
-            var target = typeof(CardModel).GetMethod(
-                nameof(CardModel.UpgradeInternal),
-                BindingFlags.Public | BindingFlags.Instance);
-            var postfix = typeof(Sts2CardUpgradeEventHooks).GetMethod(
-                nameof(UpgradeInternalPostfix),
-                BindingFlags.NonPublic | BindingFlags.Static);
-            if (target is null || postfix is null)
-            {
-                logStream.Write(
-                    BridgeLogLevel.Warn,
-                    "bridge.combat.card-upgrade-events",
-                    "Unable to install card-upgrade-event hook; CardModel.UpgradeInternal was not found.");
-                return;
-            }
-
             try
             {
+                var targets = Sts2CardUpgradeCompatibility.FindTargets(typeof(CardModel));
+                var postfix = typeof(Sts2CardUpgradeEventHooks).GetMethod(
+                    nameof(UpgradeInternalPostfix),
+                    BindingFlags.NonPublic | BindingFlags.Static);
+                if (targets.Count == 0 || postfix is null)
+                {
+                    logStream.Write(
+                        BridgeLogLevel.Warn,
+                        "bridge.combat.card-upgrade-events",
+                        "Unable to install card-upgrade-event hook; no supported upgrade signature was found.");
+                    return;
+                }
+
                 var harmony = new Harmony("spirectl.combat-card-upgrade-events");
-                harmony.Patch(target, postfix: new HarmonyMethod(postfix));
+                foreach (var target in targets)
+                {
+                    harmony.Patch(target, postfix: new HarmonyMethod(postfix));
+                }
             }
             catch (Exception ex)
             {

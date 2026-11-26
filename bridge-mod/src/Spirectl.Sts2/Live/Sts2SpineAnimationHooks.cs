@@ -40,7 +40,13 @@ namespace Spirectl.Sts2.Live;
 /// </summary>
 internal static class Sts2SpineAnimationHooks
 {
-    private static readonly object Sync = new();
+    internal static readonly string[] RequiredMembers =
+    [
+        "MegaCrit.Sts2.Core.Bindings.MegaSpine.MegaAnimationState.GetCurrent",
+        "MegaCrit.Sts2.Core.Animation.AnimState.GetNextState",
+    ];
+
+    private static readonly System.Threading.Lock Sync = new();
     private static bool _installed;
 
     // The private CreatureAnimator field holding the MegaSprite whose SpineSprite node this animator drives.
@@ -248,10 +254,7 @@ internal static class Sts2SpineAnimationHooks
             "MegaAnimationState.SetAnimation")
             ? 1
             : 0;
-        // Every queue entry point THIS game build routes a queued clip through (see
-        // GameApiSpine.QueueAnimationTargets). One on v107; v111 splits tracked/untracked and sends a looping
-        // return — the idle a one-shot hands back to — through the tracked one, so patching a single overload
-        // there would miss exactly the transition this hook exists to observe.
+        // Observe every queue entry point exposed by this lane so clip transitions stay complete.
         var queueTargets = GameApiSpine.QueueAnimationTargets();
         foreach (var (description, target) in queueTargets)
         {

@@ -1,28 +1,23 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using Spirectl.Sts2.Core.Logging;
+using Spirectl.Sts2.Core.Protocol;
 using Spirectl.Sts2.Live.GameApi;
 
 namespace Spirectl.Sts2.Live;
 
-/// <summary>
-/// Makes multi-seat single-machine combats respect per-seat end-turn readiness.
-///
-/// The game's <c>CombatManager.AllPlayersReadyToEndTurn()</c> computes the per-player
-/// ready count but ignores it whenever <c>RunManager.IsSinglePlayerOrFakeMultiplayer</c>
-/// (NetGameType.Singleplayer) — it returns <c>true</c> unconditionally, so the FIRST seat
-/// that calls <c>SetReadyToEndTurn</c> resolves the whole turn for everyone. That breaks
-/// host-local couch-coop seats and multi-player fixtures, where one seat must be able to
-/// sit in "ready, waiting on allies".
-///
-/// This postfix mirrors the game's own real-multiplayer branch when the combat has more
-/// than one player: all players must be ready AND the current side must still be Player.
-/// Solo combats (one player) keep the vanilla behavior untouched.
-/// </summary>
+/// <summary>Preserves per-seat end-turn readiness without disrupting the game's own predicate.</summary>
 internal static class Sts2EndTurnReadinessHooks
 {
-    private static readonly object Sync = new();
+    internal static readonly string[] RequiredMembers =
+    [
+        "MegaCrit.Sts2.Core.Combat.CombatManager.AllPlayersReadyToEndTurn",
+        "MegaCrit.Sts2.Core.Combat.CombatManager.IsPlayerReadyToEndTurn",
+    ];
+
+    private static readonly System.Threading.Lock Sync = new();
     private static bool _installed;
 
     public static bool IsInstalled
@@ -90,6 +85,23 @@ internal static class Sts2EndTurnReadinessHooks
             return;
         }
 
+        try
+        {
+            var result = __result;
+            UpdateReadiness(__instance, ref result);
+            __result = result;
+        }
+        catch (Exception exception)
+        {
+            Sts2CompatibilityReport.Process.Record("hook_runtime_failed", nameof(Sts2EndTurnReadinessHooks),
+                $"End-turn readiness unavailable: {exception.GetType().Name}: {exception.Message}");
+        }
+    }
+
+    // Keep JIT failures for typed game calls inside the caller's exception boundary.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void UpdateReadiness(CombatManager __instance, ref bool __result)
+    {
         var state = __instance.DebugOnlyGetState();
         var players = state?.Players;
         if (players is null || players.Count <= 1)

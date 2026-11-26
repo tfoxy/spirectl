@@ -55,7 +55,7 @@ expect_no_out() { # expect_no_out <desc> <fixed string>
 
 # Source trees: one reads through the four readers (with one wrapped call, one nested under a lane seam
 # directory that must be excluded), one is a CouchCoop-shaped tree.
-mkdir -p "$TMP/src/Pkg/GameApi/V107" "$TMP/couch/src/Patches"
+mkdir -p "$TMP/src/Pkg/GameApi/V111" "$TMP/couch/src/Patches"
 cat > "$TMP/src/Pkg/Reads.cs" <<'EOF'
 class Reads
 {
@@ -70,7 +70,7 @@ class Reads
     }
 }
 EOF
-cat > "$TMP/src/Pkg/GameApi/V107/Seam.cs" <<'EOF'
+cat > "$TMP/src/Pkg/GameApi/V111/Seam.cs" <<'EOF'
 class Seam { object Go(object n) => Sts2LiveIntrospection.GetMemberValue(n, "LaneOnlyName"); }
 EOF
 cat > "$TMP/couch/src/Patches/Patch.cs" <<'EOF'
@@ -171,7 +171,7 @@ expect_out  'the zero is reported' 'swept 0 by-name member reads under couch src
 echo "== spirectl's own tree is the default =="
 expect_exit 'default root sweeps bridge-mod/src (names absent from the fixtures are info only)' 0 \
   "$SCRIPT" "$TMP/corpus-a/decompile" "$TMP/corpus-clean-b/decompile"
-if printf '%s' "$out" | grep -Eq 'swept [1-9][0-9]* by-name member reads under spirectl bridge-mod/src'; then pass=$((pass+1)); else
+if grep -Eq 'swept [1-9][0-9]* by-name member reads under spirectl bridge-mod/src' <<<"$out"; then pass=$((pass+1)); else
   fail=$((fail+1)); echo 'FAIL  the default root found no by-name reads under bridge-mod/src' >&2; fi
 
 echo "== refusals: 2 =="

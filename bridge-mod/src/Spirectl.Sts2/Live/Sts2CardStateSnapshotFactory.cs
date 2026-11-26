@@ -110,7 +110,7 @@ internal static class Sts2CardStateSnapshotFactory
     {
         if (card is null)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         try
@@ -131,7 +131,7 @@ internal static class Sts2CardStateSnapshotFactory
         }
         catch
         {
-            return Array.Empty<string>();
+            return [];
         }
     }
 
@@ -244,9 +244,7 @@ internal static class Sts2CardStateSnapshotFactory
 #endif
         try
         {
-            clone.GetType()
-                .GetMethod("UpgradeInternal", BindingFlags.Public | BindingFlags.Instance)?
-                .Invoke(clone, []);
+            Sts2CardUpgradeCompatibility.UpgradePreview(clone);
         }
         finally
         {

@@ -60,7 +60,7 @@ jobs:
           dotnet pack bridge-mod/src/Spirectl.Sts2/Spirectl.Sts2.csproj
           --configuration Release --output dist/nuget
           -m:1 -p:Sts2AssembliesDir="$PWD/artifacts/reference-sdk"
-          -p:EnableSts2LiveHost=true -p:Sts2GameApi=v107
+          -p:EnableSts2LiveHost=true -p:Sts2GameApi=v111
           -p:Version='${{ needs.metadata.outputs.version }}'
           -p:ContinuousIntegrationBuild=true -p:DebugSymbols=false -p:DebugType=None
       - name: Verify NuGet payload excludes game references

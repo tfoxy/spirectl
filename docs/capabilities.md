@@ -14,8 +14,18 @@ What `spirectl` can do today, grouped by area. Each line points at the doc with 
 - Bounded graceful shutdown (`sts2 game close`) and an explicit force path (`sts2 game kill`).
 - `sts2 game bridge-health` is the read-only preflight: it distinguishes missing, stale, timed-out, version-mismatched
   and wrong-game-build bridges without mutating anything. `sts2 dev visual-preflight` adds lifecycle and artifact checks.
-- Source builds select API lanes `v107` (v0.107.1), `v111` (v0.111.0), and `v113` (v0.113.0, v0.113.1).
-  Released bridge payloads currently cover `v107`; the beta lanes require a source checkout.
+- Builds and bridge installation select the newest API lane floor at or below the game version:
+  `v111` from v0.111.0 and `v113` from v0.113.0. Untested versions use that lane with a warning;
+  `bridge-health` reports `untested_game_build` as information. Tested builds are v0.111.0, v0.111.1,
+  v0.113.0, v0.113.1 and v0.114.0. Versions below the oldest floor or with an unparseable version still refuse.
+  Released bridge payloads currently cover `v111`; lane `v113` requires a source checkout.
+- Runtime compatibility failures degrade affected behavior while the remaining bridge starts. Missing
+  non-critical members, reflected method signature drift and failed hook families are retained in one
+  process-wide report, logged under `bridge.game-api`, and exposed in the handshake's
+  `diagnostic.degraded` and `game bridge-health`'s `degraded` list. Only explicitly critical missing members
+  refuse startup; none are currently marked critical. An unloadable manifest skips all hook families;
+  known missing postfix dependencies skip their family. Missing potion permissions hide use and discard
+  actions. Optional method-name probes do not mark an absent name as degraded.
 - Live transport over Unix-domain sockets, Windows named pipes, or loopback TCP. See [CLI](cli.md).
 
 ## Runtime state

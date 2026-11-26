@@ -56,6 +56,7 @@
     <Compile Include="*.cs" />
     <Compile Include="Common/**/*.cs" />
     <Compile Include="Core/**/*.cs" />
+    <Compile Include="GameApi/Sts2GameApiRequirements.cs" />
     <Compile Include="Embedding/**/*.cs" />
     <Compile Include="Live/EncounterVisuals/Sts2EncounterVisualCatalog.cs" />
     <Compile Include="Live/EncounterVisuals/Sts2EncounterVisualEventStore.cs" />
@@ -70,6 +71,7 @@
          copy was built for — it answers null in a lane with no game behind it. -->
     <Compile Include="Live/Sts2ScreenContext.cs" />
     <Compile Include="Live/Sts2CardStateSnapshotFactory.cs" />
+    <Compile Include="Live/Sts2CardUpgradeCompatibility.cs" />
     <Compile Include="Live/Sts2SelectedCardViewState.cs" />
     <Compile Include="Live/Sts2RewardsOverlayInspector.cs" />
     <!-- Godot-free GodotSceneState DTOs + encoding helpers: always compiled (no Godot
@@ -482,12 +484,9 @@
        hand-maintained Exclude mirror; a new subtree there would have to be added to that mirror twice.
        Exactly one lane's directory compiles, chosen by $(Sts2GameApi) (see ../../Sts2GameApi.props). -->
   <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true'">
-    <Compile Include="GameApi/*.cs" />
+    <Compile Include="GameApi/*.cs" Exclude="GameApi/Sts2GameApiRequirements.cs" />
   </ItemGroup>
   <!-- Fixture lane adapters compile only in Spirectl.BridgeMod.Sts2Host. -->
-  <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v107'">
-    <Compile Include="GameApi/V107/**/*.cs" Exclude="GameApi/V107/GameApiFixtures.cs" />
-  </ItemGroup>
   <ItemGroup Condition="'$(EnableSts2LiveHost)' == 'true' and '$(Sts2GameApi)' == 'v111'">
     <Compile Include="GameApi/V111/**/*.cs" Exclude="GameApi/V111/GameApiFixtures.cs" />
   </ItemGroup>
