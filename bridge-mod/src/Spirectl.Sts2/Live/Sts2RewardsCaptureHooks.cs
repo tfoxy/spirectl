@@ -6,14 +6,8 @@ using Spirectl.Sts2.Core.Logging;
 
 namespace Spirectl.Sts2.Live;
 
-// Captures every NON-host host-local seat's generated RewardsSet so the browser can see + commit its
-// rewards. RewardsSet.Offer early-returns at `if (!LocalContext.IsMe(Player)) return;` for non-local
-// players, so the host never builds NRewardsScreen buttons for them — but GenerateWithoutOffering()
-// runs first (and is called per seat by the fixture loader / any per-seat offering), fully populating
-// Rewards with no screen and no LocalContext. We postfix it, and for a host-local seat that is NOT the
-// local "me", stash the live Rewards in Sts2RewardCaptureRegistry (which registers the surfaced overlay).
-// The host's own seat keeps its native screen path (we skip netId == localNetId). Real remote peers are
-// not host-local seats, so they're skipped too. Mirrors Sts2ChooseACardOverlayHooks.
+// Captures completed rewards for host-local seats without a native rewards screen. The host's own
+// seat keeps its native screen, and real remote peers keep their client-owned rewards.
 internal static class Sts2RewardsCaptureHooks
 {
     private static readonly object Sync = new();
@@ -36,15 +30,14 @@ internal static class Sts2RewardsCaptureHooks
                 binder: null,
                 types: Type.EmptyTypes,
                 modifiers: null);
-            var postfix = typeof(Sts2RewardsCaptureHooks).GetMethod(
-                nameof(RegisterGeneratedRewardsPostfix),
-                BindingFlags.NonPublic | BindingFlags.Static);
+            var postfix = target is null ? null : ResolvePostfix(target.ReturnType);
             if (target is null || postfix is null)
             {
                 logStream.Write(
                     BridgeLogLevel.Warn,
                     "bridge.state.rewards",
-                    "Unable to install reward-capture hook; RewardsSet.GenerateWithoutOffering was not found.");
+                    "Unable to install reward-capture hook; RewardsSet.GenerateWithoutOffering "
+                        + $"has a missing or unsupported signature (return type: {target?.ReturnType}).");
                 return;
             }
 
@@ -65,9 +58,27 @@ internal static class Sts2RewardsCaptureHooks
         }
     }
 
-    private static void RegisterGeneratedRewardsPostfix(RewardsSet __instance, Task<List<Reward>> __result)
+    internal static MethodInfo? ResolvePostfix(Type returnType)
     {
-        var netId = __instance.Player.NetId;
+        var name = returnType == typeof(Task<List<Reward>>)
+            ? nameof(RegisterGeneratedRewardsPostfix)
+            : returnType == typeof(Task)
+                ? nameof(RegisterGeneratedRewardsTaskPostfix)
+                : null;
+        return name is null ? null : typeof(Sts2RewardsCaptureHooks).GetMethod(
+            name, BindingFlags.NonPublic | BindingFlags.Static);
+    }
+
+    private static void RegisterGeneratedRewardsPostfix(RewardsSet __instance, Task<List<Reward>> __result)
+        => RegisterGeneratedRewards(__instance, __result, () => __result.Result);
+
+    private static void RegisterGeneratedRewardsTaskPostfix(RewardsSet __instance, Task __result)
+        => RegisterGeneratedRewards(__instance, __result, () => __instance.Rewards);
+
+    private static void RegisterGeneratedRewards(
+        RewardsSet rewardsSet, Task generation, Func<IReadOnlyList<Reward>> resolveRewards)
+    {
+        var netId = rewardsSet.Player.NetId;
         var localNetId = ToUInt64(Sts2LiveIntrospection.GetMemberValue(RunManager.Instance?.NetService, "NetId"));
 
         // Only non-host host-local (couch) seats: the host's own seat keeps its native NRewardsScreen,
@@ -79,10 +90,10 @@ internal static class Sts2RewardsCaptureHooks
         }
 
         var playerId = $"p:{netId}";
-        _ = __result.ContinueWith(
+        _ = generation.ContinueWith(
             task =>
             {
-                if (task.Status == TaskStatus.RanToCompletion && task.Result is { Count: > 0 } rewards)
+                if (task.Status == TaskStatus.RanToCompletion && resolveRewards() is { Count: > 0 } rewards)
                 {
                     Sts2RewardCaptureRegistry.Capture(playerId, netId, rewards);
                 }
